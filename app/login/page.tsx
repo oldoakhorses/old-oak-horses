@@ -5,10 +5,13 @@ import { useRouter } from "next/navigation";
 import { useAuthActions } from "@convex-dev/auth/react";
 import styles from "./login.module.css";
 
+type AuthMode = "signIn" | "signUp";
+
 export default function LoginPage() {
   const router = useRouter();
   const { signIn } = useAuthActions();
 
+  const [mode, setMode] = useState<AuthMode>("signIn");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -21,7 +24,7 @@ export default function LoginPage() {
 
     try {
       const formData = new FormData();
-      formData.set("flow", "signIn");
+      formData.set("flow", mode);
       formData.set("email", email);
       formData.set("password", password);
 
@@ -77,12 +80,40 @@ export default function LoginPage() {
             </div>
 
             <button className={styles.button} type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Signing in..." : "Sign in"}
+              {isSubmitting ? (mode === "signIn" ? "Signing in..." : "Creating account...") : mode === "signIn" ? "Sign in" : "Create account"}
             </button>
 
-            <a className={styles.forgot} href="#">
-              Forgot password?
-            </a>
+            <div className={styles.switchRow}>
+              <button
+                className={styles.switchButton}
+                type="button"
+                onClick={() => {
+                  setMode("signIn");
+                  setErrorMessage("");
+                }}
+                disabled={mode === "signIn" || isSubmitting}
+              >
+                Sign in
+              </button>
+              <span className={styles.switchDivider}>|</span>
+              <button
+                className={styles.switchButton}
+                type="button"
+                onClick={() => {
+                  setMode("signUp");
+                  setErrorMessage("");
+                }}
+                disabled={mode === "signUp" || isSubmitting}
+              >
+                Create account
+              </button>
+            </div>
+
+            {mode === "signIn" ? (
+              <a className={styles.forgot} href="#">
+                Forgot password?
+              </a>
+            ) : null}
 
             {errorMessage ? <p className={styles.error}>{errorMessage}</p> : null}
           </form>

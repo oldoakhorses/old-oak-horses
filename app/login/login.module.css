@@ -87,9 +87,37 @@
   cursor: not-allowed;
 }
 
+.switchRow {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.switchButton {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #888;
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.switchButton:disabled {
+  color: #1c1c1c;
+  cursor: default;
+}
+
+.switchDivider {
+  color: #c8c8c8;
+  font-size: 11px;
+}
+
 .forgot {
   display: inline-block;
-  margin-top: 12px;
+  margin-top: 8px;
   float: right;
   color: #bbb;
   font-family: "DM Sans", sans-serif;
