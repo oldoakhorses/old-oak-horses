@@ -87,42 +87,36 @@
   cursor: not-allowed;
 }
 
-.switchRow {
-  margin-top: 12px;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 8px;
-}
-
-.switchButton {
-  background: none;
+.forgot {
+  display: block;
+  width: max-content;
+  margin-top: 8px;
+  margin-left: auto;
+  color: #bbb;
+  background: transparent;
   border: 0;
   padding: 0;
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.backLink {
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: #888;
   font-family: "DM Sans", sans-serif;
   font-size: 12px;
   cursor: pointer;
 }
 
-.switchButton:disabled {
-  color: #1c1c1c;
-  cursor: default;
-}
-
-.switchDivider {
-  color: #c8c8c8;
-  font-size: 11px;
-}
-
-.forgot {
-  display: inline-block;
-  margin-top: 8px;
-  float: right;
-  color: #bbb;
-  font-family: "DM Sans", sans-serif;
-  font-size: 12px;
-  text-decoration: none;
+.info {
+  margin-top: 14px;
+  color: #166534;
+  font-size: 13px;
 }
 
 .error {
