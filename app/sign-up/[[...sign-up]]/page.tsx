@@ -1,9 +1,8 @@
-import { SignUp } from "@clerk/nextjs";
-
 export default function SignUpPage() {
   return (
     <div className="panel" style={{ maxWidth: 420, margin: "40px auto" }}>
-      <SignUp />
+      <h2 style={{ marginTop: 0 }}>Authentication Disabled</h2>
+      <p>This deployment is running without Clerk authentication.</p>
     </div>
   );
 }
