@@ -1,0 +1,133 @@
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,600&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500;600&display=swap");
+
+:root {
+  --bg-page: #f7f6f3;
+  --bg-card: #ffffff;
+  --bg-subtle: #fafaf8;
+  --bg-dark: #1c1c1c;
+  --bg-dark-2: #2a2a2a;
+  --text-primary: #1c1c1c;
+  --text-secondary: #444444;
+  --text-muted: #888888;
+  --text-faint: #bbbbbb;
+  --text-on-dark: #ffffff;
+  --border-light: #f0ede8;
+  --border-card: #edeae4;
+  --accent: #ffffff;
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: "DM Sans", sans-serif;
+  background: var(--bg-page);
+}
+
+a {
+  color: inherit;
+}
+
+.container {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.card {
+  background: var(--bg-card);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+  padding: 28px 32px;
+  margin-bottom: 20px;
+}
+
+.section-label {
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #1c1c1c;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+input,
+select,
+button {
+  font: inherit;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-card);
+  background: #fff;
+  font-family: "DM Sans", sans-serif;
+}
+
+button {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #fff;
+  color: var(--text-primary);
+  border-color: var(--border-card);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--bg-page);
+  padding: 10px 8px;
+  text-align: left;
+}
+
+tbody tr:hover {
+  background: var(--bg-subtle);
+}
+
+.invoice-row:hover {
+  background: var(--bg-subtle) !important;
+}
+
+th {
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #bbb;
+}
+
+small {
+  color: var(--text-muted);
+}
