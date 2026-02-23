@@ -33,12 +33,12 @@ const SUBCATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function ReportsPage() {
-  const bills = useQuery(api.bills.listAll) ?? [];
+  const bills: any[] = useQuery(api.bills.listAll) ?? [];
   const [selectedBillId, setSelectedBillId] = useState<string>("");
 
   const vetBills = useMemo(
     () =>
-      bills.filter((bill) => {
+      bills.filter((bill: any) => {
         const extracted = bill.extractedData as ParsedInvoice | undefined;
         return (
           bill.categoryName === "Veterinary" &&
@@ -55,12 +55,12 @@ export default function ReportsPage() {
       setSelectedBillId(vetBills[0]._id);
       return;
     }
-    if (selectedBillId && !vetBills.some((bill) => bill._id === selectedBillId)) {
+    if (selectedBillId && !vetBills.some((bill: any) => bill._id === selectedBillId)) {
       setSelectedBillId("");
     }
   }, [selectedBillId, vetBills]);
 
-  const selectedBill = vetBills.find((bill) => bill._id === selectedBillId);
+  const selectedBill = vetBills.find((bill: any) => bill._id === selectedBillId);
   const extracted = (selectedBill?.extractedData ?? {}) as ParsedInvoice;
   const lineItems = useMemo(() => sanitizeLineItems(extracted.line_items), [extracted.line_items]);
 
@@ -119,7 +119,7 @@ export default function ReportsPage() {
           <label htmlFor="bill">Invoice</label>
           <select id="bill" value={selectedBillId} onChange={(e) => setSelectedBillId(e.target.value)}>
             <option value="">Select a veterinary bill</option>
-            {vetBills.map((bill) => {
+            {vetBills.map((bill: any) => {
               const invoice = bill.extractedData as ParsedInvoice;
               const invoiceLabel = invoice.invoice_number ? `Invoice ${invoice.invoice_number}` : "Invoice";
               return (

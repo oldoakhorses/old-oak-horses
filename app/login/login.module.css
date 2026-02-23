@@ -1,0 +1,129 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  background: #f7f6f3;
+}
+
+.left {
+  width: 40%;
+  min-width: 420px;
+  background: #f7f6f3;
+  display: flex;
+  align-items: center;
+  padding: 0 56px;
+}
+
+.formWrap {
+  width: 100%;
+  max-width: 460px;
+}
+
+.title {
+  margin: 0;
+  color: #1c1c1c;
+  font-family: "Playfair Display", serif;
+  font-size: 34px;
+  font-weight: 700;
+}
+
+.title em {
+  font-style: italic;
+  font-weight: 600;
+}
+
+.form {
+  margin-top: 56px;
+}
+
+.field {
+  margin-bottom: 22px;
+}
+
+.label {
+  display: block;
+  margin-bottom: 8px;
+  color: #999;
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.input {
+  width: 100%;
+  background: #fafaf8;
+  border: 1.5px solid #e8e4de;
+  border-radius: 8px;
+  padding: 13px 16px;
+  color: #1c1c1c;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.input:focus {
+  border-color: #1c1c1c;
+  box-shadow: 0 0 0 3px rgba(28, 28, 28, 0.08);
+}
+
+.button {
+  width: 100%;
+  margin-top: 6px;
+  border: 0;
+  border-radius: 8px;
+  padding: 13px 16px;
+  background: #1c1c1c;
+  color: #fff;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.forgot {
+  display: inline-block;
+  margin-top: 12px;
+  float: right;
+  color: #bbb;
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.error {
+  margin-top: 14px;
+  color: #b42318;
+  font-size: 13px;
+}
+
+.right {
+  flex: 1;
+  background-image: url("/ben_abudhabi2.jpg");
+  background-size: cover;
+  background-position: center 25%;
+  background-repeat: no-repeat;
+}
+
+@media (max-width: 960px) {
+  .page {
+    display: block;
+  }
+
+  .left {
+    width: 100%;
+    min-width: 0;
+    min-height: 100vh;
+    padding: 40px 24px;
+  }
+
+  .right {
+    display: none;
+  }
+}

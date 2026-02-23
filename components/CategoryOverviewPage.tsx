@@ -66,12 +66,15 @@ export default function CategoryOverviewPage({
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [search, setSearch] = useState("");
 
-  const providers = useQuery(api.providers.getProvidersByCategory, { categoryId }) ?? [];
-  const bills = useQuery(api.bills.getBillsByCategory, { categoryId }) ?? [];
+  const providers: any[] = useQuery(api.providers.getProvidersByCategory, { categoryId }) ?? [];
+  const bills: any[] = useQuery(api.bills.getBillsByCategory, { categoryId }) ?? [];
 
-  const providerById = useMemo(() => new Map(providers.map((provider) => [provider._id, provider])), [providers]);
+  const providerById = useMemo(() => new Map(providers.map((provider: any) => [provider._id, provider])), [providers]);
 
-  const allParsedBills = useMemo(() => bills.map((bill) => toParsedBill(bill)).sort((a, b) => b.invoiceDateMs - a.invoiceDateMs), [bills]);
+  const allParsedBills = useMemo(
+    () => bills.map((bill: any) => toParsedBill(bill)).sort((a: ParsedBill, b: ParsedBill) => b.invoiceDateMs - a.invoiceDateMs),
+    [bills]
+  );
 
   const availableYears = useMemo(() => {
     const years = new Set<number>();
@@ -105,14 +108,14 @@ export default function CategoryOverviewPage({
     const term = search.trim().toLowerCase();
     if (!term) return allParsedBills;
 
-    return allParsedBills.filter(({ bill, extracted, lineItems }) => {
+    return allParsedBills.filter(({ bill, extracted, lineItems }: ParsedBill) => {
       const providerName = providerById.get(bill.providerId)?.name ?? "";
       const haystack = [
         providerName,
         extracted.invoice_number ?? "",
         extracted.invoice_date ?? "",
         bill.fileName ?? "",
-        ...lineItems.flatMap((line) => [line.horse_name ?? "", line.description ?? "", line.vet_subcategory ?? "", line.date ?? ""])
+        ...lineItems.flatMap((line: ParsedLineItem) => [line.horse_name ?? "", line.description ?? "", line.vet_subcategory ?? "", line.date ?? ""])
       ]
         .join(" ")
         .toLowerCase();
@@ -123,7 +126,7 @@ export default function CategoryOverviewPage({
 
   const summary = useMemo(() => {
     const invoiceCount = filteredBills.length;
-    const lineItemCount = filteredBills.reduce((sum, row) => sum + row.lineItems.length, 0);
+    const lineItemCount = filteredBills.reduce((sum: number, row: ParsedBill) => sum + row.lineItems.length, 0);
 
     let totalSpend = 0;
     const horseTotals = new Map<string, number>();
@@ -181,9 +184,9 @@ export default function CategoryOverviewPage({
   }, [categorySlug, filteredBills, providerById]);
 
   const providerCards = useMemo(() => {
-    return providers.map((provider) => {
+    return providers.map((provider: any) => {
       const providerBills = filteredBills.filter((row) => row.bill.providerId === provider._id);
-      const totalSpend = providerBills.reduce((sum, row) => sum + getInvoiceTotalUsd(row.extracted, row.lineItems), 0);
+      const totalSpend = providerBills.reduce((sum: number, row: ParsedBill) => sum + getInvoiceTotalUsd(row.extracted, row.lineItems), 0);
       const recentDateMs = providerBills.length > 0 ? Math.max(...providerBills.map((row) => row.invoiceDateMs)) : null;
 
       const horseSet = new Set<string>();
@@ -322,10 +325,10 @@ export default function CategoryOverviewPage({
       <section className="card">
         <div className="section-label">Providers</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
-          {providerCards.map((card) => (
+          {providerCards.map((card: any) => (
             <Link
               key={card.provider._id}
-              href={`/${categorySlug}/${slugify(card.provider.name)}`}
+              href={`/${categorySlug}/${slugify(card.provider.name)}` as any}
               style={{
                 display: "block",
                 textDecoration: "none",
@@ -348,7 +351,7 @@ export default function CategoryOverviewPage({
                     Horses: {card.horseNames.length > 3 ? `${card.horseNames.slice(0, 3).join(", ")}...` : card.horseNames.join(", ")}
                   </small>
                   <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {card.topSubcategories.map((subcategory) => {
+                    {card.topSubcategories.map((subcategory: string) => {
                       const palette = subcategoryColors[subcategory] ?? subcategoryColors.Other;
                       return (
                         <span
@@ -404,10 +407,10 @@ export default function CategoryOverviewPage({
               No invoices match your search.
             </div>
           ) : (
-            searchableBills.map((row) => {
+            searchableBills.map((row: ParsedBill) => {
               const providerName = providerById.get(row.bill.providerId)?.name ?? "Unknown";
               const providerSlug = slugify(providerName);
-              const horseNames = [...new Set(row.lineItems.map((item) => (item.horse_name ?? "Unassigned").trim() || "Unassigned"))];
+              const horseNames = [...new Set(row.lineItems.map((item: ParsedLineItem) => (item.horse_name ?? "Unassigned").trim() || "Unassigned"))];
               const bySubcategory = aggregateBySubcategory(row.lineItems);
               return (
                 <div key={row.bill._id} style={{ padding: "14px 10px", borderBottom: "1px solid #F0EDE8" }}>
@@ -430,14 +433,14 @@ export default function CategoryOverviewPage({
 
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontFamily: "Playfair Display", fontSize: 30 }}>{fmtUSD(getInvoiceTotalUsd(row.extracted, row.lineItems))}</div>
-                      <Link href={`/${categorySlug}/${providerSlug}/invoices/${row.bill._id}`} style={{ color: "#3B5BDB", fontFamily: "DM Mono", fontSize: 12 }}>
+                      <Link href={`/${categorySlug}/${providerSlug}/invoices/${row.bill._id}` as any} style={{ color: "#3B5BDB", fontFamily: "DM Mono", fontSize: 12 }}>
                         View -&gt;
                       </Link>
                     </div>
                   </div>
 
                   <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {bySubcategory.map((sub) => {
+                    {bySubcategory.map((sub: { name: string; value: number }) => {
                       const palette = subcategoryColors[sub.name] ?? subcategoryColors.Other;
                       return (
                         <span
@@ -492,7 +495,7 @@ function SummaryBars({
             <div key={row.name}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
                 {row.href ? (
-                  <Link href={row.href} style={{ color: "#1C1C1C", textDecoration: "none", fontWeight: 600 }}>
+                  <Link href={row.href as any} style={{ color: "#1C1C1C", textDecoration: "none", fontWeight: 600 }}>
                     {truncate(row.name, 32)}
                   </Link>
                 ) : (
@@ -546,7 +549,7 @@ function getInvoiceTotalUsd(extracted: ParsedInvoice, lineItems: ParsedLineItem[
   return lineItems.reduce((sum, item) => sum + getLineTotalUsd(item), 0);
 }
 
-function aggregateBySubcategory(lineItems: ParsedLineItem[]) {
+function aggregateBySubcategory(lineItems: ParsedLineItem[]): Array<{ name: string; value: number }> {
   const map = new Map<string, number>();
   for (const item of lineItems) {
     const key = (item.vet_subcategory ?? "Other").trim() || "Other";

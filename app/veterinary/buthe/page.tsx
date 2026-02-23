@@ -75,8 +75,8 @@ export default function ButheProviderPage() {
   const createBillRecord = useMutation(api.bills.createBillRecord);
   const triggerBillParsing = useMutation(api.bills.triggerBillParsing);
 
-  const categories = useQuery(api.categories.getAllCategories) ?? [];
-  const veterinaryCategory = categories.find((c) => c.slug === "veterinary") ?? null;
+  const categories: any[] = useQuery(api.categories.getAllCategories) ?? [];
+  const veterinaryCategory = categories.find((c: any) => c.slug === "veterinary") ?? null;
 
   const butheProvider =
     useQuery(
@@ -84,9 +84,9 @@ export default function ButheProviderPage() {
       veterinaryCategory ? { categoryId: veterinaryCategory._id, name: "Buthe" } : "skip"
     ) ?? null;
 
-  const allBills = useQuery(api.bills.getBillsByProvider, butheProvider ? { providerId: butheProvider._id } : "skip") ?? [];
+  const allBills: any[] = useQuery(api.bills.getBillsByProvider, butheProvider ? { providerId: butheProvider._id } : "skip") ?? [];
 
-  const allParsedBills = useMemo(() => allBills.map((bill) => toParsedBill(bill)), [allBills]);
+  const allParsedBills = useMemo(() => allBills.map((bill: any) => toParsedBill(bill)), [allBills]);
 
   const availableYears = useMemo(() => {
     const years = new Set<number>();
@@ -123,12 +123,12 @@ export default function ButheProviderPage() {
     const term = search.trim().toLowerCase();
     if (!term) return allParsedBills;
 
-    return allParsedBills.filter(({ bill, extracted, lineItems }) => {
+    return allParsedBills.filter(({ bill, extracted, lineItems }: ParsedBill) => {
       const haystack = [
         extracted.invoice_number ?? "",
         extracted.invoice_date ?? "",
         bill.fileName ?? "",
-        ...lineItems.flatMap((line) => [line.horse_name ?? "", line.description ?? "", line.vet_subcategory ?? "", line.date ?? ""])
+        ...lineItems.flatMap((line: ParsedLineItem) => [line.horse_name ?? "", line.description ?? "", line.vet_subcategory ?? "", line.date ?? ""])
       ]
         .join(" ")
         .toLowerCase();
@@ -139,7 +139,7 @@ export default function ButheProviderPage() {
 
   const summary = useMemo(() => {
     const invoiceCount = filteredBills.length;
-    const lineItemCount = filteredBills.reduce((sum, row) => sum + row.lineItems.length, 0);
+    const lineItemCount = filteredBills.reduce((sum: number, row: ParsedBill) => sum + row.lineItems.length, 0);
 
     const horseTotals = new Map<string, number>();
     const subcategoryTotals = new Map<string, number>();
@@ -185,7 +185,7 @@ export default function ButheProviderPage() {
   }, [filteredBills]);
 
   const warningRows = useMemo(() => {
-    return allParsedBills.filter(({ bill, extracted }) => {
+    return allParsedBills.filter(({ bill, extracted }: ParsedBill) => {
       const status = String(bill.status);
       const isStatement = status === "statement";
       const noInvoiceNumber = !extracted.invoice_number;
@@ -195,7 +195,7 @@ export default function ButheProviderPage() {
 
   const allUploadsTerminal = useMemo(() => {
     if (uploadRows.length === 0) return false;
-    const byId = new Map(allBills.map((b) => [b._id, b.status]));
+    const byId = new Map(allBills.map((b: any) => [b._id, b.status]));
     return uploadRows.every((row) => {
       if (!row.billId) return row.localStatus === "error";
       const status = byId.get(row.billId);
@@ -409,7 +409,7 @@ export default function ButheProviderPage() {
               No invoices match your search.
             </div>
           ) : (
-            searchableBills.map((row) => <InvoiceRow key={row.bill._id} row={row} />)
+            searchableBills.map((row: ParsedBill) => <InvoiceRow key={row.bill._id} row={row} />)
           )}
         </div>
       </section>
@@ -544,7 +544,7 @@ function InvoiceRow({ row }: { row: ParsedBill }) {
       </div>
 
       <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
-        {bySubcategory.map((sub) => {
+        {bySubcategory.map((sub: { name: string; value: number }) => {
           const palette = subcategoryColors[sub.name] ?? subcategoryColors.Other;
           return (
             <span
@@ -751,7 +751,7 @@ function getInvoiceTotalUsd(extracted: ParsedInvoice, lineItems: ParsedLineItem[
   return lineItems.reduce((sum, item) => sum + getLineTotalUsd(item), 0);
 }
 
-function aggregateBySubcategory(lineItems: ParsedLineItem[]) {
+function aggregateBySubcategory(lineItems: ParsedLineItem[]): Array<{ name: string; value: number }> {
   const map = new Map<string, number>();
   for (const item of lineItems) {
     const key = (item.vet_subcategory ?? "Other").trim() || "Other";

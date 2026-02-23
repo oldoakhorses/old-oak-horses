@@ -5,7 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
 export default function UploadPage() {
-  const categories = useQuery(api.categories.getAllCategories) ?? [];
+  const categories: any[] = useQuery(api.categories.getAllCategories) ?? [];
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
   const createBillRecord = useMutation(api.bills.createBillRecord);
   const triggerBillParsing = useMutation(api.bills.triggerBillParsing);
@@ -16,7 +16,7 @@ export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<string>("Idle");
 
-  const providers =
+  const providers: any[] =
     useQuery(
       api.providers.getProvidersByCategory,
       categoryId ? { categoryId: categoryId as never } : "skip"
@@ -27,7 +27,7 @@ export default function UploadPage() {
       setProviderId("");
       return;
     }
-    if (providerId && !providers.some((provider) => provider._id === providerId)) {
+    if (providerId && !providers.some((provider: any) => provider._id === providerId)) {
       setProviderId("");
     }
   }, [categoryId, providerId, providers]);
@@ -56,8 +56,8 @@ export default function UploadPage() {
     const { storageId } = (await uploadResult.json()) as { storageId: string };
     setStatus("Creating bill record...");
 
-    const categoryName = categories.find((category) => category._id === categoryId)?.name;
-    const providerName = providers.find((provider) => provider._id === providerId)?.name;
+    const categoryName = categories.find((category: any) => category._id === categoryId)?.name;
+    const providerName = providers.find((provider: any) => provider._id === providerId)?.name;
     if (!categoryName || !providerName) {
       setStatus("Category/provider lookup failed.");
       return;
@@ -89,7 +89,7 @@ export default function UploadPage() {
           <label htmlFor="category">Category</label>
           <select id="category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
             <option value="">Select a category</option>
-            {categories.map((category) => (
+            {categories.map((category: any) => (
               <option key={category._id} value={category._id}>
                 {category.name}
               </option>
@@ -105,7 +105,7 @@ export default function UploadPage() {
             disabled={!categoryId}
           >
             <option value="">Select a provider</option>
-            {providers.map((provider) => (
+            {providers.map((provider: any) => (
               <option key={provider._id} value={provider._id}>
                 {provider.name}
               </option>

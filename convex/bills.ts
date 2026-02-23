@@ -213,7 +213,7 @@ export const parseBillPdf = internalAction({
 
       const parsed = JSON.parse(stripCodeFences(textBlock.text)) as Record<string, unknown>;
 
-      const missingFields = provider.expectedFields.filter((field) => {
+      const missingFields = provider.expectedFields.filter((field: string) => {
         if (field === "horse_name") {
           return !hasHorseNameInLineItems(parsed);
         }

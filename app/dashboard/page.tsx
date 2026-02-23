@@ -4,7 +4,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
 export default function DashboardPage() {
-  const bills = useQuery(api.bills.listAll) ?? [];
+  const bills: any[] = useQuery(api.bills.listAll) ?? [];
 
   return (
     <section className="panel">
@@ -25,7 +25,7 @@ export default function DashboardPage() {
           </tr>
         </thead>
         <tbody>
-          {bills.map((bill) => (
+          {bills.map((bill: any) => (
             <tr key={bill._id}>
               <td>{bill.providerName}</td>
               <td>{new Date(bill.uploadedAt).toLocaleString()}</td>

@@ -5,8 +5,8 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
 export default function VeterinaryCategoryPage() {
-  const categories = useQuery(api.categories.getAllCategories) ?? [];
-  const veterinary = categories.find((category) => category.slug === "veterinary");
+  const categories: any[] = useQuery(api.categories.getAllCategories) ?? [];
+  const veterinary = categories.find((category: any) => category.slug === "veterinary");
 
   if (!veterinary) {
     return <section className="panel">Veterinary category not found.</section>;
