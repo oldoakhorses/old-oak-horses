@@ -1,4 +1,4 @@
-import { createAccount } from "@convex-dev/auth/server";
+import { createAccount, modifyAccountCredentials } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 
@@ -20,8 +20,13 @@ export const seedUser = mutation({
       throw new Error("Password must be at least 8 characters");
     }
 
-    const existingUsers = await ctx.db.query("users").take(1);
-    if (existingUsers.length > 0) {
+    const existingAdmins = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("role"), "admin"))
+      .take(1);
+
+    // Bootstrap mode: if no admin exists yet, allow seeding without auth.
+    if (existingAdmins.length > 0) {
       const identity = await ctx.auth.getUserIdentity();
       const adminEmail = process.env.INVITE_ADMIN_EMAIL?.toLowerCase();
       if (!adminEmail) {
@@ -38,6 +43,10 @@ export const seedUser = mutation({
       .first();
     if (alreadyExists) {
       await ctx.db.patch(alreadyExists._id, { role });
+      await modifyAccountCredentials(ctx as any, {
+        provider: "password",
+        account: { id: email, secret: password }
+      });
       return { ok: true as const, userId: alreadyExists._id, email, created: false as const };
     }
 
@@ -50,5 +59,39 @@ export const seedUser = mutation({
     });
 
     return { ok: true as const, userId: created.user._id, email, role, created: true as const };
+  }
+});
+
+export const purgeUserByEmail = mutation({
+  args: {
+    email: v.string()
+  },
+  handler: async (ctx, args) => {
+    const email = args.email.trim().toLowerCase();
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", email))
+      .first();
+
+    const accounts = await ctx.db
+      .query("authAccounts")
+      .withIndex("providerAndAccountId", (q) => q.eq("provider", "password").eq("providerAccountId", email))
+      .collect();
+
+    for (const account of accounts) {
+      await ctx.db.delete(account._id);
+    }
+
+    if (user) {
+      await ctx.db.delete(user._id);
+    }
+
+    return {
+      ok: true as const,
+      email,
+      deletedUser: !!user,
+      deletedAccounts: accounts.length
+    };
   }
 });

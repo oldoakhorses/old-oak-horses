@@ -200,3 +200,66 @@ export const seedCategories = mutation(async (ctx) => {
 
   return { createdCategories, createdProviders, updatedProviders, skipped: false };
 });
+
+export const seedDashboardData = mutation(async (ctx) => {
+  const horses = [
+    { name: "Ben", yearOfBirth: 2015 },
+    { name: "Gigi", yearOfBirth: 2017 },
+    { name: "Lingo Van De Watermoelen", yearOfBirth: 2014 }
+  ] as const;
+
+  const contacts: Array<{ name: string; category: string; company?: string }> = [
+    {
+      name: "Dr. André Buthe",
+      category: "Veterinary",
+      company: "Buthe Equine Clinic"
+    },
+    {
+      name: "Conejo Valley Equine",
+      category: "Veterinary"
+    },
+    {
+      name: "Mike Smith",
+      category: "Farrier"
+    }
+  ] as const;
+
+  let createdHorses = 0;
+  let createdContacts = 0;
+
+  for (const horse of horses) {
+    const existing = await ctx.db
+      .query("horses")
+      .withIndex("by_name", (q) => q.eq("name", horse.name))
+      .first();
+
+    if (!existing) {
+      await ctx.db.insert("horses", {
+        name: horse.name,
+        yearOfBirth: horse.yearOfBirth,
+        status: "active",
+        createdAt: Date.now()
+      });
+      createdHorses += 1;
+    }
+  }
+
+  for (const contact of contacts) {
+    const existing = await ctx.db
+      .query("contacts")
+      .withIndex("by_name", (q) => q.eq("name", contact.name))
+      .first();
+
+    if (!existing) {
+      await ctx.db.insert("contacts", {
+        name: contact.name,
+        category: contact.category,
+        company: contact.company,
+        createdAt: Date.now()
+      });
+      createdContacts += 1;
+    }
+  }
+
+  return { createdHorses, createdContacts };
+});

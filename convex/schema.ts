@@ -48,5 +48,43 @@ export default defineSchema({
   })
     .index("by_uploadedAt", ["uploadedAt"])
     .index("by_provider", ["providerId"])
-    .index("by_category", ["categoryId"])
+    .index("by_category", ["categoryId"]),
+
+  horses: defineTable({
+    name: v.string(),
+    yearOfBirth: v.optional(v.number()),
+    usefNumber: v.optional(v.string()),
+    feiNumber: v.optional(v.string()),
+    status: v.union(v.literal("active"), v.literal("past")),
+    leftStableDate: v.optional(v.string()),
+    createdAt: v.number()
+  })
+    .index("by_name", ["name"])
+    .index("by_status", ["status"])
+    .index("by_status_name", ["status", "name"])
+    .index("by_status_left_stable", ["status", "leftStableDate"]),
+
+  contacts: defineTable({
+    name: v.string(),
+    category: v.string(),
+    company: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    email: v.optional(v.string()),
+    createdAt: v.number()
+  })
+    .index("by_name", ["name"])
+    .index("by_category", ["category"]),
+
+  scheduleEvents: defineTable({
+    type: v.string(),
+    horseId: v.id("horses"),
+    date: v.string(),
+    providerId: v.optional(v.id("contacts")),
+    providerName: v.optional(v.string()),
+    note: v.optional(v.string()),
+    createdAt: v.number()
+  })
+    .index("by_date", ["date"])
+    .index("by_horse", ["horseId"])
+    .index("by_type", ["type"])
 });

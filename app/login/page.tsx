@@ -3,12 +3,15 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthActions } from "@convex-dev/auth/react";
+import { useConvex } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import styles from "./login.module.css";
 
 type LoginView = "signIn" | "requestReset" | "verifyReset";
 
 export default function LoginPage() {
   const router = useRouter();
+  const convex = useConvex();
   const { signIn } = useAuthActions();
 
   const [view, setView] = useState<LoginView>("signIn");
@@ -19,6 +22,15 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
+
+  const redirectByRole = async () => {
+    const user = await convex.query(api.users.currentUser, {});
+    if (user?.role === "admin") {
+      router.replace("/dashboard");
+      return;
+    }
+    router.replace("/investor");
+  };
 
   const onSignIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -33,7 +45,7 @@ export default function LoginPage() {
       formData.set("password", password);
 
       await signIn("password", formData);
-      router.replace("/");
+      await redirectByRole();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Sign in failed";
       setErrorMessage(message);
@@ -78,7 +90,7 @@ export default function LoginPage() {
       formData.set("newPassword", newPassword);
 
       await signIn("password", formData);
-      router.replace("/");
+      await redirectByRole();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Password reset failed";
       setErrorMessage(message);

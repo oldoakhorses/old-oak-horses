@@ -12,9 +12,13 @@ import type * as admin from "../admin.js";
 import type * as auth from "../auth.js";
 import type * as bills from "../bills.js";
 import type * as categories from "../categories.js";
+import type * as contacts from "../contacts.js";
+import type * as horses from "../horses.js";
 import type * as http from "../http.js";
 import type * as providers from "../providers.js";
+import type * as scheduleEvents from "../scheduleEvents.js";
 import type * as seed from "../seed.js";
+import type * as uploads from "../uploads.js";
 import type * as users from "../users.js";
 
 import type {
@@ -28,9 +32,13 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   bills: typeof bills;
   categories: typeof categories;
+  contacts: typeof contacts;
+  horses: typeof horses;
   http: typeof http;
   providers: typeof providers;
+  scheduleEvents: typeof scheduleEvents;
   seed: typeof seed;
+  uploads: typeof uploads;
   users: typeof users;
 }>;
 

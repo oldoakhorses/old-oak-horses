@@ -1,0 +1,402 @@
+.page {
+  min-height: 100vh;
+  background: #f7f6f3;
+}
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: 56px;
+  background: #1c1c1c;
+  display: flex;
+  align-items: center;
+  padding: 0 36px;
+}
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand {
+  color: #fff;
+  text-decoration: none;
+  font-family: "Playfair Display", serif;
+  font-size: 22px;
+  font-style: italic;
+}
+
+.crumbLink {
+  color: #888;
+  text-decoration: none;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+}
+
+.divider {
+  color: #444;
+}
+
+.current {
+  color: #fff;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+}
+
+.main {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+.title {
+  margin: 0;
+  font-family: "Playfair Display", serif;
+  font-size: 32px;
+  color: #1c1c1c;
+}
+
+.subtitle {
+  margin-top: 8px;
+  margin-bottom: 0;
+  font-family: "DM Sans", sans-serif;
+  font-size: 15px;
+  color: #888;
+}
+
+.card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  padding: 32px;
+}
+
+.field {
+  display: block;
+  margin-bottom: 18px;
+}
+
+.label {
+  display: block;
+  margin-bottom: 8px;
+  color: #999;
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.selectWrap {
+  position: relative;
+  display: block;
+}
+
+.selectWrap::after {
+  content: "▾";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #666;
+  pointer-events: none;
+  font-size: 14px;
+}
+
+.select {
+  width: 100%;
+  appearance: none;
+  border: 1.5px solid #e8e4de;
+  border-radius: 8px;
+  background: #fafaf8;
+  color: #1c1c1c;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  padding: 14px 16px;
+}
+
+.select:disabled {
+  color: #a0a0a0;
+  cursor: not-allowed;
+  background: #f1eeea;
+}
+
+.dividerFull {
+  height: 1px;
+  background: #f0ede8;
+  margin: 16px -32px 22px;
+}
+
+.dropZone,
+.dropZoneActive {
+  border: 2px dashed #e8e4de;
+  border-radius: 12px;
+  background: #fafaf8;
+  padding: 40px 24px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.dropZoneActive {
+  border-color: #1c1c1c;
+  background: #fff;
+}
+
+.dropIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: #f0ede8;
+  margin: 0 auto 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1c1c1c;
+  font-size: 20px;
+}
+
+.dropTitle {
+  margin: 0;
+  font-family: "DM Sans", sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: #1c1c1c;
+}
+
+.dropSubtitle {
+  margin: 6px 0 0;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  color: #888;
+}
+
+.fileList {
+  margin-top: 18px;
+}
+
+.fileHeader {
+  margin-bottom: 10px;
+  color: #999;
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.fileRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fafaf8;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+
+.fileIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #fff0f0;
+  color: #c53030;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.fileMeta {
+  flex: 1;
+  min-width: 0;
+}
+
+.fileName {
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1c1c1c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fileSize {
+  margin-top: 3px;
+  color: #888;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+}
+
+.removeButton {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  color: #777;
+  font-size: 19px;
+}
+
+.namingPreview {
+  margin-top: 8px;
+  background: #f7f6f3;
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: #666;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+}
+
+.namingPreview span {
+  color: #1c1c1c;
+}
+
+.uploadButton,
+.uploadButtonDisabled {
+  margin-top: 24px;
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  padding: 13px 16px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.uploadButton {
+  background: #1c1c1c;
+  color: #fff;
+  cursor: pointer;
+}
+
+.uploadButtonDisabled {
+  background: #e8e4de;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.progressSection {
+  margin-top: 24px;
+}
+
+.progressRow {
+  background: #fafaf8;
+  border-radius: 8px;
+  padding: 11px 13px;
+  margin-bottom: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.progressFile {
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  color: #1c1c1c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.progressState {
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  color: #666;
+}
+
+.retryButton,
+.retryAllButton,
+.viewInvoicesButton {
+  border-radius: 8px;
+  padding: 8px 11px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.retryButton,
+.retryAllButton {
+  border: 1px solid #e8e4de;
+  background: #fff;
+  color: #1c1c1c;
+  cursor: pointer;
+}
+
+.viewInvoicesButton {
+  margin-top: 8px;
+  width: 100%;
+  display: inline-block;
+  text-align: center;
+  text-decoration: none;
+  border: none;
+  background: #1c1c1c;
+  color: #fff;
+}
+
+.retryAllButton {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.rowError {
+  margin: 0;
+  color: #b42318;
+  font-size: 12px;
+  grid-column: 1 / -1;
+}
+
+.errorMessage {
+  margin: 0 0 6px;
+  color: #b42318;
+  font-size: 13px;
+}
+
+.backRow {
+  text-align: center;
+  margin-top: 24px;
+}
+
+.backLink {
+  color: #888;
+  text-decoration: none;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+}
+
+.footer {
+  margin-top: 26px;
+  text-align: center;
+  color: #ccc;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+}
+
+@media (max-width: 700px) {
+  .nav {
+    padding: 0 16px;
+  }
+
+  .main {
+    padding: 32px 16px;
+  }
+
+  .card {
+    padding: 24px;
+  }
+
+  .dividerFull {
+    margin-left: -24px;
+    margin-right: -24px;
+  }
+}

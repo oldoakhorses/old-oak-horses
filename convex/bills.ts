@@ -251,6 +251,43 @@ export const getProvider = internalQuery({
   }
 });
 
+export const getCategory = internalQuery({
+  args: { categoryId: v.id("categories") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.categoryId);
+  }
+});
+
+export const getBillFileNamesByProvider = internalQuery({
+  args: { providerId: v.id("providers") },
+  handler: async (ctx, args) => {
+    const bills = await ctx.db.query("bills").withIndex("by_provider", (q) => q.eq("providerId", args.providerId)).collect();
+    return bills.map((bill) => bill.fileName);
+  }
+});
+
+export const createParsingBill = internalMutation({
+  args: {
+    providerId: v.id("providers"),
+    categoryId: v.id("categories"),
+    fileId: v.id("_storage"),
+    fileName: v.string(),
+    billingPeriod: v.string(),
+    uploadedAt: v.number()
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("bills", {
+      providerId: args.providerId,
+      categoryId: args.categoryId,
+      fileId: args.fileId,
+      fileName: args.fileName,
+      status: "parsing",
+      billingPeriod: args.billingPeriod,
+      uploadedAt: args.uploadedAt
+    });
+  }
+});
+
 export const markDone = internalMutation({
   args: {
     billId: v.id("bills"),
