@@ -62,6 +62,7 @@ export default function UploadPage() {
   const [uploadStatus, setUploadStatus] = useState<UploadState>("idle");
   const [fileStatuses, setFileStatuses] = useState<Record<string, TrackedStatus>>({});
   const [uploadError, setUploadError] = useState("");
+  const hasRedirectedRef = useRef(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadAndParseBill = useAction((api as any).uploads.uploadAndParseBill);
@@ -146,11 +147,21 @@ export default function UploadPage() {
   }, [categories.length, categoriesLoading, seedCategories]);
 
   useEffect(() => {
-    if (!allComplete || hasErrors || files.length !== 1) return;
-    const onlyFile = files[0];
-    const status = fileStatuses[onlyFile.id];
-    if (!status?.billId || !selectedCategoryDoc || !selectedProviderDoc) return;
-    router.push(`/${selectedCategoryDoc.slug}/${slugify(selectedProviderDoc.name)}/${status.billId}`);
+    if (!allComplete || hasErrors || hasRedirectedRef.current) return;
+    if (!selectedCategoryDoc || !selectedProviderDoc) return;
+
+    const providerPath = `/${selectedCategoryDoc.slug}/${slugify(selectedProviderDoc.name)}`;
+    if (files.length === 1) {
+      const onlyFile = files[0];
+      const status = fileStatuses[onlyFile.id];
+      if (!status?.billId) return;
+      hasRedirectedRef.current = true;
+      router.push(`${providerPath}/${status.billId}`);
+      return;
+    }
+
+    hasRedirectedRef.current = true;
+    router.push(providerPath);
   }, [allComplete, files, fileStatuses, hasErrors, router, selectedCategoryDoc, selectedProviderDoc]);
 
   function onCategoryChange(value: string) {
@@ -234,6 +245,7 @@ export default function UploadPage() {
     if (!canUpload) return;
     setUploadError("");
     setUploadStatus("uploading");
+    hasRedirectedRef.current = false;
 
     for (const localFile of files) {
       const current = fileStatuses[localFile.id];
