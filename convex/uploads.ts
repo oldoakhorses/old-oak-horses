@@ -38,6 +38,7 @@ export const uploadAndParseBill: any = action({
     const fileName = nextAvailableFileName(existingFileNames, baseName);
     const bytes = Buffer.from(args.base64Pdf, "base64");
     const fileId = await ctx.storage.store(new Blob([bytes], { type: "application/pdf" }));
+    const originalPdfUrl = (await ctx.storage.getUrl(fileId)) ?? undefined;
 
     const billId = (await ctx.runMutation(internal.bills.createParsingBill, {
       providerId: args.providerId,
@@ -45,7 +46,8 @@ export const uploadAndParseBill: any = action({
       fileId,
       fileName,
       billingPeriod: uploadDate.slice(0, 7),
-      uploadedAt
+      uploadedAt,
+      originalPdfUrl
     })) as Id<"bills">;
 
     await ctx.scheduler.runAfter(0, internal.bills.parseBillPdf, { billId });

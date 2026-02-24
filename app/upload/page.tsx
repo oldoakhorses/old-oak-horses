@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useRouter } from "next/navigation";
 import { useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -30,6 +31,7 @@ type BillStatusRowProps = {
 };
 
 export default function UploadPage() {
+  const router = useRouter();
   const categories = useQuery(api.categories.getAllCategories) ?? [];
   const [selectedCategory, setSelectedCategory] = useState<Id<"categories"> | "">("");
   const [selectedProvider, setSelectedProvider] = useState<Id<"providers"> | "">("");
@@ -95,6 +97,14 @@ export default function UploadPage() {
       setUploadStatus("done");
     }
   }, [allComplete]);
+
+  useEffect(() => {
+    if (!allComplete || hasErrors || files.length !== 1) return;
+    const onlyFile = files[0];
+    const status = fileStatuses[onlyFile.id];
+    if (!status?.billId || !selectedCategoryDoc || !selectedProviderDoc) return;
+    router.push(`/${selectedCategoryDoc.slug}/${slugify(selectedProviderDoc.name)}/${status.billId}`);
+  }, [allComplete, files, fileStatuses, hasErrors, router, selectedCategoryDoc, selectedProviderDoc]);
 
   function onCategoryChange(value: string) {
     setSelectedCategory((value || "") as Id<"categories"> | "");

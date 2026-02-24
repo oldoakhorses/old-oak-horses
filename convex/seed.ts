@@ -185,7 +185,8 @@ export const seedCategories = mutation(async (ctx) => {
         categoryId: vetCategory._id,
         name: provider.name,
         extractionPrompt: provider.extractionPrompt,
-        expectedFields: provider.expectedFields
+        expectedFields: provider.expectedFields,
+        createdAt: Date.now()
       });
       createdProviders += 1;
       continue;

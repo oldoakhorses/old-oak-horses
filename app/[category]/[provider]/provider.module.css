@@ -1,0 +1,287 @@
+.page {
+  min-height: 100vh;
+  background: #f7f6f3;
+}
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: 56px;
+  background: #1c1c1c;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 36px;
+}
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand {
+  color: #fff;
+  text-decoration: none;
+  font-family: "Playfair Display", serif;
+  font-size: 22px;
+  font-style: italic;
+}
+
+.muted {
+  color: #888;
+  text-decoration: none;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+}
+
+.divider {
+  color: #444;
+}
+
+.current {
+  color: #fff;
+  font-family: "DM Sans", sans-serif;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+.uploadBtn,
+.bizBtn {
+  border-radius: 6px;
+  padding: 8px 12px;
+  text-decoration: none;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.uploadBtn {
+  background: #2a2a2a;
+  color: #fff;
+}
+
+.bizBtn {
+  background: #fff;
+  color: #1c1c1c;
+}
+
+.main {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 28px 16px;
+}
+
+.backLink {
+  color: #888;
+  text-decoration: none;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+}
+
+.card {
+  margin-top: 16px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  padding: 28px 32px;
+}
+
+.label {
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: #999;
+  text-transform: uppercase;
+}
+
+.providerName {
+  margin: 6px 0 0;
+  font-family: "Playfair Display", serif;
+  font-size: 32px;
+}
+
+.contactGrid {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+}
+
+.infoLabel {
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: #999;
+  text-transform: uppercase;
+}
+
+.infoValue,
+.infoValue a {
+  margin-top: 4px;
+  color: #1c1c1c;
+  text-decoration: none;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+}
+
+.infoValue a {
+  color: #3b5bdb;
+}
+
+.statsGrid {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.darkCard {
+  background: #1c1c1c;
+  border-radius: 12px;
+  padding: 24px 28px;
+}
+
+.darkLabel {
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  color: #555;
+  letter-spacing: 0.1em;
+}
+
+.darkAmount {
+  margin-top: 6px;
+  color: #fff;
+  font-family: "Playfair Display", serif;
+  font-size: 36px;
+}
+
+.darkSub {
+  color: #888;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+}
+
+.totalAmount {
+  margin-top: 6px;
+  font-family: "Playfair Display", serif;
+  font-size: 36px;
+}
+
+.sub {
+  color: #888;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+}
+
+.rowHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.invoiceTitle {
+  margin: 0;
+  font-family: "Playfair Display", serif;
+  font-size: 22px;
+}
+
+.count {
+  font-family: "DM Mono", monospace;
+  font-size: 12px;
+  color: #888;
+}
+
+.invoiceRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid #f0ede8;
+  text-decoration: none;
+  color: inherit;
+}
+
+.invoiceRow:last-child {
+  border-bottom: none;
+}
+
+.invoiceMeta {
+  font-family: "DM Mono", monospace;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.invoiceMeta span {
+  color: #888;
+  font-weight: 400;
+}
+
+.horsePills {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.pill {
+  border-radius: 99px;
+  background: #1c1c1c;
+  color: #fff;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-family: "DM Sans", sans-serif;
+}
+
+.itemCount {
+  color: #888;
+  font-size: 12px;
+  font-family: "DM Sans", sans-serif;
+}
+
+.invoiceRight {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.invoiceAmount {
+  font-family: "Playfair Display", serif;
+  font-size: 20px;
+}
+
+.chevron {
+  color: #888;
+  font-size: 20px;
+}
+
+.footer {
+  margin-top: 24px;
+  text-align: center;
+  color: #ccc;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+}
+
+@media (max-width: 860px) {
+  .nav {
+    height: auto;
+    padding: 10px 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 20px;
+  }
+}

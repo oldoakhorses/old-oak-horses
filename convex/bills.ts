@@ -13,7 +13,8 @@ export const createBillRecord = mutation({
     categoryId: v.id("categories"),
     fileId: v.id("_storage"),
     fileName: v.string(),
-    billingPeriod: v.string()
+    billingPeriod: v.string(),
+    originalPdfUrl: v.optional(v.string())
   },
   handler: async (ctx, args) => {
     const provider = await ctx.db.get(args.providerId);
@@ -29,7 +30,8 @@ export const createBillRecord = mutation({
       fileName: args.fileName,
       status: "uploading",
       billingPeriod: args.billingPeriod,
-      uploadedAt: Date.now()
+      uploadedAt: Date.now(),
+      originalPdfUrl: args.originalPdfUrl
     });
   }
 });
@@ -40,7 +42,8 @@ export const createAndParseBill = mutation({
     categoryId: v.id("categories"),
     fileId: v.id("_storage"),
     fileName: v.string(),
-    billingPeriod: v.string()
+    billingPeriod: v.string(),
+    originalPdfUrl: v.optional(v.string())
   },
   handler: async (ctx, args) => {
     const provider = await ctx.db.get(args.providerId);
@@ -56,7 +59,8 @@ export const createAndParseBill = mutation({
       fileName: args.fileName,
       status: "parsing",
       billingPeriod: args.billingPeriod,
-      uploadedAt: Date.now()
+      uploadedAt: Date.now(),
+      originalPdfUrl: args.originalPdfUrl
     });
 
     await ctx.scheduler.runAfter(0, internal.bills.parseBillPdf, { billId });
@@ -161,7 +165,47 @@ export const getBillsByDateRange = query({
 export const getBillById = query({
   args: { billId: v.id("bills") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.billId);
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) return null;
+    const provider = await ctx.db.get(bill.providerId);
+    const category = await ctx.db.get(bill.categoryId);
+    return {
+      ...bill,
+      provider,
+      category
+    };
+  }
+});
+
+export const getProviderStats = query({
+  args: { providerId: v.id("providers") },
+  handler: async (ctx, args) => {
+    const bills = await ctx.db.query("bills").withIndex("by_provider", (q) => q.eq("providerId", args.providerId)).collect();
+
+    const now = new Date();
+    const ytdStart = new Date(now.getFullYear(), 0, 1).getTime();
+
+    let totalSpend = 0;
+    let ytdSpend = 0;
+    let totalInvoices = 0;
+    let ytdInvoices = 0;
+
+    for (const bill of bills) {
+      const amount = getInvoiceTotalUsdFromAny(bill.extractedData);
+      totalSpend += amount;
+      totalInvoices += 1;
+      if (bill.uploadedAt >= ytdStart && bill.uploadedAt <= now.getTime()) {
+        ytdSpend += amount;
+        ytdInvoices += 1;
+      }
+    }
+
+    return {
+      totalSpend,
+      totalInvoices,
+      ytdSpend,
+      ytdInvoices
+    };
   }
 });
 
@@ -229,6 +273,22 @@ export const parseBillPdf = internalAction({
         billId: bill._id,
         extractedData: parsed
       });
+
+      const providerContactPatch = extractProviderContactInfo(parsed);
+      if (
+        provider &&
+        (!provider.fullName || !provider.address || !provider.phone || !provider.email || !provider.accountNumber) &&
+        Object.keys(providerContactPatch).length > 0
+      ) {
+        await ctx.runMutation(internal.bills.updateProviderContactInfo, {
+          providerId: provider._id,
+          fullName: provider.fullName ?? providerContactPatch.fullName,
+          address: provider.address ?? providerContactPatch.address,
+          phone: provider.phone ?? providerContactPatch.phone,
+          email: provider.email ?? providerContactPatch.email,
+          accountNumber: provider.accountNumber ?? providerContactPatch.accountNumber
+        });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown parse error";
       await ctx.runMutation(internal.bills.markError, { billId: bill._id, errorMessage: message });
@@ -273,7 +333,8 @@ export const createParsingBill = internalMutation({
     fileId: v.id("_storage"),
     fileName: v.string(),
     billingPeriod: v.string(),
-    uploadedAt: v.number()
+    uploadedAt: v.number(),
+    originalPdfUrl: v.optional(v.string())
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("bills", {
@@ -283,7 +344,28 @@ export const createParsingBill = internalMutation({
       fileName: args.fileName,
       status: "parsing",
       billingPeriod: args.billingPeriod,
-      uploadedAt: args.uploadedAt
+      uploadedAt: args.uploadedAt,
+      originalPdfUrl: args.originalPdfUrl
+    });
+  }
+});
+
+export const updateProviderContactInfo = internalMutation({
+  args: {
+    providerId: v.id("providers"),
+    fullName: v.optional(v.string()),
+    address: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    email: v.optional(v.string()),
+    accountNumber: v.optional(v.string())
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.providerId, {
+      fullName: args.fullName,
+      address: args.address,
+      phone: args.phone,
+      email: args.email,
+      accountNumber: args.accountNumber
     });
   }
 });
@@ -349,4 +431,47 @@ function getInvoiceDateSortValue(bill: { extractedData?: unknown; uploadedAt: nu
     if (Number.isFinite(parsed)) return parsed;
   }
   return bill.uploadedAt;
+}
+
+function getInvoiceTotalUsdFromAny(extractedData: unknown) {
+  if (!extractedData || typeof extractedData !== "object") return 0;
+  const extracted = extractedData as { invoice_total_usd?: unknown; line_items?: unknown };
+  if (typeof extracted.invoice_total_usd === "number" && Number.isFinite(extracted.invoice_total_usd)) {
+    return extracted.invoice_total_usd;
+  }
+  if (!Array.isArray(extracted.line_items)) return 0;
+  return extracted.line_items.reduce((sum, item) => {
+    if (!item || typeof item !== "object") return sum;
+    const total = (item as { total_usd?: unknown }).total_usd;
+    if (typeof total === "number" && Number.isFinite(total)) {
+      return sum + total;
+    }
+    return sum;
+  }, 0);
+}
+
+function extractProviderContactInfo(parsed: Record<string, unknown>) {
+  const fullNameCandidates = ["provider_full_name", "provider_name", "clinic_name", "client_name"];
+  const addressCandidates = ["provider_address", "address"];
+  const phoneCandidates = ["provider_phone", "phone"];
+  const emailCandidates = ["provider_email", "email"];
+  const accountCandidates = ["account_number", "account"];
+
+  return {
+    fullName: pickString(parsed, fullNameCandidates),
+    address: pickString(parsed, addressCandidates),
+    phone: pickString(parsed, phoneCandidates),
+    email: pickString(parsed, emailCandidates),
+    accountNumber: pickString(parsed, accountCandidates)
+  };
+}
+
+function pickString(source: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return undefined;
 }

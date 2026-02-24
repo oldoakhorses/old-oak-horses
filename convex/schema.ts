@@ -28,8 +28,14 @@ export default defineSchema({
   providers: defineTable({
     categoryId: v.id("categories"),
     name: v.string(),
+    fullName: v.optional(v.string()),
+    address: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    email: v.optional(v.string()),
+    accountNumber: v.optional(v.string()),
     extractionPrompt: v.string(),
-    expectedFields: v.array(v.string())
+    expectedFields: v.array(v.string()),
+    createdAt: v.number()
   })
     .index("by_name", ["name"])
     .index("by_category", ["categoryId"])
@@ -44,7 +50,8 @@ export default defineSchema({
     billingPeriod: v.string(),
     uploadedAt: v.number(),
     extractedData: v.optional(v.any()),
-    errorMessage: v.optional(v.string())
+    errorMessage: v.optional(v.string()),
+    originalPdfUrl: v.optional(v.string())
   })
     .index("by_uploadedAt", ["uploadedAt"])
     .index("by_provider", ["providerId"])

@@ -25,6 +25,33 @@ export const getProviderById = query({
   }
 });
 
+export const getProviderBySlug = query({
+  args: {
+    categorySlug: v.string(),
+    providerSlug: v.string()
+  },
+  handler: async (ctx, args) => {
+    const category = await ctx.db
+      .query("categories")
+      .withIndex("by_slug", (q) => q.eq("slug", args.categorySlug))
+      .first();
+    if (!category) return null;
+
+    const providers = await ctx.db
+      .query("providers")
+      .withIndex("by_category", (q) => q.eq("categoryId", category._id))
+      .collect();
+
+    const provider = providers.find((entry) => slugify(entry.name) === args.providerSlug);
+    if (!provider) return null;
+
+    return {
+      ...provider,
+      category
+    };
+  }
+});
+
 export const getProviderByNameInCategory = query({
   args: {
     categoryId: v.id("categories"),
@@ -55,7 +82,8 @@ export const createProvider = mutation({
       categoryId: args.categoryId,
       name: args.name,
       extractionPrompt: args.extractionPrompt,
-      expectedFields: args.expectedFields
+      expectedFields: args.expectedFields,
+      createdAt: Date.now()
     });
   }
 });
@@ -80,3 +108,12 @@ export const updateProviderPrompt = mutation({
     return args.providerId;
   }
 });
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+}
