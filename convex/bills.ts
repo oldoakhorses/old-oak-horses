@@ -99,15 +99,51 @@ export const listAll = query(async (ctx) => {
 });
 
 export const getBillsByProvider = query({
-  args: { providerId: v.id("providers") },
+  args: {
+    providerId: v.id("providers"),
+    limit: v.optional(v.number()),
+    cursor: v.optional(v.string())
+  },
   handler: async (ctx, args) => {
     const bills = await ctx.db.query("bills").withIndex("by_provider", (q) => q.eq("providerId", args.providerId)).collect();
-    return bills.sort((a, b) => {
-      const aDate = getInvoiceDateSortValue(a);
-      const bDate = getInvoiceDateSortValue(b);
-      if (aDate !== bDate) return bDate - aDate;
-      return b.uploadedAt - a.uploadedAt;
-    });
+    const doneBills = bills.filter((bill) => bill.status === "done");
+    const mapped = doneBills
+      .map((bill) => {
+        const extracted = (bill.extractedData ?? {}) as {
+          line_items?: Array<{ horse_name?: string; total_usd?: number }>;
+          invoice_total_usd?: number;
+          invoice_number?: string;
+          invoice_date?: string;
+        };
+        const lineItems = Array.isArray(extracted.line_items) ? extracted.line_items : [];
+        const horses = [...new Set(lineItems.map((item) => item.horse_name?.trim()).filter((name): name is string => Boolean(name)))];
+        const total_usd =
+          typeof extracted.invoice_total_usd === "number"
+            ? extracted.invoice_total_usd
+            : lineItems.reduce((sum, item) => sum + (typeof item.total_usd === "number" ? item.total_usd : 0), 0);
+
+        return {
+          ...bill,
+          horses,
+          total_usd,
+          invoice_number: extracted.invoice_number || bill.fileName,
+          invoice_date: extracted.invoice_date || null,
+          line_item_count: lineItems.length
+        };
+      })
+      .sort((a, b) => {
+        const aInvoice = a.invoice_date ? Date.parse(a.invoice_date) : 0;
+        const bInvoice = b.invoice_date ? Date.parse(b.invoice_date) : 0;
+        if (aInvoice !== bInvoice) return bInvoice - aInvoice;
+        return b.uploadedAt - a.uploadedAt;
+      });
+
+    if (!args.limit || args.limit <= 0) {
+      return mapped;
+    }
+    const offset = args.cursor ? Number(args.cursor) : 0;
+    const start = Number.isFinite(offset) ? Math.max(0, offset) : 0;
+    return mapped.slice(start, start + args.limit);
   }
 });
 
@@ -180,31 +216,26 @@ export const getBillById = query({
 export const getProviderStats = query({
   args: { providerId: v.id("providers") },
   handler: async (ctx, args) => {
-    const bills = await ctx.db.query("bills").withIndex("by_provider", (q) => q.eq("providerId", args.providerId)).collect();
+    const bills = await ctx.db
+      .query("bills")
+      .withIndex("by_provider", (q) => q.eq("providerId", args.providerId))
+      .filter((q) => q.eq(q.field("status"), "done"))
+      .collect();
 
-    const now = new Date();
-    const ytdStart = new Date(now.getFullYear(), 0, 1).getTime();
-
-    let totalSpend = 0;
-    let ytdSpend = 0;
-    let totalInvoices = 0;
-    let ytdInvoices = 0;
-
-    for (const bill of bills) {
-      const amount = getInvoiceTotalUsdFromAny(bill.extractedData);
-      totalSpend += amount;
-      totalInvoices += 1;
-      if (bill.uploadedAt >= ytdStart && bill.uploadedAt <= now.getTime()) {
-        ytdSpend += amount;
-        ytdInvoices += 1;
-      }
-    }
+    const currentYear = new Date().getFullYear();
+    const totalSpend = bills.reduce((sum, bill) => sum + getInvoiceTotalUsdFromAny(bill.extractedData), 0);
+    const ytdBills = bills.filter((bill) => {
+      const extracted = (bill.extractedData ?? {}) as { invoice_date?: unknown };
+      return typeof extracted.invoice_date === "string" && extracted.invoice_date.startsWith(String(currentYear));
+    });
+    const ytdSpend = ytdBills.reduce((sum, bill) => sum + getInvoiceTotalUsdFromAny(bill.extractedData), 0);
 
     return {
       totalSpend,
-      totalInvoices,
+      totalInvoices: bills.length,
       ytdSpend,
-      ytdInvoices
+      ytdInvoices: ytdBills.length,
+      currentYear
     };
   }
 });
@@ -275,14 +306,12 @@ export const parseBillPdf = internalAction({
       });
 
       const providerContactPatch = extractProviderContactInfo(parsed);
-      if (
-        provider &&
-        (!provider.fullName || !provider.address || !provider.phone || !provider.email || !provider.accountNumber) &&
-        Object.keys(providerContactPatch).length > 0
-      ) {
+      if (provider && !provider.fullName && Object.values(providerContactPatch).some((value) => value !== undefined)) {
         await ctx.runMutation(internal.bills.updateProviderContactInfo, {
           providerId: provider._id,
           fullName: provider.fullName ?? providerContactPatch.fullName,
+          primaryContactName: provider.primaryContactName ?? providerContactPatch.primaryContactName,
+          primaryContactPhone: provider.primaryContactPhone ?? providerContactPatch.primaryContactPhone,
           address: provider.address ?? providerContactPatch.address,
           phone: provider.phone ?? providerContactPatch.phone,
           email: provider.email ?? providerContactPatch.email,
@@ -354,6 +383,8 @@ export const updateProviderContactInfo = internalMutation({
   args: {
     providerId: v.id("providers"),
     fullName: v.optional(v.string()),
+    primaryContactName: v.optional(v.string()),
+    primaryContactPhone: v.optional(v.string()),
     address: v.optional(v.string()),
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
@@ -362,10 +393,13 @@ export const updateProviderContactInfo = internalMutation({
   handler: async (ctx, args) => {
     await ctx.db.patch(args.providerId, {
       fullName: args.fullName,
+      primaryContactName: args.primaryContactName,
+      primaryContactPhone: args.primaryContactPhone,
       address: args.address,
       phone: args.phone,
       email: args.email,
-      accountNumber: args.accountNumber
+      accountNumber: args.accountNumber,
+      updatedAt: Date.now()
     });
   }
 });
@@ -452,6 +486,8 @@ function getInvoiceTotalUsdFromAny(extractedData: unknown) {
 
 function extractProviderContactInfo(parsed: Record<string, unknown>) {
   const fullNameCandidates = ["provider_full_name", "provider_name", "clinic_name", "client_name"];
+  const primaryContactNameCandidates = ["primary_contact_name", "contact_name", "provider_contact_name"];
+  const primaryContactPhoneCandidates = ["primary_contact_phone", "contact_phone"];
   const addressCandidates = ["provider_address", "address"];
   const phoneCandidates = ["provider_phone", "phone"];
   const emailCandidates = ["provider_email", "email"];
@@ -459,6 +495,8 @@ function extractProviderContactInfo(parsed: Record<string, unknown>) {
 
   return {
     fullName: pickString(parsed, fullNameCandidates),
+    primaryContactName: pickString(parsed, primaryContactNameCandidates),
+    primaryContactPhone: pickString(parsed, primaryContactPhoneCandidates),
     address: pickString(parsed, addressCandidates),
     phone: pickString(parsed, phoneCandidates),
     email: pickString(parsed, emailCandidates),

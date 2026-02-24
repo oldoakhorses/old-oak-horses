@@ -29,6 +29,10 @@
   font-style: italic;
 }
 
+.divider {
+  color: #444;
+}
+
 .muted {
   color: #888;
   text-decoration: none;
@@ -36,13 +40,10 @@
   font-size: 14px;
 }
 
-.divider {
-  color: #444;
-}
-
 .current {
   color: #fff;
   font-family: "DM Sans", sans-serif;
+  font-size: 14px;
 }
 
 .actions {
@@ -73,7 +74,7 @@
 .main {
   max-width: 1040px;
   margin: 0 auto;
-  padding: 28px 16px;
+  padding: 28px 16px 40px;
 }
 
 .backLink {
@@ -89,6 +90,7 @@
   border-radius: 16px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
   padding: 28px 32px;
+  position: relative;
 }
 
 .label {
@@ -100,47 +102,66 @@
 }
 
 .providerName {
-  margin: 6px 0 0;
+  margin: 8px 0 0;
   font-family: "Playfair Display", serif;
   font-size: 32px;
+  color: #1c1c1c;
+}
+
+.editBtn {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  border: none;
+  background: transparent;
+  color: #888;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  cursor: pointer;
 }
 
 .contactGrid {
-  margin-top: 18px;
+  margin-top: 16px;
   display: flex;
   flex-wrap: wrap;
   gap: 28px;
+}
+
+.info {
+  min-width: 160px;
 }
 
 .infoLabel {
   font-family: "DM Mono", monospace;
   font-size: 10px;
   letter-spacing: 0.08em;
-  color: #999;
+  color: #888;
   text-transform: uppercase;
 }
 
-.infoValue,
-.infoValue a {
+.infoValue {
   margin-top: 4px;
   color: #1c1c1c;
-  text-decoration: none;
   font-family: "DM Sans", sans-serif;
   font-size: 14px;
+  font-weight: 500;
 }
 
 .infoValue a {
   color: #3b5bdb;
+  text-decoration: none;
+  font-family: "DM Mono", monospace;
+  font-size: 13px;
 }
 
 .statsGrid {
-  margin-top: 20px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
 }
 
 .darkCard {
+  margin-top: 20px;
   background: #1c1c1c;
   border-radius: 12px;
   padding: 24px 28px;
@@ -154,34 +175,37 @@
 }
 
 .darkAmount {
-  margin-top: 6px;
+  margin-top: 8px;
   color: #fff;
   font-family: "Playfair Display", serif;
   font-size: 36px;
 }
 
 .darkSub {
+  margin-top: 4px;
   color: #888;
   font-family: "DM Sans", sans-serif;
   font-size: 13px;
 }
 
 .totalAmount {
-  margin-top: 6px;
+  margin-top: 8px;
   font-family: "Playfair Display", serif;
   font-size: 36px;
 }
 
 .sub {
+  margin-top: 4px;
   color: #888;
   font-family: "DM Sans", sans-serif;
   font-size: 13px;
 }
 
-.rowHead {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+.invoiceHeader {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 320px) auto;
+  align-items: center;
+  gap: 14px;
 }
 
 .invoiceTitle {
@@ -190,28 +214,58 @@
   font-size: 22px;
 }
 
-.count {
+.searchWrap {
+  position: relative;
+}
+
+.searchIcon {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+  color: #aaa;
+}
+
+.searchInput {
+  width: 100%;
+  background: #fafaf8;
+  border: 1.5px solid #e8e4de;
+  border-radius: 8px;
+  padding: 11px 12px 11px 30px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+}
+
+.resultCount {
+  justify-self: end;
+  color: #888;
   font-family: "DM Mono", monospace;
   font-size: 12px;
-  color: #888;
 }
 
 .invoiceRow {
   display: flex;
   justify-content: space-between;
-  align-items: center;
   gap: 14px;
+  align-items: center;
   padding: 14px 0;
   border-bottom: 1px solid #f0ede8;
   text-decoration: none;
   color: inherit;
 }
 
-.invoiceRow:last-child {
+.invoiceRow:last-of-type {
   border-bottom: none;
 }
 
+.leftCol {
+  min-width: 0;
+}
+
 .invoiceMeta {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
   font-family: "DM Mono", monospace;
   font-size: 14px;
   font-weight: 600;
@@ -219,6 +273,7 @@
 
 .invoiceMeta span {
   color: #888;
+  font-size: 12px;
   font-weight: 400;
 }
 
@@ -226,14 +281,14 @@
   margin-top: 8px;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
   align-items: center;
+  gap: 8px;
 }
 
 .pill {
-  border-radius: 99px;
   background: #1c1c1c;
   color: #fff;
+  border-radius: 99px;
   padding: 3px 10px;
   font-size: 11px;
   font-family: "DM Sans", sans-serif;
@@ -245,10 +300,10 @@
   font-family: "DM Sans", sans-serif;
 }
 
-.invoiceRight {
+.rightCol {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 
 .invoiceAmount {
@@ -258,18 +313,189 @@
 
 .chevron {
   color: #888;
-  font-size: 20px;
+  font-size: 18px;
+}
+
+.empty {
+  padding: 40px 0;
+  text-align: center;
+  color: #888;
+  font-family: "DM Sans", sans-serif;
+  font-size: 15px;
+}
+
+.paginationRow {
+  border-top: 1px solid #f0ede8;
+  margin-top: 20px;
+  padding-top: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.pageMeta {
+  color: #888;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+}
+
+.pageControls {
+  display: flex;
+  gap: 6px;
+}
+
+.pageBtn,
+.pageBtnActive {
+  border: 1px solid #e8e4de;
+  background: #fff;
+  color: #888;
+  border-radius: 8px;
+  min-width: 32px;
+  height: 32px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pageBtnActive {
+  background: #1c1c1c;
+  color: #fff;
+  border-color: #1c1c1c;
+}
+
+.pageBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .footer {
-  margin-top: 24px;
+  margin-top: 40px;
   text-align: center;
   color: #ccc;
   font-family: "DM Mono", monospace;
   font-size: 11px;
+  letter-spacing: 0.05em;
 }
 
-@media (max-width: 860px) {
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 70;
+}
+
+.modal {
+  width: min(500px, 100%);
+  background: #fff;
+  border-radius: 16px;
+  padding: 32px;
+}
+
+.modalTitle {
+  margin: 0 0 14px;
+  font-family: "Playfair Display", serif;
+  font-size: 24px;
+}
+
+.formGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field span {
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  color: #999;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.field input {
+  width: 100%;
+  border: 1.5px solid #e8e4de;
+  border-radius: 8px;
+  background: #fafaf8;
+  padding: 13px 16px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+}
+
+.error {
+  margin: 10px 0 0;
+  color: #b42318;
+  font-size: 13px;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.cancelBtn,
+.saveBtn {
+  border-radius: 8px;
+  padding: 11px 14px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cancelBtn {
+  border: 1px solid #e8e4de;
+  background: #fff;
+  color: #1c1c1c;
+}
+
+.saveBtn {
+  border: none;
+  background: #1c1c1c;
+  color: #fff;
+}
+
+.skeletonCard,
+.skeletonCardTall {
+  margin-top: 16px;
+  border-radius: 16px;
+  background: linear-gradient(90deg, #f0ede8 20%, #f7f6f3 40%, #f0ede8 60%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.skeletonCard {
+  height: 140px;
+}
+
+.skeletonCardTall {
+  height: 340px;
+}
+
+.skeletonStats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (max-width: 900px) {
   .nav {
     height: auto;
     padding: 10px 16px;
@@ -277,11 +503,21 @@
     gap: 8px;
   }
 
-  .statsGrid {
+  .statsGrid,
+  .skeletonStats {
     grid-template-columns: 1fr;
   }
 
-  .card {
-    padding: 20px;
+  .invoiceHeader {
+    grid-template-columns: 1fr;
+  }
+
+  .resultCount {
+    justify-self: start;
+  }
+
+  .paginationRow {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

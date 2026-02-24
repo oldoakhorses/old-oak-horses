@@ -37,13 +37,23 @@ export const getProviderBySlug = query({
       .first();
     if (!category) return null;
 
-    const providers = await ctx.db
+    const provider = await ctx.db
       .query("providers")
-      .withIndex("by_category", (q) => q.eq("categoryId", category._id))
-      .collect();
-
-    const provider = providers.find((entry) => slugify(entry.name) === args.providerSlug);
-    if (!provider) return null;
+      .withIndex("by_slug", (q) => q.eq("slug", args.providerSlug))
+      .filter((q) => q.eq(q.field("categoryId"), category._id))
+      .first();
+    if (!provider) {
+      const categoryProviders = await ctx.db
+        .query("providers")
+        .withIndex("by_category", (q) => q.eq("categoryId", category._id))
+        .collect();
+      const fallback = categoryProviders.find((entry) => slugify(entry.name) === args.providerSlug);
+      if (!fallback) return null;
+      return {
+        ...fallback,
+        category
+      };
+    }
 
     return {
       ...provider,
@@ -81,6 +91,7 @@ export const createProvider = mutation({
     return await ctx.db.insert("providers", {
       categoryId: args.categoryId,
       name: args.name,
+      slug: slugify(args.name),
       extractionPrompt: args.extractionPrompt,
       expectedFields: args.expectedFields,
       createdAt: Date.now()
@@ -106,6 +117,32 @@ export const updateProviderPrompt = mutation({
     });
 
     return args.providerId;
+  }
+});
+
+export const updateProviderContact = mutation({
+  args: {
+    providerId: v.id("providers"),
+    fullName: v.optional(v.string()),
+    primaryContactName: v.optional(v.string()),
+    primaryContactPhone: v.optional(v.string()),
+    address: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    email: v.optional(v.string()),
+    accountNumber: v.optional(v.string())
+  },
+  handler: async (ctx, args) => {
+    const provider = await ctx.db.get(args.providerId);
+    if (!provider) {
+      throw new Error("Provider not found");
+    }
+
+    const { providerId, ...updates } = args;
+    await ctx.db.patch(providerId, {
+      ...updates,
+      updatedAt: Date.now()
+    });
+    return providerId;
   }
 });
 

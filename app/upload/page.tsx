@@ -100,7 +100,7 @@ export default function UploadPage() {
 
   const providerHref = useMemo(() => {
     if (!selectedCategoryDoc || !selectedProviderDoc) return "/dashboard";
-    return `/${selectedCategoryDoc.slug}/${slugify(selectedProviderDoc.name)}`;
+    return `/${selectedCategoryDoc.slug}/${selectedProviderDoc.slug ?? slugify(selectedProviderDoc.name)}`;
   }, [selectedCategoryDoc, selectedProviderDoc]);
 
   const allComplete = useMemo(() => {
@@ -150,7 +150,7 @@ export default function UploadPage() {
     if (!allComplete || hasErrors || hasRedirectedRef.current) return;
     if (!selectedCategoryDoc || !selectedProviderDoc) return;
 
-    const providerPath = `/${selectedCategoryDoc.slug}/${slugify(selectedProviderDoc.name)}`;
+    const providerPath = `/${selectedCategoryDoc.slug}/${selectedProviderDoc.slug ?? slugify(selectedProviderDoc.name)}`;
     if (files.length === 1) {
       const onlyFile = files[0];
       const status = fileStatuses[onlyFile.id];

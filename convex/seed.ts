@@ -184,6 +184,7 @@ export const seedCategories = mutation(async (ctx) => {
       await ctx.db.insert("providers", {
         categoryId: vetCategory._id,
         name: provider.name,
+        slug: slugify(provider.name),
         extractionPrompt: provider.extractionPrompt,
         expectedFields: provider.expectedFields,
         createdAt: Date.now()
@@ -193,8 +194,10 @@ export const seedCategories = mutation(async (ctx) => {
     }
 
     await ctx.db.patch(existingProvider._id, {
+      slug: existingProvider.slug ?? slugify(provider.name),
       extractionPrompt: provider.extractionPrompt,
-      expectedFields: provider.expectedFields
+      expectedFields: provider.expectedFields,
+      updatedAt: Date.now()
     });
     updatedProviders += 1;
   }
@@ -264,3 +267,12 @@ export const seedDashboardData = mutation(async (ctx) => {
 
   return { createdHorses, createdContacts };
 });
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+}

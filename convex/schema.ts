@@ -19,7 +19,7 @@ export default defineSchema({
 
   categories: defineTable({
     name: v.string(),
-    slug: v.string(),
+    slug: v.optional(v.string()),
     description: v.optional(v.string())
   })
     .index("by_name", ["name"])
@@ -28,16 +28,21 @@ export default defineSchema({
   providers: defineTable({
     categoryId: v.id("categories"),
     name: v.string(),
+    slug: v.string(),
     fullName: v.optional(v.string()),
+    primaryContactName: v.optional(v.string()),
+    primaryContactPhone: v.optional(v.string()),
     address: v.optional(v.string()),
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
     accountNumber: v.optional(v.string()),
     extractionPrompt: v.string(),
     expectedFields: v.array(v.string()),
-    createdAt: v.number()
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number())
   })
     .index("by_name", ["name"])
+    .index("by_slug", ["slug"])
     .index("by_category", ["categoryId"])
     .index("by_category_name", ["categoryId", "name"]),
 

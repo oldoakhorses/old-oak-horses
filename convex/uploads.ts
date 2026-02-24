@@ -36,7 +36,7 @@ export const uploadAndParseBill: any = action({
     })) as string[];
 
     const fileName = nextAvailableFileName(existingFileNames, baseName);
-    const bytes = Buffer.from(args.base64Pdf, "base64");
+    const bytes = base64ToBytes(args.base64Pdf);
     const fileId = await ctx.storage.store(new Blob([bytes], { type: "application/pdf" }));
     const originalPdfUrl = (await ctx.storage.getUrl(fileId)) ?? undefined;
 
@@ -69,4 +69,13 @@ function nextAvailableFileName(existingNames: string[], baseName: string) {
     }
     index += 1;
   }
+}
+
+function base64ToBytes(base64: string) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
