@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import styles from "./upload.module.css";
@@ -30,9 +30,31 @@ type BillStatusRowProps = {
   onStageChange: (fileId: string, stage: FileStage, error?: string) => void;
 };
 
+const CATEGORY_DISPLAY_ORDER = [
+  "Veterinary",
+  "Feed & Bedding",
+  "Stabling",
+  "Farrier",
+  "Therapeutic Care",
+  "Travel",
+  "Salaries",
+  "Housing",
+  "Riding & Training",
+  "Commissions",
+  "Horse Purchases",
+  "Supplies",
+  "Marketing",
+  "Dues & Registrations",
+  "Admin",
+  "Horse Transport",
+  "Show Expenses"
+] as const;
+
 export default function UploadPage() {
   const router = useRouter();
-  const categories = useQuery(api.categories.getAllCategories) ?? [];
+  const categoriesQuery = useQuery(api.categories.getAllCategories);
+  const categoriesLoading = categoriesQuery === undefined;
+  const categories = categoriesQuery ?? [];
   const [selectedCategory, setSelectedCategory] = useState<Id<"categories"> | "">("");
   const [selectedProvider, setSelectedProvider] = useState<Id<"providers"> | "">("");
   const [files, setFiles] = useState<LocalUploadFile[]>([]);
@@ -43,14 +65,31 @@ export default function UploadPage() {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadAndParseBill = useAction((api as any).uploads.uploadAndParseBill);
+  const seedCategories = useMutation(api.seed.seedCategories);
 
-  const providers =
-    useQuery(api.providers.getProvidersByCategory, selectedCategory ? { categoryId: selectedCategory } : "skip") ?? [];
+  const providersQuery = useQuery(api.providers.getProvidersByCategory, selectedCategory ? { categoryId: selectedCategory } : "skip");
+  const providersLoading = Boolean(selectedCategory) && providersQuery === undefined;
+  const providers = providersQuery ?? [];
+
+  const orderedCategories = useMemo(() => {
+    if (categories.length === 0) return categories;
+    const rank = new Map<string, number>(CATEGORY_DISPLAY_ORDER.map((name, idx) => [name, idx]));
+    return [...categories].sort((a, b) => {
+      const aRank = rank.get(a.name);
+      const bRank = rank.get(b.name);
+      if (aRank !== undefined && bRank !== undefined) return aRank - bRank;
+      if (aRank !== undefined) return -1;
+      if (bRank !== undefined) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [categories]);
 
   const selectedCategoryDoc = categories.find((category) => category._id === selectedCategory);
   const selectedProviderDoc = providers.find((provider) => provider._id === selectedProvider);
 
-  const providerPlaceholder = !selectedCategory
+  const providerPlaceholder = providersLoading
+    ? "Loading providers..."
+    : !selectedCategory
     ? "Select a category first"
     : providers.length === 0
     ? "No providers for this category"
@@ -97,6 +136,14 @@ export default function UploadPage() {
       setUploadStatus("done");
     }
   }, [allComplete]);
+
+  useEffect(() => {
+    if (categoriesLoading) return;
+    if (categories.length > 0) return;
+    void seedCategories().catch(() => {
+      // No-op here; the page will remain usable and user can retry later.
+    });
+  }, [categories.length, categoriesLoading, seedCategories]);
 
   useEffect(() => {
     if (!allComplete || hasErrors || files.length !== 1) return;
@@ -222,8 +269,8 @@ export default function UploadPage() {
             <span className={styles.label}>Category *</span>
             <span className={styles.selectWrap}>
               <select value={selectedCategory} onChange={(event) => onCategoryChange(event.target.value)} className={styles.select}>
-                <option value="">Select a category</option>
-                {categories.map((category) => (
+                <option value="">{categoriesLoading ? "Loading categories..." : "Select a category"}</option>
+                {orderedCategories.map((category) => (
                   <option key={category._id} value={category._id}>
                     {category.name}
                   </option>
@@ -239,7 +286,7 @@ export default function UploadPage() {
                 value={selectedProvider}
                 onChange={(event) => onProviderChange(event.target.value)}
                 className={styles.select}
-                disabled={!selectedCategory || providers.length === 0}
+                disabled={!selectedCategory || providers.length === 0 || providersLoading}
               >
                 <option value="">{providerPlaceholder}</option>
                 {providers.map((provider) => (
