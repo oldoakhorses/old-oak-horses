@@ -1,0 +1,29 @@
+.wrap {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--color-card);
+}
+
+.button,
+.active {
+  border: none;
+  border-right: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  padding: 7px 14px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.button:last-child,
+.active:last-child {
+  border-right: none;
+}
+
+.active {
+  background: var(--color-text);
+  color: #fff;
+  font-weight: 700;
+}

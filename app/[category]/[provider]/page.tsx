@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import InvoiceList, { type InvoiceListItem } from "@/components/InvoiceList";
+import Modal from "@/components/Modal";
+import NavBar from "@/components/NavBar";
 import styles from "./provider.module.css";
-
-const ITEMS_PER_PAGE = 5;
 
 type ContactFormState = {
   fullName: string;
@@ -40,8 +41,6 @@ export default function ProviderOverviewPage() {
   const stats = useQuery(api.bills.getProviderStats, provider ? { providerId: provider._id } : "skip");
   const updateProviderContact = useMutation(api.providers.updateProviderContact);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
   const [showEditModal, setShowEditModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -52,20 +51,28 @@ export default function ProviderOverviewPage() {
     address: "",
     phone: "",
     email: "",
-    accountNumber: ""
+    accountNumber: "",
   });
+
+  const listItems: InvoiceListItem[] = useMemo(() => {
+    const rows = (invoices ?? []) as ProviderInvoiceRow[];
+    return rows.map((invoice) => ({
+      id: invoice._id,
+      href: `/${categorySlug}/${providerSlug}/${invoice._id}`,
+      invoiceNumber: invoice.invoice_number,
+      invoiceDate: invoice.invoice_date,
+      horses: invoice.horses,
+      lineItemCount: invoice.line_item_count,
+      fileName: invoice.fileName,
+      amountUsd: invoice.total_usd,
+    }));
+  }, [categorySlug, invoices, providerSlug]);
 
   if (provider === undefined || invoices === undefined || stats === undefined) {
     return (
-      <div className={styles.page}>
-        <nav className={styles.nav} />
-        <main className={styles.main}>
-          <div className={styles.skeletonCard} />
-          <div className={styles.skeletonStats}>
-            <div className={styles.skeletonCard} />
-            <div className={styles.skeletonCard} />
-          </div>
-          <div className={styles.skeletonCardTall} />
+      <div className="page-shell">
+        <main className="page-main">
+          <section className="ui-card">loading provider...</section>
         </main>
       </div>
     );
@@ -73,34 +80,13 @@ export default function ProviderOverviewPage() {
 
   if (provider === null) {
     return (
-      <main className={styles.page}>
-        <div className={styles.main}>
-          <section className={styles.card}>Provider not found.</section>
-        </div>
-      </main>
+      <div className="page-shell">
+        <main className="page-main">
+          <section className="ui-card">provider not found</section>
+        </main>
+      </div>
     );
   }
-
-  const allInvoices = invoices as ProviderInvoiceRow[];
-
-  const filteredInvoices = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return allInvoices;
-
-    return allInvoices.filter((invoice) => {
-      const inInvoiceNumber = invoice.invoice_number.toLowerCase().includes(query);
-      const inDate = (invoice.invoice_date ?? "").toLowerCase().includes(query);
-      const inFileName = invoice.fileName.toLowerCase().includes(query);
-      const inHorses = invoice.horses.some((horse) => horse.toLowerCase().includes(query));
-      return inInvoiceNumber || inDate || inFileName || inHorses;
-    });
-  }, [allInvoices, searchQuery]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE));
-  const safePage = Math.min(currentPage, totalPages);
-  const start = (safePage - 1) * ITEMS_PER_PAGE;
-  const end = start + ITEMS_PER_PAGE;
-  const paginatedInvoices = filteredInvoices.slice(start, end);
 
   async function saveContactEdits() {
     if (!provider) return;
@@ -115,7 +101,7 @@ export default function ProviderOverviewPage() {
         address: emptyToUndefined(contactForm.address),
         phone: emptyToUndefined(contactForm.phone),
         email: emptyToUndefined(contactForm.email),
-        accountNumber: emptyToUndefined(contactForm.accountNumber)
+        accountNumber: emptyToUndefined(contactForm.accountNumber),
       });
       setShowEditModal(false);
     } catch (error) {
@@ -126,38 +112,28 @@ export default function ProviderOverviewPage() {
   }
 
   return (
-    <div className={styles.page}>
-      <nav className={styles.nav}>
-        <div className={styles.crumbs}>
-          <Link href="/dashboard" className={styles.brand}>
-            Old Oak Horses
-          </Link>
-          <span className={styles.divider}>/</span>
-          <Link href={`/${categorySlug}`} className={styles.muted}>
-            {provider.category?.name ?? categorySlug}
-          </Link>
-          <span className={styles.divider}>/</span>
-          <span className={styles.current}>{provider.name}</span>
-        </div>
-        <div className={styles.actions}>
-          <Link href="/upload" className={styles.uploadBtn}>
-            Upload Invoice
-          </Link>
-          <Link href="/reports" className={styles.bizBtn}>
-            Biz Overview
-          </Link>
-        </div>
-      </nav>
+    <div className="page-shell">
+      <NavBar
+        items={[
+          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: categorySlug, href: `/${categorySlug}` },
+          { label: providerSlug, current: true },
+        ]}
+        actions={[
+          { label: "upload invoice", href: "/upload", variant: "outlined" },
+          { label: "biz overview", href: "/reports", variant: "filled" },
+        ]}
+      />
 
-      <main className={styles.main}>
-        <Link href={`/${categorySlug}`} className={styles.backLink}>
-          ← Back to {provider.category?.name ?? categorySlug}
+      <main className="page-main">
+        <Link href={`/${categorySlug}`} className="ui-back-link">
+          ← cd /{categorySlug}
         </Link>
 
-        <section className={styles.card}>
+        <section className={styles.headerCard}>
           <button
             type="button"
-            className={styles.editBtn}
+            className={styles.editButton}
             onClick={() => {
               setContactForm({
                 fullName: provider.fullName ?? provider.name,
@@ -166,188 +142,99 @@ export default function ProviderOverviewPage() {
                 address: provider.address ?? "",
                 phone: provider.phone ?? "",
                 email: provider.email ?? "",
-                accountNumber: provider.accountNumber ?? ""
+                accountNumber: provider.accountNumber ?? "",
               });
               setShowEditModal(true);
             }}
           >
-            Edit
+            edit
           </button>
-          <div className={styles.label}>{(provider.category?.name ?? categorySlug).toUpperCase()} PROVIDER</div>
+          <div className="ui-label">// {categorySlug} provider</div>
           <h1 className={styles.providerName}>{provider.fullName || provider.name}</h1>
           <div className={styles.contactGrid}>
             <Info
-              label="Primary Contact"
+              label="PRIMARY CONTACT"
               value={
-                <div>
-                  <div>{provider.primaryContactName || "—"}</div>
-                  {provider.primaryContactPhone ? <a href={`tel:${provider.primaryContactPhone}`}>{provider.primaryContactPhone}</a> : null}
-                </div>
+                <span>
+                  {provider.primaryContactName || "—"}
+                  {provider.primaryContactPhone ? <a href={`tel:${provider.primaryContactPhone}`}> {provider.primaryContactPhone}</a> : null}
+                </span>
               }
             />
-            <Info label="Address" value={provider.address || "—"} />
-            <Info label="Phone" value={provider.phone ? <a href={`tel:${provider.phone}`}>{provider.phone}</a> : "—"} />
-            <Info label="Email" value={provider.email ? <a href={`mailto:${provider.email}`}>{provider.email}</a> : "—"} />
-            <Info label="Account #" value={provider.accountNumber || "—"} />
+            <Info label="ADDRESS" value={provider.address || "—"} />
+            <Info label="PHONE" value={provider.phone ? <a href={`tel:${provider.phone}`}>{provider.phone}</a> : "—"} />
+            <Info label="EMAIL" value={provider.email ? <a href={`mailto:${provider.email}`}>{provider.email}</a> : "—"} />
+            <Info label="ACCOUNT #" value={provider.accountNumber || "—"} />
           </div>
         </section>
 
         <section className={styles.statsGrid}>
-          <div className={styles.darkCard}>
-            <div className={styles.darkLabel}>YTD SPEND ({stats.currentYear})</div>
-            <div className={styles.darkAmount}>{fmtUSD(stats.ytdSpend)}</div>
-            <div className={styles.darkSub}>{stats.ytdInvoices} invoices this year</div>
-          </div>
-          <div className={styles.card}>
-            <div className={styles.label}>TOTAL SPEND</div>
-            <div className={styles.totalAmount}>{fmtUSD(stats.totalSpend)}</div>
-            <div className={styles.sub}>{stats.totalInvoices} invoices total</div>
-          </div>
+          <article className={styles.statCard}>
+            <div className={styles.statLabel}>YTD SPEND ({stats.currentYear})</div>
+            <div className={styles.statAmount}>{fmtUSD(stats.ytdSpend)}</div>
+            <div className={styles.statSub}>{stats.ytdInvoices} invoices this year</div>
+          </article>
+          <article className={styles.statCard}>
+            <div className={styles.statLabel}>TOTAL SPEND</div>
+            <div className={styles.statAmount}>{fmtUSD(stats.totalSpend)}</div>
+            <div className={styles.statSub}>{stats.totalInvoices} invoices total</div>
+          </article>
         </section>
 
-        <section className={styles.card}>
-          <div className={styles.invoiceHeader}>
-            <h2 className={styles.invoiceTitle}>Invoices</h2>
-            <div className={styles.searchWrap}>
-              <span className={styles.searchIcon}>⌕</span>
-              <input
-                value={searchQuery}
-                onChange={(event) => {
-                  setSearchQuery(event.target.value);
-                  setCurrentPage(1);
-                }}
-                placeholder="Search by invoice #, date, or horse..."
-                className={styles.searchInput}
-              />
-            </div>
-            <div className={styles.resultCount}>{filteredInvoices.length} RESULTS</div>
-          </div>
+        <InvoiceList title="all_invoices" items={listItems} showProviderTag={false} searchPlaceholder="search by invoice #, date, or horse..." />
 
-          {filteredInvoices.length === 0 ? (
-            <div className={styles.empty}>No invoices found matching "{searchQuery}"</div>
-          ) : (
-            <>
-              {paginatedInvoices.map((invoice) => (
-                <Link key={invoice._id} href={`/${categorySlug}/${providerSlug}/${invoice._id}`} className={styles.invoiceRow}>
-                  <div className={styles.leftCol}>
-                    <div className={styles.invoiceMeta}>
-                      {invoice.invoice_number}
-                      <span>{invoice.invoice_date ?? "No date"}</span>
-                    </div>
-                    <div className={styles.horsePills}>
-                      {invoice.horses.map((horse) => (
-                        <span key={horse} className={styles.pill}>
-                          {horse}
-                        </span>
-                      ))}
-                      <span className={styles.itemCount}>{invoice.line_item_count} items</span>
-                    </div>
-                  </div>
-                  <div className={styles.rightCol}>
-                    <div className={styles.invoiceAmount}>{fmtUSD(invoice.total_usd)}</div>
-                    <span className={styles.chevron}>›</span>
-                  </div>
-                </Link>
-              ))}
-
-              {totalPages > 1 ? (
-                <div className={styles.paginationRow}>
-                  <span className={styles.pageMeta}>
-                    Showing {start + 1}-{Math.min(end, filteredInvoices.length)} of {filteredInvoices.length}
-                  </span>
-                  <div className={styles.pageControls}>
-                    <button
-                      type="button"
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      className={styles.pageBtn}
-                      disabled={safePage === 1}
-                    >
-                      ‹
-                    </button>
-                    {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((page) => (
-                      <button
-                        key={page}
-                        type="button"
-                        className={page === safePage ? styles.pageBtnActive : styles.pageBtn}
-                        onClick={() => setCurrentPage(page)}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      className={styles.pageBtn}
-                      disabled={safePage === totalPages}
-                    >
-                      ›
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-            </>
-          )}
-        </section>
-
-        <footer className={styles.footer}>
-          OLD OAK HORSES · {(provider.category?.name ?? categorySlug).toUpperCase()} · {provider.name.toUpperCase()}
-        </footer>
+        <div className="ui-footer">OLD_OAK_HORSES // {categorySlug.toUpperCase()} // {providerSlug.toUpperCase()}</div>
       </main>
 
-      {showEditModal ? (
-        <div className={styles.modalBackdrop} onMouseDown={(event) => event.target === event.currentTarget && setShowEditModal(false)}>
-          <div className={styles.modal}>
-            <h3 className={styles.modalTitle}>Edit Contact Details</h3>
-            <div className={styles.formGrid}>
-              <Field label="Full Name">
-                <input value={contactForm.fullName} onChange={(e) => setContactForm((p) => ({ ...p, fullName: e.target.value }))} />
-              </Field>
-              <Field label="Primary Contact Name">
-                <input
-                  value={contactForm.primaryContactName}
-                  onChange={(e) => setContactForm((p) => ({ ...p, primaryContactName: e.target.value }))}
-                />
-              </Field>
-              <Field label="Primary Contact Phone">
-                <input
-                  type="tel"
-                  value={contactForm.primaryContactPhone}
-                  onChange={(e) => setContactForm((p) => ({ ...p, primaryContactPhone: e.target.value }))}
-                />
-              </Field>
-              <Field label="Address">
-                <input value={contactForm.address} onChange={(e) => setContactForm((p) => ({ ...p, address: e.target.value }))} />
-              </Field>
-              <Field label="Phone">
-                <input type="tel" value={contactForm.phone} onChange={(e) => setContactForm((p) => ({ ...p, phone: e.target.value }))} />
-              </Field>
-              <Field label="Email">
-                <input type="email" value={contactForm.email} onChange={(e) => setContactForm((p) => ({ ...p, email: e.target.value }))} />
-              </Field>
-              <Field label="Account #">
-                <input
-                  value={contactForm.accountNumber}
-                  onChange={(e) => setContactForm((p) => ({ ...p, accountNumber: e.target.value }))}
-                />
-              </Field>
-            </div>
-            {saveError ? <p className={styles.error}>{saveError}</p> : null}
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.cancelBtn} onClick={() => setShowEditModal(false)}>
-                Cancel
-              </button>
-              <button type="button" className={styles.saveBtn} disabled={isSaving} onClick={saveContactEdits}>
-                {isSaving ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </div>
+      <Modal open={showEditModal} title="edit contact details" onClose={() => setShowEditModal(false)}>
+        <div className={styles.formGrid}>
+          <Field label="FULL NAME">
+            <input value={contactForm.fullName} onChange={(e) => setContactForm((p) => ({ ...p, fullName: e.target.value }))} className={styles.input} />
+          </Field>
+          <Field label="PRIMARY CONTACT NAME">
+            <input
+              value={contactForm.primaryContactName}
+              onChange={(e) => setContactForm((p) => ({ ...p, primaryContactName: e.target.value }))}
+              className={styles.input}
+            />
+          </Field>
+          <Field label="PRIMARY CONTACT PHONE">
+            <input
+              value={contactForm.primaryContactPhone}
+              onChange={(e) => setContactForm((p) => ({ ...p, primaryContactPhone: e.target.value }))}
+              className={styles.input}
+            />
+          </Field>
+          <Field label="ADDRESS">
+            <input value={contactForm.address} onChange={(e) => setContactForm((p) => ({ ...p, address: e.target.value }))} className={styles.input} />
+          </Field>
+          <Field label="PHONE">
+            <input value={contactForm.phone} onChange={(e) => setContactForm((p) => ({ ...p, phone: e.target.value }))} className={styles.input} />
+          </Field>
+          <Field label="EMAIL">
+            <input value={contactForm.email} onChange={(e) => setContactForm((p) => ({ ...p, email: e.target.value }))} className={styles.input} />
+          </Field>
+          <Field label="ACCOUNT #">
+            <input value={contactForm.accountNumber} onChange={(e) => setContactForm((p) => ({ ...p, accountNumber: e.target.value }))} className={styles.input} />
+          </Field>
         </div>
-      ) : null}
+
+        {saveError ? <p className={styles.error}>{saveError}</p> : null}
+
+        <div className={styles.modalActions}>
+          <button type="button" className="ui-button-outlined" onClick={() => setShowEditModal(false)}>
+            cancel
+          </button>
+          <button type="button" className="ui-button-filled" onClick={saveContactEdits} disabled={isSaving}>
+            {isSaving ? "saving..." : "save changes"}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }
 
-function Info({ label, value }: { label: string; value: React.ReactNode }) {
+function Info({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className={styles.info}>
       <div className={styles.infoLabel}>{label}</div>
@@ -356,10 +243,10 @@ function Info({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className={styles.field}>
-      <span>{label}</span>
+      <span className={styles.fieldLabel}>{label}</span>
       {children}
     </label>
   );
@@ -371,5 +258,5 @@ function fmtUSD(v: number) {
 
 function emptyToUndefined(value: string) {
   const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+  return trimmed.length === 0 ? undefined : trimmed;
 }

@@ -1,0 +1,93 @@
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: 52px;
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  gap: 12px;
+}
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.breadcrumbs::-webkit-scrollbar {
+  display: none;
+}
+
+.crumbWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.sep {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.brand {
+  color: var(--color-text-muted);
+  font-style: italic;
+  text-decoration: none;
+  font-size: 11px;
+}
+
+.segment {
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 11px;
+}
+
+.current {
+  color: var(--color-text);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.actionOutlined,
+.actionFilled {
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.actionOutlined {
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  background: transparent;
+}
+
+.actionFilled {
+  border: 1px solid var(--color-text);
+  background: var(--color-text);
+  color: #fff;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .actionOutlined,
+  .actionFilled {
+    padding: 7px 10px;
+    font-size: 10px;
+  }
+}

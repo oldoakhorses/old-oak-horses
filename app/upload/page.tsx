@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import NavBar from "@/components/NavBar";
 import styles from "./upload.module.css";
 
 type UploadState = "idle" | "uploading" | "done";
@@ -20,14 +21,6 @@ type TrackedStatus = {
   stage: FileStage;
   billId?: Id<"bills">;
   error?: string;
-};
-
-type BillStatusRowProps = {
-  fileName: string;
-  fileId: string;
-  status: TrackedStatus;
-  onRetry: (fileId: string) => void;
-  onStageChange: (fileId: string, stage: FileStage, error?: string) => void;
 };
 
 const CATEGORY_DISPLAY_ORDER = [
@@ -47,21 +40,20 @@ const CATEGORY_DISPLAY_ORDER = [
   "Dues & Registrations",
   "Admin",
   "Horse Transport",
-  "Show Expenses"
+  "Show Expenses",
 ] as const;
 
 export default function UploadPage() {
   const router = useRouter();
   const categoriesQuery = useQuery(api.categories.getAllCategories);
-  const categoriesLoading = categoriesQuery === undefined;
   const categories = categoriesQuery ?? [];
+
   const [selectedCategory, setSelectedCategory] = useState<Id<"categories"> | "">("");
   const [selectedProvider, setSelectedProvider] = useState<Id<"providers"> | "">("");
   const [files, setFiles] = useState<LocalUploadFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<UploadState>("idle");
   const [fileStatuses, setFileStatuses] = useState<Record<string, TrackedStatus>>({});
-  const [uploadError, setUploadError] = useState("");
   const hasRedirectedRef = useRef(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -69,7 +61,6 @@ export default function UploadPage() {
   const seedCategories = useMutation(api.seed.seedCategories);
 
   const providersQuery = useQuery(api.providers.getProvidersByCategory, selectedCategory ? { categoryId: selectedCategory } : "skip");
-  const providersLoading = Boolean(selectedCategory) && providersQuery === undefined;
   const providers = providersQuery ?? [];
 
   const orderedCategories = useMemo(() => {
@@ -88,13 +79,13 @@ export default function UploadPage() {
   const selectedCategoryDoc = categories.find((category) => category._id === selectedCategory);
   const selectedProviderDoc = providers.find((provider) => provider._id === selectedProvider);
 
-  const providerPlaceholder = providersLoading
-    ? "Loading providers..."
+  const providerPlaceholder = providersQuery === undefined
+    ? "loading providers..."
     : !selectedCategory
-    ? "Select a category first"
-    : providers.length === 0
-    ? "No providers for this category"
-    : "Select a provider";
+      ? "select a category first"
+      : providers.length === 0
+        ? "no providers for this category"
+        : "select a provider";
 
   const canUpload = Boolean(selectedCategory && selectedProvider && files.length > 0 && uploadStatus !== "uploading");
 
@@ -111,40 +102,28 @@ export default function UploadPage() {
     });
   }, [fileStatuses, files]);
 
-  const hasErrors = useMemo(() => {
-    return files.some((localFile) => fileStatuses[localFile.id]?.stage === "error");
-  }, [fileStatuses, files]);
+  const hasErrors = useMemo(() => files.some((localFile) => fileStatuses[localFile.id]?.stage === "error"), [fileStatuses, files]);
 
   const handleStageChange = useCallback((fileId: string, stage: FileStage, error?: string) => {
-    setFileStatuses((prev) => {
-      const existing = prev[fileId];
-      if (existing?.stage === stage && existing?.error === error) {
-        return prev;
-      }
-      return {
-        ...prev,
-        [fileId]: {
-          ...existing,
-          stage,
-          error
-        }
-      };
-    });
+    setFileStatuses((prev) => ({
+      ...prev,
+      [fileId]: {
+        ...prev[fileId],
+        stage,
+        error,
+      },
+    }));
   }, []);
 
   useEffect(() => {
-    if (allComplete) {
-      setUploadStatus("done");
-    }
+    if (allComplete) setUploadStatus("done");
   }, [allComplete]);
 
   useEffect(() => {
-    if (categoriesLoading) return;
-    if (categories.length > 0) return;
-    void seedCategories().catch(() => {
-      // No-op here; the page will remain usable and user can retry later.
-    });
-  }, [categories.length, categoriesLoading, seedCategories]);
+    if (categoriesQuery !== undefined && categories.length === 0) {
+      void seedCategories().catch(() => undefined);
+    }
+  }, [categories.length, categoriesQuery, seedCategories]);
 
   useEffect(() => {
     if (!allComplete || hasErrors || hasRedirectedRef.current) return;
@@ -152,8 +131,7 @@ export default function UploadPage() {
 
     const providerPath = `/${selectedCategoryDoc.slug}/${selectedProviderDoc.slug ?? slugify(selectedProviderDoc.name)}`;
     if (files.length === 1) {
-      const onlyFile = files[0];
-      const status = fileStatuses[onlyFile.id];
+      const status = fileStatuses[files[0].id];
       if (!status?.billId) return;
       hasRedirectedRef.current = true;
       router.push(`${providerPath}/${status.billId}`);
@@ -162,7 +140,7 @@ export default function UploadPage() {
 
     hasRedirectedRef.current = true;
     router.push(providerPath);
-  }, [allComplete, files, fileStatuses, hasErrors, router, selectedCategoryDoc, selectedProviderDoc]);
+  }, [allComplete, fileStatuses, files, hasErrors, router, selectedCategoryDoc, selectedProviderDoc]);
 
   function onCategoryChange(value: string) {
     setSelectedCategory((value || "") as Id<"categories"> | "");
@@ -202,8 +180,8 @@ export default function UploadPage() {
       ...prev,
       ...newFiles.map((file) => ({
         id: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`,
-        file
-      }))
+        file,
+      })),
     ]);
   }
 
@@ -228,22 +206,21 @@ export default function UploadPage() {
       const result = await uploadAndParseBill({
         categoryId: selectedCategory,
         providerId: selectedProvider,
-        base64Pdf
+        base64Pdf,
       });
 
       setFileStatuses((prev) => ({
         ...prev,
-        [fileId]: { stage: "parsing", billId: result.billId }
+        [fileId]: { stage: "parsing", billId: result.billId },
       }));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Upload failed";
+      const message = error instanceof Error ? error.message : "upload failed";
       setFileStatuses((prev) => ({ ...prev, [fileId]: { stage: "error", error: message } }));
     }
   }
 
   async function onUploadClick() {
     if (!canUpload) return;
-    setUploadError("");
     setUploadStatus("uploading");
     hasRedirectedRef.current = false;
 
@@ -255,203 +232,211 @@ export default function UploadPage() {
   }
 
   return (
-    <div className={styles.page}>
-      <nav className={styles.nav}>
-        <div className={styles.crumbs}>
-          <Link href="/dashboard" className={styles.brand}>
-            Old Oak Horses
-          </Link>
-          <span className={styles.divider}>/</span>
-          <Link href="/dashboard" className={styles.crumbLink}>
-            Dashboard
-          </Link>
-          <span className={styles.divider}>/</span>
-          <span className={styles.current}>Upload</span>
-        </div>
-      </nav>
+    <div className="page-shell">
+      <NavBar
+        items={[
+          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "dashboard", href: "/dashboard" },
+          { label: "upload", current: true },
+        ]}
+      />
 
-      <main className={styles.main}>
+      <main className="page-main">
+        <Link href="/dashboard" className="ui-back-link">
+          ← cd /dashboard
+        </Link>
+
         <header className={styles.header}>
+          <div className="ui-label">// upload</div>
           <h1 className={styles.title}>Upload Invoice</h1>
-          <p className={styles.subtitle}>Select a category and provider, then upload your PDF</p>
+          <p className={styles.subtitle}>select a category and provider, then upload your PDF</p>
         </header>
 
         <section className={styles.card}>
           <label className={styles.field}>
-            <span className={styles.label}>Category *</span>
-            <span className={styles.selectWrap}>
-              <select value={selectedCategory} onChange={(event) => onCategoryChange(event.target.value)} className={styles.select}>
-                <option value="">{categoriesLoading ? "Loading categories..." : "Select a category"}</option>
-                {orderedCategories.map((category) => (
-                  <option key={category._id} value={category._id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </span>
+            <span className={styles.label}>CATEGORY *</span>
+            <select value={selectedCategory} onChange={(event) => onCategoryChange(event.target.value)} className={styles.select}>
+              <option value="">{categoriesQuery === undefined ? "loading categories..." : "select a category"}</option>
+              {orderedCategories.map((category) => (
+                <option key={category._id} value={category._id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className={styles.field}>
-            <span className={styles.label}>Provider *</span>
-            <span className={styles.selectWrap}>
-              <select
-                value={selectedProvider}
-                onChange={(event) => onProviderChange(event.target.value)}
-                className={styles.select}
-                disabled={!selectedCategory || providers.length === 0 || providersLoading}
-              >
-                <option value="">{providerPlaceholder}</option>
-                {providers.map((provider) => (
-                  <option key={provider._id} value={provider._id}>
-                    {provider.name}
-                  </option>
-                ))}
-              </select>
-            </span>
+            <span className={styles.label}>PROVIDER *</span>
+            <select
+              value={selectedProvider}
+              onChange={(event) => onProviderChange(event.target.value)}
+              className={styles.select}
+              disabled={!selectedCategory || providers.length === 0 || providersQuery === undefined}
+            >
+              <option value="">{providerPlaceholder}</option>
+              {providers.map((provider) => (
+                <option key={provider._id} value={provider._id}>
+                  {provider.name}
+                </option>
+              ))}
+            </select>
           </label>
 
-          <div className={styles.dividerFull} />
+          <div className={styles.divider} />
 
           <div
-            className={isDragging ? styles.dropZoneActive : styles.dropZone}
+            className={isDragging ? styles.dropActive : styles.drop}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onClick={() => inputRef.current?.click()}
-            role="button"
-            tabIndex={0}
           >
-            <input ref={inputRef} type="file" accept=".pdf,application/pdf" multiple hidden onChange={handleFileSelect} />
-            <div className={styles.dropIcon}>↑</div>
-            <p className={styles.dropTitle}>Drop PDF files here or click to browse</p>
-            <p className={styles.dropSubtitle}>Accepts multiple PDF files</p>
+            <div className={styles.dropIcon}>⇪</div>
+            <p className={styles.dropTitle}>drop PDF files here or click to browse</p>
+            <p className={styles.dropSub}>accepts multiple PDF files</p>
+            <input ref={inputRef} type="file" multiple accept=".pdf" className={styles.hiddenInput} onChange={handleFileSelect} />
           </div>
 
           {files.length > 0 ? (
-            <div className={styles.fileList}>
-              <div className={styles.fileHeader}>Selected Files ({files.length})</div>
-              {files.map((localFile) => (
+            <section className={styles.filesWrap}>
+              <div className={styles.label}>SELECTED FILES ({files.length})</div>
+              {files.map((localFile, index) => (
                 <div key={localFile.id} className={styles.fileRow}>
                   <div className={styles.fileIcon}>PDF</div>
                   <div className={styles.fileMeta}>
                     <div className={styles.fileName}>{localFile.file.name}</div>
-                    <div className={styles.fileSize}>{formatKb(localFile.file.size)} KB</div>
+                    <div className={styles.fileSize}>{Math.max(1, Math.round(localFile.file.size / 1024)).toLocaleString()} KB</div>
                   </div>
-                  <button type="button" className={styles.removeButton} onClick={() => removeFile(localFile.id)} aria-label="Remove file">
+                  <button type="button" className={styles.remove} onClick={() => removeFile(localFile.id)} aria-label={`remove file ${index + 1}`}>
                     ×
                   </button>
                 </div>
               ))}
-            </div>
+            </section>
           ) : null}
 
           {selectedCategoryDoc && selectedProviderDoc ? (
             <div className={styles.namingPreview}>
-              Files will be saved as: <span>{selectedCategoryDoc.name}</span> - <span>{selectedProviderDoc.name}</span> - YYYY-MM-DD
+              files will be saved as: <span>{selectedCategoryDoc.name}</span> - <span>{selectedProviderDoc.name}</span> - YYYY-MM-DD
             </div>
           ) : null}
 
-          {uploadStatus === "idle" ? (
-            <button type="button" className={canUpload ? styles.uploadButton : styles.uploadButtonDisabled} onClick={onUploadClick} disabled={!canUpload}>
-              ⬆ {files.length > 1 ? `Upload ${files.length} Invoices` : "Upload Invoice"}
+          {uploadStatus !== "uploading" ? (
+            <button type="button" className={canUpload ? "ui-button-filled" : styles.uploadDisabled} onClick={onUploadClick} disabled={!canUpload}>
+              {files.length > 1 ? `upload ${files.length} invoices` : "upload invoice"}
             </button>
           ) : (
-            <div className={styles.progressSection}>
+            <section className={styles.progressList}>
               {files.map((localFile) => (
                 <BillStatusRow
                   key={localFile.id}
-                  fileId={localFile.id}
                   fileName={localFile.file.name}
+                  fileId={localFile.id}
                   status={fileStatuses[localFile.id] ?? { stage: "queued" }}
                   onRetry={runUploadForFile}
                   onStageChange={handleStageChange}
                 />
               ))}
-              {uploadError ? <p className={styles.errorMessage}>{uploadError}</p> : null}
+
               {allComplete && !hasErrors ? (
-                <Link href={providerHref} className={styles.viewInvoicesButton}>
-                  View All Invoices
+                <Link href={providerHref} className="ui-button-filled">
+                  view all invoices
                 </Link>
               ) : null}
-              {allComplete && hasErrors ? (
-                <button type="button" className={styles.retryAllButton} onClick={onUploadClick}>
-                  Retry Failed Files
-                </button>
-              ) : null}
-            </div>
+            </section>
           )}
         </section>
 
-        <div className={styles.backRow}>
-          <Link href="/dashboard" className={styles.backLink}>
-            ← Back to Dashboard
-          </Link>
-        </div>
-
-        <footer className={styles.footer}>OLD OAK HORSES · UPLOAD</footer>
+        <div className="ui-footer">OLD_OAK_HORSES // UPLOAD</div>
       </main>
     </div>
   );
 }
 
-function BillStatusRow({ fileName, fileId, status, onRetry, onStageChange }: BillStatusRowProps) {
+function BillStatusRow({
+  fileName,
+  fileId,
+  status,
+  onRetry,
+  onStageChange,
+}: {
+  fileName: string;
+  fileId: string;
+  status: TrackedStatus;
+  onRetry: (fileId: string) => void;
+  onStageChange: (fileId: string, stage: FileStage, error?: string) => void;
+}) {
   const bill = useQuery(api.bills.getBillById, status.billId ? { billId: status.billId } : "skip");
-  const liveStage = status.stage === "parsing" && bill?.status ? (bill.status as FileStage) : status.stage;
-  const errorMessage = liveStage === "error" ? bill?.errorMessage ?? status.error ?? "Failed to parse file." : undefined;
 
   useEffect(() => {
-    onStageChange(fileId, liveStage, errorMessage);
-  }, [errorMessage, fileId, liveStage, onStageChange]);
+    if (!status.billId || bill === undefined || !bill) return;
+    if (bill.status === "done") {
+      onStageChange(fileId, "done");
+      return;
+    }
+    if (bill.status === "error") {
+      onStageChange(fileId, "error", bill.errorMessage ?? "Parsing failed");
+      return;
+    }
+    if (bill.status === "parsing") {
+      onStageChange(fileId, "parsing");
+    }
+  }, [bill, fileId, onStageChange, status.billId]);
 
   return (
     <div className={styles.progressRow}>
-      <span className={styles.progressFile}>{fileName}</span>
-      <span className={styles.progressState}>
-        {liveStage === "queued" ? "Queued..." : null}
-        {liveStage === "uploading" ? "Uploading..." : null}
-        {liveStage === "parsing" ? "Parsing..." : null}
-        {liveStage === "done" ? "Done ✓" : null}
-        {liveStage === "error" ? "Error ✗" : null}
-      </span>
-      {liveStage === "error" ? (
-        <button type="button" className={styles.retryButton} onClick={() => onRetry(fileId)}>
-          Retry
+      <div className={styles.progressFile}>{fileName}</div>
+      <div className={styles.progressStage}>{stageLabel(status.stage)}</div>
+      {status.stage === "error" ? (
+        <button type="button" className="ui-button-outlined" onClick={() => onRetry(fileId)}>
+          retry
         </button>
       ) : null}
-      {errorMessage ? <p className={styles.rowError}>{errorMessage}</p> : null}
+      {status.error ? <p className={styles.progressError}>{status.error}</p> : null}
     </div>
   );
 }
 
-function isPdfFile(file: File) {
-  if (file.type === "application/pdf") return true;
-  return file.name.toLowerCase().endsWith(".pdf");
+function stageLabel(stage: FileStage) {
+  switch (stage) {
+    case "uploading":
+      return "uploading...";
+    case "parsing":
+      return "parsing...";
+    case "done":
+      return "done ✓";
+    case "error":
+      return "error ✗";
+    default:
+      return "queued";
+  }
 }
 
-function formatKb(bytes: number) {
-  return (bytes / 1024).toLocaleString("en-US", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+function isPdfFile(file: File) {
+  return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 }
 
 function fileToBase64(file: File) {
-  return file.arrayBuffer().then((buffer) => arrayBufferToBase64(buffer));
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== "string") {
+        reject(new Error("Invalid file result"));
+        return;
+      }
+      const [, base64] = result.split(",");
+      resolve(base64 ?? "");
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
-function slugify(input: string) {
-  return input
+function slugify(value: string) {
+  return value
     .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[^\w\s-]/g, "")
     .trim()
-    .replace(/\s+/g, "-");
-}
-
-function arrayBufferToBase64(buffer: ArrayBuffer) {
-  let binary = "";
-  const bytes = new Uint8Array(buffer);
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize);
-    binary += String.fromCharCode(...chunk);
-  }
-  return btoa(binary);
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
 }

@@ -1,290 +1,151 @@
-.page {
-  min-height: 100vh;
-  background: #f7f6f3;
-}
-
-.nav {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  height: 56px;
-  background: #1c1c1c;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 36px;
-}
-
-.crumbs {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.brand {
-  color: #fff;
-  text-decoration: none;
-  font-family: "Playfair Display", serif;
-  font-size: 22px;
-  font-style: italic;
-}
-
-.divider {
-  color: #444;
-}
-
-.muted {
-  color: #888;
-  text-decoration: none;
-  font-family: "DM Sans", sans-serif;
-  font-size: 14px;
-}
-
-.current {
-  color: #fff;
-  font-family: "DM Sans", sans-serif;
-  font-size: 14px;
-}
-
-.bizBtn {
-  text-decoration: none;
-  background: #fff;
-  color: #1c1c1c;
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-family: "DM Sans", sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.main {
-  max-width: 1040px;
-  margin: 0 auto;
-  padding: 28px 16px;
-}
-
 .topRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-}
-
-.backLink {
-  color: #888;
-  text-decoration: none;
-  font-family: "DM Sans", sans-serif;
-  font-size: 14px;
+  gap: 10px;
 }
 
 .topActions {
-  display: flex;
-  gap: 12px;
+  display: inline-flex;
   align-items: center;
+  gap: 10px;
 }
 
 .pdfLink {
-  color: #3b5bdb;
+  font-size: 11px;
+  color: var(--color-accent);
   text-decoration: none;
-  font-family: "DM Sans", sans-serif;
-  font-size: 14px;
 }
 
-.uploadBtn {
-  text-decoration: none;
-  background: #1c1c1c;
-  color: #fff;
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-family: "DM Sans", sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-}
-
+.headerCard,
 .card {
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-  padding: 24px 32px;
-  margin-bottom: 20px;
+  margin-top: 12px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 28px 32px;
 }
 
-.headerGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 18px;
+.headerCard {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
 }
 
-.label {
-  font-family: "DM Mono", monospace;
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  color: #999;
-  text-transform: uppercase;
-}
-
-.providerTitle {
-  margin: 6px 0 12px;
-  font-family: "Playfair Display", serif;
-  font-size: 28px;
+.providerName {
+  margin: 8px 0 0;
+  font-size: 24px;
+  font-weight: 700;
 }
 
 .detailRow {
+  margin-top: 12px;
   display: flex;
   flex-wrap: wrap;
-  gap: 24px;
+  gap: 20px;
 }
 
 .detailLabel {
-  font-family: "DM Mono", monospace;
   font-size: 10px;
-  color: #999;
-  text-transform: uppercase;
+  color: var(--color-text-muted);
   letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .detailValue {
   margin-top: 4px;
-  font-family: "DM Sans", sans-serif;
-  font-size: 14px;
+  font-size: 12px;
+  color: var(--color-text);
 }
 
-.rateNote {
-  margin-top: 12px;
-  font-family: "DM Mono", monospace;
-  font-size: 11px;
-  color: #b0a090;
+.rate {
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  font-style: italic;
 }
 
 .totalBox {
-  text-align: right;
+  min-width: 240px;
 }
 
-.totalAmount {
-  margin-top: 6px;
-  font-family: "Playfair Display", serif;
-  font-size: 36px;
+.total {
+  margin-top: 8px;
+  font-size: 32px;
+  font-weight: 700;
 }
 
-.meta {
-  margin-top: 5px;
-  font-family: "DM Mono", monospace;
-  font-size: 12px;
-  color: #888;
-}
-
-.reportLabel {
-  font-family: "DM Mono", monospace;
-  font-size: 10px;
-  color: #1c1c1c;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+.totalMeta {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--color-text-muted);
 }
 
 .sectionTitle {
-  margin: 4px 0 14px;
-  font-family: "Playfair Display", serif;
-  font-size: 20px;
+  margin: 6px 0 0;
+  font-size: 16px;
+  text-transform: lowercase;
 }
 
-.subRow {
-  margin-bottom: 14px;
-}
-
-.subTop {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.subName {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: "DM Sans", sans-serif;
-  font-size: 14px;
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-}
-
-.subMeta {
-  font-family: "DM Mono", monospace;
-  font-size: 12px;
-  color: #666;
-}
-
-.track {
-  height: 5px;
-  border-radius: 999px;
-  background: #f0ede8;
-}
-
-.fill {
-  height: 100%;
-  border-radius: 999px;
+.list {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
 }
 
 .horseHead {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  gap: 12px;
 }
 
 .horseLeft {
-  display: flex;
-  gap: 10px;
+  display: inline-flex;
   align-items: center;
+  gap: 10px;
 }
 
 .horseAvatar {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border-radius: 999px;
-  background: #1c1c1c;
-  color: #fff;
+  background: var(--color-tag-bg);
   display: grid;
   place-items: center;
 }
 
 .horseName {
-  font-family: "Playfair Display", serif;
-  font-size: 22px;
+  font-size: 18px;
+  font-weight: 700;
 }
 
 .horseMeta {
-  font-family: "DM Sans", sans-serif;
-  font-size: 12px;
-  color: #888;
+  margin-top: 3px;
+  font-size: 10px;
+  color: var(--color-text-muted);
 }
 
 .subtotal {
-  text-align: right;
-}
-
-.subtotalAmount {
-  font-family: "Playfair Display", serif;
-  font-size: 24px;
+  margin-top: 6px;
+  font-size: 20px;
+  font-weight: 700;
 }
 
 .itemList {
-  background: #fafaf8;
-  border-radius: 12px;
-  padding: 16px 20px;
+  margin-top: 12px;
+  background: var(--color-input-bg);
+  border-radius: 8px;
+  padding: 14px 18px;
 }
 
 .itemRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px solid #e8e4de;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .itemRow:last-child {
@@ -292,98 +153,71 @@
 }
 
 .itemDesc {
-  font-family: "DM Sans", sans-serif;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 12px;
+  color: var(--color-text);
 }
 
 .badge {
-  margin-top: 6px;
+  margin-top: 4px;
   display: inline-block;
-  border-radius: 99px;
-  padding: 3px 10px;
-  font-family: "DM Sans", sans-serif;
-  font-size: 11px;
-  font-weight: 600;
+  color: #fff;
+  font-size: 9px;
+  padding: 2px 7px;
+  border-radius: 4px;
 }
 
 .itemAmount {
-  font-family: "DM Mono", monospace;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .summaryBar {
-  background: #1c1c1c;
-  border-radius: 12px;
-  padding: 22px 28px;
+  margin-top: 12px;
+  border-radius: 10px;
+  background: var(--color-text);
+  color: #fff;
+  padding: 20px 26px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
 }
 
 .summaryLeft {
-  display: flex;
-  gap: 32px;
+  display: inline-flex;
+  gap: 28px;
 }
 
 .summaryLabel {
-  font-family: "DM Mono", monospace;
   font-size: 10px;
-  color: #555;
-  letter-spacing: 0.08em;
+  color: #6b7084;
 }
 
 .summaryValue {
-  margin-top: 4px;
+  margin-top: 3px;
+  font-size: 13px;
+  font-weight: 700;
   color: #fff;
-  font-family: "DM Sans", sans-serif;
 }
 
 .summaryTotal {
+  margin-top: 6px;
+  font-size: 24px;
+  font-weight: 700;
   color: #fff;
-  font-family: "Playfair Display", serif;
-  font-size: 28px;
 }
 
-.footer {
-  text-align: center;
-  font-family: "DM Mono", monospace;
-  font-size: 11px;
-  color: #ccc;
-}
-
-@media (max-width: 900px) {
-  .nav {
-    height: auto;
-    padding: 10px 16px;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .topRow {
+@media (max-width: 860px) {
+  .headerCard {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .headerGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .totalBox {
-    text-align: left;
   }
 
   .summaryBar {
     flex-direction: column;
     align-items: flex-start;
-    gap: 12px;
+    gap: 10px;
   }
 
   .summaryLeft {
-    gap: 20px;
     flex-wrap: wrap;
   }
 }

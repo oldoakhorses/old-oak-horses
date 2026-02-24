@@ -1,84 +1,99 @@
 .page {
   min-height: 100vh;
-  display: flex;
-  background: #f7f6f3;
+  display: grid;
+  place-items: center;
+  background: var(--color-bg);
+  padding: 24px;
 }
 
-.left {
-  width: 40%;
-  min-width: 420px;
-  background: #f7f6f3;
-  display: flex;
-  align-items: center;
-  padding: 0 56px;
+.wrap {
+  width: min(400px, 100%);
 }
 
-.formWrap {
-  width: 100%;
-  max-width: 460px;
-}
-
-.title {
+.brand {
   margin: 0;
-  color: #1c1c1c;
-  font-family: "Playfair Display", serif;
-  font-size: 34px;
-  font-weight: 700;
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-text-muted);
+  font-style: italic;
+  text-transform: lowercase;
 }
 
-.title em {
-  font-style: italic;
-  font-weight: 600;
+.section {
+  margin: 10px 0 16px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 32px;
 }
 
 .form {
-  margin-top: 56px;
+  display: grid;
+  gap: 14px;
 }
 
 .field {
-  margin-bottom: 22px;
+  display: grid;
+  gap: 7px;
 }
 
 .label {
-  display: block;
-  margin-bottom: 8px;
-  color: #999;
-  font-family: "DM Mono", monospace;
   font-size: 10px;
-  font-weight: 700;
+  color: var(--color-text-muted);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
+.inputWrap {
+  position: relative;
+}
+
 .input {
   width: 100%;
-  background: #fafaf8;
-  border: 1.5px solid #e8e4de;
-  border-radius: 8px;
-  padding: 13px 16px;
-  color: #1c1c1c;
-  font-family: "DM Sans", sans-serif;
-  font-size: 14px;
-  outline: none;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  color: var(--color-text);
+  font-size: 13px;
 }
 
 .input:focus {
-  border-color: #1c1c1c;
-  box-shadow: 0 0 0 3px rgba(28, 28, 28, 0.08);
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.eye {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px;
 }
 
 .button {
   width: 100%;
-  margin-top: 6px;
-  border: 0;
-  border-radius: 8px;
-  padding: 13px 16px;
-  background: #1c1c1c;
+  border: 1px solid var(--color-text);
+  border-radius: 6px;
+  background: var(--color-text);
   color: #fff;
-  font-family: "DM Sans", sans-serif;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 14px;
+  margin-top: 4px;
   cursor: pointer;
 }
 
@@ -87,65 +102,32 @@
   cursor: not-allowed;
 }
 
-.forgot {
-  display: block;
-  width: max-content;
-  margin-top: 8px;
-  margin-left: auto;
-  color: #bbb;
+.forgot,
+.back {
+  border: none;
   background: transparent;
-  border: 0;
-  padding: 0;
-  font-family: "DM Sans", sans-serif;
-  font-size: 12px;
-  text-decoration: none;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  text-align: center;
   cursor: pointer;
-}
-
-.backLink {
-  margin-top: 10px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #888;
-  font-family: "DM Sans", sans-serif;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.info {
-  margin-top: 14px;
-  color: #166534;
-  font-size: 13px;
 }
 
 .error {
-  margin-top: 14px;
-  color: #b42318;
-  font-size: 13px;
+  margin: 0;
+  color: var(--color-red);
+  font-size: 11px;
 }
 
-.right {
-  flex: 1;
-  background-image: url("/ben_abudhabi2.jpg");
-  background-size: cover;
-  background-position: center 25%;
-  background-repeat: no-repeat;
+.info {
+  margin: 0;
+  color: var(--color-green);
+  font-size: 11px;
 }
 
-@media (max-width: 960px) {
-  .page {
-    display: block;
-  }
-
-  .left {
-    width: 100%;
-    min-width: 0;
-    min-height: 100vh;
-    padding: 40px 24px;
-  }
-
-  .right {
-    display: none;
-  }
+.footer {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 9px;
+  color: var(--color-text-muted);
+  letter-spacing: 0.1em;
 }

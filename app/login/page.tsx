@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [view, setView] = useState<LoginView>("signIn");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [resetCode, setResetCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -101,17 +102,16 @@ export default function LoginPage() {
 
   return (
     <div className={styles.page}>
-      <section className={styles.left}>
-        <div className={styles.formWrap}>
-          <h1 className={styles.title}>
-            Old Oak <em>Horses</em>
-          </h1>
+      <div className={styles.wrap}>
+        <p className={styles.brand}>old-oak-horses</p>
+        <div className={styles.section}>// login</div>
 
+        <section className={styles.card}>
           {view === "signIn" ? (
             <form className={styles.form} onSubmit={onSignIn}>
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="email">
-                  EMAIL
+                  Email
                 </label>
                 <input
                   id="email"
@@ -127,22 +127,27 @@ export default function LoginPage() {
 
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="password">
-                  PASSWORD
+                  Password
                 </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  className={styles.input}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
+                <div className={styles.inputWrap}>
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    required
+                    className={styles.input}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <button type="button" className={styles.eye} onClick={() => setShowPassword((v) => !v)}>
+                    {showPassword ? "hide" : "show"}
+                  </button>
+                </div>
               </div>
 
               <button className={styles.button} type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Signing in..." : "Sign in"}
+                {isSubmitting ? "signing in..." : "sign in"}
               </button>
 
               <button
@@ -154,7 +159,7 @@ export default function LoginPage() {
                   setInfoMessage("");
                 }}
               >
-                Forgot password?
+                forgot password?
               </button>
 
               {errorMessage ? <p className={styles.error}>{errorMessage}</p> : null}
@@ -165,7 +170,7 @@ export default function LoginPage() {
             <form className={styles.form} onSubmit={onRequestReset}>
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="reset-email">
-                  EMAIL
+                  Email
                 </label>
                 <input
                   id="reset-email"
@@ -178,18 +183,18 @@ export default function LoginPage() {
                 />
               </div>
               <button className={styles.button} type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Sending..." : "Send reset code"}
+                {isSubmitting ? "sending..." : "send reset code"}
               </button>
               <button
                 type="button"
-                className={styles.backLink}
+                className={styles.back}
                 onClick={() => {
                   setView("signIn");
                   setErrorMessage("");
                   setInfoMessage("");
                 }}
               >
-                Back to sign in
+                back to sign in
               </button>
               {infoMessage ? <p className={styles.info}>{infoMessage}</p> : null}
               {errorMessage ? <p className={styles.error}>{errorMessage}</p> : null}
@@ -200,7 +205,7 @@ export default function LoginPage() {
             <form className={styles.form} onSubmit={onVerifyReset}>
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="verify-email">
-                  EMAIL
+                  Email
                 </label>
                 <input
                   id="verify-email"
@@ -214,7 +219,7 @@ export default function LoginPage() {
               </div>
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="reset-code">
-                  RESET CODE
+                  Reset Code
                 </label>
                 <input
                   id="reset-code"
@@ -226,7 +231,7 @@ export default function LoginPage() {
               </div>
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="new-password">
-                  NEW PASSWORD
+                  New Password
                 </label>
                 <input
                   id="new-password"
@@ -238,27 +243,27 @@ export default function LoginPage() {
                 />
               </div>
               <button className={styles.button} type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Resetting..." : "Reset password"}
+                {isSubmitting ? "resetting..." : "reset password"}
               </button>
               <button
                 type="button"
-                className={styles.backLink}
+                className={styles.back}
                 onClick={() => {
                   setView("signIn");
                   setErrorMessage("");
                   setInfoMessage("");
                 }}
               >
-                Back to sign in
+                back to sign in
               </button>
               {infoMessage ? <p className={styles.info}>{infoMessage}</p> : null}
               {errorMessage ? <p className={styles.error}>{errorMessage}</p> : null}
             </form>
           ) : null}
-        </div>
-      </section>
+        </section>
 
-      <section className={styles.right} />
+        <div className={styles.footer}>OLD_OAK_HORSES // LOGIN</div>
+      </div>
     </div>
   );
 }
