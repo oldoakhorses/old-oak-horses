@@ -70,6 +70,7 @@ export default defineSchema({
     travelSubcategory: v.optional(v.string()),
     housingSubcategory: v.optional(v.string()),
     horseTransportSubcategory: v.optional(v.string()),
+    marketingSubcategory: v.optional(v.string()),
     originalCurrency: v.optional(v.string()),
     originalTotal: v.optional(v.number()),
     exchangeRate: v.optional(v.number()),
@@ -80,6 +81,16 @@ export default defineSchema({
       v.array(
         v.object({
           personId: v.id("people"),
+          amount: v.number()
+        })
+      )
+    ),
+    horseSplitType: v.optional(v.union(v.literal("single"), v.literal("split"))),
+    assignedHorses: v.optional(
+      v.array(
+        v.object({
+          horseId: v.id("horses"),
+          horseName: v.string(),
           amount: v.number()
         })
       )

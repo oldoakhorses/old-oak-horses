@@ -7,6 +7,7 @@ import { internal } from "./_generated/api";
 
 const TRAVEL_SUBCATEGORY_SLUGS = new Set(["flights", "trains", "rental-car", "gas", "meals", "hotels"]);
 const HOUSING_SUBCATEGORY_SLUGS = new Set(["rider-housing", "groom-housing"]);
+const MARKETING_SUBCATEGORY_SLUGS = new Set(["vip-tickets", "photography", "social-media"]);
 
 export const parseBillPdf = internalAction({
   args: { billId: v.id("bills") },
@@ -58,7 +59,25 @@ export const parseBillPdf = internalAction({
 
       const parsed = JSON.parse(stripCodeFences(textBlock.text)) as Record<string, unknown>;
 
-      const expectedFields = provider?.expectedFields ?? [];
+      let resolvedProvider = provider;
+      if (category.slug === "marketing" && !resolvedProvider && !bill.customProviderName) {
+        const extractedProviderName = pickString(parsed, ["provider_name", "vendor_name", "supplier_name", "merchant_name"]);
+        if (extractedProviderName) {
+          const existingProvider = await ctx.runQuery(internal.providers.getProviderByNameInCategoryInternal, {
+            categoryId: bill.categoryId,
+            name: extractedProviderName
+          });
+          const providerId =
+            existingProvider?._id ??
+            (await ctx.runMutation(internal.providers.createProviderOnUploadInternal, {
+              categoryId: bill.categoryId,
+              name: extractedProviderName
+            }));
+          resolvedProvider = existingProvider ?? (await ctx.runQuery(internal.bills.getProvider, { providerId }));
+        }
+      }
+
+      const expectedFields = resolvedProvider?.expectedFields ?? [];
       const missingFields = expectedFields.filter((field: string) => {
         if (field === "horse_name") {
           return !hasHorseNameInLineItems(parsed);
@@ -71,38 +90,47 @@ export const parseBillPdf = internalAction({
         throw new Error(`Missing expected parsed fields: ${missingFields.join(", ")}`);
       }
 
-      const needsApproval = category.slug === "travel" || category.slug === "housing" || category.slug === "stabling";
+      const needsApproval =
+        category.slug === "travel" ||
+        category.slug === "housing" ||
+        category.slug === "stabling" ||
+        category.slug === "marketing" ||
+        category.slug === "bodywork" ||
+        category.slug === "feed-bedding";
       const needsApprovalWithTransport = needsApproval || category.slug === "horse-transport";
       const status = needsApprovalWithTransport ? "pending" : "done";
       const categoryMeta =
         category.slug === "travel"
-          ? extractTravelMeta(parsed, provider?.slug ?? provider?.name)
+          ? extractTravelMeta(parsed, resolvedProvider?.slug ?? resolvedProvider?.name)
           : category.slug === "housing"
-            ? extractHousingMeta(parsed, provider?.slug ?? provider?.name)
+            ? extractHousingMeta(parsed, resolvedProvider?.slug ?? resolvedProvider?.name)
             : category.slug === "stabling"
               ? extractStablingMeta(parsed)
               : category.slug === "horse-transport"
                 ? extractHorseTransportMeta(parsed, bill.horseTransportSubcategory)
+              : category.slug === "marketing"
+                ? extractMarketingMeta(parsed, bill.marketingSubcategory)
               : {};
 
       await ctx.runMutation(internal.bills.markDone, {
         billId: bill._id,
         extractedData: parsed,
         status,
+        providerId: resolvedProvider?._id,
         ...categoryMeta
       });
 
       const providerContactPatch = extractProviderContactInfo(parsed);
-      if (provider && !provider.fullName && Object.values(providerContactPatch).some((value) => value !== undefined)) {
+      if (resolvedProvider && Object.values(providerContactPatch).some((value) => value !== undefined)) {
         await ctx.runMutation(internal.bills.updateProviderContactInfo, {
-          providerId: provider._id,
-          fullName: provider.fullName ?? providerContactPatch.fullName,
-          primaryContactName: provider.primaryContactName ?? providerContactPatch.primaryContactName,
-          primaryContactPhone: provider.primaryContactPhone ?? providerContactPatch.primaryContactPhone,
-          address: provider.address ?? providerContactPatch.address,
-          phone: provider.phone ?? providerContactPatch.phone,
-          email: provider.email ?? providerContactPatch.email,
-          accountNumber: provider.accountNumber ?? providerContactPatch.accountNumber
+          providerId: resolvedProvider._id,
+          fullName: resolvedProvider.fullName ?? providerContactPatch.fullName,
+          primaryContactName: resolvedProvider.primaryContactName ?? providerContactPatch.primaryContactName,
+          primaryContactPhone: resolvedProvider.primaryContactPhone ?? providerContactPatch.primaryContactPhone,
+          address: resolvedProvider.address ?? providerContactPatch.address,
+          phone: resolvedProvider.phone ?? providerContactPatch.phone,
+          email: resolvedProvider.email ?? providerContactPatch.email,
+          accountNumber: resolvedProvider.accountNumber ?? providerContactPatch.accountNumber
         });
       }
     } catch (error) {
@@ -296,6 +324,23 @@ function extractHorseTransportMeta(parsed: Record<string, unknown>, billSubcateg
   };
 }
 
+function extractMarketingMeta(parsed: Record<string, unknown>, billSubcategory: string | undefined) {
+  const originalCurrency = pickString(parsed, ["original_currency", "currency"])?.toUpperCase();
+  const originalTotal = pickNumber(parsed, ["original_total", "invoice_total_original"]);
+  const exchangeRate = pickNumber(parsed, ["exchange_rate", "exchange_rate_used"]);
+  const parsedSubcategory = slugify(pickString(parsed, ["marketing_subcategory", "subcategory"]) ?? "");
+  const marketingSubcategory = MARKETING_SUBCATEGORY_SLUGS.has(parsedSubcategory)
+    ? parsedSubcategory
+    : billSubcategory ?? "other";
+  return {
+    marketingSubcategory,
+    originalCurrency,
+    originalTotal,
+    exchangeRate,
+    isApproved: false
+  };
+}
+
 function genericExtractionPrompt(categorySlug?: string) {
   const base =
     "Extract invoice data as strict JSON with invoice_number, invoice_date, provider_name, account_number, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[].";
@@ -304,6 +349,15 @@ function genericExtractionPrompt(categorySlug?: string) {
   }
   if (categorySlug === "travel" || categorySlug === "housing") {
     return `${base} For each line item return amount_original and amount_usd when available.`;
+  }
+  if (categorySlug === "marketing") {
+    return "Extract from this marketing invoice: provider/vendor name and contact details (address, phone, email), invoice_number, invoice_date, due_date, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, quantity, unit_price, total_usd. Return strict JSON.";
+  }
+  if (categorySlug === "bodywork") {
+    return "Extract from this bodywork/chiropractic/massage invoice: invoice_number, invoice_date, due_date, provider_name, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, horse_name (if identifiable), quantity, unit_price, total_usd. Return strict JSON.";
+  }
+  if (categorySlug === "feed-bedding") {
+    return 'Extract from this feed and bedding invoice: invoice_number, invoice_date, due_date, provider_name, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, quantity, unit_price, total_usd, and subcategory ("feed", "bedding", or null for delivery/tax). Return strict JSON.';
   }
   return base;
 }

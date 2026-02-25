@@ -5,6 +5,7 @@ const CATEGORY_SEED = [
   { name: "Feed & Bedding", slug: "feed-bedding" },
   { name: "Stabling", slug: "stabling" },
   { name: "Farrier", slug: "farrier" },
+  { name: "Bodywork", slug: "bodywork" },
   { name: "Therapeutic Care", slug: "therapeutic-care" },
   { name: "Travel", slug: "travel" },
   { name: "Salaries", slug: "salaries" },
@@ -381,6 +382,86 @@ export const seedCategories = mutation(async (ctx) => {
         slug: provider.slug,
         extractionPrompt:
           "Extract a farrier invoice as strict JSON with invoice_number, invoice_date, provider_name, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[].",
+        expectedFields: ["invoice_number", "invoice_date", "provider_name", "invoice_total_usd", "line_items"],
+        createdAt: Date.now()
+      });
+      createdProviders += 1;
+      continue;
+    }
+    if (!existingProvider.slug) {
+      await ctx.db.patch(existingProvider._id, { slug: provider.slug, updatedAt: Date.now() });
+      updatedProviders += 1;
+    }
+  }
+
+  const feedBeddingCategory = await ctx.db
+    .query("categories")
+    .withIndex("by_slug", (q) => q.eq("slug", "feed-bedding"))
+    .first();
+  if (!feedBeddingCategory) {
+    throw new Error("Feed & Bedding category not found after category seed");
+  }
+
+  const feedBeddingProviders = [
+    { name: "Pradera", slug: "pradera" },
+    { name: "El Campeon", slug: "el-campeon" },
+    { name: "DaMoors", slug: "damoors" },
+    { name: "Travers", slug: "travers" },
+    { name: "Red Mills", slug: "red-mills" },
+    { name: "Watermolen", slug: "watermolen" }
+  ] as const;
+
+  for (const provider of feedBeddingProviders) {
+    const existingProvider = await ctx.db
+      .query("providers")
+      .withIndex("by_category_name", (q) => q.eq("categoryId", feedBeddingCategory._id).eq("name", provider.name))
+      .first();
+    if (!existingProvider) {
+      await ctx.db.insert("providers", {
+        categoryId: feedBeddingCategory._id,
+        name: provider.name,
+        slug: provider.slug,
+        extractionPrompt:
+          "Extract from this feed and bedding invoice: invoice_number, invoice_date, due_date, provider_name, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, quantity, unit_price, total_usd, and subcategory where subcategory is feed, bedding, or null for fees/tax.",
+        expectedFields: ["invoice_number", "invoice_date", "provider_name", "invoice_total_usd", "line_items"],
+        createdAt: Date.now()
+      });
+      createdProviders += 1;
+      continue;
+    }
+    if (!existingProvider.slug) {
+      await ctx.db.patch(existingProvider._id, { slug: provider.slug, updatedAt: Date.now() });
+      updatedProviders += 1;
+    }
+  }
+
+  const bodyworkCategory = await ctx.db
+    .query("categories")
+    .withIndex("by_slug", (q) => q.eq("slug", "bodywork"))
+    .first();
+  if (!bodyworkCategory) {
+    throw new Error("Bodywork category not found after category seed");
+  }
+
+  const bodyworkProviders = [
+    { name: "Steve Engle", slug: "steve-engle" },
+    { name: "Fred Michaelson", slug: "fred-michaelson" },
+    { name: "Janice", slug: "janice" },
+    { name: "Inga Pavling", slug: "inga-pavling" }
+  ] as const;
+
+  for (const provider of bodyworkProviders) {
+    const existingProvider = await ctx.db
+      .query("providers")
+      .withIndex("by_category_name", (q) => q.eq("categoryId", bodyworkCategory._id).eq("name", provider.name))
+      .first();
+    if (!existingProvider) {
+      await ctx.db.insert("providers", {
+        categoryId: bodyworkCategory._id,
+        name: provider.name,
+        slug: provider.slug,
+        extractionPrompt:
+          "Extract from this bodywork/chiropractic/massage invoice: invoice_number, invoice_date, due_date, provider_name, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, horse_name (if identifiable), quantity, unit_price, total_usd.",
         expectedFields: ["invoice_number", "invoice_date", "provider_name", "invoice_total_usd", "line_items"],
         createdAt: Date.now()
       });

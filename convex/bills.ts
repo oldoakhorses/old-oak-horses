@@ -416,6 +416,168 @@ export const getHousingStats = query({
   }
 });
 
+export const getMarketingBills = query({
+  args: {
+    categoryId: v.id("categories"),
+    subcategory: v.optional(v.string())
+  },
+  handler: async (ctx, args) => {
+    const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
+    const filtered = bills.filter((bill) => (args.subcategory ? bill.marketingSubcategory === args.subcategory : true));
+    const rows = await Promise.all(
+      filtered.map(async (bill) => {
+        const provider = bill.providerId ? await ctx.db.get(bill.providerId) : null;
+        const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+        const invoiceNumber =
+          typeof extracted.invoice_number === "string" && extracted.invoice_number.trim().length > 0
+            ? extracted.invoice_number
+            : bill.fileName;
+        const invoiceDate =
+          typeof extracted.invoice_date === "string" && extracted.invoice_date.trim().length > 0
+            ? extracted.invoice_date
+            : null;
+        const lineItems = getLineItems(bill.extractedData);
+        return {
+          ...bill,
+          providerName: provider?.name ?? bill.customProviderName ?? (typeof extracted.provider_name === "string" ? extracted.provider_name : "Unknown"),
+          providerSlug: provider?.slug ?? slugify(provider?.name ?? bill.customProviderName ?? "unknown"),
+          invoiceNumber,
+          invoiceDate,
+          totalUsd: getInvoiceTotalUsdFromAny(bill.extractedData),
+          lineItemCount: lineItems.length,
+          approvalStatus: bill.status === "done" && bill.isApproved ? "approved" : "pending"
+        };
+      })
+    );
+
+    return rows.sort((a, b) => {
+      const aDate = getInvoiceDateSortValue(a);
+      const bDate = getInvoiceDateSortValue(b);
+      if (aDate !== bDate) return bDate - aDate;
+      return b.uploadedAt - a.uploadedAt;
+    });
+  }
+});
+
+export const getMarketingSpendBySubcategory = query({
+  args: { categoryId: v.id("categories") },
+  handler: async (ctx, args) => {
+    const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
+    const totals = new Map<string, { totalSpend: number; invoiceCount: number }>();
+    for (const bill of bills) {
+      const key = bill.marketingSubcategory ?? "other";
+      const current = totals.get(key) ?? { totalSpend: 0, invoiceCount: 0 };
+      current.totalSpend += getInvoiceTotalUsdFromAny(bill.extractedData);
+      current.invoiceCount += 1;
+      totals.set(key, current);
+    }
+    const grandTotal = [...totals.values()].reduce((sum, row) => sum + row.totalSpend, 0);
+    return [...totals.entries()]
+      .map(([subcategory, row]) => ({
+        subcategory,
+        totalSpend: row.totalSpend,
+        invoiceCount: row.invoiceCount,
+        pctOfTotal: grandTotal > 0 ? (row.totalSpend / grandTotal) * 100 : 0
+      }))
+      .sort((a, b) => b.totalSpend - a.totalSpend);
+  }
+});
+
+export const getMarketingSpendByProvider = query({
+  args: { categoryId: v.id("categories") },
+  handler: async (ctx, args) => {
+    const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
+    const totals = new Map<string, { providerName: string; totalSpend: number; invoiceCount: number }>();
+    for (const bill of bills) {
+      const provider = bill.providerId ? await ctx.db.get(bill.providerId) : null;
+      const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+      const providerName = provider?.name ?? bill.customProviderName ?? (typeof extracted.provider_name === "string" ? extracted.provider_name : "Unknown");
+      const current = totals.get(providerName) ?? { providerName, totalSpend: 0, invoiceCount: 0 };
+      current.totalSpend += getInvoiceTotalUsdFromAny(bill.extractedData);
+      current.invoiceCount += 1;
+      totals.set(providerName, current);
+    }
+    const grandTotal = [...totals.values()].reduce((sum, row) => sum + row.totalSpend, 0);
+    return [...totals.values()]
+      .map((row) => ({
+        providerName: row.providerName,
+        totalSpend: row.totalSpend,
+        invoiceCount: row.invoiceCount,
+        pctOfTotal: grandTotal > 0 ? (row.totalSpend / grandTotal) * 100 : 0
+      }))
+      .sort((a, b) => b.totalSpend - a.totalSpend);
+  }
+});
+
+export const getFeedBeddingBills = query({
+  args: {
+    categoryId: v.id("categories"),
+    providerId: v.optional(v.id("providers"))
+  },
+  handler: async (ctx, args) => {
+    const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
+    const filtered = bills.filter((bill) => (args.providerId ? bill.providerId === args.providerId : true));
+    const rows = await Promise.all(
+      filtered.map(async (bill) => {
+        const provider = bill.providerId ? await ctx.db.get(bill.providerId) : null;
+        const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+        const lineItems = getLineItems(bill.extractedData);
+        let feedTotal = 0;
+        let beddingTotal = 0;
+        for (const item of lineItems) {
+          if (!item || typeof item !== "object") continue;
+          const record = item as Record<string, unknown>;
+          const subcategory = slugify(String(record.subcategory ?? ""));
+          const amount = getLineItemTotalUsd(record);
+          if (subcategory === "bedding") beddingTotal += amount;
+          else feedTotal += amount;
+        }
+        return {
+          ...bill,
+          providerName: provider?.name ?? bill.customProviderName ?? "Unknown",
+          providerSlug: provider?.slug ?? slugify(provider?.name ?? bill.customProviderName ?? "unknown"),
+          invoiceNumber: typeof extracted.invoice_number === "string" ? extracted.invoice_number : bill.fileName,
+          invoiceDate: typeof extracted.invoice_date === "string" ? extracted.invoice_date : null,
+          totalUsd: getInvoiceTotalUsdFromAny(bill.extractedData),
+          feedTotal,
+          beddingTotal,
+          lineItemCount: lineItems.length,
+          approvalStatus: bill.status === "done" && bill.isApproved ? "approved" : "pending"
+        };
+      })
+    );
+    return rows.sort((a, b) => {
+      const aDate = getInvoiceDateSortValue(a);
+      const bDate = getInvoiceDateSortValue(b);
+      if (aDate !== bDate) return bDate - aDate;
+      return b.uploadedAt - a.uploadedAt;
+    });
+  }
+});
+
+export const saveFeedBeddingAssignment = mutation({
+  args: {
+    billId: v.id("bills"),
+    splitType: v.union(v.literal("single"), v.literal("split")),
+    assignedHorses: v.array(
+      v.object({
+        horseId: v.id("horses"),
+        horseName: v.string(),
+        amount: v.number()
+      })
+    )
+  },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+    await ctx.db.patch(args.billId, {
+      horseSplitType: args.splitType,
+      assignedHorses: args.assignedHorses
+    });
+    return args.billId;
+  }
+});
+
 export const getStablingBills = query({
   args: {
     categoryId: v.id("categories"),
@@ -705,6 +867,8 @@ export const getBizOverview = query({
             ? bill.travelSubcategory ?? slugify(providerName)
             : categorySlug === "housing"
               ? bill.housingSubcategory ?? slugify(providerName)
+              : categorySlug === "marketing"
+                ? bill.marketingSubcategory ?? slugify(providerName)
               : provider?.slug ?? slugify(providerName);
         const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
         const invoiceNumber =
@@ -854,7 +1018,8 @@ export const createParsingBill = internalMutation({
     originalPdfUrl: v.optional(v.string()),
     travelSubcategory: v.optional(v.string()),
     housingSubcategory: v.optional(v.string()),
-    horseTransportSubcategory: v.optional(v.string())
+    horseTransportSubcategory: v.optional(v.string()),
+    marketingSubcategory: v.optional(v.string())
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("bills", {
@@ -869,7 +1034,8 @@ export const createParsingBill = internalMutation({
       originalPdfUrl: args.originalPdfUrl,
       travelSubcategory: args.travelSubcategory,
       housingSubcategory: args.housingSubcategory,
-      horseTransportSubcategory: args.horseTransportSubcategory
+      horseTransportSubcategory: args.horseTransportSubcategory,
+      marketingSubcategory: args.marketingSubcategory
     });
   }
 });
@@ -907,6 +1073,8 @@ export const markDone = internalMutation({
     travelSubcategory: v.optional(v.string()),
     housingSubcategory: v.optional(v.string()),
     horseTransportSubcategory: v.optional(v.string()),
+    marketingSubcategory: v.optional(v.string()),
+    providerId: v.optional(v.id("providers")),
     horseAssignments: v.optional(
       v.array(
         v.object({
@@ -943,6 +1111,8 @@ export const markDone = internalMutation({
       travelSubcategory: args.travelSubcategory,
       housingSubcategory: args.housingSubcategory,
       horseTransportSubcategory: args.horseTransportSubcategory,
+      marketingSubcategory: args.marketingSubcategory,
+      providerId: args.providerId,
       horseAssignments: args.horseAssignments,
       splitLineItems: args.splitLineItems,
       originalCurrency: args.originalCurrency,
@@ -1163,6 +1333,13 @@ function getLineItemTotalUsdByIndex(extractedData: unknown, index: number) {
   return 0;
 }
 
+function getLineItemTotalUsd(record: Record<string, unknown>) {
+  if (typeof record.total_usd === "number" && Number.isFinite(record.total_usd)) return record.total_usd;
+  if (typeof record.amount_usd === "number" && Number.isFinite(record.amount_usd)) return record.amount_usd;
+  if (typeof record.total === "number" && Number.isFinite(record.total)) return record.total;
+  return 0;
+}
+
 function classifyStablingSubcategory(item: Record<string, unknown>) {
   const raw = pickString(item, ["stabling_subcategory", "subcategory", "line_item_subcategory"]);
   const slug = slugify(raw ?? "");
@@ -1319,6 +1496,8 @@ function getCategoryColor(slug: string) {
   const map: Record<string, string> = {
     veterinary: "#4A5BDB",
     farrier: "#14B8A6",
+    bodywork: "#5B8DEF",
+    "feed-bedding": "#22C583",
     stabling: "#F59E0B",
     travel: "#EC4899",
     housing: "#A78BFA",

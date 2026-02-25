@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 
 export const getProvidersByCategory = query({
   args: { categoryId: v.id("categories") },
@@ -76,6 +76,19 @@ export const getProviderBySlug = query({
 });
 
 export const getProviderByNameInCategory = query({
+  args: {
+    categoryId: v.id("categories"),
+    name: v.string()
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("providers")
+      .withIndex("by_category_name", (q) => q.eq("categoryId", args.categoryId).eq("name", args.name))
+      .first();
+  }
+});
+
+export const getProviderByNameInCategoryInternal = internalQuery({
   args: {
     categoryId: v.id("categories"),
     name: v.string()
