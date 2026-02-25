@@ -32,6 +32,11 @@ const TRAVEL_SUBCATEGORIES = [
   { name: "Hotels", slug: "hotels" }
 ] as const;
 
+const HOUSING_SUBCATEGORIES = [
+  { name: "Rider Housing", slug: "rider-housing" },
+  { name: "Groom Housing", slug: "groom-housing" }
+] as const;
+
 const CATEGORY_DISPLAY_ORDER = [
   "Veterinary",
   "Feed & Bedding",
@@ -60,6 +65,7 @@ export default function UploadPage() {
   const [selectedCategory, setSelectedCategory] = useState<Id<"categories"> | "">("");
   const [selectedProvider, setSelectedProvider] = useState<Id<"providers"> | "">("");
   const [selectedTravelSubcategory, setSelectedTravelSubcategory] = useState<string>("");
+  const [selectedHousingSubcategory, setSelectedHousingSubcategory] = useState<string>("");
   const [files, setFiles] = useState<LocalUploadFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<UploadState>("idle");
@@ -88,14 +94,17 @@ export default function UploadPage() {
 
   const selectedCategoryDoc = categories.find((category) => category._id === selectedCategory);
   const isTravelCategory = selectedCategoryDoc?.slug === "travel";
+  const isHousingCategory = selectedCategoryDoc?.slug === "housing";
+  const isPeopleSubcategoryCategory = isTravelCategory || isHousingCategory;
   const selectedProviderDoc = providers.find((provider) => provider._id === selectedProvider);
   const selectedTravelOption = TRAVEL_SUBCATEGORIES.find((row) => row.slug === selectedTravelSubcategory);
+  const selectedHousingOption = HOUSING_SUBCATEGORIES.find((row) => row.slug === selectedHousingSubcategory);
 
   const providerPlaceholder = providersQuery === undefined
     ? "loading options..."
     : !selectedCategory
       ? "select a category first"
-      : isTravelCategory
+      : isPeopleSubcategoryCategory
         ? "select a subcategory"
         : providers.length === 0
           ? "no providers for this category"
@@ -109,8 +118,12 @@ export default function UploadPage() {
       const subSlug = selectedTravelOption?.slug ?? selectedProviderDoc.slug ?? slugify(selectedProviderDoc.name);
       return `/travel/${subSlug}`;
     }
+    if (selectedCategoryDoc.slug === "housing") {
+      const subSlug = selectedHousingOption?.slug ?? selectedProviderDoc.slug ?? slugify(selectedProviderDoc.name);
+      return `/housing/${subSlug}`;
+    }
     return `/${selectedCategoryDoc.slug}/${selectedProviderDoc.slug ?? slugify(selectedProviderDoc.name)}`;
-  }, [selectedCategoryDoc, selectedProviderDoc, selectedTravelOption?.slug]);
+  }, [selectedCategoryDoc, selectedHousingOption?.slug, selectedProviderDoc, selectedTravelOption?.slug]);
 
   const allComplete = useMemo(() => {
     if (files.length === 0) return false;
@@ -164,6 +177,7 @@ export default function UploadPage() {
     setSelectedCategory((value || "") as Id<"categories"> | "");
     setSelectedProvider("");
     setSelectedTravelSubcategory("");
+    setSelectedHousingSubcategory("");
   }
 
   function onProviderChange(value: string) {
@@ -172,6 +186,12 @@ export default function UploadPage() {
 
   function onTravelSubcategoryChange(value: string) {
     setSelectedTravelSubcategory(value);
+    const provider = providers.find((row) => (row.slug ?? slugify(row.name)) === value);
+    setSelectedProvider(provider?._id ?? "");
+  }
+
+  function onHousingSubcategoryChange(value: string) {
+    setSelectedHousingSubcategory(value);
     const provider = providers.find((row) => (row.slug ?? slugify(row.name)) === value);
     setSelectedProvider(provider?._id ?? "");
   }
@@ -232,6 +252,7 @@ export default function UploadPage() {
         categoryId: selectedCategory,
         providerId: selectedProvider,
         travelSubcategory: selectedTravelSubcategory || undefined,
+        housingSubcategory: selectedHousingSubcategory || undefined,
         base64Pdf,
       });
 
@@ -292,7 +313,7 @@ export default function UploadPage() {
           </label>
 
           <label className={styles.field}>
-            <span className={styles.label}>{isTravelCategory ? "SUBCATEGORY *" : "PROVIDER *"}</span>
+            <span className={styles.label}>{isPeopleSubcategoryCategory ? "SUBCATEGORY *" : "PROVIDER *"}</span>
             {isTravelCategory ? (
               <select
                 value={selectedTravelSubcategory}
@@ -302,6 +323,23 @@ export default function UploadPage() {
               >
                 <option value="">{providerPlaceholder}</option>
                 {TRAVEL_SUBCATEGORIES.map((option) => {
+                  const exists = providers.some((provider) => (provider.slug ?? slugify(provider.name)) === option.slug);
+                  return (
+                    <option key={option.slug} value={option.slug} disabled={!exists}>
+                      {option.name}
+                    </option>
+                  );
+                })}
+              </select>
+            ) : isHousingCategory ? (
+              <select
+                value={selectedHousingSubcategory}
+                onChange={(event) => onHousingSubcategoryChange(event.target.value)}
+                className={styles.select}
+                disabled={!selectedCategory || providersQuery === undefined}
+              >
+                <option value="">{providerPlaceholder}</option>
+                {HOUSING_SUBCATEGORIES.map((option) => {
                   const exists = providers.some((provider) => (provider.slug ?? slugify(provider.name)) === option.slug);
                   return (
                     <option key={option.slug} value={option.slug} disabled={!exists}>
@@ -415,7 +453,7 @@ function BillStatusRow({
 
   useEffect(() => {
     if (!status.billId || bill === undefined || !bill) return;
-    if (bill.status === "done") {
+    if (bill.status === "done" || bill.status === "pending") {
       onStageChange(fileId, "done");
       return;
     }

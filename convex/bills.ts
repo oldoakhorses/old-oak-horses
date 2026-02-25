@@ -4,6 +4,7 @@ import { action, internalAction, internalMutation, internalQuery, mutation, quer
 import { internal } from "./_generated/api";
 
 const TRAVEL_SUBCATEGORY_SLUGS = new Set(["flights", "trains", "rental-car", "gas", "meals", "hotels"]);
+const HOUSING_SUBCATEGORY_SLUGS = new Set(["rider-housing", "groom-housing"]);
 
 export const generateUploadUrl = mutation(async (ctx) => {
   return await ctx.storage.generateUploadUrl();
@@ -246,6 +247,33 @@ export const getTravelSpendBySubcategory = query({
   }
 });
 
+export const getHousingSpendBySubcategory = query({
+  args: { categoryId: v.id("categories") },
+  handler: async (ctx, args) => {
+    const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
+    const totals = new Map<string, { totalSpend: number; invoiceCount: number }>();
+
+    for (const bill of bills) {
+      const subcategory = (bill.housingSubcategory ?? "other").toLowerCase();
+      const total = getInvoiceTotalUsdFromAny(bill.extractedData);
+      const current = totals.get(subcategory) ?? { totalSpend: 0, invoiceCount: 0 };
+      current.totalSpend += total;
+      current.invoiceCount += 1;
+      totals.set(subcategory, current);
+    }
+
+    const grandTotal = [...totals.values()].reduce((sum, row) => sum + row.totalSpend, 0);
+    return [...totals.entries()]
+      .map(([subcategory, row]) => ({
+        subcategory,
+        totalSpend: row.totalSpend,
+        invoiceCount: row.invoiceCount,
+        pctOfTotal: grandTotal > 0 ? (row.totalSpend / grandTotal) * 100 : 0
+      }))
+      .sort((a, b) => b.totalSpend - a.totalSpend);
+  }
+});
+
 export const getTravelSpendByPerson = query({
   args: { categoryId: v.id("categories") },
   handler: async (ctx, args) => {
@@ -287,6 +315,105 @@ export const getTravelSpendByPerson = query({
         pctOfTotal: grandTotal > 0 ? (row.totalSpend / grandTotal) * 100 : 0
       }))
       .sort((a, b) => b.totalSpend - a.totalSpend);
+  }
+});
+
+export const getHousingSpendByPerson = query({
+  args: { categoryId: v.id("categories") },
+  handler: async (ctx, args) => {
+    return await getPeopleSpend(ctx, args.categoryId);
+  }
+});
+
+export const getHousingSpendByProvider = query({
+  args: { categoryId: v.id("categories") },
+  handler: async (ctx, args) => {
+    const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
+    const totals = new Map<string, { providerName: string; totalSpend: number; invoiceCount: number }>();
+
+    for (const bill of bills) {
+      const provider = await ctx.db.get(bill.providerId);
+      const providerName = provider?.name ?? "Unknown";
+      const current = totals.get(providerName) ?? { providerName, totalSpend: 0, invoiceCount: 0 };
+      current.totalSpend += getInvoiceTotalUsdFromAny(bill.extractedData);
+      current.invoiceCount += 1;
+      totals.set(providerName, current);
+    }
+
+    const grandTotal = [...totals.values()].reduce((sum, row) => sum + row.totalSpend, 0);
+    return [...totals.values()]
+      .map((row) => ({
+        providerName: row.providerName,
+        totalSpend: row.totalSpend,
+        invoiceCount: row.invoiceCount,
+        pctOfTotal: grandTotal > 0 ? (row.totalSpend / grandTotal) * 100 : 0
+      }))
+      .sort((a, b) => b.totalSpend - a.totalSpend);
+  }
+});
+
+export const getHousingBills = query({
+  args: {
+    categoryId: v.id("categories"),
+    subcategory: v.optional(v.string())
+  },
+  handler: async (ctx, args) => {
+    const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
+    const rows = await Promise.all(
+      bills.map(async (bill) => {
+        const provider = await ctx.db.get(bill.providerId);
+        const assignedPeopleResolved = await Promise.all(
+          (bill.assignedPeople ?? []).map(async (row) => {
+            const person = await ctx.db.get(row.personId);
+            return {
+              personId: row.personId,
+              amount: row.amount,
+              personName: person?.name ?? "Unknown",
+              role: person?.role ?? "freelance"
+            };
+          })
+        );
+        return {
+          ...bill,
+          providerName: provider?.name ?? "Unknown",
+          assignedPeopleResolved,
+          approvalStatus: bill.status === "done" && bill.isApproved ? "approved" : "pending"
+        };
+      })
+    );
+
+    return rows
+      .filter((row) => (args.subcategory ? row.housingSubcategory === args.subcategory : true))
+      .sort((a, b) => {
+        const aDate = getInvoiceDateSortValue(a);
+        const bDate = getInvoiceDateSortValue(b);
+        if (aDate !== bDate) return bDate - aDate;
+        return b.uploadedAt - a.uploadedAt;
+      });
+  }
+});
+
+export const getHousingStats = query({
+  args: {
+    categoryId: v.id("categories"),
+    subcategory: v.optional(v.string())
+  },
+  handler: async (ctx, args) => {
+    const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
+    const filtered = bills.filter((bill) => (args.subcategory ? bill.housingSubcategory === args.subcategory : true));
+    const currentYear = new Date().getFullYear();
+    const totalSpend = filtered.reduce((sum, row) => sum + getInvoiceTotalUsdFromAny(row.extractedData), 0);
+    const ytdInvoices = filtered.filter((row) => {
+      const extracted = (row.extractedData ?? {}) as { invoice_date?: unknown };
+      return typeof extracted.invoice_date === "string" && extracted.invoice_date.startsWith(String(currentYear));
+    });
+    return {
+      totalSpend,
+      totalInvoices: filtered.length,
+      ytdSpend: ytdInvoices.reduce((sum, row) => sum + getInvoiceTotalUsdFromAny(row.extractedData), 0),
+      ytdInvoices: ytdInvoices.length,
+      currentYear
+    };
   }
 });
 
@@ -413,15 +540,20 @@ export const parseBillPdf = internalAction({
         throw new Error(`Missing expected parsed fields: ${missingFields.join(", ")}`);
       }
 
-      const isTravel = category.slug === "travel";
-      const status = isTravel ? "pending" : "done";
-      const travelMeta = isTravel ? extractTravelMeta(parsed, provider?.slug ?? provider?.name) : {};
+      const isPeopleCategory = category.slug === "travel" || category.slug === "housing";
+      const status = isPeopleCategory ? "pending" : "done";
+      const categoryMeta =
+        category.slug === "travel"
+          ? extractTravelMeta(parsed, provider?.slug ?? provider?.name)
+          : category.slug === "housing"
+            ? extractHousingMeta(parsed, provider?.slug ?? provider?.name)
+            : {};
 
       await ctx.runMutation(internal.bills.markDone, {
         billId: bill._id,
         extractedData: parsed,
         status,
-        ...travelMeta
+        ...categoryMeta
       });
 
       const providerContactPatch = extractProviderContactInfo(parsed);
@@ -483,7 +615,8 @@ export const createParsingBill = internalMutation({
     billingPeriod: v.string(),
     uploadedAt: v.number(),
     originalPdfUrl: v.optional(v.string()),
-    travelSubcategory: v.optional(v.string())
+    travelSubcategory: v.optional(v.string()),
+    housingSubcategory: v.optional(v.string())
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("bills", {
@@ -495,7 +628,8 @@ export const createParsingBill = internalMutation({
       billingPeriod: args.billingPeriod,
       uploadedAt: args.uploadedAt,
       originalPdfUrl: args.originalPdfUrl,
-      travelSubcategory: args.travelSubcategory
+      travelSubcategory: args.travelSubcategory,
+      housingSubcategory: args.housingSubcategory
     });
   }
 });
@@ -531,6 +665,7 @@ export const markDone = internalMutation({
     extractedData: v.any(),
     status: v.union(v.literal("pending"), v.literal("done")),
     travelSubcategory: v.optional(v.string()),
+    housingSubcategory: v.optional(v.string()),
     originalCurrency: v.optional(v.string()),
     originalTotal: v.optional(v.number()),
     exchangeRate: v.optional(v.number()),
@@ -542,6 +677,7 @@ export const markDone = internalMutation({
       errorMessage: undefined,
       extractedData: args.extractedData,
       travelSubcategory: args.travelSubcategory,
+      housingSubcategory: args.housingSubcategory,
       originalCurrency: args.originalCurrency,
       originalTotal: args.originalTotal,
       exchangeRate: args.exchangeRate,
@@ -564,6 +700,28 @@ export const parseBillNow = action({
   args: { billId: v.id("bills") },
   handler: async (ctx, args) => {
     await ctx.runAction(internal.bills.parseBillPdf, { billId: args.billId });
+  }
+});
+
+export const savePersonAssignment = mutation({
+  args: {
+    billId: v.id("bills"),
+    isSplit: v.boolean(),
+    assignedPeople: v.array(
+      v.object({
+        personId: v.id("people"),
+        amount: v.number()
+      })
+    )
+  },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+    await ctx.db.patch(args.billId, {
+      isSplit: args.isSplit,
+      assignedPeople: args.assignedPeople
+    });
+    return args.billId;
   }
 });
 
@@ -714,6 +872,68 @@ function extractTravelMeta(parsed: Record<string, unknown>, providerSlugOrName: 
     exchangeRate,
     isApproved: false
   };
+}
+
+function extractHousingMeta(parsed: Record<string, unknown>, providerSlugOrName: string | undefined) {
+  const originalCurrency = pickString(parsed, ["original_currency", "currency"])?.toUpperCase();
+  const originalTotal = pickNumber(parsed, ["original_total", "invoice_total_original"]);
+  const exchangeRate = pickNumber(parsed, ["exchange_rate", "exchange_rate_used"]);
+  const providerSubcategory = slugify(providerSlugOrName ?? "");
+  const parsedSubcategory = slugify(pickString(parsed, ["housing_subcategory", "subcategory"]) ?? "");
+  const housingSubcategory = HOUSING_SUBCATEGORY_SLUGS.has(parsedSubcategory)
+    ? parsedSubcategory
+    : HOUSING_SUBCATEGORY_SLUGS.has(providerSubcategory)
+      ? providerSubcategory
+      : "housing";
+
+  return {
+    housingSubcategory,
+    originalCurrency,
+    originalTotal,
+    exchangeRate,
+    isApproved: false
+  };
+}
+
+async function getPeopleSpend(ctx: any, categoryId: string) {
+  const bills = await ctx.db.query("bills").withIndex("by_category", (q: any) => q.eq("categoryId", categoryId)).collect();
+  const totals = new Map<string, { personId: string; totalSpend: number; invoiceCount: number }>();
+
+  for (const bill of bills) {
+    const assigned = bill.assignedPeople ?? [];
+    for (const row of assigned) {
+      const key = row.personId;
+      const current = totals.get(key) ?? { personId: key, totalSpend: 0, invoiceCount: 0 };
+      current.totalSpend += row.amount;
+      current.invoiceCount += 1;
+      totals.set(key, current);
+    }
+  }
+
+  const people = await Promise.all(
+    [...totals.values()].map(async (row) => {
+      const person = await ctx.db.get(row.personId as any);
+      return {
+        personId: row.personId,
+        person,
+        totalSpend: row.totalSpend,
+        invoiceCount: row.invoiceCount
+      };
+    })
+  );
+  const grandTotal = people.reduce((sum, row) => sum + row.totalSpend, 0);
+
+  return people
+    .filter((row) => row.person && "name" in row.person && "role" in row.person)
+    .map((row) => ({
+      personId: row.person!._id,
+      personName: (row.person as any).name as string,
+      role: (row.person as any).role as string,
+      totalSpend: row.totalSpend,
+      invoiceCount: row.invoiceCount,
+      pctOfTotal: grandTotal > 0 ? (row.totalSpend / grandTotal) * 100 : 0
+    }))
+    .sort((a, b) => b.totalSpend - a.totalSpend);
 }
 
 function pickNumber(source: Record<string, unknown>, keys: string[]) {

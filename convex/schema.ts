@@ -64,6 +64,7 @@ export default defineSchema({
     errorMessage: v.optional(v.string()),
     originalPdfUrl: v.optional(v.string()),
     travelSubcategory: v.optional(v.string()),
+    housingSubcategory: v.optional(v.string()),
     originalCurrency: v.optional(v.string()),
     originalTotal: v.optional(v.number()),
     exchangeRate: v.optional(v.number()),

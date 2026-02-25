@@ -235,6 +235,39 @@ export const seedCategories = mutation(async (ctx) => {
     }
   }
 
+  const housingCategory = await ctx.db
+    .query("categories")
+    .withIndex("by_slug", (q) => q.eq("slug", "housing"))
+    .first();
+  if (!housingCategory) {
+    throw new Error("Housing category not found after category seed");
+  }
+
+  const housingProviders = ["Rider Housing", "Groom Housing"] as const;
+  for (const name of housingProviders) {
+    const existingProvider = await ctx.db
+      .query("providers")
+      .withIndex("by_category_name", (q) => q.eq("categoryId", housingCategory._id).eq("name", name))
+      .first();
+    if (!existingProvider) {
+      await ctx.db.insert("providers", {
+        categoryId: housingCategory._id,
+        name,
+        slug: slugify(name),
+        extractionPrompt:
+          "Extract a housing invoice as strict JSON with original_currency, original_total, exchange_rate, total_usd, invoice_number, invoice_date, provider_name, and line_items[].",
+        expectedFields: ["invoice_number", "invoice_date", "provider_name", "original_currency", "original_total", "total_usd", "line_items"],
+        createdAt: Date.now()
+      });
+      createdProviders += 1;
+      continue;
+    }
+    if (!existingProvider.slug) {
+      await ctx.db.patch(existingProvider._id, { slug: slugify(name), updatedAt: Date.now() });
+      updatedProviders += 1;
+    }
+  }
+
   return { createdCategories, createdProviders, updatedProviders, skipped: false };
 });
 

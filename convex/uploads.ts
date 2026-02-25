@@ -8,6 +8,7 @@ export const uploadAndParseBill: any = action({
     categoryId: v.id("categories"),
     providerId: v.id("providers"),
     travelSubcategory: v.optional(v.string()),
+    housingSubcategory: v.optional(v.string()),
     base64Pdf: v.string(),
     uploadedAt: v.optional(v.number())
   },
@@ -49,7 +50,8 @@ export const uploadAndParseBill: any = action({
       billingPeriod: uploadDate.slice(0, 7),
       uploadedAt,
       originalPdfUrl,
-      travelSubcategory: args.travelSubcategory
+      travelSubcategory: args.travelSubcategory,
+      housingSubcategory: args.housingSubcategory
     })) as Id<"bills">;
 
     await ctx.scheduler.runAfter(0, internal.bills.parseBillPdf, { billId });
