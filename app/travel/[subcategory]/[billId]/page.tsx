@@ -142,7 +142,7 @@ export default function TravelInvoicePage() {
           { label: subcategory, href: `/travel/${subcategory}` },
           { label: extracted.invoice_number || "invoice", current: true }
         ]}
-        actions={[{ label: "biz overview", href: "/reports", variant: "filled" }]}
+        actions={[{ label: "biz overview", href: "/biz-overview", variant: "filled" }]}
       />
 
       <main className="page-main">

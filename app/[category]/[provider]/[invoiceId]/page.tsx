@@ -96,7 +96,7 @@ export default function InvoiceReportPage() {
           { label: providerSlug, href: `/${categorySlug}/${providerSlug}` },
           { label: extracted.invoice_number || "invoice", current: true },
         ]}
-        actions={[{ label: "biz overview", href: "/reports", variant: "filled" }]}
+        actions={[{ label: "biz overview", href: "/biz-overview", variant: "filled" }]}
       />
 
       <main className="page-main">

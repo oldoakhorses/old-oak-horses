@@ -59,7 +59,7 @@ export default function StablingOverviewPage() {
         ]}
         actions={[
           { label: "upload invoices", href: "/upload", variant: "outlined" },
-          { label: "biz overview", href: "/reports", variant: "filled" }
+          { label: "biz overview", href: "/biz-overview", variant: "filled" }
         ]}
       />
 

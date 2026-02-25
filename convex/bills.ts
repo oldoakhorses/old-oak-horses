@@ -578,6 +578,183 @@ export const getStablingSpendByHorse = query({
   }
 });
 
+export const getBizOverview = query({
+  args: {
+    period: v.union(v.literal("thisMonth"), v.literal("ytd"), v.literal("2024"), v.literal("all"))
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const currentRange = getPeriodRange(args.period, now);
+    const previousRange = getPreviousPeriodRange(args.period, currentRange);
+
+    const [bills, categories, people] = await Promise.all([
+      ctx.db.query("bills").collect(),
+      ctx.db.query("categories").collect(),
+      ctx.db.query("people").withIndex("by_active", (q) => q.eq("isActive", true)).collect(),
+    ]);
+    const categoryById = new Map(categories.map((row) => [String(row._id), row]));
+    const peopleById = new Map(people.map((row) => [String(row._id), row]));
+
+    const providerIds = [...new Set(bills.flatMap((bill) => (bill.providerId ? [bill.providerId] : [])))];
+    const providerDocs = await Promise.all(providerIds.map((id) => ctx.db.get(id)));
+    const providerById = new Map(providerDocs.filter(Boolean).map((row: any) => [String(row._id), row]));
+
+    const currentBills = bills.filter((bill) => inRange(getBillTimestamp(bill), currentRange));
+    const previousBills = bills.filter((bill) => inRange(getBillTimestamp(bill), previousRange));
+
+    const totalSpend = sumInvoiceTotals(currentBills);
+    const previousPeriodSpend = sumInvoiceTotals(previousBills);
+    const invoiceCount = currentBills.length;
+    const categoryCount = new Set(
+      currentBills.map((bill) => categoryById.get(String(bill.categoryId))?.slug ?? "unknown")
+    ).size;
+
+    const categoriesRows = categories
+      .map((category) => {
+        const current = currentBills.filter((bill) => String(bill.categoryId) === String(category._id));
+        const previous = previousBills.filter((bill) => String(bill.categoryId) === String(category._id));
+        return {
+          name: category.name,
+          slug: category.slug,
+          color: getCategoryColor(category.slug),
+          spend: sumInvoiceTotals(current),
+          previousSpend: sumInvoiceTotals(previous),
+          invoiceCount: current.length
+        };
+      })
+      .filter((row) => row.spend > 0 || row.invoiceCount > 0)
+      .sort((a, b) => b.spend - a.spend);
+
+    const horseMap = new Map<string, { name: string; totalSpend: number; breakdown: Record<string, number>; invoiceIds: Set<string> }>();
+    for (const bill of currentBills) {
+      const categorySlug = categoryById.get(String(bill.categoryId))?.slug ?? "unknown";
+      const horseRows = getHorseSpendRowsFromBill(bill, categorySlug);
+      for (const row of horseRows) {
+        const key = row.horseName.toLowerCase();
+        const current = horseMap.get(key) ?? {
+          name: row.horseName,
+          totalSpend: 0,
+          breakdown: { veterinary: 0, farrier: 0, stabling: 0, other: 0 },
+          invoiceIds: new Set<string>()
+        };
+        current.totalSpend += row.amount;
+        const bucket =
+          categorySlug === "veterinary"
+            ? "veterinary"
+            : categorySlug === "farrier"
+              ? "farrier"
+              : categorySlug === "stabling"
+                ? "stabling"
+                : "other";
+        current.breakdown[bucket] += row.amount;
+        current.invoiceIds.add(String(bill._id));
+        horseMap.set(key, current);
+      }
+    }
+    const horseTotal = [...horseMap.values()].reduce((sum, row) => sum + row.totalSpend, 0);
+    const horses = [...horseMap.values()]
+      .map((row) => ({
+        name: row.name,
+        totalSpend: row.totalSpend,
+        pctOfTotal: horseTotal > 0 ? (row.totalSpend / horseTotal) * 100 : 0,
+        invoiceCount: row.invoiceIds.size,
+        breakdown: row.breakdown
+      }))
+      .sort((a, b) => b.totalSpend - a.totalSpend);
+
+    const peopleMap = new Map<string, { personId: string; name: string; role: string; totalSpend: number; breakdown: { travel: number; housing: number }; invoiceIds: Set<string> }>();
+    for (const bill of currentBills) {
+      const categorySlug = categoryById.get(String(bill.categoryId))?.slug ?? "unknown";
+      if (categorySlug !== "travel" && categorySlug !== "housing") continue;
+      for (const row of bill.assignedPeople ?? []) {
+        const person = peopleById.get(String(row.personId));
+        const key = String(row.personId);
+        const current = peopleMap.get(key) ?? {
+          personId: key,
+          name: person?.name ?? "Unknown",
+          role: person?.role ?? "freelance",
+          totalSpend: 0,
+          breakdown: { travel: 0, housing: 0 },
+          invoiceIds: new Set<string>()
+        };
+        current.totalSpend += row.amount;
+        if (categorySlug === "travel") current.breakdown.travel += row.amount;
+        if (categorySlug === "housing") current.breakdown.housing += row.amount;
+        current.invoiceIds.add(String(bill._id));
+        peopleMap.set(key, current);
+      }
+    }
+    const peopleTotal = [...peopleMap.values()].reduce((sum, row) => sum + row.totalSpend, 0);
+    const peopleRows = [...peopleMap.values()]
+      .map((row) => ({
+        personId: row.personId,
+        name: row.name,
+        role: row.role as "rider" | "groom" | "freelance" | "trainer",
+        totalSpend: row.totalSpend,
+        pctOfTotal: peopleTotal > 0 ? (row.totalSpend / peopleTotal) * 100 : 0,
+        invoiceCount: row.invoiceIds.size,
+        breakdown: row.breakdown
+      }))
+      .sort((a, b) => b.totalSpend - a.totalSpend);
+
+    const recentInvoices = currentBills
+      .map((bill) => {
+        const category = categoryById.get(String(bill.categoryId));
+        const categorySlug = category?.slug ?? "unknown";
+        const provider = bill.providerId ? providerById.get(String(bill.providerId)) : null;
+        const providerName = provider?.name ?? bill.customProviderName ?? "Unknown";
+        const providerSlug =
+          categorySlug === "travel"
+            ? bill.travelSubcategory ?? slugify(providerName)
+            : categorySlug === "housing"
+              ? bill.housingSubcategory ?? slugify(providerName)
+              : provider?.slug ?? slugify(providerName);
+        const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+        const invoiceNumber =
+          typeof extracted.invoice_number === "string" && extracted.invoice_number.trim().length > 0
+            ? extracted.invoice_number
+            : bill.fileName;
+        const date =
+          typeof extracted.invoice_date === "string" && extracted.invoice_date.trim().length > 0
+            ? extracted.invoice_date
+            : new Date(bill.uploadedAt).toISOString().slice(0, 10);
+        const entities = getInvoiceEntities(bill, categorySlug, peopleById);
+
+        return {
+          _id: bill._id,
+          invoiceNumber,
+          category: category?.name ?? "Unknown",
+          categoryColor: getCategoryColor(categorySlug),
+          provider: providerName,
+          date,
+          entities: entities.names,
+          entityType: entities.type,
+          status: (bill.status === "done" && bill.isApproved) || categorySlug === "veterinary" ? "done" : "pending",
+          total: getInvoiceTotalUsdFromAny(bill.extractedData),
+          categorySlug,
+          providerSlug
+        };
+      })
+      .sort((a, b) => {
+        const aTs = Date.parse(a.date);
+        const bTs = Date.parse(b.date);
+        if (Number.isFinite(aTs) && Number.isFinite(bTs) && aTs !== bTs) return bTs - aTs;
+        return 0;
+      });
+
+    return {
+      totalSpend,
+      previousPeriodSpend,
+      invoiceCount,
+      categoryCount,
+      categories: categoriesRows,
+      horses,
+      people: peopleRows,
+      recentInvoices
+    };
+  }
+});
+
 export const getBillsByDateRange = query({
   args: {
     categoryId: v.id("categories"),
@@ -1249,4 +1426,149 @@ function genericExtractionPrompt(categorySlug?: string) {
     return `${base} For each line item return amount_original and amount_usd when available.`;
   }
   return base;
+}
+
+function inRange(ts: number, range: { start: number; end: number }) {
+  return ts >= range.start && ts <= range.end;
+}
+
+function getBillTimestamp(bill: { extractedData?: unknown; uploadedAt: number }) {
+  const extracted = (bill.extractedData ?? {}) as { invoice_date?: unknown };
+  if (typeof extracted.invoice_date === "string") {
+    const parsed = Date.parse(extracted.invoice_date);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return bill.uploadedAt;
+}
+
+function getPeriodRange(period: "thisMonth" | "ytd" | "2024" | "all", nowTs: number) {
+  const now = new Date(nowTs);
+  switch (period) {
+    case "thisMonth":
+      return { start: new Date(now.getFullYear(), now.getMonth(), 1).getTime(), end: nowTs };
+    case "ytd":
+      return { start: new Date(now.getFullYear(), 0, 1).getTime(), end: nowTs };
+    case "2024":
+      return { start: new Date(2024, 0, 1).getTime(), end: new Date(2024, 11, 31, 23, 59, 59, 999).getTime() };
+    case "all":
+    default:
+      return { start: 0, end: nowTs };
+  }
+}
+
+function getPreviousPeriodRange(period: "thisMonth" | "ytd" | "2024" | "all", current: { start: number; end: number }) {
+  const startDate = new Date(current.start);
+  switch (period) {
+    case "thisMonth": {
+      const prevStart = new Date(startDate.getFullYear(), startDate.getMonth() - 1, 1).getTime();
+      const prevEnd = new Date(startDate.getFullYear(), startDate.getMonth(), 0, 23, 59, 59, 999).getTime();
+      return { start: prevStart, end: prevEnd };
+    }
+    case "ytd": {
+      const now = new Date(current.end);
+      const daysIntoYear = Math.floor((current.end - new Date(now.getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24));
+      const prevYear = now.getFullYear() - 1;
+      return {
+        start: new Date(prevYear, 0, 1).getTime(),
+        end: new Date(prevYear, 0, 1 + daysIntoYear, 23, 59, 59, 999).getTime()
+      };
+    }
+    case "2024":
+      return { start: new Date(2023, 0, 1).getTime(), end: new Date(2023, 11, 31, 23, 59, 59, 999).getTime() };
+    case "all":
+    default:
+      return { start: 0, end: 0 };
+  }
+}
+
+function sumInvoiceTotals(bills: Array<{ extractedData?: unknown }>) {
+  return bills.reduce((sum, bill) => sum + getInvoiceTotalUsdFromAny(bill.extractedData), 0);
+}
+
+function getHorseSpendRowsFromBill(
+  bill: {
+    extractedData?: unknown;
+    horseAssignments?: Array<{ lineItemIndex: number; horseName?: string }>;
+    splitLineItems?: Array<{ lineItemIndex: number; splits: Array<{ horseName: string; amount: number }> }>;
+  },
+  categorySlug: string
+) {
+  const rows: Array<{ horseName: string; amount: number }> = [];
+  if (categorySlug === "stabling") {
+    for (const row of bill.horseAssignments ?? []) {
+      const horseName = row.horseName?.trim();
+      if (!horseName) continue;
+      rows.push({ horseName, amount: getLineItemTotalUsdByIndex(bill.extractedData, row.lineItemIndex) });
+    }
+    for (const row of bill.splitLineItems ?? []) {
+      for (const split of row.splits) {
+        const horseName = split.horseName?.trim();
+        if (!horseName) continue;
+        rows.push({ horseName, amount: split.amount });
+      }
+    }
+    return rows;
+  }
+
+  const lineItems = getLineItems(bill.extractedData);
+  for (const item of lineItems) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const horseName = pickString(record, ["horse_name", "horseName"]);
+    if (!horseName) continue;
+    const amount =
+      typeof record.total_usd === "number" ? record.total_usd :
+      typeof record.amount_usd === "number" ? record.amount_usd : 0;
+    rows.push({ horseName, amount });
+  }
+  return rows;
+}
+
+function getInvoiceEntities(
+  bill: {
+    extractedData?: unknown;
+    assignedPeople?: Array<{ personId: string }>;
+    horseAssignments?: Array<{ horseName?: string }>;
+    splitLineItems?: Array<{ splits: Array<{ horseName: string }> }>;
+  },
+  categorySlug: string,
+  peopleById: Map<string, { name: string }>
+) {
+  if (categorySlug === "travel" || categorySlug === "housing") {
+    const names = [...new Set((bill.assignedPeople ?? []).map((row) => peopleById.get(String(row.personId))?.name).filter(Boolean) as string[])];
+    return { type: "person" as const, names };
+  }
+
+  const names = new Set<string>();
+  for (const row of bill.horseAssignments ?? []) {
+    if (row.horseName?.trim()) names.add(row.horseName.trim());
+  }
+  for (const row of bill.splitLineItems ?? []) {
+    for (const split of row.splits) {
+      if (split.horseName?.trim()) names.add(split.horseName.trim());
+    }
+  }
+  if (names.size === 0) {
+    const lineItems = getLineItems(bill.extractedData);
+    for (const item of lineItems) {
+      if (!item || typeof item !== "object") continue;
+      const horseName = pickString(item as Record<string, unknown>, ["horse_name", "horseName"]);
+      if (horseName) names.add(horseName);
+    }
+  }
+  return { type: "horse" as const, names: [...names] };
+}
+
+function getCategoryColor(slug: string) {
+  const map: Record<string, string> = {
+    veterinary: "#4A5BDB",
+    farrier: "#14B8A6",
+    stabling: "#F59E0B",
+    travel: "#EC4899",
+    housing: "#A78BFA",
+    "entry-fees": "#EF4444",
+    "tack-equipment": "#6B7084",
+    insurance: "#22C583",
+  };
+  return map[slug] ?? "#6B7084";
 }
