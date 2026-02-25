@@ -279,7 +279,8 @@ export const seedCategories = mutation(async (ctx) => {
   const stablingProviders = [
     { name: "Travers Horse Facility", slug: "travers-horse-facility" },
     { name: "El Campeon Farms", slug: "el-campeon-farms" },
-    { name: "Vanessa Mannix Stables", slug: "vanessa-mannix-stables" }
+    { name: "Vanessa Mannix Stables", slug: "vanessa-mannix-stables" },
+    { name: "Malnik Family Farms", slug: "malnik-family-farms" }
   ] as const;
 
   for (const provider of stablingProviders) {
@@ -294,6 +295,44 @@ export const seedCategories = mutation(async (ctx) => {
         slug: provider.slug,
         extractionPrompt:
           "Extract a stabling invoice as strict JSON with invoice_number, invoice_date, provider_name, account_number, original_currency, original_total, exchange_rate, invoice_total_usd and line_items[] containing description, total_usd, horse_name (if present), and stabling_subcategory.",
+        expectedFields: ["invoice_number", "invoice_date", "provider_name", "invoice_total_usd", "line_items"],
+        createdAt: Date.now()
+      });
+      createdProviders += 1;
+      continue;
+    }
+    if (!existingProvider.slug) {
+      await ctx.db.patch(existingProvider._id, { slug: provider.slug, updatedAt: Date.now() });
+      updatedProviders += 1;
+    }
+  }
+
+  const farrierCategory = await ctx.db
+    .query("categories")
+    .withIndex("by_slug", (q) => q.eq("slug", "farrier"))
+    .first();
+  if (!farrierCategory) {
+    throw new Error("Farrier category not found after category seed");
+  }
+
+  const farrierProviders = [
+    { name: "Steve Lorenzo", slug: "steve-lorenzo" },
+    { name: "Tyler Tablert", slug: "tyler-tablert" },
+    { name: "Paul Bocken", slug: "paul-bocken" }
+  ] as const;
+
+  for (const provider of farrierProviders) {
+    const existingProvider = await ctx.db
+      .query("providers")
+      .withIndex("by_category_name", (q) => q.eq("categoryId", farrierCategory._id).eq("name", provider.name))
+      .first();
+    if (!existingProvider) {
+      await ctx.db.insert("providers", {
+        categoryId: farrierCategory._id,
+        name: provider.name,
+        slug: provider.slug,
+        extractionPrompt:
+          "Extract a farrier invoice as strict JSON with invoice_number, invoice_date, provider_name, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[].",
         expectedFields: ["invoice_number", "invoice_date", "provider_name", "invoice_total_usd", "line_items"],
         createdAt: Date.now()
       });

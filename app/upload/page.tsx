@@ -139,12 +139,12 @@ export default function UploadPage() {
 
   const otherNameValid = otherName.trim().length >= 2;
 
-  const providerPlaceholder = providersQuery === undefined
-    ? "loading options..."
-    : !selectedCategory
-      ? "select a category first"
-      : isPeopleSubcategoryCategory
-        ? "select a subcategory"
+  const providerPlaceholder = !selectedCategory
+    ? "select a category first"
+    : isPeopleSubcategoryCategory
+      ? "select a subcategory"
+      : providersQuery === undefined
+        ? "loading providers..."
         : providers.length === 0
           ? "no providers for this category"
           : "select a provider";
@@ -443,13 +443,12 @@ export default function UploadPage() {
                 value={selectedTravelSubcategory}
                 onChange={(event) => onTravelSubcategoryChange(event.target.value)}
                 className={styles.select}
-                disabled={!selectedCategory || providersQuery === undefined}
+                disabled={!selectedCategory}
               >
                 <option value="">{providerPlaceholder}</option>
                 {mergedTravelOptions.map((option) => {
-                  const exists = providers.some((provider) => (provider.slug ?? slugify(provider.name)) === option.slug) || customSubcategories.some((row) => row.slug === option.slug);
                   return (
-                    <option key={option.slug} value={option.slug} disabled={!exists}>
+                    <option key={option.slug} value={option.slug}>
                       {option.name}
                     </option>
                   );
@@ -462,13 +461,12 @@ export default function UploadPage() {
                 value={selectedHousingSubcategory}
                 onChange={(event) => onHousingSubcategoryChange(event.target.value)}
                 className={styles.select}
-                disabled={!selectedCategory || providersQuery === undefined}
+                disabled={!selectedCategory}
               >
                 <option value="">{providerPlaceholder}</option>
                 {mergedHousingOptions.map((option) => {
-                  const exists = providers.some((provider) => (provider.slug ?? slugify(provider.name)) === option.slug) || customSubcategories.some((row) => row.slug === option.slug);
                   return (
-                    <option key={option.slug} value={option.slug} disabled={!exists}>
+                    <option key={option.slug} value={option.slug}>
                       {option.name}
                     </option>
                   );
@@ -481,7 +479,7 @@ export default function UploadPage() {
                 value={selectedProvider}
                 onChange={(event) => onProviderChange(event.target.value)}
                 className={styles.select}
-                disabled={!selectedCategory || providersQuery === undefined}
+                disabled={!selectedCategory}
               >
                 <option value="">{providerPlaceholder}</option>
                 {providers.map((provider) => (
