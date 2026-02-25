@@ -51,12 +51,33 @@ export default defineSchema({
     categoryId: v.id("categories"),
     fileId: v.id("_storage"),
     fileName: v.string(),
-    status: v.union(v.literal("uploading"), v.literal("parsing"), v.literal("done"), v.literal("error")),
+    status: v.union(
+      v.literal("uploading"),
+      v.literal("parsing"),
+      v.literal("pending"),
+      v.literal("done"),
+      v.literal("error")
+    ),
     billingPeriod: v.string(),
     uploadedAt: v.number(),
     extractedData: v.optional(v.any()),
     errorMessage: v.optional(v.string()),
-    originalPdfUrl: v.optional(v.string())
+    originalPdfUrl: v.optional(v.string()),
+    travelSubcategory: v.optional(v.string()),
+    originalCurrency: v.optional(v.string()),
+    originalTotal: v.optional(v.number()),
+    exchangeRate: v.optional(v.number()),
+    isApproved: v.optional(v.boolean()),
+    approvedAt: v.optional(v.number()),
+    isSplit: v.optional(v.boolean()),
+    assignedPeople: v.optional(
+      v.array(
+        v.object({
+          personId: v.id("people"),
+          amount: v.number()
+        })
+      )
+    )
   })
     .index("by_uploadedAt", ["uploadedAt"])
     .index("by_provider", ["providerId"])
@@ -98,5 +119,14 @@ export default defineSchema({
   })
     .index("by_date", ["date"])
     .index("by_horse", ["horseId"])
-    .index("by_type", ["type"])
+    .index("by_type", ["type"]),
+
+  people: defineTable({
+    name: v.string(),
+    role: v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer")),
+    isActive: v.boolean(),
+    createdAt: v.number()
+  })
+    .index("by_role", ["role"])
+    .index("by_active", ["isActive"])
 });

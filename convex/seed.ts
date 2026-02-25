@@ -202,6 +202,39 @@ export const seedCategories = mutation(async (ctx) => {
     updatedProviders += 1;
   }
 
+  const travelCategory = await ctx.db
+    .query("categories")
+    .withIndex("by_slug", (q) => q.eq("slug", "travel"))
+    .first();
+  if (!travelCategory) {
+    throw new Error("Travel category not found after category seed");
+  }
+
+  const travelProviders = ["Flights", "Trains", "Rental Car", "Gas", "Meals", "Hotels"] as const;
+  for (const name of travelProviders) {
+    const existingProvider = await ctx.db
+      .query("providers")
+      .withIndex("by_category_name", (q) => q.eq("categoryId", travelCategory._id).eq("name", name))
+      .first();
+    if (!existingProvider) {
+      await ctx.db.insert("providers", {
+        categoryId: travelCategory._id,
+        name,
+        slug: slugify(name),
+        extractionPrompt:
+          "Extract a travel invoice as strict JSON with original_currency, original_total, exchange_rate, total_usd, invoice_number, invoice_date, provider_name, and line_items[].",
+        expectedFields: ["invoice_number", "invoice_date", "provider_name", "original_currency", "original_total", "total_usd", "line_items"],
+        createdAt: Date.now()
+      });
+      createdProviders += 1;
+      continue;
+    }
+    if (!existingProvider.slug) {
+      await ctx.db.patch(existingProvider._id, { slug: slugify(name), updatedAt: Date.now() });
+      updatedProviders += 1;
+    }
+  }
+
   return { createdCategories, createdProviders, updatedProviders, skipped: false };
 });
 
@@ -266,6 +299,31 @@ export const seedDashboardData = mutation(async (ctx) => {
   }
 
   return { createdHorses, createdContacts };
+});
+
+export const seedPeople = mutation(async (ctx) => {
+  const seedRows: Array<{ name: string; role: "rider" | "groom" | "freelance" | "trainer" }> = [
+    { name: "Lucy Davis Kennedy", role: "rider" },
+    { name: "Charlotte Oakes", role: "groom" },
+    { name: "Leah Knowles", role: "groom" },
+    { name: "Sigrun Land", role: "freelance" },
+    { name: "Johanna Mattila", role: "freelance" }
+  ];
+
+  let created = 0;
+  for (const row of seedRows) {
+    const existing = await ctx.db.query("people").filter((q) => q.eq(q.field("name"), row.name)).first();
+    if (existing) continue;
+    await ctx.db.insert("people", {
+      name: row.name,
+      role: row.role,
+      isActive: true,
+      createdAt: Date.now()
+    });
+    created += 1;
+  }
+
+  return { created };
 });
 
 function slugify(value: string) {

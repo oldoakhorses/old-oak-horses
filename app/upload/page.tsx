@@ -23,6 +23,15 @@ type TrackedStatus = {
   error?: string;
 };
 
+const TRAVEL_SUBCATEGORIES = [
+  { name: "Flights", slug: "flights" },
+  { name: "Trains", slug: "trains" },
+  { name: "Rental Car", slug: "rental-car" },
+  { name: "Gas", slug: "gas" },
+  { name: "Meals", slug: "meals" },
+  { name: "Hotels", slug: "hotels" }
+] as const;
+
 const CATEGORY_DISPLAY_ORDER = [
   "Veterinary",
   "Feed & Bedding",
@@ -50,6 +59,7 @@ export default function UploadPage() {
 
   const [selectedCategory, setSelectedCategory] = useState<Id<"categories"> | "">("");
   const [selectedProvider, setSelectedProvider] = useState<Id<"providers"> | "">("");
+  const [selectedTravelSubcategory, setSelectedTravelSubcategory] = useState<string>("");
   const [files, setFiles] = useState<LocalUploadFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<UploadState>("idle");
@@ -77,22 +87,30 @@ export default function UploadPage() {
   }, [categories]);
 
   const selectedCategoryDoc = categories.find((category) => category._id === selectedCategory);
+  const isTravelCategory = selectedCategoryDoc?.slug === "travel";
   const selectedProviderDoc = providers.find((provider) => provider._id === selectedProvider);
+  const selectedTravelOption = TRAVEL_SUBCATEGORIES.find((row) => row.slug === selectedTravelSubcategory);
 
   const providerPlaceholder = providersQuery === undefined
-    ? "loading providers..."
+    ? "loading options..."
     : !selectedCategory
       ? "select a category first"
-      : providers.length === 0
-        ? "no providers for this category"
-        : "select a provider";
+      : isTravelCategory
+        ? "select a subcategory"
+        : providers.length === 0
+          ? "no providers for this category"
+          : "select a provider";
 
   const canUpload = Boolean(selectedCategory && selectedProvider && files.length > 0 && uploadStatus !== "uploading");
 
   const providerHref = useMemo(() => {
     if (!selectedCategoryDoc || !selectedProviderDoc) return "/dashboard";
+    if (selectedCategoryDoc.slug === "travel") {
+      const subSlug = selectedTravelOption?.slug ?? selectedProviderDoc.slug ?? slugify(selectedProviderDoc.name);
+      return `/travel/${subSlug}`;
+    }
     return `/${selectedCategoryDoc.slug}/${selectedProviderDoc.slug ?? slugify(selectedProviderDoc.name)}`;
-  }, [selectedCategoryDoc, selectedProviderDoc]);
+  }, [selectedCategoryDoc, selectedProviderDoc, selectedTravelOption?.slug]);
 
   const allComplete = useMemo(() => {
     if (files.length === 0) return false;
@@ -145,10 +163,17 @@ export default function UploadPage() {
   function onCategoryChange(value: string) {
     setSelectedCategory((value || "") as Id<"categories"> | "");
     setSelectedProvider("");
+    setSelectedTravelSubcategory("");
   }
 
   function onProviderChange(value: string) {
     setSelectedProvider((value || "") as Id<"providers"> | "");
+  }
+
+  function onTravelSubcategoryChange(value: string) {
+    setSelectedTravelSubcategory(value);
+    const provider = providers.find((row) => (row.slug ?? slugify(row.name)) === value);
+    setSelectedProvider(provider?._id ?? "");
   }
 
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
@@ -206,6 +231,7 @@ export default function UploadPage() {
       const result = await uploadAndParseBill({
         categoryId: selectedCategory,
         providerId: selectedProvider,
+        travelSubcategory: selectedTravelSubcategory || undefined,
         base64Pdf,
       });
 
@@ -266,20 +292,39 @@ export default function UploadPage() {
           </label>
 
           <label className={styles.field}>
-            <span className={styles.label}>PROVIDER *</span>
-            <select
-              value={selectedProvider}
-              onChange={(event) => onProviderChange(event.target.value)}
-              className={styles.select}
-              disabled={!selectedCategory || providers.length === 0 || providersQuery === undefined}
-            >
-              <option value="">{providerPlaceholder}</option>
-              {providers.map((provider) => (
-                <option key={provider._id} value={provider._id}>
-                  {provider.name}
-                </option>
-              ))}
-            </select>
+            <span className={styles.label}>{isTravelCategory ? "SUBCATEGORY *" : "PROVIDER *"}</span>
+            {isTravelCategory ? (
+              <select
+                value={selectedTravelSubcategory}
+                onChange={(event) => onTravelSubcategoryChange(event.target.value)}
+                className={styles.select}
+                disabled={!selectedCategory || providersQuery === undefined}
+              >
+                <option value="">{providerPlaceholder}</option>
+                {TRAVEL_SUBCATEGORIES.map((option) => {
+                  const exists = providers.some((provider) => (provider.slug ?? slugify(provider.name)) === option.slug);
+                  return (
+                    <option key={option.slug} value={option.slug} disabled={!exists}>
+                      {option.name}
+                    </option>
+                  );
+                })}
+              </select>
+            ) : (
+              <select
+                value={selectedProvider}
+                onChange={(event) => onProviderChange(event.target.value)}
+                className={styles.select}
+                disabled={!selectedCategory || providers.length === 0 || providersQuery === undefined}
+              >
+                <option value="">{providerPlaceholder}</option>
+                {providers.map((provider) => (
+                  <option key={provider._id} value={provider._id}>
+                    {provider.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </label>
 
           <div className={styles.divider} />

@@ -3,6 +3,8 @@ import { v } from "convex/values";
 import { action, internalAction, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 
+const TRAVEL_SUBCATEGORY_SLUGS = new Set(["flights", "trains", "rental-car", "gas", "meals", "hotels"]);
+
 export const generateUploadUrl = mutation(async (ctx) => {
   return await ctx.storage.generateUploadUrl();
 });
@@ -179,6 +181,115 @@ export const getBillsByCategory = query({
   }
 });
 
+export const getTravelBills = query({
+  args: {
+    categoryId: v.id("categories")
+  },
+  handler: async (ctx, args) => {
+    const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
+    const rows = await Promise.all(
+      bills.map(async (bill) => {
+        const provider = await ctx.db.get(bill.providerId);
+        const assignedPeopleResolved = await Promise.all(
+          (bill.assignedPeople ?? []).map(async (row) => {
+            const person = await ctx.db.get(row.personId);
+            return {
+              personId: row.personId,
+              amount: row.amount,
+              personName: person?.name ?? "Unknown",
+              role: person?.role ?? "freelance"
+            };
+          })
+        );
+        return {
+          ...bill,
+          providerName: provider?.name ?? "Unknown",
+          assignedPeople: bill.assignedPeople ?? [],
+          assignedPeopleResolved,
+          approvalStatus: bill.status === "done" && bill.isApproved ? "approved" : "pending"
+        };
+      })
+    );
+    return rows.sort((a, b) => {
+      const aDate = getInvoiceDateSortValue(a);
+      const bDate = getInvoiceDateSortValue(b);
+      if (aDate !== bDate) return bDate - aDate;
+      return b.uploadedAt - a.uploadedAt;
+    });
+  }
+});
+
+export const getTravelSpendBySubcategory = query({
+  args: { categoryId: v.id("categories") },
+  handler: async (ctx, args) => {
+    const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
+    const totals = new Map<string, { totalSpend: number; invoiceCount: number }>();
+
+    for (const bill of bills) {
+      const subcategory = (bill.travelSubcategory ?? "other").toLowerCase();
+      const total = getInvoiceTotalUsdFromAny(bill.extractedData);
+      const current = totals.get(subcategory) ?? { totalSpend: 0, invoiceCount: 0 };
+      current.totalSpend += total;
+      current.invoiceCount += 1;
+      totals.set(subcategory, current);
+    }
+
+    const grandTotal = [...totals.values()].reduce((sum, row) => sum + row.totalSpend, 0);
+    return [...totals.entries()]
+      .map(([subcategory, row]) => ({
+        subcategory,
+        totalSpend: row.totalSpend,
+        invoiceCount: row.invoiceCount,
+        pctOfTotal: grandTotal > 0 ? (row.totalSpend / grandTotal) * 100 : 0
+      }))
+      .sort((a, b) => b.totalSpend - a.totalSpend);
+  }
+});
+
+export const getTravelSpendByPerson = query({
+  args: { categoryId: v.id("categories") },
+  handler: async (ctx, args) => {
+    const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
+    const totals = new Map<string, { personId: string; totalSpend: number; invoiceCount: number }>();
+
+    for (const bill of bills) {
+      const assigned = bill.assignedPeople ?? [];
+      for (const row of assigned) {
+        const key = row.personId;
+        const current = totals.get(key) ?? { personId: key, totalSpend: 0, invoiceCount: 0 };
+        current.totalSpend += row.amount;
+        current.invoiceCount += 1;
+        totals.set(key, current);
+      }
+    }
+
+    const people = await Promise.all(
+      [...totals.values()].map(async (row) => {
+        const person = await ctx.db.get(row.personId as any);
+        return {
+          personId: row.personId,
+          person,
+          totalSpend: row.totalSpend,
+          invoiceCount: row.invoiceCount
+        };
+      })
+    );
+    const grandTotal = people.reduce((sum, row) => sum + row.totalSpend, 0);
+
+    return people
+      .filter((row) => row.person && "name" in row.person && "role" in row.person)
+      .map((row) => ({
+        personId: row.person!._id,
+        personName: (row.person as any).name as string,
+        role: (row.person as any).role as string,
+        totalSpend: row.totalSpend,
+        invoiceCount: row.invoiceCount,
+        pctOfTotal: grandTotal > 0 ? (row.totalSpend / grandTotal) * 100 : 0
+      }))
+      .sort((a, b) => b.totalSpend - a.totalSpend);
+  }
+});
+
 export const getBillsByDateRange = query({
   args: {
     categoryId: v.id("categories"),
@@ -248,6 +359,8 @@ export const parseBillPdf = internalAction({
 
     const provider = await ctx.runQuery(internal.bills.getProvider, { providerId: bill.providerId });
     if (!provider) throw new Error("Provider not found");
+    const category = await ctx.runQuery(internal.bills.getCategory, { categoryId: bill.categoryId });
+    if (!category) throw new Error("Category not found");
 
     try {
       const blob = await ctx.storage.get(bill.fileId);
@@ -300,9 +413,15 @@ export const parseBillPdf = internalAction({
         throw new Error(`Missing expected parsed fields: ${missingFields.join(", ")}`);
       }
 
+      const isTravel = category.slug === "travel";
+      const status = isTravel ? "pending" : "done";
+      const travelMeta = isTravel ? extractTravelMeta(parsed, provider?.slug ?? provider?.name) : {};
+
       await ctx.runMutation(internal.bills.markDone, {
         billId: bill._id,
-        extractedData: parsed
+        extractedData: parsed,
+        status,
+        ...travelMeta
       });
 
       const providerContactPatch = extractProviderContactInfo(parsed);
@@ -363,7 +482,8 @@ export const createParsingBill = internalMutation({
     fileName: v.string(),
     billingPeriod: v.string(),
     uploadedAt: v.number(),
-    originalPdfUrl: v.optional(v.string())
+    originalPdfUrl: v.optional(v.string()),
+    travelSubcategory: v.optional(v.string())
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("bills", {
@@ -374,7 +494,8 @@ export const createParsingBill = internalMutation({
       status: "parsing",
       billingPeriod: args.billingPeriod,
       uploadedAt: args.uploadedAt,
-      originalPdfUrl: args.originalPdfUrl
+      originalPdfUrl: args.originalPdfUrl,
+      travelSubcategory: args.travelSubcategory
     });
   }
 });
@@ -407,13 +528,24 @@ export const updateProviderContactInfo = internalMutation({
 export const markDone = internalMutation({
   args: {
     billId: v.id("bills"),
-    extractedData: v.any()
+    extractedData: v.any(),
+    status: v.union(v.literal("pending"), v.literal("done")),
+    travelSubcategory: v.optional(v.string()),
+    originalCurrency: v.optional(v.string()),
+    originalTotal: v.optional(v.number()),
+    exchangeRate: v.optional(v.number()),
+    isApproved: v.optional(v.boolean())
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.billId, {
-      status: "done",
+      status: args.status,
       errorMessage: undefined,
-      extractedData: args.extractedData
+      extractedData: args.extractedData,
+      travelSubcategory: args.travelSubcategory,
+      originalCurrency: args.originalCurrency,
+      originalTotal: args.originalTotal,
+      exchangeRate: args.exchangeRate,
+      isApproved: args.isApproved
     });
   }
 });
@@ -432,6 +564,55 @@ export const parseBillNow = action({
   args: { billId: v.id("bills") },
   handler: async (ctx, args) => {
     await ctx.runAction(internal.bills.parseBillPdf, { billId: args.billId });
+  }
+});
+
+export const saveTravelAssignment = mutation({
+  args: {
+    billId: v.id("bills"),
+    isSplit: v.boolean(),
+    assignedPeople: v.array(
+      v.object({
+        personId: v.id("people"),
+        amount: v.number()
+      })
+    )
+  },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+    await ctx.db.patch(args.billId, {
+      isSplit: args.isSplit,
+      assignedPeople: args.assignedPeople
+    });
+    return args.billId;
+  }
+});
+
+export const approveInvoice = mutation({
+  args: { billId: v.id("bills") },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+    await ctx.db.patch(args.billId, {
+      isApproved: true,
+      approvedAt: Date.now(),
+      status: "done"
+    });
+    return args.billId;
+  }
+});
+
+export const deleteBill = mutation({
+  args: { billId: v.id("bills") },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) return { deleted: false };
+    if (bill.fileId) {
+      await ctx.storage.delete(bill.fileId);
+    }
+    await ctx.db.delete(args.billId);
+    return { deleted: true };
   }
 });
 
@@ -512,4 +693,47 @@ function pickString(source: Record<string, unknown>, keys: string[]) {
     }
   }
   return undefined;
+}
+
+function extractTravelMeta(parsed: Record<string, unknown>, providerSlugOrName: string | undefined) {
+  const originalCurrency = pickString(parsed, ["original_currency", "currency"])?.toUpperCase();
+  const originalTotal = pickNumber(parsed, ["original_total", "invoice_total_original"]);
+  const exchangeRate = pickNumber(parsed, ["exchange_rate", "exchange_rate_used"]);
+  const providerSubcategory = slugify(providerSlugOrName ?? "");
+  const parsedSubcategory = slugify(pickString(parsed, ["travel_subcategory", "subcategory"]) ?? "");
+  const travelSubcategory = TRAVEL_SUBCATEGORY_SLUGS.has(parsedSubcategory)
+    ? parsedSubcategory
+    : TRAVEL_SUBCATEGORY_SLUGS.has(providerSubcategory)
+      ? providerSubcategory
+      : "travel";
+
+  return {
+    travelSubcategory,
+    originalCurrency,
+    originalTotal,
+    exchangeRate,
+    isApproved: false
+  };
+}
+
+function pickNumber(source: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return undefined;
+}
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
 }

@@ -15,6 +15,7 @@ import type * as categories from "../categories.js";
 import type * as contacts from "../contacts.js";
 import type * as horses from "../horses.js";
 import type * as http from "../http.js";
+import type * as people from "../people.js";
 import type * as providers from "../providers.js";
 import type * as scheduleEvents from "../scheduleEvents.js";
 import type * as seed from "../seed.js";
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   contacts: typeof contacts;
   horses: typeof horses;
   http: typeof http;
+  people: typeof people;
   providers: typeof providers;
   scheduleEvents: typeof scheduleEvents;
   seed: typeof seed;
