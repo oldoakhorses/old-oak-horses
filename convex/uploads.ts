@@ -84,7 +84,7 @@ export const uploadAndParseBill: any = action({
           : undefined
     })) as Id<"bills">;
 
-    await ctx.scheduler.runAfter(0, internal.bills.parseBillPdf, { billId });
+    await ctx.scheduler.runAfter(0, internal.billParsing.parseBillPdf, { billId });
 
     const providerSlug = provider ? slugify(provider.name) : customProviderName ? slugify(customProviderName) : "other";
     const travelSubcategory = args.travelSubcategory || (!providerId && customProviderName ? slugify(customProviderName) : "travel");
