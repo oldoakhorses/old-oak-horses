@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 
 export const getProvidersByCategory = query({
   args: { categoryId: v.id("categories") },
@@ -146,6 +146,26 @@ export const updateProviderContact = mutation({
   }
 });
 
+export const createProviderOnUpload = mutation({
+  args: {
+    name: v.string(),
+    categoryId: v.id("categories")
+  },
+  handler: async (ctx, args) => {
+    return await createProviderOnUploadImpl(ctx, args.name, args.categoryId);
+  }
+});
+
+export const createProviderOnUploadInternal = internalMutation({
+  args: {
+    name: v.string(),
+    categoryId: v.id("categories")
+  },
+  handler: async (ctx, args) => {
+    return await createProviderOnUploadImpl(ctx, args.name, args.categoryId);
+  }
+});
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -153,4 +173,23 @@ function slugify(value: string) {
     .replace(/[^\w\s-]/g, "")
     .trim()
     .replace(/\s+/g, "-");
+}
+
+async function createProviderOnUploadImpl(ctx: any, name: string, categoryId: string) {
+  const cleanName = name.trim();
+  const baseSlug = slugify(cleanName);
+  const existing = await ctx.db
+    .query("providers")
+    .withIndex("by_slug", (q: any) => q.eq("slug", baseSlug))
+    .first();
+
+  const slug = existing ? `${baseSlug}-${Date.now().toString(36).slice(-4)}` : baseSlug;
+  return await ctx.db.insert("providers", {
+    name: cleanName,
+    slug,
+    categoryId,
+    extractionPrompt: "",
+    expectedFields: [],
+    createdAt: Date.now()
+  });
 }

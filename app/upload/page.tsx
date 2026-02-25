@@ -21,6 +21,8 @@ type TrackedStatus = {
   stage: FileStage;
   billId?: Id<"bills">;
   error?: string;
+  redirectPath?: string;
+  listPath?: string;
 };
 
 const TRAVEL_SUBCATEGORIES = [
@@ -36,6 +38,7 @@ const HOUSING_SUBCATEGORIES = [
   { name: "Rider Housing", slug: "rider-housing" },
   { name: "Groom Housing", slug: "groom-housing" }
 ] as const;
+const OTHER_OPTION_VALUE = "__other__";
 
 const CATEGORY_DISPLAY_ORDER = [
   "Veterinary",
@@ -66,6 +69,9 @@ export default function UploadPage() {
   const [selectedProvider, setSelectedProvider] = useState<Id<"providers"> | "">("");
   const [selectedTravelSubcategory, setSelectedTravelSubcategory] = useState<string>("");
   const [selectedHousingSubcategory, setSelectedHousingSubcategory] = useState<string>("");
+  const [usingOtherOption, setUsingOtherOption] = useState(false);
+  const [otherName, setOtherName] = useState("");
+  const [saveAsNew, setSaveAsNew] = useState(false);
   const [files, setFiles] = useState<LocalUploadFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<UploadState>("idle");
@@ -75,9 +81,17 @@ export default function UploadPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadAndParseBill = useAction((api as any).uploads.uploadAndParseBill);
   const seedCategories = useMutation(api.seed.seedCategories);
+  const selectedCategoryDoc = categories.find((category) => category._id === selectedCategory);
 
   const providersQuery = useQuery(api.providers.getProvidersByCategory, selectedCategory ? { categoryId: selectedCategory } : "skip");
   const providers = providersQuery ?? [];
+  const customSubcategoriesQuery = useQuery(
+    api.customSubcategories.getByCategory,
+    selectedCategory && (selectedCategoryDoc?.slug === "travel" || selectedCategoryDoc?.slug === "housing")
+      ? { categoryId: selectedCategory }
+      : "skip"
+  );
+  const customSubcategories = customSubcategoriesQuery ?? [];
 
   const orderedCategories = useMemo(() => {
     if (categories.length === 0) return categories;
@@ -92,13 +106,38 @@ export default function UploadPage() {
     });
   }, [categories]);
 
-  const selectedCategoryDoc = categories.find((category) => category._id === selectedCategory);
   const isTravelCategory = selectedCategoryDoc?.slug === "travel";
   const isHousingCategory = selectedCategoryDoc?.slug === "housing";
   const isPeopleSubcategoryCategory = isTravelCategory || isHousingCategory;
   const selectedProviderDoc = providers.find((provider) => provider._id === selectedProvider);
   const selectedTravelOption = TRAVEL_SUBCATEGORIES.find((row) => row.slug === selectedTravelSubcategory);
   const selectedHousingOption = HOUSING_SUBCATEGORIES.find((row) => row.slug === selectedHousingSubcategory);
+  const mergedTravelOptions = useMemo(
+    () => [
+      ...TRAVEL_SUBCATEGORIES,
+      ...customSubcategories.map((row) => ({ name: row.name, slug: row.slug }))
+    ],
+    [customSubcategories]
+  );
+  const mergedHousingOptions = useMemo(
+    () => [
+      ...HOUSING_SUBCATEGORIES,
+      ...customSubcategories.map((row) => ({ name: row.name, slug: row.slug }))
+    ],
+    [customSubcategories]
+  );
+
+  const duplicateNameExists = useMemo(() => {
+    const value = otherName.trim().toLowerCase();
+    if (!value) return false;
+    if (isPeopleSubcategoryCategory) {
+      const source = isTravelCategory ? mergedTravelOptions : mergedHousingOptions;
+      return source.some((row) => row.name.trim().toLowerCase() === value);
+    }
+    return providers.some((provider) => provider.name.trim().toLowerCase() === value);
+  }, [isHousingCategory, isPeopleSubcategoryCategory, isTravelCategory, mergedHousingOptions, mergedTravelOptions, otherName, providers]);
+
+  const otherNameValid = otherName.trim().length >= 2;
 
   const providerPlaceholder = providersQuery === undefined
     ? "loading options..."
@@ -110,10 +149,27 @@ export default function UploadPage() {
           ? "no providers for this category"
           : "select a provider";
 
-  const canUpload = Boolean(selectedCategory && selectedProvider && files.length > 0 && uploadStatus !== "uploading");
+  const canUpload = Boolean(
+    selectedCategory &&
+      files.length > 0 &&
+      uploadStatus !== "uploading" &&
+      (usingOtherOption
+        ? otherNameValid && (!saveAsNew || !duplicateNameExists)
+        : isPeopleSubcategoryCategory
+          ? Boolean(isTravelCategory ? selectedTravelSubcategory : selectedHousingSubcategory)
+          : Boolean(selectedProvider))
+  );
 
   const providerHref = useMemo(() => {
-    if (!selectedCategoryDoc || !selectedProviderDoc) return "/dashboard";
+    if (!selectedCategoryDoc) return "/dashboard";
+    if (usingOtherOption && otherNameValid) {
+      const slug = slugify(otherName);
+      if (selectedCategoryDoc.slug === "travel") return `/travel/${slug}`;
+      if (selectedCategoryDoc.slug === "housing") return `/housing/${slug}`;
+      if (selectedCategoryDoc.slug === "stabling") return `/stabling/${slug}`;
+      return `/${selectedCategoryDoc.slug}`;
+    }
+    if (!selectedProviderDoc) return "/dashboard";
     if (selectedCategoryDoc.slug === "travel") {
       const subSlug = selectedTravelOption?.slug ?? selectedProviderDoc.slug ?? slugify(selectedProviderDoc.name);
       return `/travel/${subSlug}`;
@@ -123,7 +179,7 @@ export default function UploadPage() {
       return `/housing/${subSlug}`;
     }
     return `/${selectedCategoryDoc.slug}/${selectedProviderDoc.slug ?? slugify(selectedProviderDoc.name)}`;
-  }, [selectedCategoryDoc, selectedHousingOption?.slug, selectedProviderDoc, selectedTravelOption?.slug]);
+  }, [otherName, otherNameValid, selectedCategoryDoc, selectedHousingOption?.slug, selectedProviderDoc, selectedTravelOption?.slug, usingOtherOption]);
 
   const allComplete = useMemo(() => {
     if (files.length === 0) return false;
@@ -134,6 +190,13 @@ export default function UploadPage() {
   }, [fileStatuses, files]);
 
   const hasErrors = useMemo(() => files.some((localFile) => fileStatuses[localFile.id]?.stage === "error"), [fileStatuses, files]);
+  const completedListPath = useMemo(() => {
+    for (const file of files) {
+      const status = fileStatuses[file.id];
+      if (status?.listPath) return status.listPath;
+    }
+    return providerHref;
+  }, [fileStatuses, files, providerHref]);
 
   const handleStageChange = useCallback((fileId: string, stage: FileStage, error?: string) => {
     setFileStatuses((prev) => ({
@@ -158,42 +221,74 @@ export default function UploadPage() {
 
   useEffect(() => {
     if (!allComplete || hasErrors || hasRedirectedRef.current) return;
-    if (!selectedCategoryDoc || !selectedProviderDoc) return;
-
-    const providerPath = `/${selectedCategoryDoc.slug}/${selectedProviderDoc.slug ?? slugify(selectedProviderDoc.name)}`;
     if (files.length === 1) {
       const status = fileStatuses[files[0].id];
-      if (!status?.billId) return;
+      if (!status?.redirectPath) return;
       hasRedirectedRef.current = true;
-      router.push(`${providerPath}/${status.billId}`);
+      router.push(status.redirectPath);
       return;
     }
 
     hasRedirectedRef.current = true;
-    router.push(providerPath);
-  }, [allComplete, fileStatuses, files, hasErrors, router, selectedCategoryDoc, selectedProviderDoc]);
+    router.push(completedListPath);
+  }, [allComplete, completedListPath, fileStatuses, files, hasErrors, router]);
 
   function onCategoryChange(value: string) {
     setSelectedCategory((value || "") as Id<"categories"> | "");
     setSelectedProvider("");
     setSelectedTravelSubcategory("");
     setSelectedHousingSubcategory("");
+    setUsingOtherOption(false);
+    setOtherName("");
+    setSaveAsNew(false);
   }
 
   function onProviderChange(value: string) {
+    if (value === OTHER_OPTION_VALUE) {
+      setUsingOtherOption(true);
+      setSelectedProvider("");
+      return;
+    }
+    setUsingOtherOption(false);
+    setOtherName("");
+    setSaveAsNew(false);
     setSelectedProvider((value || "") as Id<"providers"> | "");
   }
 
   function onTravelSubcategoryChange(value: string) {
+    if (value === OTHER_OPTION_VALUE) {
+      setUsingOtherOption(true);
+      setSelectedTravelSubcategory("");
+      setSelectedProvider("");
+      return;
+    }
+    setUsingOtherOption(false);
+    setOtherName("");
+    setSaveAsNew(false);
     setSelectedTravelSubcategory(value);
     const provider = providers.find((row) => (row.slug ?? slugify(row.name)) === value);
     setSelectedProvider(provider?._id ?? "");
   }
 
   function onHousingSubcategoryChange(value: string) {
+    if (value === OTHER_OPTION_VALUE) {
+      setUsingOtherOption(true);
+      setSelectedHousingSubcategory("");
+      setSelectedProvider("");
+      return;
+    }
+    setUsingOtherOption(false);
+    setOtherName("");
+    setSaveAsNew(false);
     setSelectedHousingSubcategory(value);
     const provider = providers.find((row) => (row.slug ?? slugify(row.name)) === value);
     setSelectedProvider(provider?._id ?? "");
+  }
+
+  function resetOtherMode() {
+    setUsingOtherOption(false);
+    setOtherName("");
+    setSaveAsNew(false);
   }
 
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
@@ -240,7 +335,10 @@ export default function UploadPage() {
   }
 
   async function runUploadForFile(fileId: string) {
-    if (!selectedCategory || !selectedProvider) return;
+    if (!selectedCategory) return;
+    if (!usingOtherOption && !isPeopleSubcategoryCategory && !selectedProvider) return;
+    if (!usingOtherOption && isPeopleSubcategoryCategory && !(isTravelCategory ? selectedTravelSubcategory : selectedHousingSubcategory)) return;
+    if (usingOtherOption && !otherNameValid) return;
 
     const fileRecord = files.find((file) => file.id === fileId);
     if (!fileRecord) return;
@@ -250,7 +348,9 @@ export default function UploadPage() {
       const base64Pdf = await fileToBase64(fileRecord.file);
       const result = await uploadAndParseBill({
         categoryId: selectedCategory,
-        providerId: selectedProvider,
+        providerId: usingOtherOption ? undefined : selectedProvider,
+        customProviderName: usingOtherOption ? otherName.trim() : undefined,
+        saveAsNew: usingOtherOption ? saveAsNew : undefined,
         travelSubcategory: selectedTravelSubcategory || undefined,
         housingSubcategory: selectedHousingSubcategory || undefined,
         base64Pdf,
@@ -258,7 +358,7 @@ export default function UploadPage() {
 
       setFileStatuses((prev) => ({
         ...prev,
-        [fileId]: { stage: "parsing", billId: result.billId },
+        [fileId]: { stage: "parsing", billId: result.billId, redirectPath: result.redirectPath, listPath: result.listPath },
       }));
     } catch (error) {
       const message = error instanceof Error ? error.message : "upload failed";
@@ -314,7 +414,31 @@ export default function UploadPage() {
 
           <label className={styles.field}>
             <span className={styles.label}>{isPeopleSubcategoryCategory ? "SUBCATEGORY *" : "PROVIDER *"}</span>
-            {isTravelCategory ? (
+            {usingOtherOption ? (
+              <>
+                <div className={styles.otherHeader}>
+                  <span className={styles.label}>{isPeopleSubcategoryCategory ? "SUBCATEGORY NAME *" : "PROVIDER NAME *"}</span>
+                  <button type="button" className={styles.backToList} onClick={resetOtherMode}>
+                    ← back to list
+                  </button>
+                </div>
+                <input
+                  value={otherName}
+                  onChange={(event) => setOtherName(event.target.value)}
+                  placeholder={isPeopleSubcategoryCategory ? "enter subcategory name..." : "enter provider name..."}
+                  className={styles.select}
+                />
+                <label className={styles.checkboxRow}>
+                  <input type="checkbox" checked={saveAsNew} onChange={(event) => setSaveAsNew(event.target.checked)} />
+                  <span>
+                    Save as a new {isPeopleSubcategoryCategory ? "subcategory" : "provider"} for {selectedCategoryDoc?.name ?? "this category"}
+                  </span>
+                </label>
+                {saveAsNew && duplicateNameExists ? (
+                  <div className={styles.inlineError}>this {isPeopleSubcategoryCategory ? "subcategory" : "provider"} already exists — select it from the list</div>
+                ) : null}
+              </>
+            ) : isTravelCategory ? (
               <select
                 value={selectedTravelSubcategory}
                 onChange={(event) => onTravelSubcategoryChange(event.target.value)}
@@ -322,14 +446,16 @@ export default function UploadPage() {
                 disabled={!selectedCategory || providersQuery === undefined}
               >
                 <option value="">{providerPlaceholder}</option>
-                {TRAVEL_SUBCATEGORIES.map((option) => {
-                  const exists = providers.some((provider) => (provider.slug ?? slugify(provider.name)) === option.slug);
+                {mergedTravelOptions.map((option) => {
+                  const exists = providers.some((provider) => (provider.slug ?? slugify(provider.name)) === option.slug) || customSubcategories.some((row) => row.slug === option.slug);
                   return (
                     <option key={option.slug} value={option.slug} disabled={!exists}>
                       {option.name}
                     </option>
                   );
                 })}
+                <option disabled>──────────────</option>
+                <option value={OTHER_OPTION_VALUE}>+ Other...</option>
               </select>
             ) : isHousingCategory ? (
               <select
@@ -339,21 +465,23 @@ export default function UploadPage() {
                 disabled={!selectedCategory || providersQuery === undefined}
               >
                 <option value="">{providerPlaceholder}</option>
-                {HOUSING_SUBCATEGORIES.map((option) => {
-                  const exists = providers.some((provider) => (provider.slug ?? slugify(provider.name)) === option.slug);
+                {mergedHousingOptions.map((option) => {
+                  const exists = providers.some((provider) => (provider.slug ?? slugify(provider.name)) === option.slug) || customSubcategories.some((row) => row.slug === option.slug);
                   return (
                     <option key={option.slug} value={option.slug} disabled={!exists}>
                       {option.name}
                     </option>
                   );
                 })}
+                <option disabled>──────────────</option>
+                <option value={OTHER_OPTION_VALUE}>+ Other...</option>
               </select>
             ) : (
               <select
                 value={selectedProvider}
                 onChange={(event) => onProviderChange(event.target.value)}
                 className={styles.select}
-                disabled={!selectedCategory || providers.length === 0 || providersQuery === undefined}
+                disabled={!selectedCategory || providersQuery === undefined}
               >
                 <option value="">{providerPlaceholder}</option>
                 {providers.map((provider) => (
@@ -361,6 +489,8 @@ export default function UploadPage() {
                     {provider.name}
                   </option>
                 ))}
+                <option disabled>──────────────</option>
+                <option value={OTHER_OPTION_VALUE}>+ Other...</option>
               </select>
             )}
           </label>
@@ -398,9 +528,20 @@ export default function UploadPage() {
             </section>
           ) : null}
 
-          {selectedCategoryDoc && selectedProviderDoc ? (
+          {selectedCategoryDoc && (selectedProviderDoc || usingOtherOption || selectedTravelSubcategory || selectedHousingSubcategory) ? (
             <div className={styles.namingPreview}>
-              files will be saved as: <span>{selectedCategoryDoc.name}</span> - <span>{selectedProviderDoc.name}</span> - YYYY-MM-DD
+              files will be saved as: <span>{selectedCategoryDoc.name}</span> -{" "}
+              <span>
+                {selectedProviderDoc?.name ??
+                  (usingOtherOption
+                    ? otherName || "Other"
+                    : isTravelCategory
+                      ? mergedTravelOptions.find((row) => row.slug === selectedTravelSubcategory)?.name ?? "Travel"
+                      : isHousingCategory
+                        ? mergedHousingOptions.find((row) => row.slug === selectedHousingSubcategory)?.name ?? "Housing"
+                        : "Other")}
+              </span>{" "}
+              - YYYY-MM-DD
             </div>
           ) : null}
 
@@ -422,7 +563,7 @@ export default function UploadPage() {
               ))}
 
               {allComplete && !hasErrors ? (
-                <Link href={providerHref} className="ui-button-filled">
+                <Link href={completedListPath} className="ui-button-filled">
                   view all invoices
                 </Link>
               ) : null}

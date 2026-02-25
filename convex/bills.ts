@@ -2,9 +2,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { v } from "convex/values";
 import { action, internalAction, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 
 const TRAVEL_SUBCATEGORY_SLUGS = new Set(["flights", "trains", "rental-car", "gas", "meals", "hotels"]);
 const HOUSING_SUBCATEGORY_SLUGS = new Set(["rider-housing", "groom-housing"]);
+const STABLING_SUBCATEGORY_SLUGS = new Set(["board", "turnout", "bedding", "hay-feed", "facility-fees", "other"]);
 
 export const generateUploadUrl = mutation(async (ctx) => {
   return await ctx.storage.generateUploadUrl();
@@ -86,7 +88,7 @@ export const triggerBillParsing = mutation({
 export const listAll = query(async (ctx) => {
   const bills = await ctx.db.query("bills").withIndex("by_uploadedAt").order("desc").collect();
 
-  const providerIds = [...new Set(bills.map((bill) => bill.providerId))];
+  const providerIds = [...new Set(bills.flatMap((bill) => (bill.providerId ? [bill.providerId] : [])))];
   const providerPairs = await Promise.all(providerIds.map(async (id) => [id, await ctx.db.get(id)] as const));
   const providerMap = new Map(providerPairs.map(([id, provider]) => [id, provider?.name ?? "Unknown"]));
 
@@ -96,7 +98,7 @@ export const listAll = query(async (ctx) => {
 
   return bills.map((bill) => ({
     ...bill,
-    providerName: providerMap.get(bill.providerId) ?? "Unknown",
+    providerName: (bill.providerId ? providerMap.get(bill.providerId) : undefined) ?? bill.customProviderName ?? "Unknown",
     categoryName: categoryMap.get(bill.categoryId) ?? "Unknown"
   }));
 });
@@ -190,7 +192,7 @@ export const getTravelBills = query({
     const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
     const rows = await Promise.all(
       bills.map(async (bill) => {
-        const provider = await ctx.db.get(bill.providerId);
+        const provider = bill.providerId ? await ctx.db.get(bill.providerId) : null;
         const assignedPeopleResolved = await Promise.all(
           (bill.assignedPeople ?? []).map(async (row) => {
             const person = await ctx.db.get(row.personId);
@@ -204,7 +206,7 @@ export const getTravelBills = query({
         );
         return {
           ...bill,
-          providerName: provider?.name ?? "Unknown",
+          providerName: provider?.name ?? bill.customProviderName ?? "Unknown",
           assignedPeople: bill.assignedPeople ?? [],
           assignedPeopleResolved,
           approvalStatus: bill.status === "done" && bill.isApproved ? "approved" : "pending"
@@ -332,8 +334,8 @@ export const getHousingSpendByProvider = query({
     const totals = new Map<string, { providerName: string; totalSpend: number; invoiceCount: number }>();
 
     for (const bill of bills) {
-      const provider = await ctx.db.get(bill.providerId);
-      const providerName = provider?.name ?? "Unknown";
+      const provider = bill.providerId ? await ctx.db.get(bill.providerId) : null;
+      const providerName = provider?.name ?? bill.customProviderName ?? "Unknown";
       const current = totals.get(providerName) ?? { providerName, totalSpend: 0, invoiceCount: 0 };
       current.totalSpend += getInvoiceTotalUsdFromAny(bill.extractedData);
       current.invoiceCount += 1;
@@ -361,7 +363,7 @@ export const getHousingBills = query({
     const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
     const rows = await Promise.all(
       bills.map(async (bill) => {
-        const provider = await ctx.db.get(bill.providerId);
+        const provider = bill.providerId ? await ctx.db.get(bill.providerId) : null;
         const assignedPeopleResolved = await Promise.all(
           (bill.assignedPeople ?? []).map(async (row) => {
             const person = await ctx.db.get(row.personId);
@@ -375,7 +377,7 @@ export const getHousingBills = query({
         );
         return {
           ...bill,
-          providerName: provider?.name ?? "Unknown",
+          providerName: provider?.name ?? bill.customProviderName ?? "Unknown",
           assignedPeopleResolved,
           approvalStatus: bill.status === "done" && bill.isApproved ? "approved" : "pending"
         };
@@ -417,6 +419,165 @@ export const getHousingStats = query({
   }
 });
 
+export const getStablingBills = query({
+  args: {
+    categoryId: v.id("categories"),
+    providerId: v.optional(v.id("providers"))
+  },
+  handler: async (ctx, args) => {
+    const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
+    const filtered = bills.filter((bill) => (args.providerId ? bill.providerId === args.providerId : true));
+
+    const rows = await Promise.all(
+      filtered.map(async (bill) => {
+        const provider = bill.providerId ? await ctx.db.get(bill.providerId) : null;
+        const horseTotals = new Map<string, { horseName: string; amount: number }>();
+
+        for (const row of bill.horseAssignments ?? []) {
+          const horseName = row.horseName?.trim();
+          if (!horseName) continue;
+          const amount = getLineItemTotalUsdByIndex(bill.extractedData, row.lineItemIndex);
+          const current = horseTotals.get(horseName) ?? { horseName, amount: 0 };
+          current.amount += amount;
+          horseTotals.set(horseName, current);
+        }
+        for (const split of bill.splitLineItems ?? []) {
+          for (const splitRow of split.splits) {
+            const horseName = splitRow.horseName?.trim();
+            if (!horseName) continue;
+            const current = horseTotals.get(horseName) ?? { horseName, amount: 0 };
+            current.amount += splitRow.amount;
+            horseTotals.set(horseName, current);
+          }
+        }
+
+        return {
+          ...bill,
+          providerName: provider?.name ?? bill.customProviderName ?? "Unknown",
+          provider,
+          horses: [...horseTotals.values()],
+          approvalStatus: bill.status === "done" && bill.isApproved ? "approved" : "pending"
+        };
+      })
+    );
+
+    return rows.sort((a, b) => {
+      const aDate = getInvoiceDateSortValue(a);
+      const bDate = getInvoiceDateSortValue(b);
+      if (aDate !== bDate) return bDate - aDate;
+      return b.uploadedAt - a.uploadedAt;
+    });
+  }
+});
+
+export const getStablingSpendByProvider = query({
+  args: { categoryId: v.id("categories") },
+  handler: async (ctx, args) => {
+    const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
+    const totals = new Map<string, { providerId: string; providerName: string; totalSpend: number; invoiceCount: number }>();
+    for (const bill of bills) {
+      const provider = bill.providerId ? await ctx.db.get(bill.providerId) : null;
+      const providerName = provider?.name ?? bill.customProviderName ?? "Unknown";
+      const providerId = String(bill.providerId ?? providerName);
+      const current = totals.get(providerId) ?? { providerId, providerName, totalSpend: 0, invoiceCount: 0 };
+      current.totalSpend += getInvoiceTotalUsdFromAny(bill.extractedData);
+      current.invoiceCount += 1;
+      totals.set(providerId, current);
+    }
+    const grandTotal = [...totals.values()].reduce((sum, row) => sum + row.totalSpend, 0);
+    return [...totals.values()]
+      .map((row) => ({
+        providerId: row.providerId,
+        providerName: row.providerName,
+        totalSpend: row.totalSpend,
+        invoiceCount: row.invoiceCount,
+        pctOfTotal: grandTotal > 0 ? (row.totalSpend / grandTotal) * 100 : 0
+      }))
+      .sort((a, b) => b.totalSpend - a.totalSpend);
+  }
+});
+
+export const getStablingSpendBySubcategory = query({
+  args: { categoryId: v.id("categories") },
+  handler: async (ctx, args) => {
+    const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
+    const totals = new Map<string, { totalSpend: number; lineItemCount: number }>();
+
+    for (const bill of bills) {
+      const lineItems = getLineItems(bill.extractedData);
+      for (let index = 0; index < lineItems.length; index += 1) {
+        const item = lineItems[index] as Record<string, unknown>;
+        const baseSubcategory = classifyStablingSubcategory(item);
+        const split = (bill.splitLineItems ?? []).find((row) => row.lineItemIndex === index);
+        if (split && split.splits.length > 0) {
+          const totalSplit = split.splits.reduce((sum, row) => sum + row.amount, 0);
+          const current = totals.get(baseSubcategory) ?? { totalSpend: 0, lineItemCount: 0 };
+          current.totalSpend += totalSplit;
+          current.lineItemCount += 1;
+          totals.set(baseSubcategory, current);
+          continue;
+        }
+        const amount = typeof item.total_usd === "number" ? (item.total_usd as number) : 0;
+        const current = totals.get(baseSubcategory) ?? { totalSpend: 0, lineItemCount: 0 };
+        current.totalSpend += amount;
+        current.lineItemCount += 1;
+        totals.set(baseSubcategory, current);
+      }
+    }
+
+    const grandTotal = [...totals.values()].reduce((sum, row) => sum + row.totalSpend, 0);
+    return [...totals.entries()]
+      .map(([subcategory, row]) => ({
+        subcategory,
+        totalSpend: row.totalSpend,
+        lineItemCount: row.lineItemCount,
+        pctOfTotal: grandTotal > 0 ? (row.totalSpend / grandTotal) * 100 : 0
+      }))
+      .sort((a, b) => b.totalSpend - a.totalSpend);
+  }
+});
+
+export const getStablingSpendByHorse = query({
+  args: { categoryId: v.id("categories") },
+  handler: async (ctx, args) => {
+    const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
+    const totals = new Map<string, { horseName: string; totalSpend: number; invoiceIds: Set<string> }>();
+
+    for (const bill of bills) {
+      for (const row of bill.horseAssignments ?? []) {
+        const horseName = row.horseName?.trim();
+        if (!horseName) continue;
+        const amount = getLineItemTotalUsdByIndex(bill.extractedData, row.lineItemIndex);
+        const current = totals.get(horseName) ?? { horseName, totalSpend: 0, invoiceIds: new Set<string>() };
+        current.totalSpend += amount;
+        current.invoiceIds.add(String(bill._id));
+        totals.set(horseName, current);
+      }
+      for (const split of bill.splitLineItems ?? []) {
+        for (const splitRow of split.splits) {
+          const horseName = splitRow.horseName?.trim();
+          if (!horseName) continue;
+          const current = totals.get(horseName) ?? { horseName, totalSpend: 0, invoiceIds: new Set<string>() };
+          current.totalSpend += splitRow.amount;
+          current.invoiceIds.add(String(bill._id));
+          totals.set(horseName, current);
+        }
+      }
+    }
+
+    const rows = [...totals.values()];
+    const grandTotal = rows.reduce((sum, row) => sum + row.totalSpend, 0);
+    return rows
+      .map((row) => ({
+        horseName: row.horseName,
+        totalSpend: row.totalSpend,
+        invoiceCount: row.invoiceIds.size,
+        pctOfTotal: grandTotal > 0 ? (row.totalSpend / grandTotal) * 100 : 0
+      }))
+      .sort((a, b) => b.totalSpend - a.totalSpend);
+  }
+});
+
 export const getBillsByDateRange = query({
   args: {
     categoryId: v.id("categories"),
@@ -441,7 +602,7 @@ export const getBillById = query({
   handler: async (ctx, args) => {
     const bill = await ctx.db.get(args.billId);
     if (!bill) return null;
-    const provider = await ctx.db.get(bill.providerId);
+    const provider = bill.providerId ? await ctx.db.get(bill.providerId) : null;
     const category = await ctx.db.get(bill.categoryId);
     return {
       ...bill,
@@ -484,8 +645,7 @@ export const parseBillPdf = internalAction({
     const bill = await ctx.runQuery(internal.bills.getBill, { billId: args.billId });
     if (!bill) throw new Error("Bill not found");
 
-    const provider = await ctx.runQuery(internal.bills.getProvider, { providerId: bill.providerId });
-    if (!provider) throw new Error("Provider not found");
+    const provider = bill.providerId ? await ctx.runQuery(internal.bills.getProvider, { providerId: bill.providerId }) : null;
     const category = await ctx.runQuery(internal.bills.getCategory, { categoryId: bill.categoryId });
     if (!category) throw new Error("Category not found");
 
@@ -497,7 +657,8 @@ export const parseBillPdf = internalAction({
       const base64Pdf = Buffer.from(bytes).toString("base64");
 
       const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-      const prompt = `${provider.extractionPrompt}\n\nReturn strict JSON.`;
+      const extractionPrompt = provider?.extractionPrompt || genericExtractionPrompt(category.slug);
+      const prompt = `${extractionPrompt}\n\nReturn strict JSON.`;
 
       const response = await client.messages.create({
         model: "claude-sonnet-4-6",
@@ -528,7 +689,8 @@ export const parseBillPdf = internalAction({
 
       const parsed = JSON.parse(stripCodeFences(textBlock.text)) as Record<string, unknown>;
 
-      const missingFields = provider.expectedFields.filter((field: string) => {
+      const expectedFields = provider?.expectedFields ?? [];
+      const missingFields = expectedFields.filter((field: string) => {
         if (field === "horse_name") {
           return !hasHorseNameInLineItems(parsed);
         }
@@ -540,13 +702,15 @@ export const parseBillPdf = internalAction({
         throw new Error(`Missing expected parsed fields: ${missingFields.join(", ")}`);
       }
 
-      const isPeopleCategory = category.slug === "travel" || category.slug === "housing";
-      const status = isPeopleCategory ? "pending" : "done";
+      const needsApproval = category.slug === "travel" || category.slug === "housing" || category.slug === "stabling";
+      const status = needsApproval ? "pending" : "done";
       const categoryMeta =
         category.slug === "travel"
           ? extractTravelMeta(parsed, provider?.slug ?? provider?.name)
           : category.slug === "housing"
             ? extractHousingMeta(parsed, provider?.slug ?? provider?.name)
+            : category.slug === "stabling"
+              ? extractStablingMeta(parsed)
             : {};
 
       await ctx.runMutation(internal.bills.markDone, {
@@ -608,12 +772,13 @@ export const getBillFileNamesByProvider = internalQuery({
 
 export const createParsingBill = internalMutation({
   args: {
-    providerId: v.id("providers"),
+    providerId: v.optional(v.id("providers")),
     categoryId: v.id("categories"),
     fileId: v.id("_storage"),
     fileName: v.string(),
     billingPeriod: v.string(),
     uploadedAt: v.number(),
+    customProviderName: v.optional(v.string()),
     originalPdfUrl: v.optional(v.string()),
     travelSubcategory: v.optional(v.string()),
     housingSubcategory: v.optional(v.string())
@@ -627,6 +792,7 @@ export const createParsingBill = internalMutation({
       status: "parsing",
       billingPeriod: args.billingPeriod,
       uploadedAt: args.uploadedAt,
+      customProviderName: args.customProviderName,
       originalPdfUrl: args.originalPdfUrl,
       travelSubcategory: args.travelSubcategory,
       housingSubcategory: args.housingSubcategory
@@ -666,6 +832,29 @@ export const markDone = internalMutation({
     status: v.union(v.literal("pending"), v.literal("done")),
     travelSubcategory: v.optional(v.string()),
     housingSubcategory: v.optional(v.string()),
+    horseAssignments: v.optional(
+      v.array(
+        v.object({
+          lineItemIndex: v.number(),
+          horseId: v.optional(v.id("horses")),
+          horseName: v.optional(v.string())
+        })
+      )
+    ),
+    splitLineItems: v.optional(
+      v.array(
+        v.object({
+          lineItemIndex: v.number(),
+          splits: v.array(
+            v.object({
+              horseId: v.id("horses"),
+              horseName: v.string(),
+              amount: v.number()
+            })
+          )
+        })
+      )
+    ),
     originalCurrency: v.optional(v.string()),
     originalTotal: v.optional(v.number()),
     exchangeRate: v.optional(v.number()),
@@ -678,6 +867,8 @@ export const markDone = internalMutation({
       extractedData: args.extractedData,
       travelSubcategory: args.travelSubcategory,
       housingSubcategory: args.housingSubcategory,
+      horseAssignments: args.horseAssignments,
+      splitLineItems: args.splitLineItems,
       originalCurrency: args.originalCurrency,
       originalTotal: args.originalTotal,
       exchangeRate: args.exchangeRate,
@@ -720,6 +911,40 @@ export const savePersonAssignment = mutation({
     await ctx.db.patch(args.billId, {
       isSplit: args.isSplit,
       assignedPeople: args.assignedPeople
+    });
+    return args.billId;
+  }
+});
+
+export const saveHorseAssignment = mutation({
+  args: {
+    billId: v.id("bills"),
+    horseAssignments: v.array(
+      v.object({
+        lineItemIndex: v.number(),
+        horseId: v.optional(v.id("horses")),
+        horseName: v.optional(v.string())
+      })
+    ),
+    splitLineItems: v.array(
+      v.object({
+        lineItemIndex: v.number(),
+        splits: v.array(
+          v.object({
+            horseId: v.id("horses"),
+            horseName: v.string(),
+            amount: v.number()
+          })
+        )
+      })
+    )
+  },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+    await ctx.db.patch(args.billId, {
+      horseAssignments: args.horseAssignments,
+      splitLineItems: args.splitLineItems
     });
     return args.billId;
   }
@@ -895,6 +1120,31 @@ function extractHousingMeta(parsed: Record<string, unknown>, providerSlugOrName:
   };
 }
 
+function extractStablingMeta(parsed: Record<string, unknown>) {
+  const originalCurrency = pickString(parsed, ["original_currency", "currency"])?.toUpperCase();
+  const originalTotal = pickNumber(parsed, ["original_total", "invoice_total_original"]);
+  const exchangeRate = pickNumber(parsed, ["exchange_rate", "exchange_rate_used"]);
+  const lineItems = getLineItems(parsed);
+  const horseAssignments = lineItems.map((item, index) => {
+    const row = item as Record<string, unknown>;
+    const horseName = pickString(row, ["horse_name", "horseName"]);
+    return {
+      lineItemIndex: index,
+      horseName,
+      horseId: undefined
+    };
+  });
+
+  return {
+    horseAssignments,
+    splitLineItems: [] as any[],
+    originalCurrency,
+    originalTotal,
+    exchangeRate,
+    isApproved: false
+  };
+}
+
 async function getPeopleSpend(ctx: any, categoryId: string) {
   const bills = await ctx.db.query("bills").withIndex("by_category", (q: any) => q.eq("categoryId", categoryId)).collect();
   const totals = new Map<string, { personId: string; totalSpend: number; invoiceCount: number }>();
@@ -936,6 +1186,37 @@ async function getPeopleSpend(ctx: any, categoryId: string) {
     .sort((a, b) => b.totalSpend - a.totalSpend);
 }
 
+function getLineItems(extractedData: unknown) {
+  if (!extractedData || typeof extractedData !== "object") return [] as unknown[];
+  const extracted = extractedData as { line_items?: unknown; lineItems?: unknown };
+  if (Array.isArray(extracted.line_items)) return extracted.line_items;
+  if (Array.isArray(extracted.lineItems)) return extracted.lineItems;
+  return [] as unknown[];
+}
+
+function getLineItemTotalUsdByIndex(extractedData: unknown, index: number) {
+  const lineItems = getLineItems(extractedData);
+  const row = lineItems[index];
+  if (!row || typeof row !== "object") return 0;
+  const record = row as Record<string, unknown>;
+  if (typeof record.total_usd === "number" && Number.isFinite(record.total_usd)) return record.total_usd;
+  if (typeof record.amount_usd === "number" && Number.isFinite(record.amount_usd)) return record.amount_usd;
+  return 0;
+}
+
+function classifyStablingSubcategory(item: Record<string, unknown>) {
+  const raw = pickString(item, ["stabling_subcategory", "subcategory", "line_item_subcategory"]);
+  const slug = slugify(raw ?? "");
+  if (STABLING_SUBCATEGORY_SLUGS.has(slug)) return slug;
+  const description = String(item.description ?? "").toLowerCase();
+  if (description.includes("turnout") || description.includes("paddock")) return "turnout";
+  if (description.includes("bedding")) return "bedding";
+  if (description.includes("hay") || description.includes("feed")) return "hay-feed";
+  if (description.includes("facility")) return "facility-fees";
+  if (description.includes("board") || description.includes("stall")) return "board";
+  return "board";
+}
+
 function pickNumber(source: Record<string, unknown>, keys: string[]) {
   for (const key of keys) {
     const value = source[key];
@@ -956,4 +1237,16 @@ function slugify(value: string) {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)+/g, "");
+}
+
+function genericExtractionPrompt(categorySlug?: string) {
+  const base =
+    "Extract invoice data as strict JSON with invoice_number, invoice_date, provider_name, account_number, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[].";
+  if (categorySlug === "stabling") {
+    return `${base} For each line item also return horse_name (if present) and stabling_subcategory.`;
+  }
+  if (categorySlug === "travel" || categorySlug === "housing") {
+    return `${base} For each line item return amount_original and amount_usd when available.`;
+  }
+  return base;
 }

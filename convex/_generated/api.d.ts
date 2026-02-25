@@ -13,6 +13,7 @@ import type * as auth from "../auth.js";
 import type * as bills from "../bills.js";
 import type * as categories from "../categories.js";
 import type * as contacts from "../contacts.js";
+import type * as customSubcategories from "../customSubcategories.js";
 import type * as horses from "../horses.js";
 import type * as http from "../http.js";
 import type * as people from "../people.js";
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   bills: typeof bills;
   categories: typeof categories;
   contacts: typeof contacts;
+  customSubcategories: typeof customSubcategories;
   horses: typeof horses;
   http: typeof http;
   people: typeof people;

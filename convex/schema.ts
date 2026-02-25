@@ -47,7 +47,7 @@ export default defineSchema({
     .index("by_category_name", ["categoryId", "name"]),
 
   bills: defineTable({
-    providerId: v.id("providers"),
+    providerId: v.optional(v.id("providers")),
     categoryId: v.id("categories"),
     fileId: v.id("_storage"),
     fileName: v.string(),
@@ -62,6 +62,7 @@ export default defineSchema({
     uploadedAt: v.number(),
     extractedData: v.optional(v.any()),
     errorMessage: v.optional(v.string()),
+    customProviderName: v.optional(v.string()),
     originalPdfUrl: v.optional(v.string()),
     travelSubcategory: v.optional(v.string()),
     housingSubcategory: v.optional(v.string()),
@@ -76,6 +77,29 @@ export default defineSchema({
         v.object({
           personId: v.id("people"),
           amount: v.number()
+        })
+      )
+    ),
+    horseAssignments: v.optional(
+      v.array(
+        v.object({
+          lineItemIndex: v.number(),
+          horseId: v.optional(v.id("horses")),
+          horseName: v.optional(v.string())
+        })
+      )
+    ),
+    splitLineItems: v.optional(
+      v.array(
+        v.object({
+          lineItemIndex: v.number(),
+          splits: v.array(
+            v.object({
+              horseId: v.id("horses"),
+              horseName: v.string(),
+              amount: v.number()
+            })
+          )
         })
       )
     )
@@ -129,5 +153,15 @@ export default defineSchema({
     createdAt: v.number()
   })
     .index("by_role", ["role"])
-    .index("by_active", ["isActive"])
+    .index("by_active", ["isActive"]),
+
+  customSubcategories: defineTable({
+    categoryId: v.id("categories"),
+    name: v.string(),
+    slug: v.string(),
+    color: v.optional(v.string()),
+    createdAt: v.number()
+  })
+    .index("by_category", ["categoryId"])
+    .index("by_category_slug", ["categoryId", "slug"])
 });

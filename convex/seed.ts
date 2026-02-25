@@ -268,6 +268,44 @@ export const seedCategories = mutation(async (ctx) => {
     }
   }
 
+  const stablingCategory = await ctx.db
+    .query("categories")
+    .withIndex("by_slug", (q) => q.eq("slug", "stabling"))
+    .first();
+  if (!stablingCategory) {
+    throw new Error("Stabling category not found after category seed");
+  }
+
+  const stablingProviders = [
+    { name: "Travers Horse Facility", slug: "travers-horse-facility" },
+    { name: "El Campeon Farms", slug: "el-campeon-farms" },
+    { name: "Vanessa Mannix Stables", slug: "vanessa-mannix-stables" }
+  ] as const;
+
+  for (const provider of stablingProviders) {
+    const existingProvider = await ctx.db
+      .query("providers")
+      .withIndex("by_category_name", (q) => q.eq("categoryId", stablingCategory._id).eq("name", provider.name))
+      .first();
+    if (!existingProvider) {
+      await ctx.db.insert("providers", {
+        categoryId: stablingCategory._id,
+        name: provider.name,
+        slug: provider.slug,
+        extractionPrompt:
+          "Extract a stabling invoice as strict JSON with invoice_number, invoice_date, provider_name, account_number, original_currency, original_total, exchange_rate, invoice_total_usd and line_items[] containing description, total_usd, horse_name (if present), and stabling_subcategory.",
+        expectedFields: ["invoice_number", "invoice_date", "provider_name", "invoice_total_usd", "line_items"],
+        createdAt: Date.now()
+      });
+      createdProviders += 1;
+      continue;
+    }
+    if (!existingProvider.slug) {
+      await ctx.db.patch(existingProvider._id, { slug: provider.slug, updatedAt: Date.now() });
+      updatedProviders += 1;
+    }
+  }
+
   return { createdCategories, createdProviders, updatedProviders, skipped: false };
 });
 

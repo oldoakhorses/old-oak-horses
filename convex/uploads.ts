@@ -6,36 +6,59 @@ import type { Id } from "./_generated/dataModel";
 export const uploadAndParseBill: any = action({
   args: {
     categoryId: v.id("categories"),
-    providerId: v.id("providers"),
+    providerId: v.optional(v.id("providers")),
+    customProviderName: v.optional(v.string()),
+    saveAsNew: v.optional(v.boolean()),
     travelSubcategory: v.optional(v.string()),
     housingSubcategory: v.optional(v.string()),
     base64Pdf: v.string(),
     uploadedAt: v.optional(v.number())
   },
-  handler: async (ctx, args): Promise<{ billId: Id<"bills">; fileName: string }> => {
-    const provider = (await ctx.runQuery(internal.bills.getProvider, { providerId: args.providerId })) as
-      | { categoryId: Id<"categories">; name: string }
-      | null;
-    if (!provider) {
-      throw new Error("Provider not found");
-    }
-    if (provider.categoryId !== args.categoryId) {
-      throw new Error("Provider/category mismatch");
-    }
-
+  handler: async (ctx, args): Promise<{ billId: Id<"bills">; fileName: string; redirectPath: string; listPath: string }> => {
     const category = (await ctx.runQuery(internal.bills.getCategory, { categoryId: args.categoryId })) as
-      | { name: string }
+      | { name: string; slug?: string }
       | null;
     if (!category) {
       throw new Error("Category not found");
     }
 
+    let providerId = args.providerId;
+    const customProviderName = args.customProviderName?.trim() || undefined;
+
+    const isSubcategoryCategory = category.slug === "travel" || category.slug === "housing";
+
+    if (!providerId && customProviderName && args.saveAsNew) {
+      if (isSubcategoryCategory) {
+        await ctx.runMutation(internal.customSubcategories.createCustomSubcategoryOnUploadInternal, {
+          categoryId: args.categoryId,
+          name: customProviderName
+        });
+      } else {
+        providerId = (await ctx.runMutation(internal.providers.createProviderOnUploadInternal, {
+          categoryId: args.categoryId,
+          name: customProviderName
+        })) as Id<"providers">;
+      }
+    }
+
+    const provider = providerId
+      ? ((await ctx.runQuery(internal.bills.getProvider, { providerId })) as
+      | { categoryId: Id<"categories">; name: string }
+      | null)
+      : null;
+    if (provider && provider.categoryId !== args.categoryId) {
+      throw new Error("Provider/category mismatch");
+    }
+
     const uploadedAt = args.uploadedAt ?? Date.now();
     const uploadDate = new Date(uploadedAt).toISOString().slice(0, 10);
-    const baseName = `${category.name} - ${provider.name} - ${uploadDate}`;
-    const existingFileNames = (await ctx.runQuery(internal.bills.getBillFileNamesByProvider, {
-      providerId: args.providerId
-    })) as string[];
+    const displayName = provider?.name ?? customProviderName ?? "Other";
+    const baseName = `${category.name} - ${displayName} - ${uploadDate}`;
+    const existingFileNames = providerId
+      ? ((await ctx.runQuery(internal.bills.getBillFileNamesByProvider, {
+          providerId
+        })) as string[])
+      : [];
 
     const fileName = nextAvailableFileName(existingFileNames, baseName);
     const bytes = base64ToBytes(args.base64Pdf);
@@ -43,19 +66,46 @@ export const uploadAndParseBill: any = action({
     const originalPdfUrl = (await ctx.storage.getUrl(fileId)) ?? undefined;
 
     const billId = (await ctx.runMutation(internal.bills.createParsingBill, {
-      providerId: args.providerId,
+      providerId,
       categoryId: args.categoryId,
       fileId,
       fileName,
       billingPeriod: uploadDate.slice(0, 7),
       uploadedAt,
+      customProviderName: !providerId ? customProviderName : undefined,
       originalPdfUrl,
-      travelSubcategory: args.travelSubcategory,
-      housingSubcategory: args.housingSubcategory
+      travelSubcategory:
+        category.slug === "travel"
+          ? args.travelSubcategory || (!providerId && customProviderName ? slugify(customProviderName) : undefined)
+          : undefined,
+      housingSubcategory:
+        category.slug === "housing"
+          ? args.housingSubcategory || (!providerId && customProviderName ? slugify(customProviderName) : undefined)
+          : undefined
     })) as Id<"bills">;
 
     await ctx.scheduler.runAfter(0, internal.bills.parseBillPdf, { billId });
-    return { billId, fileName };
+
+    const providerSlug = provider ? slugify(provider.name) : customProviderName ? slugify(customProviderName) : "other";
+    const travelSubcategory = args.travelSubcategory || (!providerId && customProviderName ? slugify(customProviderName) : "travel");
+    const housingSubcategory = args.housingSubcategory || (!providerId && customProviderName ? slugify(customProviderName) : "housing");
+
+    let redirectPath = `/${category.slug}/${providerSlug}/${billId}`;
+    let listPath = `/${category.slug}`;
+    if (category.slug === "travel") {
+      redirectPath = `/travel/${travelSubcategory}/${billId}`;
+      listPath = `/travel/${travelSubcategory}`;
+    } else if (category.slug === "housing") {
+      redirectPath = `/housing/${housingSubcategory}/${billId}`;
+      listPath = `/housing/${housingSubcategory}`;
+    } else if (category.slug === "stabling") {
+      redirectPath = `/stabling/${providerSlug}/${billId}`;
+      listPath = `/stabling/${providerSlug}`;
+    } else if (providerId) {
+      listPath = `/${category.slug}/${providerSlug}`;
+    }
+
+    return { billId, fileName, redirectPath, listPath };
   }
 });
 
@@ -82,4 +132,12 @@ function base64ToBytes(base64: string) {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
+}
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
 }
