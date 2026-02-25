@@ -11,6 +11,19 @@ export const getProvidersByCategory = query({
   }
 });
 
+export const getProvidersByCategoryAndSubcategory = query({
+  args: {
+    categoryId: v.id("categories"),
+    subcategorySlug: v.string()
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("providers")
+      .withIndex("by_category_subcategory_name", (q) => q.eq("categoryId", args.categoryId).eq("subcategorySlug", args.subcategorySlug))
+      .collect();
+  }
+});
+
 export const getProviderById = query({
   args: { providerId: v.id("providers") },
   handler: async (ctx, args) => {
@@ -78,6 +91,7 @@ export const getProviderByNameInCategory = query({
 export const createProvider = mutation({
   args: {
     categoryId: v.id("categories"),
+    subcategorySlug: v.optional(v.string()),
     name: v.string(),
     extractionPrompt: v.string(),
     expectedFields: v.array(v.string())
@@ -90,6 +104,7 @@ export const createProvider = mutation({
 
     return await ctx.db.insert("providers", {
       categoryId: args.categoryId,
+      subcategorySlug: args.subcategorySlug,
       name: args.name,
       slug: slugify(args.name),
       extractionPrompt: args.extractionPrompt,
@@ -149,20 +164,22 @@ export const updateProviderContact = mutation({
 export const createProviderOnUpload = mutation({
   args: {
     name: v.string(),
-    categoryId: v.id("categories")
+    categoryId: v.id("categories"),
+    subcategorySlug: v.optional(v.string())
   },
   handler: async (ctx, args) => {
-    return await createProviderOnUploadImpl(ctx, args.name, args.categoryId);
+    return await createProviderOnUploadImpl(ctx, args.name, args.categoryId, args.subcategorySlug);
   }
 });
 
 export const createProviderOnUploadInternal = internalMutation({
   args: {
     name: v.string(),
-    categoryId: v.id("categories")
+    categoryId: v.id("categories"),
+    subcategorySlug: v.optional(v.string())
   },
   handler: async (ctx, args) => {
-    return await createProviderOnUploadImpl(ctx, args.name, args.categoryId);
+    return await createProviderOnUploadImpl(ctx, args.name, args.categoryId, args.subcategorySlug);
   }
 });
 
@@ -175,7 +192,7 @@ function slugify(value: string) {
     .replace(/\s+/g, "-");
 }
 
-async function createProviderOnUploadImpl(ctx: any, name: string, categoryId: string) {
+async function createProviderOnUploadImpl(ctx: any, name: string, categoryId: string, subcategorySlug?: string) {
   const cleanName = name.trim();
   const baseSlug = slugify(cleanName);
   const existing = await ctx.db
@@ -188,6 +205,7 @@ async function createProviderOnUploadImpl(ctx: any, name: string, categoryId: st
     name: cleanName,
     slug,
     categoryId,
+    subcategorySlug,
     extractionPrompt: "",
     expectedFields: [],
     createdAt: Date.now()

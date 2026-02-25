@@ -853,7 +853,8 @@ export const createParsingBill = internalMutation({
     customProviderName: v.optional(v.string()),
     originalPdfUrl: v.optional(v.string()),
     travelSubcategory: v.optional(v.string()),
-    housingSubcategory: v.optional(v.string())
+    housingSubcategory: v.optional(v.string()),
+    horseTransportSubcategory: v.optional(v.string())
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("bills", {
@@ -867,7 +868,8 @@ export const createParsingBill = internalMutation({
       customProviderName: args.customProviderName,
       originalPdfUrl: args.originalPdfUrl,
       travelSubcategory: args.travelSubcategory,
-      housingSubcategory: args.housingSubcategory
+      housingSubcategory: args.housingSubcategory,
+      horseTransportSubcategory: args.horseTransportSubcategory
     });
   }
 });
@@ -904,6 +906,7 @@ export const markDone = internalMutation({
     status: v.union(v.literal("pending"), v.literal("done")),
     travelSubcategory: v.optional(v.string()),
     housingSubcategory: v.optional(v.string()),
+    horseTransportSubcategory: v.optional(v.string()),
     horseAssignments: v.optional(
       v.array(
         v.object({
@@ -939,6 +942,7 @@ export const markDone = internalMutation({
       extractedData: args.extractedData,
       travelSubcategory: args.travelSubcategory,
       housingSubcategory: args.housingSubcategory,
+      horseTransportSubcategory: args.horseTransportSubcategory,
       horseAssignments: args.horseAssignments,
       splitLineItems: args.splitLineItems,
       originalCurrency: args.originalCurrency,

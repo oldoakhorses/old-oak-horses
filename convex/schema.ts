@@ -27,6 +27,7 @@ export default defineSchema({
 
   providers: defineTable({
     categoryId: v.id("categories"),
+    subcategorySlug: v.optional(v.string()),
     name: v.string(),
     slug: v.optional(v.string()),
     fullName: v.optional(v.string()),
@@ -44,7 +45,9 @@ export default defineSchema({
     .index("by_name", ["name"])
     .index("by_slug", ["slug"])
     .index("by_category", ["categoryId"])
-    .index("by_category_name", ["categoryId", "name"]),
+    .index("by_category_name", ["categoryId", "name"])
+    .index("by_category_subcategory", ["categoryId", "subcategorySlug"])
+    .index("by_category_subcategory_name", ["categoryId", "subcategorySlug", "name"]),
 
   bills: defineTable({
     providerId: v.optional(v.id("providers")),
@@ -66,6 +69,7 @@ export default defineSchema({
     originalPdfUrl: v.optional(v.string()),
     travelSubcategory: v.optional(v.string()),
     housingSubcategory: v.optional(v.string()),
+    horseTransportSubcategory: v.optional(v.string()),
     originalCurrency: v.optional(v.string()),
     originalTotal: v.optional(v.number()),
     exchangeRate: v.optional(v.number()),

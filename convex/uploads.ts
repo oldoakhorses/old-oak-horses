@@ -11,6 +11,7 @@ export const uploadAndParseBill: any = action({
     saveAsNew: v.optional(v.boolean()),
     travelSubcategory: v.optional(v.string()),
     housingSubcategory: v.optional(v.string()),
+    horseTransportSubcategory: v.optional(v.string()),
     base64Pdf: v.string(),
     uploadedAt: v.optional(v.number())
   },
@@ -26,6 +27,7 @@ export const uploadAndParseBill: any = action({
     const customProviderName = args.customProviderName?.trim() || undefined;
 
     const isSubcategoryCategory = category.slug === "travel" || category.slug === "housing";
+    const isHorseTransportCategory = category.slug === "horse-transport";
 
     if (!providerId && customProviderName && args.saveAsNew) {
       if (isSubcategoryCategory) {
@@ -36,7 +38,8 @@ export const uploadAndParseBill: any = action({
       } else {
         providerId = (await ctx.runMutation(internal.providers.createProviderOnUploadInternal, {
           categoryId: args.categoryId,
-          name: customProviderName
+          name: customProviderName,
+          subcategorySlug: isHorseTransportCategory ? args.horseTransportSubcategory : undefined
         })) as Id<"providers">;
       }
     }
@@ -82,6 +85,11 @@ export const uploadAndParseBill: any = action({
         category.slug === "housing"
           ? args.housingSubcategory || (!providerId && customProviderName ? slugify(customProviderName) : undefined)
           : undefined
+      ,
+      horseTransportSubcategory:
+        category.slug === "horse-transport"
+          ? args.horseTransportSubcategory || undefined
+          : undefined
     })) as Id<"bills">;
 
     await ctx.scheduler.runAfter(0, internal.billParsing.parseBillPdf, { billId });
@@ -101,6 +109,10 @@ export const uploadAndParseBill: any = action({
     } else if (category.slug === "stabling") {
       redirectPath = `/stabling/${providerSlug}/${billId}`;
       listPath = `/stabling/${providerSlug}`;
+    } else if (category.slug === "horse-transport") {
+      const subSlug = args.horseTransportSubcategory || "ground-transport";
+      redirectPath = `/horse-transport/${subSlug}/${providerSlug}/${billId}`;
+      listPath = `/horse-transport/${subSlug}/${providerSlug}`;
     } else if (providerId) {
       listPath = `/${category.slug}/${providerSlug}`;
     }

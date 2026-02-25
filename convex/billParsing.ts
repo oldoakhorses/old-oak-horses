@@ -72,7 +72,8 @@ export const parseBillPdf = internalAction({
       }
 
       const needsApproval = category.slug === "travel" || category.slug === "housing" || category.slug === "stabling";
-      const status = needsApproval ? "pending" : "done";
+      const needsApprovalWithTransport = needsApproval || category.slug === "horse-transport";
+      const status = needsApprovalWithTransport ? "pending" : "done";
       const categoryMeta =
         category.slug === "travel"
           ? extractTravelMeta(parsed, provider?.slug ?? provider?.name)
@@ -80,6 +81,8 @@ export const parseBillPdf = internalAction({
             ? extractHousingMeta(parsed, provider?.slug ?? provider?.name)
             : category.slug === "stabling"
               ? extractStablingMeta(parsed)
+              : category.slug === "horse-transport"
+                ? extractHorseTransportMeta(parsed, bill.horseTransportSubcategory)
               : {};
 
       await ctx.runMutation(internal.bills.markDone, {
@@ -258,6 +261,32 @@ function extractStablingMeta(parsed: Record<string, unknown>) {
   });
 
   return {
+    horseAssignments,
+    splitLineItems: [] as any[],
+    originalCurrency,
+    originalTotal,
+    exchangeRate,
+    isApproved: false
+  };
+}
+
+function extractHorseTransportMeta(parsed: Record<string, unknown>, billSubcategory: string | undefined) {
+  const originalCurrency = pickString(parsed, ["original_currency", "currency"])?.toUpperCase();
+  const originalTotal = pickNumber(parsed, ["original_total", "invoice_total_original"]);
+  const exchangeRate = pickNumber(parsed, ["exchange_rate", "exchange_rate_used"]);
+  const lineItems = getLineItems(parsed);
+  const horseAssignments = lineItems.map((item, index) => {
+    const row = item as Record<string, unknown>;
+    const horseName = pickString(row, ["horse_name", "horseName"]);
+    return {
+      lineItemIndex: index,
+      horseName,
+      horseId: undefined
+    };
+  });
+
+  return {
+    horseTransportSubcategory: billSubcategory,
     horseAssignments,
     splitLineItems: [] as any[],
     originalCurrency,

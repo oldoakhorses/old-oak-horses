@@ -307,6 +307,54 @@ export const seedCategories = mutation(async (ctx) => {
     }
   }
 
+  const horseTransportCategory = await ctx.db
+    .query("categories")
+    .withIndex("by_slug", (q) => q.eq("slug", "horse-transport"))
+    .first();
+  if (!horseTransportCategory) {
+    throw new Error("Horse Transport category not found after category seed");
+  }
+
+  const horseTransportProviders = [
+    { name: "Brook Ledge", slug: "brook-ledge", subcategorySlug: "ground-transport" },
+    { name: "Johnson", slug: "johnson", subcategorySlug: "ground-transport" },
+    { name: "Stateside", slug: "stateside", subcategorySlug: "ground-transport" },
+    { name: "Sominium", slug: "sominium", subcategorySlug: "ground-transport" },
+    { name: "Gelissen", slug: "gelissen", subcategorySlug: "ground-transport" },
+    { name: "Dutta Corp", slug: "dutta-corp", subcategorySlug: "air-transport" },
+    { name: "Apollo Equine Transport", slug: "apollo-equine-transport", subcategorySlug: "air-transport" },
+    { name: "Guido Klatte", slug: "guido-klatte", subcategorySlug: "air-transport" }
+  ] as const;
+
+  for (const provider of horseTransportProviders) {
+    const existingProvider = await ctx.db
+      .query("providers")
+      .withIndex("by_category_name", (q) => q.eq("categoryId", horseTransportCategory._id).eq("name", provider.name))
+      .first();
+    if (!existingProvider) {
+      await ctx.db.insert("providers", {
+        categoryId: horseTransportCategory._id,
+        subcategorySlug: provider.subcategorySlug,
+        name: provider.name,
+        slug: provider.slug,
+        extractionPrompt:
+          "Extract from this horse transport invoice: invoice_number, invoice_date, due_date, provider_name, original_currency, original_total, exchange_rate, invoice_total_usd, origin, destination, and line_items[] with description, horse_name (or null), quantity, unit_price, total_usd.",
+        expectedFields: ["invoice_number", "invoice_date", "provider_name", "invoice_total_usd", "line_items"],
+        createdAt: Date.now()
+      });
+      createdProviders += 1;
+      continue;
+    }
+    if (!existingProvider.slug || !existingProvider.subcategorySlug) {
+      await ctx.db.patch(existingProvider._id, {
+        slug: existingProvider.slug ?? provider.slug,
+        subcategorySlug: existingProvider.subcategorySlug ?? provider.subcategorySlug,
+        updatedAt: Date.now()
+      });
+      updatedProviders += 1;
+    }
+  }
+
   const farrierCategory = await ctx.db
     .query("categories")
     .withIndex("by_slug", (q) => q.eq("slug", "farrier"))

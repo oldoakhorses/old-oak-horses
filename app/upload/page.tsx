@@ -38,6 +38,10 @@ const HOUSING_SUBCATEGORIES = [
   { name: "Rider Housing", slug: "rider-housing" },
   { name: "Groom Housing", slug: "groom-housing" }
 ] as const;
+const HORSE_TRANSPORT_SUBCATEGORIES = [
+  { name: "Ground Transport", slug: "ground-transport" },
+  { name: "Air Transport", slug: "air-transport" }
+] as const;
 const OTHER_OPTION_VALUE = "__other__";
 
 const CATEGORY_DISPLAY_ORDER = [
@@ -69,6 +73,7 @@ export default function UploadPage() {
   const [selectedProvider, setSelectedProvider] = useState<Id<"providers"> | "">("");
   const [selectedTravelSubcategory, setSelectedTravelSubcategory] = useState<string>("");
   const [selectedHousingSubcategory, setSelectedHousingSubcategory] = useState<string>("");
+  const [selectedHorseTransportSubcategory, setSelectedHorseTransportSubcategory] = useState<string>("");
   const [usingOtherOption, setUsingOtherOption] = useState(false);
   const [otherName, setOtherName] = useState("");
   const [saveAsNew, setSaveAsNew] = useState(false);
@@ -108,8 +113,8 @@ export default function UploadPage() {
 
   const isTravelCategory = selectedCategoryDoc?.slug === "travel";
   const isHousingCategory = selectedCategoryDoc?.slug === "housing";
+  const isHorseTransportCategory = selectedCategoryDoc?.slug === "horse-transport";
   const isPeopleSubcategoryCategory = isTravelCategory || isHousingCategory;
-  const selectedProviderDoc = providers.find((provider) => provider._id === selectedProvider);
   const selectedTravelOption = TRAVEL_SUBCATEGORIES.find((row) => row.slug === selectedTravelSubcategory);
   const selectedHousingOption = HOUSING_SUBCATEGORIES.find((row) => row.slug === selectedHousingSubcategory);
   const mergedTravelOptions = useMemo(
@@ -126,6 +131,15 @@ export default function UploadPage() {
     ],
     [customSubcategories]
   );
+  const horseTransportProvidersQuery = useQuery(
+    api.providers.getProvidersByCategoryAndSubcategory,
+    selectedCategory && isHorseTransportCategory && selectedHorseTransportSubcategory
+      ? { categoryId: selectedCategory, subcategorySlug: selectedHorseTransportSubcategory }
+      : "skip"
+  );
+  const horseTransportProviders = horseTransportProvidersQuery ?? [];
+  const providerOptions = isHorseTransportCategory ? horseTransportProviders : providers;
+  const selectedProviderDoc = providerOptions.find((provider) => provider._id === selectedProvider);
 
   const duplicateNameExists = useMemo(() => {
     const value = otherName.trim().toLowerCase();
@@ -134,8 +148,8 @@ export default function UploadPage() {
       const source = isTravelCategory ? mergedTravelOptions : mergedHousingOptions;
       return source.some((row) => row.name.trim().toLowerCase() === value);
     }
-    return providers.some((provider) => provider.name.trim().toLowerCase() === value);
-  }, [isHousingCategory, isPeopleSubcategoryCategory, isTravelCategory, mergedHousingOptions, mergedTravelOptions, otherName, providers]);
+    return providerOptions.some((provider) => provider.name.trim().toLowerCase() === value);
+  }, [isHousingCategory, isPeopleSubcategoryCategory, isTravelCategory, mergedHousingOptions, mergedTravelOptions, otherName, providerOptions]);
 
   const otherNameValid = otherName.trim().length >= 2;
 
@@ -143,9 +157,11 @@ export default function UploadPage() {
     ? "select a category first"
     : isPeopleSubcategoryCategory
       ? "select a subcategory"
-      : providersQuery === undefined
+      : isHorseTransportCategory && !selectedHorseTransportSubcategory
+        ? "select a subcategory first"
+      : (isHorseTransportCategory ? horseTransportProvidersQuery === undefined : providersQuery === undefined)
         ? "loading providers..."
-        : providers.length === 0
+        : providerOptions.length === 0
           ? "no providers for this category"
           : "select a provider";
 
@@ -154,10 +170,12 @@ export default function UploadPage() {
       files.length > 0 &&
       uploadStatus !== "uploading" &&
       (usingOtherOption
-        ? otherNameValid && (!saveAsNew || !duplicateNameExists)
+        ? otherNameValid && (!saveAsNew || !duplicateNameExists) && (!isHorseTransportCategory || Boolean(selectedHorseTransportSubcategory))
         : isPeopleSubcategoryCategory
           ? Boolean(isTravelCategory ? selectedTravelSubcategory : selectedHousingSubcategory)
-          : Boolean(selectedProvider))
+          : isHorseTransportCategory
+            ? Boolean(selectedHorseTransportSubcategory && selectedProvider)
+            : Boolean(selectedProvider))
   );
 
   const providerHref = useMemo(() => {
@@ -178,8 +196,12 @@ export default function UploadPage() {
       const subSlug = selectedHousingOption?.slug ?? selectedProviderDoc.slug ?? slugify(selectedProviderDoc.name);
       return `/housing/${subSlug}`;
     }
+    if (selectedCategoryDoc.slug === "horse-transport") {
+      const subSlug = selectedHorseTransportSubcategory || "ground-transport";
+      return `/horse-transport/${subSlug}/${selectedProviderDoc.slug ?? slugify(selectedProviderDoc.name)}`;
+    }
     return `/${selectedCategoryDoc.slug}/${selectedProviderDoc.slug ?? slugify(selectedProviderDoc.name)}`;
-  }, [otherName, otherNameValid, selectedCategoryDoc, selectedHousingOption?.slug, selectedProviderDoc, selectedTravelOption?.slug, usingOtherOption]);
+  }, [otherName, otherNameValid, selectedCategoryDoc, selectedHorseTransportSubcategory, selectedHousingOption?.slug, selectedProviderDoc, selectedTravelOption?.slug, usingOtherOption]);
 
   const allComplete = useMemo(() => {
     if (files.length === 0) return false;
@@ -238,6 +260,7 @@ export default function UploadPage() {
     setSelectedProvider("");
     setSelectedTravelSubcategory("");
     setSelectedHousingSubcategory("");
+    setSelectedHorseTransportSubcategory("");
     setUsingOtherOption(false);
     setOtherName("");
     setSaveAsNew(false);
@@ -253,6 +276,14 @@ export default function UploadPage() {
     setOtherName("");
     setSaveAsNew(false);
     setSelectedProvider((value || "") as Id<"providers"> | "");
+  }
+
+  function onHorseTransportSubcategoryChange(value: string) {
+    setSelectedHorseTransportSubcategory(value);
+    setSelectedProvider("");
+    setUsingOtherOption(false);
+    setOtherName("");
+    setSaveAsNew(false);
   }
 
   function onTravelSubcategoryChange(value: string) {
@@ -336,8 +367,10 @@ export default function UploadPage() {
 
   async function runUploadForFile(fileId: string) {
     if (!selectedCategory) return;
-    if (!usingOtherOption && !isPeopleSubcategoryCategory && !selectedProvider) return;
+    if (!usingOtherOption && !isPeopleSubcategoryCategory && !isHorseTransportCategory && !selectedProvider) return;
     if (!usingOtherOption && isPeopleSubcategoryCategory && !(isTravelCategory ? selectedTravelSubcategory : selectedHousingSubcategory)) return;
+    if (!usingOtherOption && isHorseTransportCategory && (!selectedHorseTransportSubcategory || !selectedProvider)) return;
+    if (usingOtherOption && isHorseTransportCategory && !selectedHorseTransportSubcategory) return;
     if (usingOtherOption && !otherNameValid) return;
 
     const fileRecord = files.find((file) => file.id === fileId);
@@ -353,6 +386,7 @@ export default function UploadPage() {
         saveAsNew: usingOtherOption ? saveAsNew : undefined,
         travelSubcategory: selectedTravelSubcategory || undefined,
         housingSubcategory: selectedHousingSubcategory || undefined,
+        horseTransportSubcategory: selectedHorseTransportSubcategory || undefined,
         base64Pdf,
       });
 
@@ -411,6 +445,25 @@ export default function UploadPage() {
               ))}
             </select>
           </label>
+
+          {isHorseTransportCategory ? (
+            <label className={styles.field}>
+              <span className={styles.label}>SUBCATEGORY *</span>
+              <select
+                value={selectedHorseTransportSubcategory}
+                onChange={(event) => onHorseTransportSubcategoryChange(event.target.value)}
+                className={styles.select}
+                disabled={!selectedCategory}
+              >
+                <option value="">{!selectedCategory ? "select a category first" : "select a subcategory"}</option>
+                {HORSE_TRANSPORT_SUBCATEGORIES.map((option) => (
+                  <option key={option.slug} value={option.slug}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
 
           <label className={styles.field}>
             <span className={styles.label}>{isPeopleSubcategoryCategory ? "SUBCATEGORY *" : "PROVIDER *"}</span>
@@ -479,10 +532,10 @@ export default function UploadPage() {
                 value={selectedProvider}
                 onChange={(event) => onProviderChange(event.target.value)}
                 className={styles.select}
-                disabled={!selectedCategory}
+                disabled={!selectedCategory || (isHorseTransportCategory && !selectedHorseTransportSubcategory)}
               >
                 <option value="">{providerPlaceholder}</option>
-                {providers.map((provider) => (
+                {providerOptions.map((provider) => (
                   <option key={provider._id} value={provider._id}>
                     {provider.name}
                   </option>
@@ -526,7 +579,7 @@ export default function UploadPage() {
             </section>
           ) : null}
 
-          {selectedCategoryDoc && (selectedProviderDoc || usingOtherOption || selectedTravelSubcategory || selectedHousingSubcategory) ? (
+          {selectedCategoryDoc && (selectedProviderDoc || usingOtherOption || selectedTravelSubcategory || selectedHousingSubcategory || selectedHorseTransportSubcategory) ? (
             <div className={styles.namingPreview}>
               files will be saved as: <span>{selectedCategoryDoc.name}</span> -{" "}
               <span>
