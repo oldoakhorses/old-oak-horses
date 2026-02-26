@@ -8,6 +8,7 @@ import { internal } from "./_generated/api";
 const TRAVEL_SUBCATEGORY_SLUGS = new Set(["flights", "trains", "rental-car", "gas", "meals", "hotels"]);
 const HOUSING_SUBCATEGORY_SLUGS = new Set(["rider-housing", "groom-housing"]);
 const MARKETING_SUBCATEGORY_SLUGS = new Set(["vip-tickets", "photography", "social-media"]);
+const SALARIES_SUBCATEGORY_SLUGS = new Set(["rider", "groom", "freelance"]);
 
 export const parseBillPdf = internalAction({
   args: { billId: v.id("bills") },
@@ -96,7 +97,8 @@ export const parseBillPdf = internalAction({
         category.slug === "stabling" ||
         category.slug === "marketing" ||
         category.slug === "bodywork" ||
-        category.slug === "feed-bedding";
+        category.slug === "feed-bedding" ||
+        category.slug === "salaries";
       const needsApprovalWithTransport = needsApproval || category.slug === "horse-transport";
       const status = needsApprovalWithTransport ? "pending" : "done";
       const categoryMeta =
@@ -110,6 +112,8 @@ export const parseBillPdf = internalAction({
                 ? extractHorseTransportMeta(parsed, bill.horseTransportSubcategory)
               : category.slug === "marketing"
                 ? extractMarketingMeta(parsed, bill.marketingSubcategory)
+                : category.slug === "salaries"
+                  ? extractSalariesMeta(parsed, bill.salariesSubcategory)
               : {};
 
       await ctx.runMutation(internal.bills.markDone, {
@@ -341,6 +345,35 @@ function extractMarketingMeta(parsed: Record<string, unknown>, billSubcategory: 
   };
 }
 
+function extractSalariesMeta(parsed: Record<string, unknown>, billSubcategory: string | undefined) {
+  const originalCurrency = pickString(parsed, ["original_currency", "currency"])?.toUpperCase();
+  const originalTotal = pickNumber(parsed, ["original_total", "invoice_total_original"]);
+  const exchangeRate = pickNumber(parsed, ["exchange_rate", "exchange_rate_used"]);
+  const parsedSubcategory = slugify(pickString(parsed, ["salary_subcategory", "salaries_subcategory", "subcategory"]) ?? "");
+  const salariesSubcategory = SALARIES_SUBCATEGORY_SLUGS.has(parsedSubcategory) ? parsedSubcategory : billSubcategory ?? "other";
+  const role = salariesSubcategory === "rider" || salariesSubcategory === "groom" || salariesSubcategory === "freelance" ? salariesSubcategory : undefined;
+  const lineItems = getLineItems(parsed);
+  const personAssignments = lineItems.map((item, index) => {
+    const row = item as Record<string, unknown>;
+    const personName = pickString(row, ["person_name", "employee_name", "name"]);
+    return {
+      lineItemIndex: index,
+      personId: undefined,
+      personName,
+      role
+    };
+  });
+  return {
+    salariesSubcategory,
+    personAssignments,
+    splitPersonLineItems: [] as any[],
+    originalCurrency,
+    originalTotal,
+    exchangeRate,
+    isApproved: false
+  };
+}
+
 function genericExtractionPrompt(categorySlug?: string) {
   const base =
     "Extract invoice data as strict JSON with invoice_number, invoice_date, provider_name, account_number, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[].";
@@ -358,6 +391,9 @@ function genericExtractionPrompt(categorySlug?: string) {
   }
   if (categorySlug === "feed-bedding") {
     return 'Extract from this feed and bedding invoice: invoice_number, invoice_date, due_date, provider_name, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, quantity, unit_price, total_usd, and subcategory ("feed", "bedding", or null for delivery/tax). Return strict JSON.';
+  }
+  if (categorySlug === "salaries") {
+    return "Extract from this salary/payroll invoice: invoice_number, invoice_date, due_date, provider_name, pay_period, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, person_name (if identifiable), quantity, unit_price, total_usd. Return strict JSON.";
   }
   return base;
 }

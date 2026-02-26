@@ -13,6 +13,7 @@ export const uploadAndParseBill: any = action({
     housingSubcategory: v.optional(v.string()),
     horseTransportSubcategory: v.optional(v.string()),
     marketingSubcategory: v.optional(v.string()),
+    salariesSubcategory: v.optional(v.string()),
     base64Pdf: v.string(),
     uploadedAt: v.optional(v.number())
   },
@@ -27,7 +28,8 @@ export const uploadAndParseBill: any = action({
     let providerId = args.providerId;
     const customProviderName = args.customProviderName?.trim() || undefined;
 
-    const isSubcategoryCategory = category.slug === "travel" || category.slug === "housing" || category.slug === "marketing";
+    const isSubcategoryCategory =
+      category.slug === "travel" || category.slug === "housing" || category.slug === "marketing" || category.slug === "salaries";
     const isHorseTransportCategory = category.slug === "horse-transport";
 
     if (!providerId && customProviderName && args.saveAsNew) {
@@ -94,6 +96,10 @@ export const uploadAndParseBill: any = action({
       marketingSubcategory:
         category.slug === "marketing"
           ? args.marketingSubcategory || (!providerId && customProviderName ? slugify(customProviderName) : undefined)
+          : undefined,
+      salariesSubcategory:
+        category.slug === "salaries"
+          ? args.salariesSubcategory || (!providerId && customProviderName ? slugify(customProviderName) : undefined)
           : undefined
     })) as Id<"bills">;
 
@@ -122,6 +128,10 @@ export const uploadAndParseBill: any = action({
       const subSlug = args.marketingSubcategory || "other";
       redirectPath = `/marketing/${subSlug}/${billId}`;
       listPath = `/marketing/${subSlug}`;
+    } else if (category.slug === "salaries") {
+      const subSlug = args.salariesSubcategory || "other";
+      redirectPath = `/salaries/${subSlug}/${billId}`;
+      listPath = `/salaries/${subSlug}`;
     } else if (providerId) {
       listPath = `/${category.slug}/${providerSlug}`;
     }

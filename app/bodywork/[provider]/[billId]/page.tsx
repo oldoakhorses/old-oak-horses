@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
+import Modal from "@/components/Modal";
 
 type LineItem = {
   description?: string;
@@ -23,6 +24,7 @@ export default function BodyworkInvoicePage() {
   const provider = useQuery(api.providers.getProviderBySlug, providerSlug ? { categorySlug: "bodywork", providerSlug } : "skip");
   const approveInvoice = useMutation(api.bills.approveInvoice);
   const deleteBill = useMutation(api.bills.deleteBill);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const extracted = (bill?.extractedData ?? {}) as Record<string, unknown>;
   const lineItems: LineItem[] = Array.isArray(extracted.line_items) ? (extracted.line_items as LineItem[]) : [];
@@ -97,10 +99,10 @@ export default function BodyworkInvoicePage() {
         ))}
 
         <section className="ui-card" style={{ marginTop: 16, display: "flex", gap: 10 }}>
-          <button type="button" className="ui-button-filled" onClick={onApprove}>
+          <button type="button" className="ui-button-filled" onClick={onApprove} disabled={bill?.status === "done"}>
             approve invoice
           </button>
-          <button type="button" className="ui-button-outlined" onClick={onDelete}>
+          <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(true)}>
             delete
           </button>
         </section>
@@ -129,6 +131,28 @@ export default function BodyworkInvoicePage() {
         </section>
 
         <div className="ui-footer">OLD_OAK_HORSES // BODYWORK // {providerSlug.toUpperCase()}</div>
+
+        <Modal open={showDeleteConfirm} title="delete invoice?" onClose={() => setShowDeleteConfirm(false)}>
+          <p style={{ marginTop: 0, color: "var(--ui-text-secondary)" }}>
+            this will permanently delete invoice <strong>{String(extracted.invoice_number ?? billId)}</strong>.
+          </p>
+          <p style={{ color: "var(--ui-text-muted)" }}>this action cannot be undone.</p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+            <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(false)}>
+              cancel
+            </button>
+            <button
+              type="button"
+              className="ui-button-filled"
+              onClick={async () => {
+                setShowDeleteConfirm(false);
+                await onDelete();
+              }}
+            >
+              yes, delete invoice
+            </button>
+          </div>
+        </Modal>
       </main>
     </div>
   );

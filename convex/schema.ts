@@ -71,6 +71,7 @@ export default defineSchema({
     housingSubcategory: v.optional(v.string()),
     horseTransportSubcategory: v.optional(v.string()),
     marketingSubcategory: v.optional(v.string()),
+    salariesSubcategory: v.optional(v.string()),
     originalCurrency: v.optional(v.string()),
     originalTotal: v.optional(v.number()),
     exchangeRate: v.optional(v.number()),
@@ -112,6 +113,31 @@ export default defineSchema({
             v.object({
               horseId: v.id("horses"),
               horseName: v.string(),
+              amount: v.number()
+            })
+          )
+        })
+      )
+    ),
+    personAssignments: v.optional(
+      v.array(
+        v.object({
+          lineItemIndex: v.number(),
+          personId: v.optional(v.id("people")),
+          personName: v.optional(v.string()),
+          role: v.optional(v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer")))
+        })
+      )
+    ),
+    splitPersonLineItems: v.optional(
+      v.array(
+        v.object({
+          lineItemIndex: v.number(),
+          splits: v.array(
+            v.object({
+              personId: v.id("people"),
+              personName: v.string(),
+              role: v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer")),
               amount: v.number()
             })
           )

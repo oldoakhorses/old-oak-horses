@@ -43,6 +43,11 @@ const MARKETING_SUBCATEGORIES = [
   { name: "Photography", slug: "photography" },
   { name: "Social Media", slug: "social-media" }
 ] as const;
+const SALARIES_SUBCATEGORIES = [
+  { name: "Rider", slug: "rider" },
+  { name: "Groom", slug: "groom" },
+  { name: "Freelance", slug: "freelance" }
+] as const;
 const HORSE_TRANSPORT_SUBCATEGORIES = [
   { name: "Ground Transport", slug: "ground-transport" },
   { name: "Air Transport", slug: "air-transport" }
@@ -80,6 +85,7 @@ export default function UploadPage() {
   const [selectedTravelSubcategory, setSelectedTravelSubcategory] = useState<string>("");
   const [selectedHousingSubcategory, setSelectedHousingSubcategory] = useState<string>("");
   const [selectedMarketingSubcategory, setSelectedMarketingSubcategory] = useState<string>("");
+  const [selectedSalariesSubcategory, setSelectedSalariesSubcategory] = useState<string>("");
   const [selectedHorseTransportSubcategory, setSelectedHorseTransportSubcategory] = useState<string>("");
   const [usingOtherOption, setUsingOtherOption] = useState(false);
   const [otherName, setOtherName] = useState("");
@@ -100,7 +106,10 @@ export default function UploadPage() {
   const customSubcategoriesQuery = useQuery(
     api.customSubcategories.getByCategory,
     selectedCategory &&
-    (selectedCategoryDoc?.slug === "travel" || selectedCategoryDoc?.slug === "housing" || selectedCategoryDoc?.slug === "marketing")
+    (selectedCategoryDoc?.slug === "travel" ||
+      selectedCategoryDoc?.slug === "housing" ||
+      selectedCategoryDoc?.slug === "marketing" ||
+      selectedCategoryDoc?.slug === "salaries")
       ? { categoryId: selectedCategory }
       : "skip"
   );
@@ -122,9 +131,10 @@ export default function UploadPage() {
   const isTravelCategory = selectedCategoryDoc?.slug === "travel";
   const isHousingCategory = selectedCategoryDoc?.slug === "housing";
   const isMarketingCategory = selectedCategoryDoc?.slug === "marketing";
+  const isSalariesCategory = selectedCategoryDoc?.slug === "salaries";
   const isHorseTransportCategory = selectedCategoryDoc?.slug === "horse-transport";
   const isPeopleSubcategoryCategory = isTravelCategory || isHousingCategory;
-  const isSubcategoryOnlyCategory = isPeopleSubcategoryCategory || isMarketingCategory;
+  const isSubcategoryOnlyCategory = isPeopleSubcategoryCategory || isMarketingCategory || isSalariesCategory;
   const selectedTravelOption = TRAVEL_SUBCATEGORIES.find((row) => row.slug === selectedTravelSubcategory);
   const selectedHousingOption = HOUSING_SUBCATEGORIES.find((row) => row.slug === selectedHousingSubcategory);
   const mergedTravelOptions = useMemo(
@@ -144,6 +154,13 @@ export default function UploadPage() {
   const mergedMarketingOptions = useMemo(
     () => [
       ...MARKETING_SUBCATEGORIES,
+      ...customSubcategories.map((row) => ({ name: row.name, slug: row.slug }))
+    ],
+    [customSubcategories]
+  );
+  const mergedSalariesOptions = useMemo(
+    () => [
+      ...SALARIES_SUBCATEGORIES,
       ...customSubcategories.map((row) => ({ name: row.name, slug: row.slug }))
     ],
     [customSubcategories]
@@ -168,16 +185,21 @@ export default function UploadPage() {
     if (isMarketingCategory) {
       return mergedMarketingOptions.some((row) => row.name.trim().toLowerCase() === value);
     }
+    if (isSalariesCategory) {
+      return mergedSalariesOptions.some((row) => row.name.trim().toLowerCase() === value);
+    }
     return providerOptions.some((provider) => provider.name.trim().toLowerCase() === value);
-  }, [isHousingCategory, isMarketingCategory, isPeopleSubcategoryCategory, isTravelCategory, mergedHousingOptions, mergedMarketingOptions, mergedTravelOptions, otherName, providerOptions]);
+  }, [isHousingCategory, isMarketingCategory, isPeopleSubcategoryCategory, isSalariesCategory, isTravelCategory, mergedHousingOptions, mergedMarketingOptions, mergedSalariesOptions, mergedTravelOptions, otherName, providerOptions]);
 
   const otherNameValid = otherName.trim().length >= 2;
 
   const providerPlaceholder = !selectedCategory
     ? "select a category first"
-    : isPeopleSubcategoryCategory
-      ? "select a subcategory"
+      : isPeopleSubcategoryCategory
+        ? "select a subcategory"
       : isMarketingCategory
+        ? "select a subcategory"
+      : isSalariesCategory
         ? "select a subcategory"
       : isHorseTransportCategory && !selectedHorseTransportSubcategory
         ? "select a subcategory first"
@@ -197,6 +219,8 @@ export default function UploadPage() {
           ? Boolean(isTravelCategory ? selectedTravelSubcategory : selectedHousingSubcategory)
           : isMarketingCategory
             ? Boolean(selectedMarketingSubcategory)
+          : isSalariesCategory
+            ? Boolean(selectedSalariesSubcategory)
           : isHorseTransportCategory
             ? Boolean(selectedHorseTransportSubcategory && selectedProvider)
             : Boolean(selectedProvider))
@@ -215,6 +239,10 @@ export default function UploadPage() {
     if (selectedCategoryDoc.slug === "marketing") {
       const subSlug = selectedMarketingSubcategory || "other";
       return `/marketing/${subSlug}`;
+    }
+    if (selectedCategoryDoc.slug === "salaries") {
+      const subSlug = selectedSalariesSubcategory || "other";
+      return `/salaries/${subSlug}`;
     }
     if (!selectedProviderDoc) return "/dashboard";
     if (selectedCategoryDoc.slug === "travel") {
@@ -290,6 +318,7 @@ export default function UploadPage() {
     setSelectedTravelSubcategory("");
     setSelectedHousingSubcategory("");
     setSelectedMarketingSubcategory("");
+    setSelectedSalariesSubcategory("");
     setSelectedHorseTransportSubcategory("");
     setUsingOtherOption(false);
     setOtherName("");
@@ -326,6 +355,18 @@ export default function UploadPage() {
     setOtherName("");
     setSaveAsNew(false);
     setSelectedMarketingSubcategory(value);
+  }
+
+  function onSalariesSubcategoryChange(value: string) {
+    if (value === OTHER_OPTION_VALUE) {
+      setUsingOtherOption(true);
+      setSelectedSalariesSubcategory("");
+      return;
+    }
+    setUsingOtherOption(false);
+    setOtherName("");
+    setSaveAsNew(false);
+    setSelectedSalariesSubcategory(value);
   }
 
   function onTravelSubcategoryChange(value: string) {
@@ -412,6 +453,7 @@ export default function UploadPage() {
     if (!usingOtherOption && !isPeopleSubcategoryCategory && !isHorseTransportCategory && !isMarketingCategory && !selectedProvider) return;
     if (!usingOtherOption && isPeopleSubcategoryCategory && !(isTravelCategory ? selectedTravelSubcategory : selectedHousingSubcategory)) return;
     if (!usingOtherOption && isMarketingCategory && !selectedMarketingSubcategory) return;
+    if (!usingOtherOption && isSalariesCategory && !selectedSalariesSubcategory) return;
     if (!usingOtherOption && isHorseTransportCategory && (!selectedHorseTransportSubcategory || !selectedProvider)) return;
     if (usingOtherOption && isHorseTransportCategory && !selectedHorseTransportSubcategory) return;
     if (usingOtherOption && isMarketingCategory && !otherNameValid) return;
@@ -425,13 +467,14 @@ export default function UploadPage() {
       const base64Pdf = await fileToBase64(fileRecord.file);
       const result = await uploadAndParseBill({
         categoryId: selectedCategory,
-        providerId: usingOtherOption || isMarketingCategory ? undefined : selectedProvider,
-        customProviderName: usingOtherOption && !isMarketingCategory ? otherName.trim() : undefined,
+        providerId: usingOtherOption || isMarketingCategory || isSalariesCategory ? undefined : selectedProvider,
+        customProviderName: usingOtherOption && !isMarketingCategory && !isSalariesCategory ? otherName.trim() : undefined,
         saveAsNew: usingOtherOption ? saveAsNew : undefined,
         travelSubcategory: selectedTravelSubcategory || undefined,
         housingSubcategory: selectedHousingSubcategory || undefined,
         horseTransportSubcategory: selectedHorseTransportSubcategory || undefined,
         marketingSubcategory: usingOtherOption && isMarketingCategory ? slugify(otherName.trim()) : selectedMarketingSubcategory || undefined,
+        salariesSubcategory: usingOtherOption && isSalariesCategory ? slugify(otherName.trim()) : selectedSalariesSubcategory || undefined,
         base64Pdf,
       });
 
@@ -588,6 +631,22 @@ export default function UploadPage() {
                 <option disabled>──────────────</option>
                 <option value={OTHER_OPTION_VALUE}>+ Other...</option>
               </select>
+            ) : isSalariesCategory ? (
+              <select
+                value={selectedSalariesSubcategory}
+                onChange={(event) => onSalariesSubcategoryChange(event.target.value)}
+                className={styles.select}
+                disabled={!selectedCategory}
+              >
+                <option value="">{providerPlaceholder}</option>
+                {mergedSalariesOptions.map((option) => (
+                  <option key={option.slug} value={option.slug}>
+                    {option.name}
+                  </option>
+                ))}
+                <option disabled>──────────────</option>
+                <option value={OTHER_OPTION_VALUE}>+ Other...</option>
+              </select>
             ) : (
               <select
                 value={selectedProvider}
@@ -641,7 +700,13 @@ export default function UploadPage() {
           ) : null}
 
           {selectedCategoryDoc &&
-          (selectedProviderDoc || usingOtherOption || selectedTravelSubcategory || selectedHousingSubcategory || selectedMarketingSubcategory || selectedHorseTransportSubcategory) ? (
+          (selectedProviderDoc ||
+            usingOtherOption ||
+            selectedTravelSubcategory ||
+            selectedHousingSubcategory ||
+            selectedMarketingSubcategory ||
+            selectedSalariesSubcategory ||
+            selectedHorseTransportSubcategory) ? (
             <div className={styles.namingPreview}>
               files will be saved as: <span>{selectedCategoryDoc.name}</span> -{" "}
               <span>
@@ -654,6 +719,8 @@ export default function UploadPage() {
                         ? mergedHousingOptions.find((row) => row.slug === selectedHousingSubcategory)?.name ?? "Housing"
                         : isMarketingCategory
                           ? mergedMarketingOptions.find((row) => row.slug === selectedMarketingSubcategory)?.name ?? "Marketing"
+                        : isSalariesCategory
+                          ? mergedSalariesOptions.find((row) => row.slug === selectedSalariesSubcategory)?.name ?? "Salaries"
                         : "Other")}
               </span>{" "}
               - YYYY-MM-DD

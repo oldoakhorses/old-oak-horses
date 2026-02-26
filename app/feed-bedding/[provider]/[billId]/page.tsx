@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import NavBar from "@/components/NavBar";
+import Modal from "@/components/Modal";
 
 type SplitMode = "even" | "custom";
 
@@ -20,6 +21,7 @@ export default function FeedBeddingInvoicePage() {
   const provider = useQuery(api.providers.getProviderBySlug, providerSlug ? { categorySlug: "feed-bedding", providerSlug } : "skip");
   const horses = useQuery(api.horses.getActiveHorses) ?? [];
   const saveAssignment = useMutation(api.bills.saveFeedBeddingAssignment);
+  const updateLineItemSubcategory = useMutation(api.bills.updateFeedBeddingLineItemSubcategory);
   const approveInvoice = useMutation(api.bills.approveInvoice);
   const deleteBill = useMutation(api.bills.deleteBill);
 
@@ -28,6 +30,8 @@ export default function FeedBeddingInvoicePage() {
   const [splitHorseIds, setSplitHorseIds] = useState<Id<"horses">[]>([]);
   const [splitMode, setSplitMode] = useState<SplitMode>("even");
   const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
+  const [isUpdatingLineItem, setIsUpdatingLineItem] = useState<number | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const extracted = (bill?.extractedData ?? {}) as Record<string, unknown>;
   const lineItems = Array.isArray(extracted.line_items) ? (extracted.line_items as Array<Record<string, unknown>>) : [];
@@ -114,6 +118,20 @@ export default function FeedBeddingInvoicePage() {
     router.push(`/feed-bedding/${providerSlug}`);
   }
 
+  async function onToggleSubcategory(index: number, current: "feed" | "bedding") {
+    if (!bill) return;
+    setIsUpdatingLineItem(index);
+    try {
+      await updateLineItemSubcategory({
+        billId: bill._id,
+        lineItemIndex: index,
+        subcategory: current === "feed" ? "bedding" : "feed"
+      });
+    } finally {
+      setIsUpdatingLineItem(null);
+    }
+  }
+
   return (
     <div className="page-shell">
       <NavBar
@@ -157,7 +175,10 @@ export default function FeedBeddingInvoicePage() {
               return (
                 <li key={idx} style={{ marginBottom: 8 }}>
                   {String(row.description ?? "—")} · {fmtUSD(safeNumber(row.total_usd))}{" "}
-                  <span
+                  <button
+                    type="button"
+                    disabled={isUpdatingLineItem === idx}
+                    onClick={() => onToggleSubcategory(idx, sub)}
                     style={{
                       marginLeft: 8,
                       padding: "1px 7px",
@@ -165,11 +186,13 @@ export default function FeedBeddingInvoicePage() {
                       background: sub === "feed" ? "rgba(34,197,131,0.10)" : "rgba(245,158,11,0.12)",
                       color: sub === "feed" ? "#22C583" : "#F59E0B",
                       fontSize: 10,
-                      fontWeight: 700
+                      fontWeight: 700,
+                      border: "1px solid transparent",
+                      cursor: isUpdatingLineItem === idx ? "not-allowed" : "pointer"
                     }}
                   >
-                    {sub}
-                  </span>
+                    {isUpdatingLineItem === idx ? "saving..." : sub}
+                  </button>
                 </li>
               );
             })}
@@ -278,12 +301,12 @@ export default function FeedBeddingInvoicePage() {
           <button
             type="button"
             className="ui-button-filled"
-            disabled={!((bill?.assignedHorses?.length ?? 0) > 0 || assignedRows.length > 0)}
+            disabled={(bill?.status === "done") || !((bill?.assignedHorses?.length ?? 0) > 0)}
             onClick={onApprove}
           >
             approve invoice
           </button>
-          <button type="button" className="ui-button-outlined" onClick={onDelete}>
+          <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(true)}>
             delete
           </button>
         </section>
@@ -312,6 +335,28 @@ export default function FeedBeddingInvoicePage() {
             <div style={{ fontSize: 24, fontWeight: 700 }}>{fmtUSD(total)}</div>
           </div>
         </section>
+
+        <Modal open={showDeleteConfirm} title="delete invoice?" onClose={() => setShowDeleteConfirm(false)}>
+          <p style={{ marginTop: 0, color: "var(--ui-text-secondary)" }}>
+            this will permanently delete invoice <strong>{String(extracted.invoice_number ?? billId)}</strong>.
+          </p>
+          <p style={{ color: "var(--ui-text-muted)" }}>this action cannot be undone.</p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+            <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(false)}>
+              cancel
+            </button>
+            <button
+              type="button"
+              className="ui-button-filled"
+              onClick={async () => {
+                setShowDeleteConfirm(false);
+                await onDelete();
+              }}
+            >
+              yes, delete invoice
+            </button>
+          </div>
+        </Modal>
       </main>
     </div>
   );
