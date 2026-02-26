@@ -16,7 +16,6 @@
   margin: 0;
   font-size: 14px;
   font-weight: 700;
-  text-transform: lowercase;
 }
 
 .searchWrap {
@@ -35,11 +34,11 @@
 .search {
   width: 100%;
   background: var(--color-input-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 7px;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
   color: var(--color-text);
   font-size: 11px;
-  padding: 8px 12px 8px 28px;
+  padding: 6px 14px 6px 28px;
 }
 
 .count {
@@ -90,9 +89,12 @@
 .providerTag {
   background: var(--color-tag-bg);
   color: var(--color-tag-text);
-  border-radius: 5px;
-  font-size: 10px;
-  padding: 3px 9px;
+  border-radius: 4px;
+  font-size: 9px;
+  padding: 3px 8px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .horseTag {
@@ -100,7 +102,7 @@
   color: var(--color-horse-text);
   border-radius: 4px;
   font-size: 9px;
-  padding: 2px 8px;
+  padding: 2px 7px;
 }
 
 .right {
@@ -128,7 +130,7 @@
 }
 
 .pagination {
-  border-top: 1px solid var(--color-border-light);
+  border-top: 1px solid var(--color-border);
   margin-top: 8px;
   padding-top: 16px;
   display: flex;

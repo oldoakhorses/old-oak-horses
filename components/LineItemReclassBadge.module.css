@@ -4,13 +4,18 @@
 }
 
 .button {
-  font-size: 9px;
-  padding: 3px 8px;
+  font-size: 8px;
+  padding: 3px 10px;
   border-radius: 4px;
   cursor: pointer;
-  font-family: inherit;
+  font-family: "Space Mono", "SF Mono", Menlo, monospace;
   font-weight: 700;
   background: transparent;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .menu {
@@ -22,7 +27,6 @@
   border-radius: 8px;
   background: #fff;
   z-index: 20;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
   overflow: hidden;
 }
 

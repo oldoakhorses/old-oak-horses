@@ -12,9 +12,10 @@
   border-right: 1px solid var(--color-border);
   background: transparent;
   color: var(--color-text-muted);
-  padding: 7px 14px;
+  padding: 7px 16px;
   font-size: 11px;
   cursor: pointer;
+  font-family: "Space Mono", "SF Mono", Menlo, monospace;
 }
 
 .button:last-child,
