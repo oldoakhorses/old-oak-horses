@@ -31,7 +31,7 @@ export default function SalariesInvoicePage() {
   const router = useRouter();
 
   const bill = useQuery(api.bills.getBillById, billId ? { billId } : "skip");
-  const people = useQuery(api.people.getAllPeople) ?? [];
+  const people: any[] = useQuery(api.people.getAllPeople) ?? [];
 
   const saveSalaryAssignment = useMutation(api.bills.saveSalaryAssignment);
   const approveInvoice = useMutation(api.bills.approveInvoice);
@@ -589,7 +589,8 @@ export default function SalariesInvoicePage() {
 
         <Modal open={showDeleteConfirm} title="delete invoice?" onClose={() => setShowDeleteConfirm(false)}>
           <p style={{ marginTop: 0, color: "var(--ui-text-secondary)" }}>
-            this will permanently delete invoice <strong>{String(extracted.invoice_number ?? billId)}</strong>.
+            this will permanently delete invoice <strong>{String(extracted.invoice_number ?? billId)}</strong> from{" "}
+            {String(extracted.provider_name ?? bill?.provider?.name ?? "provider")}.
           </p>
           <p style={{ color: "var(--ui-text-muted)" }}>this action cannot be undone.</p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
@@ -598,7 +599,7 @@ export default function SalariesInvoicePage() {
             </button>
             <button
               type="button"
-              className="ui-button-filled"
+              className="ui-button-danger"
               onClick={async () => {
                 setShowDeleteConfirm(false);
                 await onDelete();

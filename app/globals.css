@@ -96,7 +96,8 @@ textarea {
 }
 
 .ui-button-filled,
-.ui-button-outlined {
+.ui-button-outlined,
+.ui-button-danger {
   font-family: "Space Mono", "SF Mono", Menlo, monospace;
   border-radius: 6px;
   padding: 7px 16px;
@@ -116,6 +117,13 @@ textarea {
   color: var(--color-text-secondary);
   border: 1px solid var(--color-border);
   font-weight: 400;
+}
+
+.ui-button-danger {
+  background: var(--color-red);
+  color: #fff;
+  border: 1px solid var(--color-red);
+  font-weight: 700;
 }
 
 input[type="text"],

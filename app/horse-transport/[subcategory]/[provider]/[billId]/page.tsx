@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
-import { useParams } from "next/navigation";
-import { useQuery } from "convex/react";
+import { useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
+import Modal from "@/components/Modal";
 
 type LineItem = {
   description?: string;
@@ -24,6 +25,7 @@ type Extracted = {
 };
 
 export default function HorseTransportInvoicePage() {
+  const router = useRouter();
   const params = useParams<{ subcategory: string; provider: string; billId: string }>();
   const subcategory = params?.subcategory ?? "";
   const providerSlug = params?.provider ?? "";
@@ -31,6 +33,9 @@ export default function HorseTransportInvoicePage() {
 
   const bill = useQuery(api.bills.getBillById, billId ? { billId: billId as any } : "skip");
   const provider = useQuery(api.providers.getProviderBySlug, { categorySlug: "horse-transport", providerSlug });
+  const approveInvoice = useMutation(api.bills.approveInvoice);
+  const deleteBill = useMutation(api.bills.deleteBill);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const extracted = (bill?.extractedData ?? {}) as Extracted;
   const lineItems = Array.isArray(extracted.line_items) ? extracted.line_items : [];
 
@@ -46,6 +51,17 @@ export default function HorseTransportInvoicePage() {
   const total = typeof extracted.invoice_total_usd === "number"
     ? extracted.invoice_total_usd
     : lineItems.reduce((sum, item) => sum + safe(item.total_usd), 0);
+
+  async function onApprove() {
+    if (!bill) return;
+    await approveInvoice({ billId: bill._id });
+  }
+
+  async function onDelete() {
+    if (!bill) return;
+    await deleteBill({ billId: bill._id });
+    router.push(`/horse-transport/${subcategory}/${providerSlug}`);
+  }
 
   return (
     <div className="page-shell">
@@ -93,6 +109,37 @@ export default function HorseTransportInvoicePage() {
             </ul>
           </section>
         ))}
+
+        <section className="ui-card" style={{ marginTop: 16, display: "flex", gap: 10 }}>
+          <button type="button" className="ui-button-filled" onClick={onApprove} disabled={bill?.status === "done"}>
+            {bill?.status === "done" ? "invoice approved" : "approve invoice"}
+          </button>
+          <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(true)}>
+            delete
+          </button>
+        </section>
+
+        <Modal open={showDeleteConfirm} title="delete invoice?" onClose={() => setShowDeleteConfirm(false)}>
+          <p style={{ marginTop: 0, color: "var(--ui-text-secondary)" }}>
+            this will permanently delete invoice <strong>{String(extracted.invoice_number ?? billId)}</strong> from {provider?.name ?? providerSlug}.
+          </p>
+          <p style={{ color: "var(--ui-text-muted)" }}>this action cannot be undone.</p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+            <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(false)}>
+              cancel
+            </button>
+            <button
+              type="button"
+              className="ui-button-danger"
+              onClick={async () => {
+                setShowDeleteConfirm(false);
+                await onDelete();
+              }}
+            >
+              yes, delete invoice
+            </button>
+          </div>
+        </Modal>
       </main>
     </div>
   );

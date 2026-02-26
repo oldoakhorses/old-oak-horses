@@ -55,6 +55,7 @@ export default function InvoiceReportPage() {
 
   const provider = useQuery(api.providers.getProviderBySlug, categorySlug && providerSlug ? { categorySlug, providerSlug } : "skip");
   const bill = useQuery(api.bills.getBillById, invoiceId ? { billId: invoiceId as any } : "skip");
+  const approveInvoice = useMutation(api.bills.approveInvoice);
   const approveInvoiceWithReclassification = useMutation(api.bills.approveInvoiceWithReclassification);
   const deleteBill = useMutation(api.bills.deleteBill);
   const [lineCategoryDecisions, setLineCategoryDecisions] = useState<Record<number, string | null>>({});
@@ -138,6 +139,10 @@ export default function InvoiceReportPage() {
 
   async function onApprove() {
     if (!bill) return;
+    if (!isReclassCategory) {
+      await approveInvoice({ billId: bill._id });
+      return;
+    }
     await approveInvoiceWithReclassification({
       billId: bill._id,
       lineItemDecisions: lineItems.map((_, index) => ({
@@ -271,20 +276,18 @@ export default function InvoiceReportPage() {
           />
         ) : null}
 
-        {isReclassCategory ? (
-          <section className="ui-card" style={{ marginTop: 16, display: "flex", gap: 10 }}>
-            <button type="button" className="ui-button-filled" onClick={onApprove} disabled={bill?.status === "done"}>
-              {bill?.status === "done"
-                ? "invoice approved"
-                : reclassification.movedCount > 0
-                  ? `approve & move ${reclassification.movedCount} items`
-                  : "approve invoice"}
-            </button>
-            <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(true)}>
-              delete
-            </button>
-          </section>
-        ) : null}
+        <section className="ui-card" style={{ marginTop: 16, display: "flex", gap: 10 }}>
+          <button type="button" className="ui-button-filled" onClick={onApprove} disabled={bill?.status === "done"}>
+            {bill?.status === "done"
+              ? "invoice approved"
+              : isReclassCategory && reclassification.movedCount > 0
+                ? `approve & move ${reclassification.movedCount} items`
+                : "approve invoice"}
+          </button>
+          <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(true)}>
+            delete
+          </button>
+        </section>
 
         <section className={styles.summaryBar}>
           <div className={styles.summaryLeft}>
@@ -303,19 +306,19 @@ export default function InvoiceReportPage() {
 
         <Modal open={showDeleteConfirm} title="delete invoice?" onClose={() => setShowDeleteConfirm(false)}>
           <p style={{ marginTop: 0, color: "var(--ui-text-secondary)" }}>
-            this will permanently delete invoice <strong>{String(extracted.invoice_number ?? invoiceId)}</strong>.
+            this will permanently delete invoice <strong>{String(extracted.invoice_number ?? invoiceId)}</strong> from {provider?.name ?? providerSlug}.
           </p>
+          <p style={{ color: "var(--ui-text-muted)" }}>this action cannot be undone.</p>
           {bill?.linkedBills?.length ? (
             <p style={{ color: "var(--ui-text-muted)" }}>This will also delete {bill.linkedBills.length} linked invoices created from reclassified items.</p>
           ) : null}
-          <p style={{ color: "var(--ui-text-muted)" }}>this action cannot be undone.</p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
             <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(false)}>
               cancel
             </button>
             <button
               type="button"
-              className="ui-button-filled"
+              className="ui-button-danger"
               onClick={async () => {
                 setShowDeleteConfirm(false);
                 await onDelete();

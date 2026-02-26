@@ -1241,6 +1241,7 @@ export const markDone = internalMutation({
     marketingSubcategory: v.optional(v.string()),
     salariesSubcategory: v.optional(v.string()),
     providerId: v.optional(v.id("providers")),
+    customProviderName: v.optional(v.string()),
     horseAssignments: v.optional(
       v.array(
         v.object({
@@ -1305,6 +1306,7 @@ export const markDone = internalMutation({
       marketingSubcategory: args.marketingSubcategory,
       salariesSubcategory: args.salariesSubcategory,
       providerId: args.providerId,
+      customProviderName: args.customProviderName,
       horseAssignments: args.horseAssignments,
       splitLineItems: args.splitLineItems,
       personAssignments: args.personAssignments,
@@ -1576,16 +1578,20 @@ export const deleteBill = mutation({
     const bill = await ctx.db.get(args.billId);
     if (!bill) return { deleted: false };
 
+    const fileIdsToDelete = new Set<string>();
+    if (bill.fileId) fileIdsToDelete.add(String(bill.fileId));
+
     if (bill.linkedBills && bill.linkedBills.length > 0) {
       for (const linked of bill.linkedBills) {
         const linkedBill = await ctx.db.get(linked.targetBillId);
         if (!linkedBill) continue;
+        if (linkedBill.fileId) fileIdsToDelete.add(String(linkedBill.fileId));
         await ctx.db.delete(linked.targetBillId);
       }
-      if (bill.fileId) {
-        await ctx.storage.delete(bill.fileId);
-      }
       await ctx.db.delete(args.billId);
+      for (const fileId of fileIdsToDelete) {
+        await ctx.storage.delete(fileId as Id<"_storage">);
+      }
       return { deleted: true };
     }
 
@@ -1597,13 +1603,16 @@ export const deleteBill = mutation({
         });
       }
       await ctx.db.delete(args.billId);
+      for (const fileId of fileIdsToDelete) {
+        await ctx.storage.delete(fileId as Id<"_storage">);
+      }
       return { deleted: true };
     }
 
-    if (bill.fileId) {
-      await ctx.storage.delete(bill.fileId);
-    }
     await ctx.db.delete(args.billId);
+    for (const fileId of fileIdsToDelete) {
+      await ctx.storage.delete(fileId as Id<"_storage">);
+    }
     return { deleted: true };
   }
 });
