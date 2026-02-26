@@ -1455,16 +1455,185 @@ export const approveInvoice = mutation({
   }
 });
 
+export const approveInvoiceWithReclassification = mutation({
+  args: {
+    billId: v.id("bills"),
+    lineItemDecisions: v.array(
+      v.object({
+        lineItemIndex: v.number(),
+        confirmedCategory: v.optional(v.string())
+      })
+    )
+  },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+    const category = await ctx.db.get(bill.categoryId);
+    if (!category) throw new Error("Source category not found");
+
+    const sourceCategoryKey = toCategoryKey(category.slug);
+    const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+    const lineItems = getLineItems(extracted).map((row) => ({ ...(row as Record<string, unknown>) }));
+    const decisionsByIndex = new Map(args.lineItemDecisions.map((row) => [row.lineItemIndex, row.confirmedCategory]));
+
+    const grouped = new Map<string, Array<{ index: number; item: Record<string, unknown> }>>();
+    const kept: Array<Record<string, unknown>> = [];
+
+    for (let index = 0; index < lineItems.length; index += 1) {
+      const item = lineItems[index];
+      const suggested = normalizeCategoryKey(item.suggestedCategory);
+      const decided = normalizeCategoryKey(decisionsByIndex.get(index));
+      const target = decided === "keep" ? null : decided ?? suggested;
+      const normalizedTarget = target && target !== sourceCategoryKey ? target : null;
+
+      if (!normalizedTarget) {
+        kept.push({
+          ...item,
+          confirmedCategory: decided ?? item.confirmedCategory ?? undefined,
+          reclassified: false
+        });
+        continue;
+      }
+
+      const current = grouped.get(normalizedTarget) ?? [];
+      current.push({
+        index,
+        item: {
+          ...item,
+          confirmedCategory: normalizedTarget,
+          reclassified: true
+        }
+      });
+      grouped.set(normalizedTarget, current);
+    }
+
+    const sourceProviderName = bill.providerId ? (await ctx.db.get(bill.providerId))?.name : bill.customProviderName;
+    const linkedBills: Array<{ targetBillId: Id<"bills">; targetCategory: string; amount: number; itemCount: number }> = [];
+
+    for (const [targetCategoryKey, items] of grouped.entries()) {
+      const targetSlug = fromCategoryKey(targetCategoryKey);
+      const targetCategory = await ctx.db.query("categories").withIndex("by_slug", (q) => q.eq("slug", targetSlug)).first();
+      if (!targetCategory) continue;
+
+      const newLineItems = items.map((row) => row.item);
+      const newTotal = newLineItems.reduce((sum, row) => sum + getLineItemTotalUsd(row), 0);
+      const targetExtracted = {
+        ...extracted,
+        line_items: newLineItems,
+        invoice_total_usd: roundCurrency(newTotal)
+      };
+
+      const targetBillId = await ctx.db.insert("bills", {
+        providerId: undefined,
+        categoryId: targetCategory._id,
+        fileId: bill.fileId,
+        fileName: `${bill.fileName} · ${targetCategory.name}`,
+        status: "pending",
+        billingPeriod: bill.billingPeriod,
+        uploadedAt: Date.now(),
+        extractedData: targetExtracted,
+        customProviderName: sourceProviderName,
+        originalPdfUrl: bill.originalPdfUrl,
+        originalCurrency: bill.originalCurrency,
+        originalTotal: roundCurrency(newTotal),
+        exchangeRate: bill.exchangeRate,
+        isApproved: false,
+        linkedFromBillId: bill._id
+      });
+
+      linkedBills.push({
+        targetBillId,
+        targetCategory: targetCategoryKey,
+        amount: roundCurrency(newTotal),
+        itemCount: newLineItems.length
+      });
+    }
+
+    const keptTotal = kept.reduce((sum, row) => sum + getLineItemTotalUsd(row), 0);
+    const nextLinked = [...(bill.linkedBills ?? []), ...linkedBills];
+    await ctx.db.patch(args.billId, {
+      extractedData: {
+        ...extracted,
+        line_items: kept,
+        invoice_total_usd: roundCurrency(keptTotal)
+      },
+      linkedBills: nextLinked,
+      isApproved: true,
+      approvedAt: Date.now(),
+      status: "done"
+    });
+
+    return {
+      billId: args.billId,
+      linkedBills: nextLinked
+    };
+  }
+});
+
 export const deleteBill = mutation({
   args: { billId: v.id("bills") },
   handler: async (ctx, args) => {
     const bill = await ctx.db.get(args.billId);
     if (!bill) return { deleted: false };
+
+    if (bill.linkedBills && bill.linkedBills.length > 0) {
+      for (const linked of bill.linkedBills) {
+        const linkedBill = await ctx.db.get(linked.targetBillId);
+        if (!linkedBill) continue;
+        await ctx.db.delete(linked.targetBillId);
+      }
+      if (bill.fileId) {
+        await ctx.storage.delete(bill.fileId);
+      }
+      await ctx.db.delete(args.billId);
+      return { deleted: true };
+    }
+
+    if (bill.linkedFromBillId) {
+      const source = await ctx.db.get(bill.linkedFromBillId);
+      if (source?.linkedBills) {
+        await ctx.db.patch(source._id, {
+          linkedBills: source.linkedBills.filter((row) => row.targetBillId !== bill._id)
+        });
+      }
+      await ctx.db.delete(args.billId);
+      return { deleted: true };
+    }
+
     if (bill.fileId) {
       await ctx.storage.delete(bill.fileId);
     }
     await ctx.db.delete(args.billId);
     return { deleted: true };
+  }
+});
+
+export const setLineItemConfirmedCategory = mutation({
+  args: {
+    billId: v.id("bills"),
+    lineItemIndex: v.number(),
+    confirmedCategory: v.optional(v.string())
+  },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+    const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+    const lineItems = getLineItems(extracted).map((row) => ({ ...(row as Record<string, unknown>) }));
+    if (args.lineItemIndex < 0 || args.lineItemIndex >= lineItems.length) {
+      throw new Error("Line item index out of range");
+    }
+
+    lineItems[args.lineItemIndex] = {
+      ...lineItems[args.lineItemIndex],
+      confirmedCategory: args.confirmedCategory
+    };
+    await ctx.db.patch(args.billId, {
+      extractedData: {
+        ...extracted,
+        line_items: lineItems
+      }
+    });
+    return args.billId;
   }
 });
 
@@ -1568,6 +1737,26 @@ function getLineItemTotalUsd(record: Record<string, unknown>) {
   if (typeof record.amount_usd === "number" && Number.isFinite(record.amount_usd)) return record.amount_usd;
   if (typeof record.total === "number" && Number.isFinite(record.total)) return record.total;
   return 0;
+}
+
+function roundCurrency(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+function toCategoryKey(slug: string) {
+  return slug.replace(/-/g, "_");
+}
+
+function fromCategoryKey(key: string) {
+  return key.replace(/_/g, "-");
+}
+
+function normalizeCategoryKey(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized === "keep") return "keep";
+  return normalized.replace(/-/g, "_");
 }
 
 function classifyStablingSubcategory(item: Record<string, unknown>) {

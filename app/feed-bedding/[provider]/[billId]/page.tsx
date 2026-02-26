@@ -7,7 +7,9 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import NavBar from "@/components/NavBar";
+import LineItemReclassBadge from "@/components/LineItemReclassBadge";
 import Modal from "@/components/Modal";
+import ReclassificationSummary from "@/components/ReclassificationSummary";
 
 type SplitMode = "even" | "custom";
 
@@ -22,7 +24,7 @@ export default function FeedBeddingInvoicePage() {
   const horses = useQuery(api.horses.getActiveHorses) ?? [];
   const saveAssignment = useMutation(api.bills.saveFeedBeddingAssignment);
   const updateLineItemSubcategory = useMutation(api.bills.updateFeedBeddingLineItemSubcategory);
-  const approveInvoice = useMutation(api.bills.approveInvoice);
+  const approveInvoiceWithReclassification = useMutation(api.bills.approveInvoiceWithReclassification);
   const deleteBill = useMutation(api.bills.deleteBill);
 
   const [splitType, setSplitType] = useState<"single" | "split">("single");
@@ -30,6 +32,7 @@ export default function FeedBeddingInvoicePage() {
   const [splitHorseIds, setSplitHorseIds] = useState<Id<"horses">[]>([]);
   const [splitMode, setSplitMode] = useState<SplitMode>("even");
   const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
+  const [lineCategoryDecisions, setLineCategoryDecisions] = useState<Record<number, string | null>>({});
   const [isUpdatingLineItem, setIsUpdatingLineItem] = useState<number | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -52,6 +55,13 @@ export default function FeedBeddingInvoicePage() {
       setCustomAmounts(next);
     }
   }, [bill?.assignedHorses, bill?.horseSplitType]);
+
+  useEffect(() => {
+    const next = Object.fromEntries(
+      lineItems.map((row, index) => [index, normalizeCategoryKey(row.confirmedCategory ?? row.suggestedCategory)])
+    );
+    setLineCategoryDecisions(next);
+  }, [bill?._id, lineItems]);
 
   const feedTotal = useMemo(
     () =>
@@ -93,6 +103,41 @@ export default function FeedBeddingInvoicePage() {
     return total - sum;
   }, [assignedRows, splitMode, splitType, total]);
 
+  const reclassification = useMemo(() => {
+    const current = "feed_bedding";
+    const grouped = new Map<string, Array<{ description: string; amount: number }>>();
+    let remainingItems = 0;
+    let remainingTotal = 0;
+    for (let idx = 0; idx < lineItems.length; idx += 1) {
+      const item = lineItems[idx] ?? {};
+      const suggested = normalizeCategoryKey(item.suggestedCategory);
+      const confirmed = normalizeCategoryKey(lineCategoryDecisions[idx]);
+      const target = confirmed ?? suggested;
+      const amount = safeNumber(item.total_usd);
+      if (!target || target === current) {
+        remainingItems += 1;
+        remainingTotal += amount;
+        continue;
+      }
+      const rows = grouped.get(target) ?? [];
+      rows.push({ description: String(item.description ?? "Line item"), amount });
+      grouped.set(target, rows);
+    }
+    const groups = [...grouped.entries()].map(([category, items]) => ({
+      category,
+      itemCount: items.length,
+      total: round2(items.reduce((sum, row) => sum + row.amount, 0)),
+      items
+    }));
+    groups.sort((a, b) => b.total - a.total);
+    return {
+      groups,
+      movedCount: groups.reduce((sum, row) => sum + row.itemCount, 0),
+      remainingItems,
+      remainingTotal: round2(remainingTotal)
+    };
+  }, [lineCategoryDecisions, lineItems]);
+
   const canSave =
     splitType === "single"
       ? assignedRows.length === 1
@@ -109,7 +154,13 @@ export default function FeedBeddingInvoicePage() {
 
   async function onApprove() {
     if (!bill || !(bill.assignedHorses?.length || assignedRows.length)) return;
-    await approveInvoice({ billId: bill._id });
+    await approveInvoiceWithReclassification({
+      billId: bill._id,
+      lineItemDecisions: lineItems.map((_, index) => ({
+        lineItemIndex: index,
+        confirmedCategory: lineCategoryDecisions[index] ?? undefined
+      }))
+    });
   }
 
   async function onDelete() {
@@ -175,6 +226,12 @@ export default function FeedBeddingInvoicePage() {
               return (
                 <li key={idx} style={{ marginBottom: 8 }}>
                   {String(row.description ?? "—")} · {fmtUSD(safeNumber(row.total_usd))}{" "}
+                  <LineItemReclassBadge
+                    currentCategory="feed_bedding"
+                    suggestedCategory={normalizeCategoryKey(row.suggestedCategory)}
+                    confirmedCategory={lineCategoryDecisions[idx] ?? null}
+                    onChange={(category) => setLineCategoryDecisions((prev) => ({ ...prev, [idx]: category }))}
+                  />
                   <button
                     type="button"
                     disabled={isUpdatingLineItem === idx}
@@ -297,6 +354,13 @@ export default function FeedBeddingInvoicePage() {
           </div>
         </section>
 
+        <ReclassificationSummary
+          currentCategoryLabel="Feed & Bedding"
+          groups={reclassification.groups}
+          remainingItems={reclassification.remainingItems}
+          remainingTotal={reclassification.remainingTotal}
+        />
+
         <section className="ui-card" style={{ marginTop: 16, display: "flex", gap: 10 }}>
           <button
             type="button"
@@ -304,7 +368,7 @@ export default function FeedBeddingInvoicePage() {
             disabled={(bill?.status === "done") || !((bill?.assignedHorses?.length ?? 0) > 0)}
             onClick={onApprove}
           >
-            approve invoice
+            {reclassification.movedCount > 0 ? `approve & move ${reclassification.movedCount} items` : "approve invoice"}
           </button>
           <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(true)}>
             delete
@@ -340,6 +404,9 @@ export default function FeedBeddingInvoicePage() {
           <p style={{ marginTop: 0, color: "var(--ui-text-secondary)" }}>
             this will permanently delete invoice <strong>{String(extracted.invoice_number ?? billId)}</strong>.
           </p>
+          {bill?.linkedBills?.length ? (
+            <p style={{ color: "var(--ui-text-muted)" }}>This will also delete {bill.linkedBills.length} linked invoices created from reclassified items.</p>
+          ) : null}
           <p style={{ color: "var(--ui-text-muted)" }}>this action cannot be undone.</p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
             <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(false)}>
@@ -378,6 +445,16 @@ function safeNumber(value: unknown) {
     if (Number.isFinite(parsed)) return parsed;
   }
   return 0;
+}
+
+function normalizeCategoryKey(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase().replace(/-/g, "_");
+  return normalized.length > 0 ? normalized : null;
+}
+
+function round2(value: number) {
+  return Math.round(value * 100) / 100;
 }
 
 function fmtUSD(v: number) {

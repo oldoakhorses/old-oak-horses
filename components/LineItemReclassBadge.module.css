@@ -1,0 +1,45 @@
+.wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.button {
+  font-size: 9px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 700;
+  background: transparent;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  background: #fff;
+  z-index: 20;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+.menuButton {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 0;
+  background: #fff;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.menuButton:hover {
+  background: #f7f8fb;
+}
+
+.separator {
+  border-top: 1px solid #e8eaf0;
+}

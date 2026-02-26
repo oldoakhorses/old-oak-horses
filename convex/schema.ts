@@ -143,7 +143,18 @@ export default defineSchema({
           )
         })
       )
-    )
+    ),
+    linkedBills: v.optional(
+      v.array(
+        v.object({
+          targetBillId: v.id("bills"),
+          targetCategory: v.string(),
+          amount: v.number(),
+          itemCount: v.number()
+        })
+      )
+    ),
+    linkedFromBillId: v.optional(v.id("bills"))
   })
     .index("by_uploadedAt", ["uploadedAt"])
     .index("by_provider", ["providerId"])

@@ -8,6 +8,8 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import NavBar from "@/components/NavBar";
 import HorseSelect from "@/components/HorseSelect";
+import LineItemReclassBadge from "@/components/LineItemReclassBadge";
+import ReclassificationSummary from "@/components/ReclassificationSummary";
 import styles from "./stablingInvoice.module.css";
 
 type SplitMode = "even" | "custom";
@@ -30,12 +32,13 @@ export default function StablingInvoicePage() {
   const horses = useQuery(api.horses.getActiveHorses) ?? [];
 
   const saveHorseAssignment = useMutation(api.bills.saveHorseAssignment);
-  const approveInvoice = useMutation(api.bills.approveInvoice);
+  const approveInvoiceWithReclassification = useMutation(api.bills.approveInvoiceWithReclassification);
   const deleteBill = useMutation(api.bills.deleteBill);
 
   const [editing, setEditing] = useState(false);
   const [lineAssignments, setLineAssignments] = useState<Record<number, string>>({});
   const [splitState, setSplitState] = useState<Record<number, SplitState>>({});
+  const [lineCategoryDecisions, setLineCategoryDecisions] = useState<Record<number, string | null>>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -66,6 +69,14 @@ export default function StablingInvoicePage() {
       }
       setLineAssignments(nextAssignments);
       setSplitState({});
+      setLineCategoryDecisions(
+        Object.fromEntries(
+          lineItems.map((item: any, index: number) => [
+            index,
+            normalizeCategoryKey(item.confirmedCategory ?? item.suggestedCategory)
+          ])
+        )
+      );
       setEditing(true);
       return;
     }
@@ -91,6 +102,14 @@ export default function StablingInvoicePage() {
 
     setLineAssignments(nextAssignments);
     setSplitState(nextSplits);
+    setLineCategoryDecisions(
+      Object.fromEntries(
+        lineItems.map((item: any, index: number) => [
+          index,
+          normalizeCategoryKey(item.confirmedCategory ?? item.suggestedCategory)
+        ])
+      )
+    );
     setEditing(false);
   }, [bill, horseIdByName, lineItems]);
 
@@ -210,6 +229,43 @@ export default function StablingInvoicePage() {
   }, [lineAssignments, lineItems, splitAmountsByIndex, splitState]);
 
   const assignmentSaved = Boolean(((bill?.horseAssignments ?? []).length > 0 || (bill?.splitLineItems ?? []).length > 0) && !editing);
+  const reclassification = useMemo(() => {
+    const current = "stabling";
+    const grouped = new Map<string, Array<{ description: string; amount: number }>>();
+    let remainingItems = 0;
+    let remainingTotal = 0;
+
+    for (let idx = 0; idx < lineItems.length; idx += 1) {
+      const item = lineItems[idx] ?? {};
+      const suggested = normalizeCategoryKey(item.suggestedCategory);
+      const confirmed = normalizeCategoryKey(lineCategoryDecisions[idx]);
+      const target = confirmed ?? suggested;
+      const amount = getLineAmount(item);
+      if (!target || target === current) {
+        remainingItems += 1;
+        remainingTotal += amount;
+        continue;
+      }
+      const rows = grouped.get(target) ?? [];
+      rows.push({ description: String(item.description ?? "Line item"), amount });
+      grouped.set(target, rows);
+    }
+
+    const groups = [...grouped.entries()].map(([category, items]) => ({
+      category,
+      itemCount: items.length,
+      total: round2(items.reduce((sum, row) => sum + row.amount, 0)),
+      items
+    }));
+    groups.sort((a, b) => b.total - a.total);
+    const movedCount = groups.reduce((sum, row) => sum + row.itemCount, 0);
+    return {
+      groups,
+      movedCount,
+      remainingItems,
+      remainingTotal: round2(remainingTotal)
+    };
+  }, [lineCategoryDecisions, lineItems]);
 
   if (!bill) {
     return (
@@ -263,7 +319,13 @@ export default function StablingInvoicePage() {
   }
 
   async function onApprove() {
-    await approveInvoice({ billId });
+    await approveInvoiceWithReclassification({
+      billId,
+      lineItemDecisions: lineItems.map((_: any, index: number) => ({
+        lineItemIndex: index,
+        confirmedCategory: lineCategoryDecisions[index] ?? undefined
+      }))
+    });
   }
 
   async function onDelete() {
@@ -357,6 +419,14 @@ export default function StablingInvoicePage() {
                         <div className={styles.lineMeta}>
                           <span className={styles.subcategoryBadge}>{titleCase(classifyStablingSubcategory(item))}</span>
                           {String(item.horse_name ?? item.horseName ?? "").trim() ? <span className={styles.autoBadge}>auto</span> : null}
+                          <LineItemReclassBadge
+                            currentCategory="stabling"
+                            suggestedCategory={normalizeCategoryKey(item.suggestedCategory)}
+                            confirmedCategory={lineCategoryDecisions[idx] ?? null}
+                            onChange={(category) => {
+                              setLineCategoryDecisions((prev) => ({ ...prev, [idx]: category }));
+                            }}
+                          />
                         </div>
                       </div>
 
@@ -517,12 +587,23 @@ export default function StablingInvoicePage() {
           )}
         </section>
 
+        <ReclassificationSummary
+          currentCategoryLabel="Stabling"
+          groups={reclassification.groups}
+          remainingItems={reclassification.remainingItems}
+          remainingTotal={reclassification.remainingTotal}
+        />
+
         <section className={styles.approvalRow}>
           {bill.isApproved ? (
             <div className={styles.approvedBox}>✓ invoice approved</div>
           ) : (
             <button type="button" className={assignmentSaved ? styles.approveBtn : styles.approveDisabled} disabled={!assignmentSaved} onClick={onApprove}>
-              {assignmentSaved ? "approve invoice" : "assign horses before approving"}
+              {assignmentSaved
+                ? reclassification.movedCount > 0
+                  ? `approve & move ${reclassification.movedCount} items`
+                  : "approve invoice"
+                : "assign horses before approving"}
             </button>
           )}
 
@@ -555,6 +636,9 @@ export default function StablingInvoicePage() {
             <p className={styles.modalBody}>
               this will permanently delete invoice <strong>{extracted.invoice_number || bill.fileName}</strong> from {extracted.provider_name || bill.provider?.name || "provider"}.
             </p>
+            {bill.linkedBills?.length ? (
+              <p className={styles.modalSub}>This will also delete {bill.linkedBills.length} linked invoices created from reclassified items.</p>
+            ) : null}
             <p className={styles.modalSub}>this action cannot be undone.</p>
             <div className={styles.modalActions}>
               <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(false)}>cancel</button>
@@ -625,4 +709,10 @@ function titleCase(value: string) {
 
 function fmtUSD(v: number) {
   return `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function normalizeCategoryKey(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase().replace(/-/g, "_");
+  return normalized.length > 0 ? normalized : null;
 }

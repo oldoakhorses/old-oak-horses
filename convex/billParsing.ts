@@ -9,6 +9,7 @@ const TRAVEL_SUBCATEGORY_SLUGS = new Set(["flights", "trains", "rental-car", "ga
 const HOUSING_SUBCATEGORY_SLUGS = new Set(["rider-housing", "groom-housing"]);
 const MARKETING_SUBCATEGORY_SLUGS = new Set(["vip-tickets", "photography", "social-media"]);
 const SALARIES_SUBCATEGORY_SLUGS = new Set(["rider", "groom", "freelance"]);
+const RECLASSIFICATION_SOURCE_CATEGORIES = new Set(["stabling", "show-expenses", "feed-bedding"]);
 
 export const parseBillPdf = internalAction({
   args: { billId: v.id("bills") },
@@ -59,6 +60,7 @@ export const parseBillPdf = internalAction({
       }
 
       const parsed = JSON.parse(stripCodeFences(textBlock.text)) as Record<string, unknown>;
+      annotateSuggestedCategories(parsed, category.slug);
 
       let resolvedProvider = provider;
       if (category.slug === "marketing" && !resolvedProvider && !bill.customProviderName) {
@@ -392,8 +394,57 @@ function genericExtractionPrompt(categorySlug?: string) {
   if (categorySlug === "feed-bedding") {
     return 'Extract from this feed and bedding invoice: invoice_number, invoice_date, due_date, provider_name, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, quantity, unit_price, total_usd, and subcategory ("feed", "bedding", or null for delivery/tax). Return strict JSON.';
   }
+  if (categorySlug === "stabling" || categorySlug === "show-expenses") {
+    return `${base} For each line item include suggestedCategory as null if it belongs in ${categorySlug}, or one of: feed_bedding, stabling, farrier, supplies, veterinary.`;
+  }
   if (categorySlug === "salaries") {
     return "Extract from this salary/payroll invoice: invoice_number, invoice_date, due_date, provider_name, pay_period, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, person_name (if identifiable), quantity, unit_price, total_usd. Return strict JSON.";
   }
   return base;
+}
+
+function annotateSuggestedCategories(parsed: Record<string, unknown>, categorySlug: string) {
+  if (!RECLASSIFICATION_SOURCE_CATEGORIES.has(categorySlug)) return;
+  const currentCategory = categorySlug.replace(/-/g, "_");
+  const lineItems = getLineItems(parsed);
+  for (const item of lineItems) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const existing = normalizeCategoryKey(record.suggestedCategory);
+    if (existing) {
+      record.suggestedCategory = existing === currentCategory ? null : existing;
+      continue;
+    }
+    const inferred = inferCategoryFromLineItem(record, currentCategory);
+    record.suggestedCategory = inferred && inferred !== currentCategory ? inferred : null;
+    if (record.confirmedCategory === undefined) {
+      record.confirmedCategory = undefined;
+    }
+    if (record.reclassified === undefined) {
+      record.reclassified = false;
+    }
+  }
+}
+
+function inferCategoryFromLineItem(item: Record<string, unknown>, currentCategory: string) {
+  const description = String(item.description ?? "").toLowerCase();
+  const subcategory = String(item.stabling_subcategory ?? item.subcategory ?? "").toLowerCase();
+  const text = `${description} ${subcategory}`;
+
+  if (matchesAny(text, ["shoe", "shoeing", "trim", "trimming", "farrier", "horseshoe"])) return "farrier";
+  if (matchesAny(text, ["inject", "exam", "vaccine", "medication", "xray", "radiograph", "vet"])) return "veterinary";
+  if (matchesAny(text, ["blanket", "bridle", "saddle", "boot", "tack", "equipment", "repair"])) return "supplies";
+  if (matchesAny(text, ["hay", "grain", "alfalfa", "feed", "beet pulp", "supplement", "bedding", "shavings", "straw", "wood chip", "sawdust"])) return "feed_bedding";
+  if (matchesAny(text, ["board", "stall", "turnout", "paddock", "facility"])) return "stabling";
+  return currentCategory;
+}
+
+function matchesAny(text: string, keywords: string[]) {
+  return keywords.some((keyword) => text.includes(keyword));
+}
+
+function normalizeCategoryKey(value: unknown) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase().replace(/-/g, "_");
+  return normalized.length > 0 ? normalized : null;
 }
