@@ -22,7 +22,7 @@ export default function BodyworkInvoicePage() {
 
   const bill = useQuery(api.bills.getBillById, billId ? { billId: billId as any } : "skip");
   const provider = useQuery(api.providers.getProviderBySlug, providerSlug ? { categorySlug: "bodywork", providerSlug } : "skip");
-  const approveInvoice = useMutation(api.bills.approveInvoice);
+  const approveBill = useMutation(api.bills.approveBill);
   const deleteBill = useMutation(api.bills.deleteBill);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -44,7 +44,13 @@ export default function BodyworkInvoicePage() {
 
   async function onApprove() {
     if (!bill) return;
-    await approveInvoice({ billId: bill._id });
+    console.log("Approve clicked, billId:", bill._id);
+    try {
+      await approveBill({ billId: bill._id });
+      console.log("Approve mutation succeeded");
+    } catch (error) {
+      console.error("Approve mutation failed:", error);
+    }
   }
 
   async function onDelete() {
@@ -83,6 +89,12 @@ export default function BodyworkInvoicePage() {
             {String(extracted.invoice_number ?? "—")} · {formatDate(extracted.invoice_date)} · due {formatDate(extracted.due_date)}
           </p>
           <div style={{ marginTop: 10, fontSize: 34, fontWeight: 700 }}>{fmtUSD(total)}</div>
+          {bill?.originalCurrency && bill.originalCurrency !== "USD" && typeof bill.originalTotal === "number" ? (
+            <p style={{ marginTop: 6, color: "var(--ui-text-muted)", fontSize: 10 }}>
+              Originally {fmtMoney(bill.originalTotal, bill.originalCurrency)}
+              {typeof bill.exchangeRate === "number" ? ` (rate: ${bill.exchangeRate})` : ""}
+            </p>
+          ) : null}
         </section>
 
         {grouped.map(([horseName, items]) => (
@@ -169,6 +181,10 @@ function Summary({ label, value }: { label: string; value: string }) {
 
 function fmtUSD(v: number) {
   return `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function fmtMoney(v: number, currency: string) {
+  return `${currency} ${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatDate(value: unknown) {

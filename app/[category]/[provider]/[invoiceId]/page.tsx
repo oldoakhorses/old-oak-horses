@@ -55,7 +55,7 @@ export default function InvoiceReportPage() {
 
   const provider = useQuery(api.providers.getProviderBySlug, categorySlug && providerSlug ? { categorySlug, providerSlug } : "skip");
   const bill = useQuery(api.bills.getBillById, invoiceId ? { billId: invoiceId as any } : "skip");
-  const approveInvoice = useMutation(api.bills.approveInvoice);
+  const approveBill = useMutation(api.bills.approveBill);
   const approveInvoiceWithReclassification = useMutation(api.bills.approveInvoiceWithReclassification);
   const deleteBill = useMutation(api.bills.deleteBill);
   const [lineCategoryDecisions, setLineCategoryDecisions] = useState<Record<number, string | null>>({});
@@ -139,17 +139,28 @@ export default function InvoiceReportPage() {
 
   async function onApprove() {
     if (!bill) return;
+    console.log("Approve clicked, billId:", bill._id);
     if (!isReclassCategory) {
-      await approveInvoice({ billId: bill._id });
+      try {
+        await approveBill({ billId: bill._id });
+        console.log("Approve mutation succeeded");
+      } catch (error) {
+        console.error("Approve mutation failed:", error);
+      }
       return;
     }
-    await approveInvoiceWithReclassification({
-      billId: bill._id,
-      lineItemDecisions: lineItems.map((_, index) => ({
-        lineItemIndex: index,
-        confirmedCategory: lineCategoryDecisions[index] ?? undefined
-      }))
-    });
+    try {
+      await approveInvoiceWithReclassification({
+        billId: bill._id,
+        lineItemDecisions: lineItems.map((_, index) => ({
+          lineItemIndex: index,
+          confirmedCategory: lineCategoryDecisions[index] ?? undefined
+        }))
+      });
+      console.log("Approve mutation succeeded");
+    } catch (error) {
+      console.error("Approve mutation failed:", error);
+    }
   }
 
   async function onDelete() {
@@ -205,6 +216,12 @@ export default function InvoiceReportPage() {
           <div className={styles.totalBox}>
             <div className="ui-label">INVOICE TOTAL</div>
             <div className={styles.total}>{fmtUSD(total)}</div>
+            {bill?.originalCurrency && bill.originalCurrency !== "USD" && typeof bill.originalTotal === "number" ? (
+              <div className={styles.totalMeta}>
+                Originally {fmtMoney(bill.originalTotal, bill.originalCurrency)}
+                {typeof bill.exchangeRate === "number" ? ` (rate: ${bill.exchangeRate})` : ""}
+              </div>
+            ) : null}
             <div className={styles.totalMeta}>fees: {fmtUSD(fees)} · vat: {fmtUSD(vat)}</div>
           </div>
         </section>
@@ -277,13 +294,34 @@ export default function InvoiceReportPage() {
         ) : null}
 
         <section className="ui-card" style={{ marginTop: 16, display: "flex", gap: 10 }}>
-          <button type="button" className="ui-button-filled" onClick={onApprove} disabled={bill?.status === "done"}>
-            {bill?.status === "done"
-              ? "invoice approved"
-              : isReclassCategory && reclassification.movedCount > 0
-                ? `approve & move ${reclassification.movedCount} items`
-                : "approve invoice"}
-          </button>
+          {bill?.status === "done" ? (
+            <div
+              style={{
+                flex: 1,
+                background: "rgba(34, 197, 131, 0.08)",
+                border: "1px solid #22C583",
+                borderRadius: 8,
+                padding: "14px 20px",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#22C583"
+              }}
+            >
+              ✓ invoice approved
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="ui-button-filled"
+              onClick={onApprove}
+              style={{ background: "#22C583", borderColor: "#22C583" }}
+            >
+              {isReclassCategory && reclassification.movedCount > 0 ? `approve & move ${reclassification.movedCount} items` : "approve invoice"}
+            </button>
+          )}
           <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(true)}>
             delete
           </button>
@@ -357,6 +395,10 @@ function safeAmount(value: unknown) {
 
 function fmtUSD(v: number) {
   return `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function fmtMoney(v: number, currency: string) {
+  return `${currency} ${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatDate(value?: string) {
