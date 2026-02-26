@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
+import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
 
 const SUBCATEGORIES = new Set(["vip-tickets", "photography", "social-media"]);
 const LABELS: Record<string, string> = {
@@ -58,7 +59,18 @@ export default function MarketingSegmentPage() {
               {(bills ?? []).map((bill) => (
                 <li key={bill._id} style={{ marginBottom: 8 }}>
                   <Link href={`/marketing/${segment}/${bill._id}`}>
-                    {bill.invoiceNumber} · {bill.providerName} · {fmtUSD(bill.totalUsd)}
+                    {formatInvoiceTitle({
+                      category: "marketing",
+                      providerName: bill.providerName,
+                      subcategory: segment,
+                      date: bill.invoiceDate || "",
+                    })}
+                    {" · "}
+                    <span style={{ color: "var(--ui-text-muted)", fontSize: 10 }}>
+                      #{bill.invoiceNumber} · {toIsoDateString(bill.invoiceDate || "")}
+                    </span>
+                    {" · "}
+                    {fmtUSD(bill.totalUsd)}
                   </Link>
                 </li>
               ))}
@@ -75,7 +87,18 @@ export default function MarketingSegmentPage() {
                 {providerBills.map((bill) => (
                   <li key={bill._id} style={{ marginBottom: 8 }}>
                     <Link href={`/marketing/${bill.marketingSubcategory ?? "other"}/${bill._id}`}>
-                      {String((bill.extractedData as any)?.invoice_number ?? bill.fileName)} · {fmtUSD((bill.extractedData as any)?.invoice_total_usd ?? 0)}
+                      {formatInvoiceTitle({
+                        category: "marketing",
+                        providerName: provider?.name ?? segment,
+                        subcategory: bill.marketingSubcategory ?? "other",
+                        date: String((bill.extractedData as any)?.invoice_date ?? ""),
+                      })}
+                      {" · "}
+                      <span style={{ color: "var(--ui-text-muted)", fontSize: 10 }}>
+                        #{String((bill.extractedData as any)?.invoice_number ?? bill.fileName)} · {toIsoDateString(String((bill.extractedData as any)?.invoice_date ?? ""))}
+                      </span>
+                      {" · "}
+                      {fmtUSD((bill.extractedData as any)?.invoice_total_usd ?? 0)}
                     </Link>
                   </li>
                 ))}

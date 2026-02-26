@@ -6,6 +6,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
 import FilterTabs from "@/components/FilterTabs";
+import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
 import styles from "./bizOverview.module.css";
 
 type Period = "thisMonth" | "ytd" | "2024" | "all";
@@ -232,12 +233,18 @@ export default function BizOverviewPage() {
             const href = buildInvoiceHref(row.categorySlug, row.providerSlug, String(row._id));
             return (
               <Link key={String(row._id)} href={href} className={styles.invoiceRow}>
-                <div className={styles.invoiceNumber}>{row.invoiceNumber}</div>
+                <div className={styles.invoiceNumber}>
+                  {formatInvoiceTitle({
+                    category: row.categorySlug,
+                    providerName: row.provider,
+                    date: row.date,
+                  })}
+                </div>
                 <span className={styles.catTag} style={{ background: `${row.categoryColor}1A`, color: row.categoryColor }}>
                   {shortCategory(row.categorySlug)}
                 </span>
                 <div className={row.providerSlug === "other" ? `${styles.providerText} ${styles.providerTagCustom}` : styles.providerText}>{row.provider}</div>
-                <div className={styles.invoiceDate}>{formatDate(row.date)}</div>
+                <div className={styles.invoiceDate}>#{row.invoiceNumber} · {toIsoDateString(row.date)}</div>
                 <div className={styles.entities}>
                   {row.entities.slice(0, 3).map((entity) => (
                     <span className={styles.entityPill} key={`${row._id}-${entity}`}>{row.entityType === "person" ? firstName(entity) : entity}</span>
@@ -271,12 +278,6 @@ function fmtUSD(v: number) {
 
 function snakeCase(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
-}
-
-function formatDate(value: string) {
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function buildInvoiceHref(categorySlug: string, providerSlug: string, billId: string) {

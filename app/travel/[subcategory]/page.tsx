@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
+import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
 import styles from "./subcategory.module.css";
 
 const PAGE_SIZE = 8;
@@ -113,8 +114,15 @@ export default function TravelSubcategoryPage() {
             return (
               <Link key={bill._id} href={`/travel/${subcategory}/${bill._id}`} className={styles.row}>
                 <div>
-                  <div className={styles.provider}>{bill.providerName}</div>
-                  <div className={styles.metaLine}>#{extracted.invoice_number || bill.fileName} · {extracted.invoice_date || "no date"}</div>
+                  <div className={styles.provider}>
+                    {formatInvoiceTitle({
+                      category: "travel",
+                      providerName: bill.providerName,
+                      subcategory,
+                      date: extracted.invoice_date || "",
+                    })}
+                  </div>
+                  <div className={styles.metaLine}>#{extracted.invoice_number || bill.fileName} · {toIsoDateString(extracted.invoice_date || "")}</div>
                   <div className={styles.people}>
                     {(bill.assignedPeopleResolved ?? []).map((row: any) => (
                       <span key={`${bill._id}-${row.personId}`} className={styles.personPill}>{row.personName}</span>

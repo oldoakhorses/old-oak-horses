@@ -13,11 +13,13 @@ import styles from "./provider.module.css";
 
 type ContactFormState = {
   fullName: string;
+  contactName: string;
   primaryContactName: string;
   primaryContactPhone: string;
   address: string;
   phone: string;
   email: string;
+  website: string;
   accountNumber: string;
 };
 
@@ -46,11 +48,13 @@ export default function ProviderOverviewPage() {
   const [saveError, setSaveError] = useState("");
   const [contactForm, setContactForm] = useState<ContactFormState>({
     fullName: "",
+    contactName: "",
     primaryContactName: "",
     primaryContactPhone: "",
     address: "",
     phone: "",
     email: "",
+    website: "",
     accountNumber: "",
   });
 
@@ -59,8 +63,10 @@ export default function ProviderOverviewPage() {
     return rows.map((invoice) => ({
       id: invoice._id,
       href: `/${categorySlug}/${providerSlug}/${invoice._id}`,
+      category: categorySlug,
       invoiceNumber: invoice.invoice_number,
       invoiceDate: invoice.invoice_date,
+      providerName: provider?.name ?? providerSlug,
       horses: invoice.horses,
       lineItemCount: invoice.line_item_count,
       fileName: invoice.fileName,
@@ -96,11 +102,13 @@ export default function ProviderOverviewPage() {
       await updateProviderContact({
         providerId: provider._id,
         fullName: emptyToUndefined(contactForm.fullName),
+        contactName: emptyToUndefined(contactForm.contactName),
         primaryContactName: emptyToUndefined(contactForm.primaryContactName),
         primaryContactPhone: emptyToUndefined(contactForm.primaryContactPhone),
         address: emptyToUndefined(contactForm.address),
         phone: emptyToUndefined(contactForm.phone),
         email: emptyToUndefined(contactForm.email),
+        website: emptyToUndefined(contactForm.website),
         accountNumber: emptyToUndefined(contactForm.accountNumber),
       });
       setShowEditModal(false);
@@ -137,11 +145,13 @@ export default function ProviderOverviewPage() {
             onClick={() => {
               setContactForm({
                 fullName: provider.fullName ?? provider.name,
-                primaryContactName: provider.primaryContactName ?? "",
+                contactName: provider.contactName ?? "",
+                primaryContactName: provider.primaryContactName ?? provider.contactName ?? "",
                 primaryContactPhone: provider.primaryContactPhone ?? "",
                 address: provider.address ?? "",
                 phone: provider.phone ?? "",
                 email: provider.email ?? "",
+                website: provider.website ?? "",
                 accountNumber: provider.accountNumber ?? "",
               });
               setShowEditModal(true);
@@ -164,6 +174,7 @@ export default function ProviderOverviewPage() {
             <Info label="ADDRESS" value={provider.address || "—"} />
             <Info label="PHONE" value={provider.phone ? <a href={`tel:${provider.phone}`}>{provider.phone}</a> : "—"} />
             <Info label="EMAIL" value={provider.email ? <a href={`mailto:${provider.email}`}>{provider.email}</a> : "—"} />
+            <Info label="WEBSITE" value={provider.website ? <a href={provider.website} target="_blank" rel="noreferrer">{provider.website}</a> : "—"} />
             <Info label="ACCOUNT #" value={provider.accountNumber || "—"} />
           </div>
         </section>
@@ -198,6 +209,13 @@ export default function ProviderOverviewPage() {
               className={styles.input}
             />
           </Field>
+          <Field label="CONTACT NAME">
+            <input
+              value={contactForm.contactName}
+              onChange={(e) => setContactForm((p) => ({ ...p, contactName: e.target.value }))}
+              className={styles.input}
+            />
+          </Field>
           <Field label="PRIMARY CONTACT PHONE">
             <input
               value={contactForm.primaryContactPhone}
@@ -213,6 +231,9 @@ export default function ProviderOverviewPage() {
           </Field>
           <Field label="EMAIL">
             <input value={contactForm.email} onChange={(e) => setContactForm((p) => ({ ...p, email: e.target.value }))} className={styles.input} />
+          </Field>
+          <Field label="WEBSITE">
+            <input value={contactForm.website} onChange={(e) => setContactForm((p) => ({ ...p, website: e.target.value }))} className={styles.input} />
           </Field>
           <Field label="ACCOUNT #">
             <input value={contactForm.accountNumber} onChange={(e) => setContactForm((p) => ({ ...p, accountNumber: e.target.value }))} className={styles.input} />

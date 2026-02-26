@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
+import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
 
 export default function FeedBeddingOverviewPage() {
   const categories = useQuery(api.categories.getAllCategories) ?? [];
@@ -63,12 +64,22 @@ export default function FeedBeddingOverviewPage() {
           <h2 style={{ fontSize: 16, marginBottom: 10 }}>all_invoices</h2>
           <ul style={{ paddingLeft: 18 }}>
             {bills.map((bill) => (
-              <li key={bill._id} style={{ marginBottom: 8 }}>
-                <Link href={`/feed-bedding/${bill.providerSlug}/${bill._id}`}>
-                  {bill.invoiceNumber} · {bill.providerName} · {fmtUSD(bill.totalUsd)}
-                </Link>
-              </li>
-            ))}
+                <li key={bill._id} style={{ marginBottom: 8 }}>
+                  <Link href={`/feed-bedding/${bill.providerSlug}/${bill._id}`}>
+                    {formatInvoiceTitle({
+                      category: "feed-bedding",
+                      providerName: bill.providerName,
+                      date: bill.invoiceDate || "",
+                    })}
+                    {" · "}
+                    <span style={{ color: "var(--ui-text-muted)", fontSize: 10 }}>
+                      #{bill.invoiceNumber} · {toIsoDateString(bill.invoiceDate || "")}
+                    </span>
+                    {" · "}
+                    {fmtUSD(bill.totalUsd)}
+                  </Link>
+                </li>
+              ))}
           </ul>
         </section>
         <div className="ui-footer">OLD_OAK_HORSES // FEED_BEDDING</div>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { formatInvoiceTitle } from "@/lib/invoiceTitle";
 import styles from "./InvoiceList.module.css";
 
 const ITEMS_PER_PAGE = 5;
@@ -9,9 +10,11 @@ const ITEMS_PER_PAGE = 5;
 export type InvoiceListItem = {
   id: string;
   href: string;
+  category: string;
   invoiceNumber: string;
   invoiceDate: string | null;
   providerName?: string;
+  subcategory?: string | null;
   providerSlug?: string;
   horses: string[];
   lineItemCount: number;
@@ -38,7 +41,14 @@ export default function InvoiceList({
     if (!query) return items;
 
     return items.filter((item) => {
+      const invoiceTitle = formatInvoiceTitle({
+        category: item.category,
+        providerName: item.providerName,
+        subcategory: item.subcategory,
+        date: item.invoiceDate ?? "",
+      });
       const haystack = [
+        invoiceTitle,
         item.invoiceNumber,
         item.invoiceDate ?? "",
         item.providerName ?? "",
@@ -84,13 +94,21 @@ export default function InvoiceList({
           <Link className={styles.row} key={item.id} href={item.href}>
             <div className={styles.left}>
               <div className={styles.line1}>
-                <span className={styles.invoice}>{item.invoiceNumber}</span>
+                <span className={styles.invoice}>
+                  {formatInvoiceTitle({
+                    category: item.category,
+                    providerName: item.providerName,
+                    subcategory: item.subcategory,
+                    date: item.invoiceDate ?? "",
+                  })}
+                </span>
                 {showProviderTag && item.providerName ? (
                   <span className={styles.providerTag}>{item.providerName}</span>
                 ) : null}
               </div>
               <div className={styles.line2}>
-                <span>{formatDate(item.invoiceDate)}</span>
+                <span>#{item.invoiceNumber}</span>
+                <span>{toIsoDate(item.invoiceDate)}</span>
                 {item.horses.slice(0, 3).map((horse) => (
                   <span className={styles.horseTag} key={`${item.id}-${horse}`}>
                     {horse}
@@ -136,11 +154,12 @@ export default function InvoiceList({
   );
 }
 
-function formatDate(value: string | null) {
+function toIsoDate(value: string | null) {
   if (!value) return "no date";
-  const date = new Date(`${value}T00:00:00`);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return date.toISOString().slice(0, 10);
 }
 
 function fmtUSD(v: number) {

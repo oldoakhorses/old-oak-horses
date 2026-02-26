@@ -7,6 +7,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import NavBar from "@/components/NavBar";
+import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
 
 type ProviderInvoiceRow = {
   _id: Id<"bills">;
@@ -57,7 +58,18 @@ export default function HorseTransportProviderPage() {
               {rows.map((row) => (
                 <li key={row._id}>
                   <Link href={`/horse-transport/${subcategory}/${providerSlug}/${row._id}`}>
-                    {row.invoice_number} · {row.invoice_date ?? "no date"} · {fmtUSD(row.total_usd)}
+                    {formatInvoiceTitle({
+                      category: "horse-transport",
+                      providerName: provider?.name ?? providerSlug,
+                      subcategory,
+                      date: row.invoice_date ?? "",
+                    })}
+                    {" · "}
+                    <span style={{ color: "var(--ui-text-muted)", fontSize: 10 }}>
+                      #{row.invoice_number} · {toIsoDateString(row.invoice_date ?? "")}
+                    </span>
+                    {" · "}
+                    {fmtUSD(row.total_usd)}
                   </Link>
                 </li>
               ))}

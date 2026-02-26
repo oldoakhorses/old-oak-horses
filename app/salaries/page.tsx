@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
+import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
 
 const LABELS: Record<string, string> = {
   rider: "Rider",
@@ -103,7 +104,20 @@ export default function SalariesOverviewPage() {
               {bills.map((bill) => (
                 <li key={bill._id} style={{ marginBottom: 8 }}>
                   <Link href={`/salaries/${bill.salariesSubcategory ?? "other"}/${bill._id}`}>
-                    {bill.invoiceNumber} · {bill.providerName} · {fmtUSD(bill.totalUsd)} · {bill.approvalStatus}
+                    {formatInvoiceTitle({
+                      category: "salaries",
+                      providerName: bill.providerName,
+                      subcategory: bill.salariesSubcategory ?? "other",
+                      date: bill.invoiceDate || "",
+                    })}
+                    {" · "}
+                    <span style={{ color: "var(--ui-text-muted)", fontSize: 10 }}>
+                      #{bill.invoiceNumber} · {toIsoDateString(bill.invoiceDate || "")}
+                    </span>
+                    {" · "}
+                    {fmtUSD(bill.totalUsd)}
+                    {" · "}
+                    {bill.approvalStatus}
                   </Link>
                 </li>
               ))}

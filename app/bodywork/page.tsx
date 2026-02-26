@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
+import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
 
 export default function BodyworkOverviewPage() {
   const categories = useQuery(api.categories.getAllCategories) ?? [];
@@ -78,11 +79,20 @@ export default function BodyworkOverviewPage() {
             {bills.map((bill) => {
               const provider = bill.providerId ? providerMap.get(String(bill.providerId)) : null;
               const providerSlug = provider?.slug ?? provider?.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") ?? "unknown";
-              const extracted = (bill.extractedData ?? {}) as { invoice_number?: string; invoice_total_usd?: number };
+              const extracted = (bill.extractedData ?? {}) as { invoice_number?: string; invoice_total_usd?: number; invoice_date?: string };
               return (
                 <li key={bill._id} style={{ marginBottom: 8 }}>
                   <Link href={`/bodywork/${providerSlug}/${bill._id}`}>
-                    {extracted.invoice_number ?? bill.fileName} · {provider?.name ?? bill.customProviderName ?? "Unknown"} ·{" "}
+                    {formatInvoiceTitle({
+                      category: "bodywork",
+                      providerName: provider?.name ?? bill.customProviderName ?? "Unknown",
+                      date: String(extracted.invoice_date ?? ""),
+                    })}
+                    {" · "}
+                    <span style={{ color: "var(--ui-text-muted)", fontSize: 10 }}>
+                      #{String(extracted.invoice_number ?? bill.fileName)} · {toIsoDateString(String(extracted.invoice_date ?? ""))}
+                    </span>
+                    {" · "}
                     {fmtUSD(typeof extracted.invoice_total_usd === "number" ? extracted.invoice_total_usd : 0)}
                   </Link>
                 </li>

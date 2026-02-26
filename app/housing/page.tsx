@@ -6,6 +6,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
 import SpendBar from "@/components/SpendBar";
+import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
 import styles from "./housing.module.css";
 
 const SUBCATEGORY_ORDER = ["rider-housing", "groom-housing"] as const;
@@ -114,10 +115,19 @@ export default function HousingOverviewPage() {
               <Link key={bill._id} href={`/housing/${bill.housingSubcategory || "housing"}/${bill._id}`} className={styles.invoiceRow}>
                 <div>
                   <div className={styles.invoiceTop}>
-                    <span className={styles.provider}>{bill.providerName}</span>
+                    <span className={styles.provider}>
+                      {formatInvoiceTitle({
+                        category: "housing",
+                        providerName: bill.providerName,
+                        subcategory: bill.housingSubcategory || "housing",
+                        date: (bill.extractedData as any)?.invoice_date || "",
+                      })}
+                    </span>
                     <span className={styles.tag}>{titleCase(bill.housingSubcategory || "housing")}</span>
                   </div>
-                  <div className={styles.invoiceMeta}>{(bill.extractedData as any)?.invoice_number || bill.fileName}</div>
+                  <div className={styles.invoiceMeta}>
+                    #{(bill.extractedData as any)?.invoice_number || bill.fileName} · {toIsoDateString((bill.extractedData as any)?.invoice_date || "")}
+                  </div>
                   <div className={styles.persons}>
                     {(bill.assignedPeopleResolved ?? []).map((row: any) => (
                       <span key={`${bill._id}-${row.personId}`} className={styles.personPill}>{row.personName}</span>

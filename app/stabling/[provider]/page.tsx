@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
+import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
 import styles from "./provider.module.css";
 
 const PAGE_SIZE = 8;
@@ -130,8 +131,14 @@ export default function StablingProviderPage() {
             return (
               <Link key={bill._id} href={`/stabling/${provider.slug ?? providerSlug}/${bill._id}`} className={styles.row}>
                 <div>
-                  <div className={styles.provider}>{extracted.invoice_number || bill.fileName}</div>
-                  <div className={styles.metaLine}>{extracted.invoice_date || "no date"}</div>
+                  <div className={styles.provider}>
+                    {formatInvoiceTitle({
+                      category: "stabling",
+                      providerName: provider.name,
+                      date: extracted.invoice_date || "",
+                    })}
+                  </div>
+                  <div className={styles.metaLine}>#{extracted.invoice_number || bill.fileName} · {toIsoDateString(extracted.invoice_date || "")}</div>
                   <div className={styles.people}>
                     {(bill.horses ?? []).map((row: any) => (
                       <span key={`${bill._id}-${row.horseName}`} className={styles.personPill}>{row.horseName}</span>

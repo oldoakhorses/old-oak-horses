@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
+import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
 
 const LABELS: Record<string, string> = {
   rider: "Rider",
@@ -84,7 +85,20 @@ export default function SalariesSubcategoryPage() {
               {bills.map((bill) => (
                 <li key={bill._id} style={{ marginBottom: 8 }}>
                   <Link href={`/salaries/${subcategory}/${bill._id}`}>
-                    {bill.providerName} · {bill.invoiceNumber} · {fmtUSD(bill.totalUsd)} · {bill.approvalStatus}
+                    {formatInvoiceTitle({
+                      category: "salaries",
+                      providerName: bill.providerName,
+                      subcategory,
+                      date: bill.invoiceDate || "",
+                    })}
+                    {" · "}
+                    <span style={{ color: "var(--ui-text-muted)", fontSize: 10 }}>
+                      #{bill.invoiceNumber} · {toIsoDateString(bill.invoiceDate || "")}
+                    </span>
+                    {" · "}
+                    {fmtUSD(bill.totalUsd)}
+                    {" · "}
+                    {bill.approvalStatus}
                   </Link>
                 </li>
               ))}

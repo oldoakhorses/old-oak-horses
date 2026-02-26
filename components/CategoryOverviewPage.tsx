@@ -162,6 +162,7 @@ export default function CategoryOverviewPage({
       return {
         id: row.bill._id,
         href: `/${categorySlug}/${providerSlug}/${row.bill._id}`,
+        category: categorySlug,
         invoiceNumber: row.extracted.invoice_number ?? row.bill.fileName,
         invoiceDate: row.extracted.invoice_date ?? null,
         providerName: provider?.name ?? "Unknown",
