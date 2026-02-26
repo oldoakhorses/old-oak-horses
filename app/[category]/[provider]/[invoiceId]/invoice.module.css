@@ -166,6 +166,50 @@
   border-radius: 4px;
 }
 
+.inlineMeta {
+  margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.autoBadge {
+  margin-left: 6px;
+  font-size: 8px;
+  border-radius: 4px;
+  padding: 2px 7px;
+  background: rgba(34, 197, 131, 0.08);
+  color: #22c583;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.fuzzyBadge {
+  font-size: 8px;
+  border-radius: 4px;
+  padding: 2px 7px;
+  background: rgba(245, 158, 11, 0.08);
+  color: #f59e0b;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.unmatchedBadge {
+  margin-left: 6px;
+  font-size: 8px;
+  border-radius: 4px;
+  padding: 2px 7px;
+  background: rgba(229, 72, 77, 0.08);
+  color: #e5484d;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.rawText {
+  font-size: 9px;
+  color: #9ea2b0;
+}
+
 .itemAmount {
   font-size: 12px;
   font-weight: 700;

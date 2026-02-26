@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { normalizeAliasKey } from "./matchHorse";
 
 const STABLING_SUBCATEGORY_SLUGS = new Set(["board", "turnout", "bedding", "hay-feed", "facility-fees", "other"]);
 
@@ -1176,6 +1177,100 @@ export const getBillFileNamesByProvider = internalQuery({
   }
 });
 
+export const getAllHorsesForMatching = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("horses").collect();
+    return rows.map((row) => ({ _id: row._id, name: row.name }));
+  }
+});
+
+export const getAllPeopleForMatching = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("people").withIndex("by_active", (q) => q.eq("isActive", true)).collect();
+    return rows.map((row) => ({ _id: row._id, name: row.name, role: row.role }));
+  }
+});
+
+export const getHorseAliasesForMatching = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("horseAliases").collect();
+    return rows.map((row) => ({ alias: row.alias, horseName: row.horseName, horseId: row.horseId }));
+  }
+});
+
+export const getPersonAliasesForMatching = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("personAliases").collect();
+    return rows.map((row) => ({ alias: row.alias, personName: row.personName, personId: row.personId }));
+  }
+});
+
+export const upsertHorseAlias = internalMutation({
+  args: {
+    alias: v.string(),
+    horseId: v.id("horses"),
+    horseName: v.string()
+  },
+  handler: async (ctx, args) => {
+    const normalizedAlias = normalizeAliasKey(args.alias);
+    if (!normalizedAlias || normalizedAlias.length < 2) return null;
+    const existing = await ctx.db
+      .query("horseAliases")
+      .withIndex("by_alias", (q) => q.eq("alias", normalizedAlias))
+      .first();
+    const now = Date.now();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        horseId: args.horseId,
+        horseName: args.horseName,
+        updatedAt: now
+      });
+      return existing._id;
+    }
+    return await ctx.db.insert("horseAliases", {
+      alias: normalizedAlias,
+      horseId: args.horseId,
+      horseName: args.horseName,
+      createdAt: now
+    });
+  }
+});
+
+export const upsertPersonAlias = internalMutation({
+  args: {
+    alias: v.string(),
+    personId: v.id("people"),
+    personName: v.string()
+  },
+  handler: async (ctx, args) => {
+    const normalizedAlias = normalizeAliasKey(args.alias);
+    if (!normalizedAlias || normalizedAlias.length < 2) return null;
+    const existing = await ctx.db
+      .query("personAliases")
+      .withIndex("by_alias", (q) => q.eq("alias", normalizedAlias))
+      .first();
+    const now = Date.now();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        personId: args.personId,
+        personName: args.personName,
+        updatedAt: now
+      });
+      return existing._id;
+    }
+    return await ctx.db.insert("personAliases", {
+      alias: normalizedAlias,
+      personId: args.personId,
+      personName: args.personName,
+      createdAt: now
+    });
+  }
+});
+
 export const createParsingBill = internalMutation({
   args: {
     providerId: v.optional(v.id("providers")),
@@ -1370,6 +1465,39 @@ export const savePersonAssignment = mutation({
       isSplit: args.isSplit,
       assignedPeople: args.assignedPeople
     });
+
+    if (!args.isSplit && args.assignedPeople.length === 1) {
+      const target = await ctx.db.get(args.assignedPeople[0].personId);
+      if (target) {
+        const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+        const aliasCandidate =
+          pickString(extracted, ["person_name", "driver_name", "driverName", "employee_name"]) ??
+          pickString(extracted, ["assigned_person_suggestion"]);
+        if (aliasCandidate && normalizeAliasKey(aliasCandidate) !== normalizeAliasKey(target.name)) {
+          await ctx.db
+            .query("personAliases")
+            .withIndex("by_alias", (q) => q.eq("alias", normalizeAliasKey(aliasCandidate)))
+            .first()
+            .then(async (existing) => {
+              if (existing) {
+                await ctx.db.patch(existing._id, {
+                  personId: target._id,
+                  personName: target.name,
+                  updatedAt: Date.now()
+                });
+              } else {
+                await ctx.db.insert("personAliases", {
+                  alias: normalizeAliasKey(aliasCandidate),
+                  personId: target._id,
+                  personName: target.name,
+                  createdAt: Date.now()
+                });
+              }
+            });
+        }
+      }
+    }
+
     return args.billId;
   }
 });
@@ -1404,6 +1532,35 @@ export const saveHorseAssignment = mutation({
       horseAssignments: args.horseAssignments,
       splitLineItems: args.splitLineItems
     });
+
+    const lineItems = getLineItems(bill.extractedData);
+    for (const row of args.horseAssignments) {
+      if (!row.horseId) continue;
+      const horse = await ctx.db.get(row.horseId);
+      if (!horse) continue;
+      const source = lineItems[row.lineItemIndex];
+      if (!source || typeof source !== "object") continue;
+      const raw = pickString(source as Record<string, unknown>, ["horse_name_raw", "horse_name", "horseName"]);
+      if (!raw || normalizeAliasKey(raw) === normalizeAliasKey(horse.name)) continue;
+
+      const normalizedAlias = normalizeAliasKey(raw);
+      const existing = await ctx.db.query("horseAliases").withIndex("by_alias", (q) => q.eq("alias", normalizedAlias)).first();
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          horseId: horse._id,
+          horseName: horse.name,
+          updatedAt: Date.now()
+        });
+      } else {
+        await ctx.db.insert("horseAliases", {
+          alias: normalizedAlias,
+          horseId: horse._id,
+          horseName: horse.name,
+          createdAt: Date.now()
+        });
+      }
+    }
+
     return args.billId;
   }
 });
@@ -1462,6 +1619,34 @@ export const saveSalaryAssignment = mutation({
       personAssignments: args.personAssignments,
       splitPersonLineItems: args.splitPersonLineItems
     });
+
+    const lineItems = getLineItems(bill.extractedData);
+    for (const row of args.personAssignments) {
+      if (!row.personId) continue;
+      const person = await ctx.db.get(row.personId);
+      if (!person) continue;
+      const source = lineItems[row.lineItemIndex];
+      if (!source || typeof source !== "object") continue;
+      const raw = pickString(source as Record<string, unknown>, ["person_name_raw", "person_name", "personName", "employee_name"]);
+      if (!raw || normalizeAliasKey(raw) === normalizeAliasKey(person.name)) continue;
+      const normalizedAlias = normalizeAliasKey(raw);
+      const existing = await ctx.db.query("personAliases").withIndex("by_alias", (q) => q.eq("alias", normalizedAlias)).first();
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          personId: person._id,
+          personName: person.name,
+          updatedAt: Date.now()
+        });
+      } else {
+        await ctx.db.insert("personAliases", {
+          alias: normalizedAlias,
+          personId: person._id,
+          personName: person.name,
+          createdAt: Date.now()
+        });
+      }
+    }
+
     return args.billId;
   }
 });

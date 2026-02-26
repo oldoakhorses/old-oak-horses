@@ -222,6 +222,22 @@ export default defineSchema({
     .index("by_role", ["role"])
     .index("by_active", ["isActive"]),
 
+  horseAliases: defineTable({
+    alias: v.string(),
+    horseName: v.string(),
+    horseId: v.id("horses"),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number())
+  }).index("by_alias", ["alias"]),
+
+  personAliases: defineTable({
+    alias: v.string(),
+    personName: v.string(),
+    personId: v.id("people"),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number())
+  }).index("by_alias", ["alias"]),
+
   customSubcategories: defineTable({
     categoryId: v.id("categories"),
     name: v.string(),

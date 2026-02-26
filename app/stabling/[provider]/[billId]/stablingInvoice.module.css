@@ -369,6 +369,26 @@
   color: var(--color-green);
 }
 
+.fuzzyBadge {
+  font-size: 8px;
+  border-radius: 3px;
+  padding: 2px 7px;
+  background: rgba(245, 158, 11, 0.08);
+  color: #f59e0b;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.unmatchedBadge {
+  font-size: 8px;
+  border-radius: 3px;
+  padding: 2px 7px;
+  background: rgba(229, 72, 77, 0.08);
+  color: #e5484d;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .autoNotice {
   margin-top: 10px;
   background: var(--color-green-bg);

@@ -371,14 +371,34 @@ export default function SalariesInvoicePage() {
                   const splitValues = splitAmountsByIndex.get(idx) ?? [];
                   const availableForSplit = filteredPeople.filter((person) => !split?.personIds.includes(String(person._id)));
                   const isUnassigned = !assignment;
+                  const matchConfidence = String(item.personMatchConfidence ?? item.person_match_confidence ?? "").toLowerCase();
+                  const rawPerson = String(item.person_name_raw ?? "").trim();
+                  const parsedPerson = String(item.person_name ?? item.employee_name ?? item.name ?? "").trim();
 
                   return (
                     <div key={`${idx}-${String(item.description ?? "line")}`} style={{ border: "1px solid #E8EAF0", borderRadius: 8, padding: 10, background: isUnassigned ? "rgba(229,72,77,0.03)" : "#F2F3F7" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 12, fontWeight: 700 }}>{String(item.description ?? "—")}</div>
-                          <div style={{ fontSize: 10, color: "var(--ui-text-muted)", marginTop: 2 }}>
-                            {String(item.person_name ?? item.employee_name ?? "").trim() ? "auto" : "manual"}
+                          <div style={{ fontSize: 10, color: "var(--ui-text-muted)", marginTop: 2, display: "inline-flex", gap: 6, alignItems: "center" }}>
+                            {(matchConfidence === "exact" || matchConfidence === "alias") && parsedPerson ? (
+                              <span style={{ fontSize: 8, padding: "2px 7px", borderRadius: 4, background: "rgba(34,197,131,0.08)", color: "#22C583", fontWeight: 700, textTransform: "uppercase" }}>
+                                auto
+                              </span>
+                            ) : null}
+                            {matchConfidence === "fuzzy" ? (
+                              <span style={{ fontSize: 8, padding: "2px 7px", borderRadius: 4, background: "rgba(245,158,11,0.08)", color: "#F59E0B", fontWeight: 700, textTransform: "uppercase" }}>
+                                fuzzy
+                              </span>
+                            ) : null}
+                            {matchConfidence === "none" && rawPerson ? (
+                              <span style={{ fontSize: 8, padding: "2px 7px", borderRadius: 4, background: "rgba(229,72,77,0.08)", color: "#E5484D", fontWeight: 700, textTransform: "uppercase" }}>
+                                unmatched
+                              </span>
+                            ) : null}
+                            {matchConfidence === "fuzzy" && rawPerson && parsedPerson && normalize(rawPerson) !== normalize(parsedPerson) ? (
+                              <span style={{ fontSize: 9, color: "#9EA2B0" }}>(parsed as "{rawPerson}")</span>
+                            ) : null}
                           </div>
                         </div>
                         <select
@@ -645,6 +665,10 @@ function getInvoiceTotalUsd(extracted: Record<string, any>) {
 
 function round2(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function normalize(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function fmtUSD(v: number) {

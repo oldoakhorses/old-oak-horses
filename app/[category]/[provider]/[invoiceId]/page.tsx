@@ -15,6 +15,9 @@ import styles from "./invoice.module.css";
 type LineItem = {
   description?: string;
   horse_name?: string;
+  horse_name_raw?: string;
+  match_confidence?: string;
+  matchConfidence?: string;
   vet_subcategory?: string;
   total_usd?: number;
 };
@@ -258,6 +261,22 @@ export default function InvoiceReportPage() {
                     <span className={styles.badge} style={{ background: subcategoryColors[item.vet_subcategory || ""] ?? "#6B7084" }}>
                       {item.vet_subcategory || "Other"}
                     </span>
+                    {(() => {
+                      const confidence = String((item as any).matchConfidence ?? (item as any).match_confidence ?? "").toLowerCase();
+                      const raw = String((item as any).horse_name_raw ?? "").trim();
+                      const parsedName = String((item as any).horse_name ?? "").trim();
+                      if (confidence === "exact" || confidence === "alias") return <span className={styles.autoBadge}>auto</span>;
+                      if (confidence === "fuzzy") {
+                        return (
+                          <span className={styles.inlineMeta}>
+                            <span className={styles.fuzzyBadge}>fuzzy</span>
+                            {raw && parsedName && normalize(raw) !== normalize(parsedName) ? <span className={styles.rawText}>(parsed as "{raw}")</span> : null}
+                          </span>
+                        );
+                      }
+                      if (confidence === "none" && raw) return <span className={styles.unmatchedBadge}>unmatched</span>;
+                      return null;
+                    })()}
                     {isReclassCategory ? (
                       <LineItemReclassBadge
                         currentCategory={normalizeCategoryKey(categorySlug) ?? categorySlug}
@@ -406,4 +425,8 @@ function normalizeCategoryKey(value: unknown): string | null {
 
 function round2(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function normalize(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }

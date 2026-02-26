@@ -412,6 +412,9 @@ export default function StablingInvoicePage() {
                   const split = splitState[idx];
                   const splitValues = splitAmountsByIndex.get(idx) ?? [];
                   const isUnassigned = !assignment;
+                  const matchConfidence = String(item.matchConfidence ?? item.match_confidence ?? "").toLowerCase();
+                  const rawHorse = String(item.horse_name_raw ?? "").trim();
+                  const parsedHorse = String(item.horse_name ?? item.horseName ?? "").trim();
 
                   return (
                     <div key={`${idx}-${item.description || "line"}`} className={`${styles.lineRow} ${isUnassigned ? styles.unassignedRow : ""}`}>
@@ -419,7 +422,12 @@ export default function StablingInvoicePage() {
                         <div className={styles.desc}>{item.description || "—"}</div>
                         <div className={styles.lineMeta}>
                           <span className={styles.subcategoryBadge}>{titleCase(classifyStablingSubcategory(item))}</span>
-                          {String(item.horse_name ?? item.horseName ?? "").trim() ? <span className={styles.autoBadge}>auto</span> : null}
+                          {(matchConfidence === "exact" || matchConfidence === "alias") && parsedHorse ? <span className={styles.autoBadge}>auto</span> : null}
+                          {matchConfidence === "fuzzy" ? <span className={styles.fuzzyBadge}>fuzzy</span> : null}
+                          {matchConfidence === "none" && rawHorse ? <span className={styles.unmatchedBadge}>unmatched</span> : null}
+                          {matchConfidence === "fuzzy" && rawHorse && parsedHorse && normalize(rawHorse) !== normalize(parsedHorse) ? (
+                            <span className={styles.orig}>(parsed as "{rawHorse}")</span>
+                          ) : null}
                           <LineItemReclassBadge
                             currentCategory="stabling"
                             suggestedCategory={normalizeCategoryKey(item.suggestedCategory)}
@@ -706,6 +714,10 @@ function titleCase(value: string) {
     .split("-")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function normalize(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function fmtUSD(v: number) {

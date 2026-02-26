@@ -4,6 +4,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { v } from "convex/values";
 import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { matchHorseName, normalizeAliasKey } from "./matchHorse";
+import { matchPersonName } from "./matchPerson";
 
 const TRAVEL_SUBCATEGORY_SLUGS = new Set(["flights", "trains", "rental-car", "gas", "meals", "hotels"]);
 const HOUSING_SUBCATEGORY_SLUGS = new Set(["rider-housing", "groom-housing"]);
@@ -24,17 +26,6 @@ const PROVIDER_CONTACT_PROMPT = `Also extract the provider/vendor contact detail
 - website: website URL
 - accountNumber: any account number, customer number, or debtor ID
 Look in the letterhead, header, footer, and sidebar areas of the invoice for this info.`;
-const HORSE_ALIAS_MAP: Record<string, string> = {
-  ben: "Ben",
-  "ben 431": "Ben 431",
-  carlin: "Carlin",
-  gigi: "Gigi",
-  valentina: "Numero Valentina Z",
-  "numero valentina z": "Numero Valentina Z",
-  "chino 29": "Chino 29",
-  "gaby de courcel": "Gaby de Courcel"
-};
-
 export const parseBillPdf = internalAction({
   args: { billId: v.id("bills") },
   handler: async (ctx, args) => {
@@ -103,13 +94,17 @@ export const parseBillPdf = internalAction({
       if (category.slug === "feed-bedding") {
         parsed = enforceFeedBeddingClassification(parsed);
       }
-      if (category.slug === "farrier") {
-        parsed = normalizeHorseAliasesInParsedData(parsed);
-      }
       if (category.slug === "bodywork") {
         parsed = splitBodyworkEmbeddedHorseItems(parsed);
         parsed = preferBrandedProviderName(parsed);
       }
+      const [registeredHorses, registeredPeople, dynamicHorseAliases, dynamicPersonAliases] = await Promise.all([
+        ctx.runQuery(internal.bills.getAllHorsesForMatching, {}),
+        ctx.runQuery(internal.bills.getAllPeopleForMatching, {}),
+        ctx.runQuery(internal.bills.getHorseAliasesForMatching, {}),
+        ctx.runQuery(internal.bills.getPersonAliasesForMatching, {})
+      ]);
+      parsed = applyEntityMatching(parsed, registeredHorses, registeredPeople, dynamicHorseAliases, dynamicPersonAliases);
       parsed = ensureUsdAmounts(parsed);
       annotateSuggestedCategories(parsed, category.slug);
 
@@ -493,11 +488,8 @@ function enrichTravelRentalCarParse(parsed: Record<string, unknown>) {
   const driverName = pickString(normalized, ["driver_name", "driverName", "driver"]);
   if (driverName) {
     normalized.driver_name = driverName.trim();
-    const matchedPerson = matchKnownPersonName(driverName);
-    if (matchedPerson) {
-      normalized.person_name = matchedPerson;
-      normalized.assigned_person_suggestion = matchedPerson;
-    }
+    normalized.person_name = driverName.trim();
+    normalized.assigned_person_suggestion = driverName.trim();
   }
 
   const grossTotal = pickNumber(normalized, ["invoice_total_usd", "invoiceTotalUsd", "total", "original_total", "originalTotal"]);
@@ -531,29 +523,6 @@ function enrichTravelRentalCarParse(parsed: Record<string, unknown>) {
     );
   }
   return finalized;
-}
-
-function matchKnownPersonName(sourceName: string) {
-  const normalized = sourceName.trim().toLowerCase();
-  const aliases: Record<string, string> = {
-    "lucy": "Lucy Davis Kennedy",
-    "lucy davis": "Lucy Davis Kennedy",
-    "lucy davis kennedy": "Lucy Davis Kennedy",
-    "charlotte": "Charlotte Oakes",
-    "charlotte oakes": "Charlotte Oakes",
-    "leah": "Leah Knowles",
-    "leah knowles": "Leah Knowles",
-    "sigrun": "Sigrun Land",
-    "sigrun land": "Sigrun Land",
-    "johanna": "Johanna Mattila",
-    "johanna mattila": "Johanna Mattila"
-  };
-  for (const [alias, canonical] of Object.entries(aliases)) {
-    if (normalized === alias || normalized.includes(alias)) {
-      return canonical;
-    }
-  }
-  return undefined;
 }
 
 function slugify(value: string) {
@@ -622,10 +591,11 @@ function extractStablingMeta(parsed: Record<string, unknown>) {
   const horseAssignments = lineItems.map((item, index) => {
     const row = item as Record<string, unknown>;
     const horseName = pickString(row, ["horse_name", "horseName"]);
+    const matchedHorseId = pickString(row, ["matched_horse_id", "matchedHorseId"]);
     return {
       lineItemIndex: index,
       horseName,
-      horseId: undefined
+      horseId: matchedHorseId
     };
   });
 
@@ -647,10 +617,11 @@ function extractHorseTransportMeta(parsed: Record<string, unknown>, billSubcateg
   const horseAssignments = lineItems.map((item, index) => {
     const row = item as Record<string, unknown>;
     const horseName = pickString(row, ["horse_name", "horseName"]);
+    const matchedHorseId = pickString(row, ["matched_horse_id", "matchedHorseId"]);
     return {
       lineItemIndex: index,
       horseName,
-      horseId: undefined
+      horseId: matchedHorseId
     };
   });
 
@@ -693,9 +664,10 @@ function extractSalariesMeta(parsed: Record<string, unknown>, billSubcategory: s
   const personAssignments = lineItems.map((item, index) => {
     const row = item as Record<string, unknown>;
     const personName = pickString(row, ["person_name", "employee_name", "name"]);
+    const matchedPersonId = pickString(row, ["matched_person_id", "matchedPersonId"]);
     return {
       lineItemIndex: index,
-      personId: undefined,
+      personId: matchedPersonId,
       personName,
       role
     };
@@ -921,30 +893,75 @@ function enforceFeedBeddingClassification(parsed: Record<string, unknown>) {
   return normalized;
 }
 
-function normalizeHorseAliasesInParsedData(parsed: Record<string, unknown>) {
+function applyEntityMatching(
+  parsed: Record<string, unknown>,
+  registeredHorses: Array<{ _id: string; name: string }>,
+  registeredPeople: Array<{ _id: string; name: string; role: string }>,
+  dynamicHorseAliases: Array<{ alias: string; horseName: string }>,
+  dynamicPersonAliases: Array<{ alias: string; personName: string }>
+) {
   const normalized = { ...parsed };
+  const horseAliasMap = Object.fromEntries(dynamicHorseAliases.map((row) => [normalizeAliasKey(row.alias), row.horseName]));
+  const personAliasMap = Object.fromEntries(dynamicPersonAliases.map((row) => [normalizeAliasKey(row.alias), row.personName]));
   const lineItems = getLineItems(normalized).map((item) => ({ ...(item as Record<string, unknown>) }));
+
   for (const row of lineItems) {
-    const horse = pickString(row, ["horse_name", "horseName"]);
-    if (!horse) continue;
-    const alias = normalizeHorseAlias(horse);
-    if (!alias) continue;
-    row.horse_name = alias;
-    row.horseName = alias;
+    const rawHorseName = pickString(row, ["horse_name", "horseName"]);
+    if (rawHorseName) {
+      const horseMatch = matchHorseName(rawHorseName, registeredHorses, horseAliasMap);
+      row.horse_name_raw = rawHorseName;
+      row.match_confidence = horseMatch.confidence;
+      row.matchConfidence = horseMatch.confidence;
+      if (horseMatch.matchedName) {
+        row.horse_name = horseMatch.matchedName;
+        row.horseName = horseMatch.matchedName;
+      }
+      if (horseMatch.matchedId) {
+        row.matched_horse_id = horseMatch.matchedId;
+        row.matchedHorseId = horseMatch.matchedId;
+      }
+      if (horseMatch.confidence === "exact" || horseMatch.confidence === "alias") {
+        row.auto_detected = true;
+      }
+    }
+
+    const rawPersonName = pickString(row, ["person_name", "personName", "employee_name", "name"]);
+    if (rawPersonName) {
+      const personMatch = matchPersonName(rawPersonName, registeredPeople, personAliasMap);
+      row.person_name_raw = rawPersonName;
+      row.person_match_confidence = personMatch.confidence;
+      row.personMatchConfidence = personMatch.confidence;
+      if (personMatch.matchedName) {
+        row.person_name = personMatch.matchedName;
+        row.personName = personMatch.matchedName;
+      }
+      if (personMatch.matchedId) {
+        row.matched_person_id = personMatch.matchedId;
+        row.matchedPersonId = personMatch.matchedId;
+      }
+    }
   }
+
+  const topLevelPerson = pickString(normalized, ["person_name", "driver_name", "driverName", "assigned_person_suggestion"]);
+  if (topLevelPerson) {
+    const match = matchPersonName(topLevelPerson, registeredPeople, personAliasMap);
+    normalized.person_name_raw = topLevelPerson;
+    normalized.person_match_confidence = match.confidence;
+    if (match.matchedName) {
+      normalized.person_name = match.matchedName;
+      normalized.assigned_person_suggestion = match.matchedName;
+    } else {
+      normalized.person_name = topLevelPerson;
+      normalized.assigned_person_suggestion = topLevelPerson;
+    }
+    if (match.matchedId) {
+      normalized.matched_person_id = match.matchedId;
+    }
+  }
+
   normalized.line_items = lineItems;
   normalized.lineItems = lineItems;
   return normalized;
-}
-
-function normalizeHorseAlias(value: string) {
-  const source = value.trim().toLowerCase();
-  if (!source) return undefined;
-  if (HORSE_ALIAS_MAP[source]) return HORSE_ALIAS_MAP[source];
-  for (const [alias, canonical] of Object.entries(HORSE_ALIAS_MAP)) {
-    if (source === alias || source.includes(alias)) return canonical;
-  }
-  return value.trim();
 }
 
 function round2(value: number) {
