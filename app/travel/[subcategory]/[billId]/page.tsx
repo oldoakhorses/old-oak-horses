@@ -18,10 +18,12 @@ export default function TravelInvoicePage() {
   const router = useRouter();
 
   const bill = useQuery(api.bills.getBillById, billId ? { billId } : "skip");
-  const people = useQuery(api.people.getAllPeople) ?? [];
+  const peopleQuery = useQuery(api.people.list);
+  const people: any[] = peopleQuery ?? [];
+  const ensurePeopleSeeded = useMutation(api.people.ensureSeeded);
 
   const saveAssignment = useMutation(api.bills.saveTravelAssignment);
-  const approveInvoice = useMutation(api.bills.approveInvoice);
+  const approveBill = useMutation(api.bills.approveBill);
   const deleteBill = useMutation(api.bills.deleteBill);
 
   const [editing, setEditing] = useState(false);
@@ -32,6 +34,7 @@ export default function TravelInvoicePage() {
   const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [seedAttempted, setSeedAttempted] = useState(false);
 
   const extracted = (bill?.extractedData ?? {}) as any;
   const lineItems = Array.isArray(extracted.line_items) ? extracted.line_items : [];
@@ -60,6 +63,15 @@ export default function TravelInvoicePage() {
     }
     setEditing(false);
   }, [bill]);
+
+  useEffect(() => {
+    if (seedAttempted) return;
+    if (peopleQuery === undefined) return;
+    if (peopleQuery.length > 0) return;
+
+    setSeedAttempted(true);
+    void ensurePeopleSeeded();
+  }, [ensurePeopleSeeded, peopleQuery, seedAttempted]);
 
   const peopleById = useMemo(() => new Map(people.map((row) => [String(row._id), row])), [people]);
 
@@ -125,7 +137,13 @@ export default function TravelInvoicePage() {
   }
 
   async function onApprove() {
-    await approveInvoice({ billId });
+    console.log("Approve clicked, billId:", billId);
+    try {
+      await approveBill({ billId });
+      console.log("Approve mutation succeeded");
+    } catch (error) {
+      console.error("Approve mutation failed:", error);
+    }
   }
 
   async function onDelete() {
@@ -142,7 +160,7 @@ export default function TravelInvoicePage() {
           { label: subcategory, href: `/travel/${subcategory}` },
           { label: extracted.invoice_number || "invoice", current: true }
         ]}
-        actions={[{ label: "biz overview", href: "/biz-overview", variant: "filled" }]}
+        actions={bill.originalPdfUrl ? [{ label: "view original PDF", href: bill.originalPdfUrl, variant: "link", newTab: true }] : []}
       />
 
       <main className="page-main">
@@ -150,11 +168,6 @@ export default function TravelInvoicePage() {
           <Link href={`/travel/${subcategory}`} className="ui-back-link">
             ← cd /travel/{subcategory}
           </Link>
-          {bill.originalPdfUrl ? (
-            <a href={bill.originalPdfUrl} target="_blank" rel="noreferrer" className={styles.pdfLink}>
-              view original PDF
-            </a>
-          ) : null}
         </div>
 
         <section className={styles.headerCard}>
@@ -299,24 +312,6 @@ export default function TravelInvoicePage() {
           )}
         </section>
 
-        <section className={styles.lineItemsCard}>
-          <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle}>line_items</h2>
-            <span className={styles.count}>{lineItems.length} items</span>
-          </div>
-          <div className={styles.lineRows}>
-            {lineItems.map((item: any, idx: number) => (
-              <div key={`${idx}-${item.description}`} className={styles.lineRow}>
-                <div>
-                  <div className={styles.desc}>{item.description || "—"}</div>
-                  <div className={styles.orig}>{formatOriginalLine(item, bill.originalCurrency)}</div>
-                </div>
-                <div className={styles.rowAmount}>{fmtUSD(typeof item.total_usd === "number" ? item.total_usd : 0)}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
         <section className={styles.approvalRow}>
           {bill.isApproved ? (
             <div className={styles.approvedBox}>✓ invoice approved</div>
@@ -400,13 +395,6 @@ function formatOriginal(currency: string | undefined, originalTotal: number | un
   if (!currency || currency === "USD") return fmtUSD(invoiceTotal);
   if (typeof originalTotal !== "number") return `${currency} —`;
   return formatMoneyWithCurrency(currency, originalTotal);
-}
-
-function formatOriginalLine(item: any, currency: string | undefined) {
-  if (!currency || currency === "USD") return "USD";
-  const original = typeof item.amount_original === "number" ? item.amount_original : typeof item.total_original === "number" ? item.total_original : null;
-  if (original === null) return `${currency} —`;
-  return formatMoneyWithCurrency(currency, original);
 }
 
 function formatMoneyWithCurrency(currency: string, amount: number) {

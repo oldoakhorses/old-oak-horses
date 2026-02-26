@@ -1,0 +1,134 @@
+.header {
+  margin-bottom: 18px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  margin: 8px 0 0;
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.owner {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #6b7084;
+}
+
+.activeBadge,
+.inactiveBadge,
+.soldBadge {
+  font-size: 10px;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+.activeBadge {
+  background: rgba(34, 197, 131, 0.08);
+  color: #22c583;
+}
+
+.inactiveBadge {
+  background: #f0f1f5;
+  color: #9ea2b0;
+}
+
+.soldBadge {
+  background: rgba(229, 72, 77, 0.08);
+  color: #e5484d;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 22px 26px;
+  margin-bottom: 20px;
+}
+
+.cardHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.cardTitle {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.fieldLabel {
+  font-size: 10px;
+  color: #9ea2b0;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.fieldValue {
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.fieldInput input,
+.fieldInput select {
+  width: 100%;
+  background: #f2f3f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  padding: 12px 16px;
+  font-size: 13px;
+}
+
+.actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.totalSpend {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.breakdown {
+  margin-top: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.breakdownRow {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid #f0f1f5;
+  padding: 8px 0;
+}
+
+.invoices {
+  margin-top: 12px;
+}
+
+.invoiceRow {
+  display: grid;
+  grid-template-columns: 1fr 140px 140px;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f1f5;
+  text-decoration: none;
+}
+
+.invoiceRow:hover {
+  background: #fafafc;
+}

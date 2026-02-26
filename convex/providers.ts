@@ -44,6 +44,10 @@ export const getProviderBySlug = query({
     providerSlug: v.string()
   },
   handler: async (ctx, args) => {
+    const slugAliases: Record<string, string> = {
+      "fred-michaelson": "fred-michelon"
+    };
+    const requestedSlug = slugAliases[args.providerSlug] ?? args.providerSlug;
     const category = await ctx.db
       .query("categories")
       .withIndex("by_slug", (q) => q.eq("slug", args.categorySlug))
@@ -52,7 +56,7 @@ export const getProviderBySlug = query({
 
     const provider = await ctx.db
       .query("providers")
-      .withIndex("by_slug", (q) => q.eq("slug", args.providerSlug))
+      .withIndex("by_slug", (q) => q.eq("slug", requestedSlug))
       .filter((q) => q.eq(q.field("categoryId"), category._id))
       .first();
     if (!provider) {
@@ -60,7 +64,7 @@ export const getProviderBySlug = query({
         .query("providers")
         .withIndex("by_category", (q) => q.eq("categoryId", category._id))
         .collect();
-      const fallback = categoryProviders.find((entry) => slugify(entry.name) === args.providerSlug);
+      const fallback = categoryProviders.find((entry) => slugify(entry.name) === requestedSlug);
       if (!fallback) return null;
       return {
         ...fallback,
@@ -152,11 +156,13 @@ export const updateProviderContact = mutation({
   args: {
     providerId: v.id("providers"),
     fullName: v.optional(v.string()),
+    contactName: v.optional(v.string()),
     primaryContactName: v.optional(v.string()),
     primaryContactPhone: v.optional(v.string()),
     address: v.optional(v.string()),
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
+    website: v.optional(v.string()),
     accountNumber: v.optional(v.string())
   },
   handler: async (ctx, args) => {

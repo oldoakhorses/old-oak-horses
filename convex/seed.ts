@@ -445,10 +445,23 @@ export const seedCategories = mutation(async (ctx) => {
 
   const bodyworkProviders = [
     { name: "Steve Engle", slug: "steve-engle" },
-    { name: "Fred Michaelson", slug: "fred-michaelson" },
+    { name: "Fred Michelon", slug: "fred-michelon" },
     { name: "Janice", slug: "janice" },
     { name: "Inga Pavling", slug: "inga-pavling" }
   ] as const;
+
+  const legacyFred = await ctx.db
+    .query("providers")
+    .withIndex("by_category_name", (q) => q.eq("categoryId", bodyworkCategory._id).eq("name", "Fred Michaelson"))
+    .first();
+  if (legacyFred) {
+    await ctx.db.patch(legacyFred._id, {
+      name: "Fred Michelon",
+      slug: "fred-michelon",
+      updatedAt: Date.now()
+    });
+    updatedProviders += 1;
+  }
 
   for (const provider of bodyworkProviders) {
     const existingProvider = await ctx.db

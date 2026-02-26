@@ -657,13 +657,19 @@ export const getFeedBeddingBills = query({
         const lineItems = getLineItems(bill.extractedData);
         let feedTotal = 0;
         let beddingTotal = 0;
+        let adminTotal = 0;
         for (const item of lineItems) {
           if (!item || typeof item !== "object") continue;
           const record = item as Record<string, unknown>;
           const subcategory = slugify(String(record.subcategory ?? ""));
           const amount = getLineItemTotalUsd(record);
-          if (subcategory === "bedding") beddingTotal += amount;
-          else feedTotal += amount;
+          if (subcategory === "bedding") {
+            beddingTotal += amount;
+          } else if (subcategory === "admin") {
+            adminTotal += amount;
+          } else {
+            feedTotal += amount;
+          }
         }
         return {
           ...bill,
@@ -674,6 +680,7 @@ export const getFeedBeddingBills = query({
           totalUsd: getInvoiceTotalUsdFromAny(bill.extractedData),
           feedTotal,
           beddingTotal,
+          adminTotal,
           lineItemCount: lineItems.length,
           approvalStatus: bill.status === "done" && bill.isApproved ? "approved" : "pending"
         };
@@ -715,7 +722,7 @@ export const updateFeedBeddingLineItemSubcategory = mutation({
   args: {
     billId: v.id("bills"),
     lineItemIndex: v.number(),
-    subcategory: v.union(v.literal("feed"), v.literal("bedding"))
+    subcategory: v.union(v.literal("feed"), v.literal("bedding"), v.literal("admin"))
   },
   handler: async (ctx, args) => {
     const bill = await ctx.db.get(args.billId);
@@ -1209,21 +1216,25 @@ export const updateProviderContactInfo = internalMutation({
   args: {
     providerId: v.id("providers"),
     fullName: v.optional(v.string()),
+    contactName: v.optional(v.string()),
     primaryContactName: v.optional(v.string()),
     primaryContactPhone: v.optional(v.string()),
     address: v.optional(v.string()),
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
+    website: v.optional(v.string()),
     accountNumber: v.optional(v.string())
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.providerId, {
       fullName: args.fullName,
+      contactName: args.contactName,
       primaryContactName: args.primaryContactName,
       primaryContactPhone: args.primaryContactPhone,
       address: args.address,
       phone: args.phone,
       email: args.email,
+      website: args.website,
       accountNumber: args.accountNumber,
       updatedAt: Date.now()
     });
@@ -1242,6 +1253,17 @@ export const markDone = internalMutation({
     salariesSubcategory: v.optional(v.string()),
     providerId: v.optional(v.id("providers")),
     customProviderName: v.optional(v.string()),
+    extractedProviderContact: v.optional(
+      v.object({
+        providerName: v.optional(v.string()),
+        contactName: v.optional(v.string()),
+        address: v.optional(v.string()),
+        phone: v.optional(v.string()),
+        email: v.optional(v.string()),
+        website: v.optional(v.string()),
+        accountNumber: v.optional(v.string())
+      })
+    ),
     horseAssignments: v.optional(
       v.array(
         v.object({
@@ -1307,6 +1329,7 @@ export const markDone = internalMutation({
       salariesSubcategory: args.salariesSubcategory,
       providerId: args.providerId,
       customProviderName: args.customProviderName,
+      extractedProviderContact: args.extractedProviderContact,
       horseAssignments: args.horseAssignments,
       splitLineItems: args.splitLineItems,
       personAssignments: args.personAssignments,
@@ -1443,17 +1466,28 @@ export const saveSalaryAssignment = mutation({
   }
 });
 
+async function approveBillById(ctx: any, billId: Id<"bills">) {
+  const bill = await ctx.db.get(billId);
+  if (!bill) throw new Error("Bill not found");
+  await ctx.db.patch(billId, {
+    isApproved: true,
+    approvedAt: Date.now(),
+    status: "done"
+  });
+  return billId;
+}
+
+export const approveBill = mutation({
+  args: { billId: v.id("bills") },
+  handler: async (ctx, args) => {
+    return await approveBillById(ctx, args.billId);
+  }
+});
+
 export const approveInvoice = mutation({
   args: { billId: v.id("bills") },
   handler: async (ctx, args) => {
-    const bill = await ctx.db.get(args.billId);
-    if (!bill) throw new Error("Bill not found");
-    await ctx.db.patch(args.billId, {
-      isApproved: true,
-      approvedAt: Date.now(),
-      status: "done"
-    });
-    return args.billId;
+    return await approveBillById(ctx, args.billId);
   }
 });
 

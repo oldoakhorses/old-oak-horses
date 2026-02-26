@@ -31,11 +31,13 @@ export default defineSchema({
     name: v.string(),
     slug: v.optional(v.string()),
     fullName: v.optional(v.string()),
+    contactName: v.optional(v.string()),
     primaryContactName: v.optional(v.string()),
     primaryContactPhone: v.optional(v.string()),
     address: v.optional(v.string()),
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
+    website: v.optional(v.string()),
     accountNumber: v.optional(v.string()),
     extractionPrompt: v.string(),
     expectedFields: v.array(v.string()),
@@ -155,6 +157,18 @@ export default defineSchema({
       )
     ),
     linkedFromBillId: v.optional(v.id("bills"))
+    ,
+    extractedProviderContact: v.optional(
+      v.object({
+        providerName: v.optional(v.string()),
+        contactName: v.optional(v.string()),
+        address: v.optional(v.string()),
+        phone: v.optional(v.string()),
+        email: v.optional(v.string()),
+        website: v.optional(v.string()),
+        accountNumber: v.optional(v.string())
+      })
+    )
   })
     .index("by_uploadedAt", ["uploadedAt"])
     .index("by_provider", ["providerId"])
@@ -165,14 +179,15 @@ export default defineSchema({
     yearOfBirth: v.optional(v.number()),
     usefNumber: v.optional(v.string()),
     feiNumber: v.optional(v.string()),
-    status: v.union(v.literal("active"), v.literal("past")),
-    leftStableDate: v.optional(v.string()),
+    owner: v.optional(v.string()),
+    status: v.union(v.literal("active"), v.literal("inactive"), v.literal("past")),
+    isSold: v.optional(v.boolean()),
+    soldDate: v.optional(v.number()),
     createdAt: v.number()
   })
     .index("by_name", ["name"])
     .index("by_status", ["status"])
-    .index("by_status_name", ["status", "name"])
-    .index("by_status_left_stable", ["status", "leftStableDate"]),
+    .index("by_status_name", ["status", "name"]),
 
   contacts: defineTable({
     name: v.string(),

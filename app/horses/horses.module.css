@@ -1,0 +1,207 @@
+.header {
+  margin-bottom: 18px;
+}
+
+.title {
+  margin: 8px 0 0;
+  font-size: 36px;
+  font-weight: 700;
+}
+
+.filters {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.tabs {
+  display: inline-flex;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tab,
+.tabActive {
+  border: none;
+  background: #fff;
+  color: #9ea2b0;
+  padding: 7px 16px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.tabActive {
+  background: #1a1a2e;
+  color: #fff;
+  font-weight: 700;
+}
+
+.yearFilter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: #9ea2b0;
+  letter-spacing: 0.1em;
+}
+
+.yearFilter select {
+  background: #f2f3f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #1a1a2e;
+}
+
+.tableCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 0 26px;
+}
+
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 200px 80px 100px 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0;
+  border-bottom: 1px solid #f0f1f5;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row:hover {
+  background: #fafafc;
+}
+
+.nameCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.horseLink {
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.owner,
+.year {
+  font-size: 12px;
+  color: #6b7084;
+}
+
+.year {
+  font-family: "Space Mono", monospace;
+}
+
+.activeBadge,
+.inactiveBadge,
+.soldBadge {
+  font-size: 10px;
+  border-radius: 4px;
+  padding: 2px 8px;
+  text-transform: lowercase;
+}
+
+.activeBadge {
+  background: rgba(34, 197, 131, 0.08);
+  color: #22c583;
+}
+
+.inactiveBadge {
+  background: #f0f1f5;
+  color: #9ea2b0;
+}
+
+.soldBadge {
+  background: rgba(229, 72, 77, 0.08);
+  color: #e5484d;
+}
+
+.menuWrap {
+  position: relative;
+}
+
+.menuButton {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #9ea2b0;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.menuButton:hover {
+  background: #f2f3f7;
+}
+
+.menuDropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  padding: 6px 0;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 20;
+}
+
+.menuItem {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: #6b7084;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.menuItem:hover {
+  background: #fafafc;
+}
+
+.menuItemDanger {
+  color: #e5484d;
+}
+
+.menuDivider {
+  border-top: 1px solid #e8eaf0;
+  margin: 4px 0;
+}
+
+.confirmSold {
+  padding: 8px 12px 10px;
+  border-top: 1px solid #e8eaf0;
+}
+
+.confirmSold p {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: #6b7084;
+}
+
+.confirmActions {
+  display: flex;
+  gap: 8px;
+}

@@ -1,0 +1,254 @@
+.headerCard {
+  background: #ffffff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 26px 30px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.invoiceLabel {
+  font-size: 10px;
+  color: #9ea2b0;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.providerName {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 16px;
+}
+
+.detailsRow {
+  display: flex;
+  gap: 32px;
+}
+
+.detailLabel {
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.detailValue {
+  font-size: 12px;
+  color: #1a1a2e;
+}
+
+.totalRight {
+  text-align: right;
+}
+
+.totalLabel {
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.totalAmount {
+  font-size: 32px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.totalMeta {
+  font-size: 10px;
+  color: #9ea2b0;
+  margin-top: 6px;
+}
+
+.horseCard {
+  background: #ffffff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 22px 26px;
+  margin-bottom: 12px;
+}
+
+.horseCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.horseLeft {
+  display: flex;
+  align-items: center;
+}
+
+.horseEmoji {
+  font-size: 18px;
+  margin-right: 10px;
+}
+
+.horseName {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.autoBadge {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(34, 197, 131, 0.08);
+  color: #22c583;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-left: 10px;
+}
+
+.horseRight {
+  display: flex;
+  align-items: center;
+}
+
+.horseTotal {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.horseEditBtn {
+  font-family: "Space Mono", "SF Mono", Menlo, monospace;
+  font-size: 9px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #9ea2b0;
+  cursor: pointer;
+  margin-left: 10px;
+}
+
+.horseLine {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-top: 1px solid #f0f1f5;
+  font-size: 12px;
+}
+
+.horseLineAmount {
+  font-weight: 700;
+}
+
+.approveDeleteRow {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  margin-top: 8px;
+}
+
+.approveBtn {
+  flex: 1;
+  padding: 14px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #22c583;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 12px;
+  font-family: "Space Mono", "SF Mono", Menlo, monospace;
+  cursor: pointer;
+}
+
+.deleteBtn {
+  padding: 14px 20px;
+  border-radius: 8px;
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #6b7084;
+  font-size: 12px;
+  font-family: "Space Mono", "SF Mono", Menlo, monospace;
+  cursor: pointer;
+}
+
+.deleteBtn:hover {
+  border-color: #e5484d;
+  color: #e5484d;
+}
+
+.approvedBar {
+  background: rgba(34, 197, 131, 0.08);
+  border: 1px solid #22c583;
+  border-radius: 8px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #22c583;
+  flex: 1;
+}
+
+.footerBar {
+  background: #1a1a2e;
+  border-radius: 10px;
+  padding: 20px 26px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.footerStats {
+  display: flex;
+  gap: 28px;
+}
+
+.footerStatLabel {
+  font-size: 8px;
+  color: #6b7084;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.footerStatValue {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.totalBlock {
+  text-align: right;
+}
+
+.totalDueLabel {
+  font-size: 8px;
+  color: #6b7084;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.totalDueValue {
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.modalText {
+  margin-top: 0;
+  color: #6b7084;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}

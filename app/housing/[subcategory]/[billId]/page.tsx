@@ -18,10 +18,10 @@ export default function HousingInvoicePage() {
   const router = useRouter();
 
   const bill = useQuery(api.bills.getBillById, billId ? { billId } : "skip");
-  const people = useQuery(api.people.getAllPeople) ?? [];
+  const people: any[] = useQuery(api.people.getAllPeople) ?? [];
 
   const saveAssignment = useMutation(api.bills.savePersonAssignment);
-  const approveInvoice = useMutation(api.bills.approveInvoice);
+  const approveBill = useMutation(api.bills.approveBill);
   const deleteBill = useMutation(api.bills.deleteBill);
 
   const [editing, setEditing] = useState(false);
@@ -125,7 +125,13 @@ export default function HousingInvoicePage() {
   }
 
   async function onApprove() {
-    await approveInvoice({ billId });
+    console.log("Approve clicked, billId:", billId);
+    try {
+      await approveBill({ billId });
+      console.log("Approve mutation succeeded");
+    } catch (error) {
+      console.error("Approve mutation failed:", error);
+    }
   }
 
   async function onDelete() {
@@ -142,7 +148,7 @@ export default function HousingInvoicePage() {
           { label: subcategory, href: `/housing/${subcategory}` },
           { label: extracted.invoice_number || "invoice", current: true }
         ]}
-        actions={[{ label: "biz overview", href: "/biz-overview", variant: "filled" }]}
+        actions={bill.originalPdfUrl ? [{ label: "view original PDF", href: bill.originalPdfUrl, variant: "link", newTab: true }] : []}
       />
 
       <main className="page-main">
@@ -150,11 +156,6 @@ export default function HousingInvoicePage() {
           <Link href={`/housing/${subcategory}`} className="ui-back-link">
             ← cd /housing/{subcategory}
           </Link>
-          {bill.originalPdfUrl ? (
-            <a href={bill.originalPdfUrl} target="_blank" rel="noreferrer" className={styles.pdfLink}>
-              view original PDF
-            </a>
-          ) : null}
         </div>
 
         <section className={styles.headerCard}>

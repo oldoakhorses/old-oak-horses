@@ -152,6 +152,10 @@
   text-transform: lowercase;
 }
 
+.horsesTitle a {
+  text-decoration: none;
+}
+
 .count {
   font-size: 10px;
   color: var(--color-text-muted);
@@ -189,6 +193,13 @@
   color: var(--color-text);
 }
 
+.horseOwner {
+  margin-top: -8px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
 .metaGrid {
   display: grid;
   gap: 10px;
@@ -206,6 +217,16 @@
   margin-top: 3px;
   font-size: 13px;
   color: var(--color-text);
+}
+
+.soldBadge {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 9px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(229, 72, 77, 0.08);
+  color: #e5484d;
 }
 
 .addCard {

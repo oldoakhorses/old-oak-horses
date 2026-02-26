@@ -19,6 +19,7 @@ type HorseFormState = {
   yearOfBirth: string;
   usefNumber: string;
   feiNumber: string;
+  owner: string;
 };
 
 type ContactFormState = {
@@ -47,6 +48,7 @@ const initialHorseForm: HorseFormState = {
   yearOfBirth: "",
   usefNumber: "",
   feiNumber: "",
+  owner: "",
 };
 
 const initialContactForm: ContactFormState = {
@@ -80,7 +82,7 @@ export default function DashboardPage() {
   const [formError, setFormError] = useState("");
 
   const activeHorses = useQuery(api.horses.getActiveHorses) ?? [];
-  const pastHorses = useQuery(api.horses.getPastHorses) ?? [];
+  const pastHorses = useQuery(api.horses.getInactiveHorses) ?? [];
   const contacts = useQuery(api.contacts.getAllContacts) ?? [];
   const upcomingEvents = useQuery(api.scheduleEvents.getUpcomingEvents) ?? [];
 
@@ -108,6 +110,7 @@ export default function DashboardPage() {
         yearOfBirth: horseForm.yearOfBirth ? Number(horseForm.yearOfBirth) : undefined,
         usefNumber: horseForm.usefNumber || undefined,
         feiNumber: horseForm.feiNumber || undefined,
+        owner: horseForm.owner || undefined,
       });
       setHorseForm(initialHorseForm);
       setShowHorseModal(false);
@@ -261,7 +264,9 @@ export default function DashboardPage() {
         <section className={styles.horsesSection}>
           <div className={styles.horsesHead}>
             <div className={styles.horsesLeft}>
-              <h2 className={styles.horsesTitle}>horses</h2>
+              <h2 className={styles.horsesTitle}>
+                <Link href="/horses">horses</Link>
+              </h2>
               <FilterTabs
                 value={horseView}
                 onChange={setHorseView}
@@ -279,12 +284,14 @@ export default function DashboardPage() {
               <Link href={`/horses/${horse._id}`} key={horse._id} className={styles.horseCard}>
                 <div className={styles.horseAvatar}>🐴</div>
                 <h3 className={styles.horseName}>{horse.name}</h3>
+                <div className={styles.horseOwner}>{horse.owner || "—"}</div>
                 <div className={styles.metaGrid}>
                   <Meta label="YEAR" value={horse.yearOfBirth ? String(horse.yearOfBirth) : "—"} />
                   <Meta label="USEF #" value={horse.usefNumber || "—"} />
                   <Meta label="FEI #" value={horse.feiNumber || "—"} />
-                  {horse.status === "past" ? <Meta label="LEFT STABLE" value={horse.leftStableDate || "—"} /> : null}
+                  {horseView === "past" && horse.isSold ? <Meta label="STATUS" value="sold" /> : null}
                 </div>
+                {horseView === "past" && horse.isSold ? <span className={styles.soldBadge}>sold</span> : null}
               </Link>
             ))}
 
@@ -321,6 +328,9 @@ export default function DashboardPage() {
               <input className={styles.input} value={horseForm.feiNumber} onChange={(e) => setHorseForm((p) => ({ ...p, feiNumber: e.target.value }))} />
             </Field>
           </div>
+          <Field label="owner">
+            <input className={styles.input} value={horseForm.owner} onChange={(e) => setHorseForm((p) => ({ ...p, owner: e.target.value }))} />
+          </Field>
           <ModalActions loading={isSubmitting} submitLabel="add horse" onCancel={() => setShowHorseModal(false)} error={formError} />
         </form>
       </Modal>

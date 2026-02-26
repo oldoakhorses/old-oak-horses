@@ -319,13 +319,19 @@ export default function StablingInvoicePage() {
   }
 
   async function onApprove() {
-    await approveInvoiceWithReclassification({
-      billId,
-      lineItemDecisions: lineItems.map((_: any, index: number) => ({
-        lineItemIndex: index,
-        confirmedCategory: lineCategoryDecisions[index] ?? undefined
-      }))
-    });
+    console.log("Approve clicked, billId:", billId);
+    try {
+      await approveInvoiceWithReclassification({
+        billId,
+        lineItemDecisions: lineItems.map((_: any, index: number) => ({
+          lineItemIndex: index,
+          confirmedCategory: lineCategoryDecisions[index] ?? undefined
+        }))
+      });
+      console.log("Approve mutation succeeded");
+    } catch (error) {
+      console.error("Approve mutation failed:", error);
+    }
   }
 
   async function onDelete() {
@@ -342,7 +348,7 @@ export default function StablingInvoicePage() {
           { label: providerSlug, href: `/stabling/${providerSlug}` },
           { label: extracted.invoice_number || "invoice", current: true }
         ]}
-        actions={[{ label: "biz overview", href: "/biz-overview", variant: "filled" }]}
+        actions={bill.originalPdfUrl ? [{ label: "view original PDF", href: bill.originalPdfUrl, variant: "link", newTab: true }] : []}
       />
 
       <main className="page-main">
@@ -350,11 +356,6 @@ export default function StablingInvoicePage() {
           <Link href={`/stabling/${providerSlug}`} className="ui-back-link">
             ← cd /stabling/{providerSlug}
           </Link>
-          {bill.originalPdfUrl ? (
-            <a href={bill.originalPdfUrl} target="_blank" rel="noreferrer" className={styles.pdfLink}>
-              view original PDF
-            </a>
-          ) : null}
         </div>
 
         <section className={styles.headerCard}>

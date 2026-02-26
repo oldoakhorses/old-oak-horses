@@ -106,6 +106,10 @@ export const parseBillPdf = internalAction({
       if (category.slug === "farrier") {
         parsed = normalizeHorseAliasesInParsedData(parsed);
       }
+      if (category.slug === "bodywork") {
+        parsed = splitBodyworkEmbeddedHorseItems(parsed);
+        parsed = preferBrandedProviderName(parsed);
+      }
       parsed = ensureUsdAmounts(parsed);
       annotateSuggestedCategories(parsed, category.slug);
 
@@ -466,6 +470,8 @@ function normalizeLineItem(item: unknown) {
     normalized.total_usd = amountUsd;
   } else if (typeof amountOriginal === "number") {
     normalized.total_usd = amountOriginal;
+  } else if (typeof quantity === "number" && typeof unitPrice === "number") {
+    normalized.total_usd = round2(quantity * unitPrice);
   }
   if (horseName) normalized.horse_name = horseName;
   if (personName) normalized.person_name = personName;
@@ -792,6 +798,18 @@ Return strict JSON.`;
   if (categorySlug === "bodywork") {
     return `Extract from this bodywork/chiropractic/massage invoice: invoice_number, invoice_date, due_date, provider_name, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, horse_name (if identifiable), quantity, unit_price, total_usd.
 
+Provider naming rules:
+- Prefer the branded or trading name shown in logo/header/"Billed From" for provider_name.
+- Do NOT use legal entity numbers or corporation names as provider_name when a branded name exists.
+
+Horse extraction rules:
+- Horse names may appear on a separate line below service description.
+- Horse names may appear comma-separated in description/activity fields (e.g., "Ben, Gaby + follow ups").
+- When one row mentions multiple horses, split it into separate line_items, one per horse.
+- Split amount evenly when quantity matches horse count; otherwise split total evenly across detected horses.
+- Preserve extra notes in description (e.g., output description: "Body work US + follow ups").
+- Mark auto-detected horse rows with auto_detected=true.
+
 ${PROVIDER_CONTACT_PROMPT}
 Return strict JSON.`;
   }
@@ -931,4 +949,106 @@ function normalizeHorseAlias(value: string) {
 
 function round2(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function splitBodyworkEmbeddedHorseItems(parsed: Record<string, unknown>) {
+  const normalized = { ...parsed };
+  const lineItems = getLineItems(normalized).map((item) => ({ ...(item as Record<string, unknown>) }));
+  const splitItems: Array<Record<string, unknown>> = [];
+
+  for (const row of lineItems) {
+    const baseDescription = pickString(row, ["description"]) ?? "Line item";
+    const horseField = pickString(row, ["horse_name", "horseName", "activity", "notes", "detail", "details"]) ?? "";
+    const combined = `${baseDescription} ${horseField}`.toLowerCase();
+    const detected = detectBodyworkHorseNames(combined);
+    const amount = pickNumber(row, ["total_usd", "amount_usd", "amount", "total", "amount_original", "originalAmount"]) ?? 0;
+    const quantity = pickNumber(row, ["quantity", "qty"]) ?? undefined;
+    const extras = stripHorseNamesFromText(horseField);
+    const description = extras ? `${baseDescription} ${extras}`.replace(/\s+/g, " ").trim() : baseDescription;
+
+    if (detected.length > 1 && amount > 0) {
+      const perHorse = round2(amount / detected.length);
+      const remainder = round2(amount - perHorse * detected.length);
+      detected.forEach((horseName, index) => {
+        splitItems.push({
+          ...row,
+          description,
+          horse_name: horseName,
+          horseName,
+          quantity: quantity && quantity >= detected.length ? 1 : quantity,
+          total_usd: index === detected.length - 1 ? round2(perHorse + remainder) : perHorse,
+          auto_detected: true
+        });
+      });
+      continue;
+    }
+
+    if (detected.length === 1) {
+      splitItems.push({
+        ...row,
+        description,
+        horse_name: detected[0],
+        horseName: detected[0],
+        auto_detected: true
+      });
+      continue;
+    }
+
+    splitItems.push(row);
+  }
+
+  normalized.line_items = splitItems;
+  normalized.lineItems = splitItems;
+  return normalized;
+}
+
+function detectBodyworkHorseNames(text: string) {
+  const horses = ["ben", "carlin", "gigi", "valentina", "gaby", "gaby de courcel", "numero valentina z", "chino 29"];
+  const found: string[] = [];
+  for (const horse of horses) {
+    const pattern = new RegExp(`\\b${escapeRegex(horse)}\\b`, "i");
+    if (!pattern.test(text)) continue;
+    if (horse === "valentina") {
+      found.push("Numero Valentina Z");
+      continue;
+    }
+    if (horse === "gaby de courcel") {
+      if (!found.includes("Gaby")) found.push("Gaby");
+      continue;
+    }
+    const label = horse
+      .split(" ")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+    if (!found.includes(label)) found.push(label);
+  }
+  return found;
+}
+
+function stripHorseNamesFromText(text: string) {
+  if (!text) return "";
+  let cleaned = text;
+  const horsePatterns = ["ben", "carlin", "gigi", "valentina", "gaby", "gaby de courcel", "numero valentina z", "chino 29"];
+  for (const horse of horsePatterns) {
+    cleaned = cleaned.replace(new RegExp(`\\b${escapeRegex(horse)}\\b`, "ig"), "");
+  }
+  cleaned = cleaned.replace(/^[,\s+/-]+|[,\s+/-]+$/g, "");
+  return cleaned.length > 0 ? cleaned : "";
+}
+
+function preferBrandedProviderName(parsed: Record<string, unknown>) {
+  const normalized = { ...parsed };
+  const providerName = pickString(normalized, ["provider_name", "providerName"]);
+  const contactName = pickString(normalized, ["contactName", "contact_name", "provider_contact_name"]);
+  if (!providerName) return normalized;
+  const looksLegalEntity = /\b(inc|llc|limited|ltd|corp|corporation|ontario)\b/i.test(providerName) || /^\d{6,}/.test(providerName.trim());
+  if (looksLegalEntity && contactName) {
+    normalized.provider_name = contactName;
+    normalized.providerName = contactName;
+  }
+  return normalized;
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

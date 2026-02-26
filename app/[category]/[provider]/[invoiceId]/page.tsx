@@ -178,7 +178,7 @@ export default function InvoiceReportPage() {
           { label: providerSlug, href: `/${categorySlug}/${providerSlug}` },
           { label: extracted.invoice_number || "invoice", current: true },
         ]}
-        actions={[{ label: "biz overview", href: "/biz-overview", variant: "filled" }]}
+        actions={bill?.originalPdfUrl ? [{ label: "view original PDF", href: bill.originalPdfUrl, variant: "link", newTab: true }] : []}
       />
 
       <main className="page-main">
@@ -186,16 +186,6 @@ export default function InvoiceReportPage() {
           <Link href={`/${categorySlug}/${providerSlug}`} className="ui-back-link">
             ← cd /{providerSlug}
           </Link>
-          <div className={styles.topActions}>
-            {bill?.originalPdfUrl ? (
-              <a href={bill.originalPdfUrl} target="_blank" rel="noreferrer" className={styles.pdfLink}>
-                view original PDF
-              </a>
-            ) : null}
-            <Link href="/upload" className="ui-button-filled">
-              upload another
-            </Link>
-          </div>
         </div>
 
         <section className={styles.headerCard}>
@@ -293,7 +283,7 @@ export default function InvoiceReportPage() {
           />
         ) : null}
 
-        <section className="ui-card" style={{ marginTop: 16, display: "flex", gap: 10 }}>
+        <div style={{ marginTop: 16, marginBottom: 20, display: "flex", gap: 10 }}>
           {bill?.status === "done" ? (
             <div
               style={{
@@ -325,7 +315,7 @@ export default function InvoiceReportPage() {
           <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(true)}>
             delete
           </button>
-        </section>
+        </div>
 
         <section className={styles.summaryBar}>
           <div className={styles.summaryLeft}>

@@ -21,7 +21,7 @@ export default function MarketingInvoicePage() {
   const billId = params?.billId ?? "";
 
   const bill = useQuery(api.bills.getBillById, billId ? { billId: billId as any } : "skip");
-  const approveInvoice = useMutation(api.bills.approveInvoice);
+  const approveBill = useMutation(api.bills.approveBill);
   const deleteBill = useMutation(api.bills.deleteBill);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -39,7 +39,13 @@ export default function MarketingInvoicePage() {
 
   async function onApprove() {
     if (!bill) return;
-    await approveInvoice({ billId: bill._id });
+    console.log("Approve clicked, billId:", bill._id);
+    try {
+      await approveBill({ billId: bill._id });
+      console.log("Approve mutation succeeded");
+    } catch (error) {
+      console.error("Approve mutation failed:", error);
+    }
   }
 
   async function onDelete() {
@@ -57,18 +63,13 @@ export default function MarketingInvoicePage() {
           { label: subcategory, href: `/marketing/${subcategory}` },
           { label: String(extracted.invoice_number ?? "invoice"), current: true }
         ]}
-        actions={[{ label: "biz overview", href: "/biz-overview", variant: "filled" }]}
+        actions={bill?.originalPdfUrl ? [{ label: "view original PDF", href: bill.originalPdfUrl, variant: "link", newTab: true }] : []}
       />
       <main className="page-main">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <Link className="ui-back-link" href={`/marketing/${subcategory}`}>
             ← cd /{subcategory}
           </Link>
-          {bill?.originalPdfUrl ? (
-            <a href={bill.originalPdfUrl} target="_blank" rel="noreferrer">
-              view original PDF
-            </a>
-          ) : null}
         </div>
 
         <section className="ui-card">
@@ -118,14 +119,34 @@ export default function MarketingInvoicePage() {
           )}
         </section>
 
-        <section className="ui-card" style={{ marginTop: 16, display: "flex", gap: 10 }}>
-          <button type="button" className="ui-button-filled" onClick={onApprove} disabled={bill?.status === "done"}>
-            approve invoice
-          </button>
+        <div style={{ marginTop: 16, marginBottom: 20, display: "flex", gap: 10 }}>
+          {bill?.status === "done" ? (
+            <div
+              style={{
+                flex: 1,
+                background: "rgba(34, 197, 131, 0.08)",
+                border: "1px solid #22C583",
+                borderRadius: 8,
+                padding: "14px 20px",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#22C583"
+              }}
+            >
+              ✓ invoice approved
+            </div>
+          ) : (
+            <button type="button" className="ui-button-filled" onClick={onApprove} style={{ background: "#22C583", borderColor: "#22C583" }}>
+              approve invoice
+            </button>
+          )}
           <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(true)}>
             delete
           </button>
-        </section>
+        </div>
 
         <section
           style={{

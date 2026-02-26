@@ -34,7 +34,7 @@ export default function SalariesInvoicePage() {
   const people: any[] = useQuery(api.people.getAllPeople) ?? [];
 
   const saveSalaryAssignment = useMutation(api.bills.saveSalaryAssignment);
-  const approveInvoice = useMutation(api.bills.approveInvoice);
+  const approveBill = useMutation(api.bills.approveBill);
   const deleteBill = useMutation(api.bills.deleteBill);
 
   const [editing, setEditing] = useState(false);
@@ -286,7 +286,13 @@ export default function SalariesInvoicePage() {
   }
 
   async function onApprove() {
-    await approveInvoice({ billId });
+    console.log("Approve clicked, billId:", billId);
+    try {
+      await approveBill({ billId });
+      console.log("Approve mutation succeeded");
+    } catch (error) {
+      console.error("Approve mutation failed:", error);
+    }
   }
 
   async function onDelete() {
@@ -310,7 +316,7 @@ export default function SalariesInvoicePage() {
           { label: subcategory, href: `/salaries/${subcategory}` },
           { label: String(extracted.invoice_number ?? "invoice"), current: true }
         ]}
-        actions={[{ label: "biz overview", href: "/biz-overview", variant: "filled" }]}
+        actions={bill.originalPdfUrl ? [{ label: "view original PDF", href: bill.originalPdfUrl, variant: "link", newTab: true }] : []}
       />
 
       <main className="page-main">
@@ -318,11 +324,6 @@ export default function SalariesInvoicePage() {
           <Link href={`/salaries/${subcategory}`} className="ui-back-link">
             ← cd /salaries/{subcategory}
           </Link>
-          {bill.originalPdfUrl ? (
-            <a href={bill.originalPdfUrl} target="_blank" rel="noreferrer">
-              view original PDF
-            </a>
-          ) : null}
         </div>
 
         <section className="ui-card">

@@ -11,7 +11,8 @@ export type BreadcrumbItem = {
 type NavAction = {
   label: string;
   href: string;
-  variant?: "outlined" | "filled";
+  variant?: "outlined" | "filled" | "link";
+  newTab?: boolean;
 };
 
 export default function NavBar({
@@ -51,7 +52,9 @@ export default function NavBar({
           <Link
             key={action.label}
             href={action.href}
-            className={action.variant === "filled" ? styles.actionFilled : styles.actionOutlined}
+            target={action.newTab ? "_blank" : undefined}
+            rel={action.newTab ? "noreferrer" : undefined}
+            className={action.variant === "filled" ? styles.actionFilled : action.variant === "link" ? styles.actionLink : styles.actionOutlined}
           >
             {action.label}
           </Link>

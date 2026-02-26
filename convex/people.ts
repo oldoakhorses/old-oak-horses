@@ -1,7 +1,23 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
+const PEOPLE_SEED: Array<{ name: string; role: "rider" | "groom" | "freelance" | "trainer" }> = [
+  { name: "Lucy Davis Kennedy", role: "rider" },
+  { name: "Charlotte Oakes", role: "groom" },
+  { name: "Leah Knowles", role: "groom" },
+  { name: "Sigrun Land", role: "freelance" },
+  { name: "Johanna Mattila", role: "freelance" }
+];
+
 export const getAllPeople = query(async (ctx) => {
+  const rows = await ctx.db.query("people").withIndex("by_active", (q) => q.eq("isActive", true)).collect();
+  return rows.sort((a, b) => {
+    if (a.role !== b.role) return a.role.localeCompare(b.role);
+    return a.name.localeCompare(b.name);
+  });
+});
+
+export const list = query(async (ctx) => {
   const rows = await ctx.db.query("people").withIndex("by_active", (q) => q.eq("isActive", true)).collect();
   return rows.sort((a, b) => {
     if (a.role !== b.role) return a.role.localeCompare(b.role);
@@ -64,4 +80,28 @@ export const deactivatePerson = mutation({
     await ctx.db.patch(args.id, { isActive: false });
     return args.id;
   }
+});
+
+export const ensureSeeded = mutation(async (ctx) => {
+  let created = 0;
+  for (const person of PEOPLE_SEED) {
+    const existing = await ctx.db
+      .query("people")
+      .withIndex("by_active", (q) => q.eq("isActive", true))
+      .filter((q) => q.eq(q.field("name"), person.name))
+      .first();
+
+    if (!existing) {
+      await ctx.db.insert("people", {
+        name: person.name,
+        role: person.role,
+        isActive: true,
+        createdAt: Date.now()
+      });
+      created += 1;
+    }
+  }
+
+  const people = await ctx.db.query("people").withIndex("by_active", (q) => q.eq("isActive", true)).collect();
+  return { created, people };
 });
