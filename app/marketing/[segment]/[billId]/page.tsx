@@ -16,8 +16,8 @@ const COLORS: Record<string, string> = {
 
 export default function MarketingInvoicePage() {
   const router = useRouter();
-  const params = useParams<{ subcategory: string; billId: string }>();
-  const subcategory = params?.subcategory ?? "";
+  const params = useParams<{ segment: string; billId: string }>();
+  const subcategory = params?.segment ?? "";
   const billId = params?.billId ?? "";
 
   const bill = useQuery(api.bills.getBillById, billId ? { billId: billId as any } : "skip");
