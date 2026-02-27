@@ -444,14 +444,25 @@ function extractCurrencyMeta(parsed: Record<string, unknown>) {
 
 function normalizeLineItem(item: unknown) {
   const row = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
-  const description = pickString(row, ["description", "service_description", "name"]) ?? "Line item";
+  const description = pickString(row, ["description", "service_description", "stall_desc", "service", "name"]) ?? "Line item";
   const quantity = pickNumber(row, ["quantity", "qty", "#"]);
   const unitPrice = pickNumber(row, ["unit_price", "net_unit_price", "price"]);
-  const amountOriginal = pickNumber(row, ["amount_original", "amountOriginal", "net_amount", "total", "amount"]);
+  const amountOriginal = pickNumber(row, [
+    "amount_original",
+    "amountOriginal",
+    "net_amount",
+    "total",
+    "amount",
+    "your_percent_due",
+    "your_pct_due",
+    "your_due",
+    "%_due"
+  ]);
   const amountUsd = pickNumber(row, ["total_usd", "amount_usd", "amountUsd", "total"]);
-  const horseName = pickString(row, ["horse_name", "horseName"]);
+  const horseName = pickString(row, ["horse_name", "horseName", "horse"]);
   const personName = pickString(row, ["person_name", "personName", "employee_name"]);
   const taxCode = pickString(row, ["tax_code", "taxCode"]);
+  const ownershipPercent = pickNumber(row, ["ownership_percent", "owned_percent", "percent_owned", "%_owned", "percent"]);
   const normalized: Record<string, unknown> = {
     ...row,
     description
@@ -471,6 +482,7 @@ function normalizeLineItem(item: unknown) {
   if (horseName) normalized.horse_name = horseName;
   if (personName) normalized.person_name = personName;
   if (taxCode) normalized.tax_code = taxCode;
+  if (typeof ownershipPercent === "number") normalized.ownership_percent = ownershipPercent;
   return normalized;
 }
 
@@ -689,6 +701,9 @@ function getExtractionPrompt(args: {
   providerName?: string;
   providerPrompt?: string;
 }) {
+  if (args.categorySlug === "horse-transport") {
+    return horseTransportExtractionPrompt(args.providerName, args.providerPrompt);
+  }
   if (args.categorySlug === "farrier") {
     return farrierExtractionPrompt(args.providerName);
   }
@@ -696,6 +711,49 @@ function getExtractionPrompt(args: {
     return `${args.providerPrompt.trim()}\n\n${PROVIDER_CONTACT_PROMPT}`;
   }
   return genericExtractionPrompt(args.categorySlug, args.travelSubcategory);
+}
+
+function horseTransportExtractionPrompt(providerName?: string, providerPrompt?: string) {
+  const providerHint = providerName ? `Provider hint: ${providerName}.` : "";
+  const custom = providerPrompt?.trim() ? `${providerPrompt.trim()}\n\n` : "";
+  return `${custom}${providerHint}
+Extract all data from this horse transport invoice as strict JSON.
+
+Key fields:
+- provider_name: transport company name from header/logo/"Remit To"
+- invoice_number
+- invoice_date (billing date)
+- due_date
+- ship_date
+- origin (full pickup location text, including facility + city/state)
+- destination (full delivery location text)
+- terms
+- customer_number (Customer ID if present)
+- invoice_total_usd from "Please Pay This Amount", "Balance Due", or equivalent
+
+Line item rules (critical):
+Horse transport invoices list horses being transported with per-horse costs.
+
+Format A (Brook Ledge style): table with "% Owned | Horse | Stall Desc | Your % Due"
+- each row = one horse
+- "100.0000% BEN ... 105.00" => horse_name: "BEN", total_usd: 105.00, ownership_percent: 100.0000
+
+Format B (general): per-horse charge table
+- each row => horse_name + per-horse amount
+
+Format C (lump sum): horse names listed, one total
+- split total evenly across detected horses
+
+For each line item extract:
+- horse_name
+- description (Ground Transport / Horse Transport / stall description)
+- total_usd
+- ownership_percent (if present)
+
+Also extract provider contact details: address, phone, fax, email, website.
+
+${PROVIDER_CONTACT_PROMPT}
+Return strict JSON only.`;
 }
 
 function farrierExtractionPrompt(providerName?: string) {
