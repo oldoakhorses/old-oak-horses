@@ -41,7 +41,8 @@ export const getProviderById = query({
 export const getProviderBySlug = query({
   args: {
     categorySlug: v.string(),
-    providerSlug: v.string()
+    providerSlug: v.string(),
+    subcategorySlug: v.optional(v.string())
   },
   handler: async (ctx, args) => {
     const slugAliases: Record<string, string> = {
@@ -55,17 +56,26 @@ export const getProviderBySlug = query({
       .first();
     if (!category) return null;
 
-    const provider = await ctx.db
-      .query("providers")
-      .withIndex("by_slug", (q) => q.eq("slug", requestedSlug))
-      .filter((q) => q.eq(q.field("categoryId"), category._id))
-      .first();
+    const provider = args.subcategorySlug
+      ? await ctx.db
+          .query("providers")
+          .withIndex("by_slug", (q) => q.eq("slug", requestedSlug))
+          .filter((q) => q.and(q.eq(q.field("categoryId"), category._id), q.eq(q.field("subcategorySlug"), args.subcategorySlug)))
+          .first()
+      : await ctx.db
+          .query("providers")
+          .withIndex("by_slug", (q) => q.eq("slug", requestedSlug))
+          .filter((q) => q.eq(q.field("categoryId"), category._id))
+          .first();
     if (!provider) {
       const categoryProviders = await ctx.db
         .query("providers")
         .withIndex("by_category", (q) => q.eq("categoryId", category._id))
         .collect();
-      const fallback = categoryProviders.find((entry) => slugify(entry.name) === requestedSlug);
+      const fallback = categoryProviders.find((entry) =>
+        slugify(entry.name) === requestedSlug &&
+        (!args.subcategorySlug || entry.subcategorySlug === args.subcategorySlug)
+      );
       if (!fallback) return null;
       return {
         ...fallback,

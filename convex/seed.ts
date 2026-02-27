@@ -8,7 +8,6 @@ const CATEGORY_SEED = [
   { name: "Bodywork", slug: "bodywork" },
   { name: "Therapeutic Care", slug: "therapeutic-care" },
   { name: "Travel", slug: "travel" },
-  { name: "Salaries", slug: "salaries" },
   { name: "Housing", slug: "housing" },
   { name: "Riding & Training", slug: "riding-training" },
   { name: "Commissions", slug: "commissions" },
@@ -498,6 +497,136 @@ export const seedCategories = mutation(async (ctx) => {
       await ctx.db.patch(existingProvider._id, { slug: provider.slug, updatedAt: Date.now() });
       updatedProviders += 1;
     }
+  }
+
+  const adminCategory = await ctx.db
+    .query("categories")
+    .withIndex("by_slug", (q) => q.eq("slug", "admin"))
+    .first();
+  if (!adminCategory) {
+    throw new Error("Admin category not found after category seed");
+  }
+
+  const adminProviders: Array<{ name: string; slug: string; subcategorySlug: string }> = [
+    { name: "General", slug: "general", subcategorySlug: "legal" },
+    { name: "Zeidan & Associates", slug: "zeidan-associates", subcategorySlug: "visas" },
+    { name: "Karel Thijssens", slug: "karel-thijssens", subcategorySlug: "visas" },
+    { name: "Fishmann", slug: "fishmann", subcategorySlug: "accounting" },
+    { name: "Hoeymakers", slug: "hoeymakers", subcategorySlug: "contractors" },
+    { name: "Freelance Grooming", slug: "freelance-grooming", subcategorySlug: "contractors" },
+    { name: "Freelance Riding", slug: "freelance-riding", subcategorySlug: "contractors" },
+    { name: "Media/Marketing", slug: "media-marketing", subcategorySlug: "contractors" }
+  ];
+
+  for (const provider of adminProviders) {
+    const existingProvider = await ctx.db
+      .query("providers")
+      .withIndex("by_category_name", (q) => q.eq("categoryId", adminCategory._id).eq("name", provider.name))
+      .first();
+    if (!existingProvider) {
+      await ctx.db.insert("providers", {
+        categoryId: adminCategory._id,
+        subcategorySlug: provider.subcategorySlug,
+        name: provider.name,
+        slug: provider.slug,
+        extractionPrompt:
+          "Extract all data from this admin/business operations invoice as strict JSON with provider_name, invoice_number, invoice_date, due_date, subtotal, tax_total_usd, invoice_total_usd, original_currency, admin_subcategory, and line_items[] with description, quantity, unit_price, total_usd, person_name.",
+        expectedFields: ["invoice_number", "invoice_date", "provider_name", "invoice_total_usd", "line_items"],
+        createdAt: Date.now()
+      });
+      createdProviders += 1;
+      continue;
+    }
+    const patch: Record<string, unknown> = {};
+    if (!existingProvider.slug) patch.slug = provider.slug;
+    if (!existingProvider.subcategorySlug) patch.subcategorySlug = provider.subcategorySlug;
+    if (Object.keys(patch).length > 0) {
+      patch.updatedAt = Date.now();
+      await ctx.db.patch(existingProvider._id, patch);
+      updatedProviders += 1;
+    }
+  }
+
+  const duesCategory = await ctx.db
+    .query("categories")
+    .withIndex("by_slug", (q) => q.eq("slug", "dues-registrations"))
+    .first();
+  if (!duesCategory) {
+    throw new Error("Dues & Registrations category not found after category seed");
+  }
+
+  const duesProviders: Array<{ name: string; slug: string; subcategorySlug: string }> = [
+    { name: "USEF", slug: "usef", subcategorySlug: "horse-registrations" },
+    { name: "USHJA", slug: "ushja", subcategorySlug: "horse-registrations" },
+    { name: "USEF", slug: "usef", subcategorySlug: "rider-registrations" },
+    { name: "USHJA", slug: "ushja", subcategorySlug: "rider-registrations" },
+    { name: "USEF", slug: "usef", subcategorySlug: "memberships" },
+    { name: "USHJA", slug: "ushja", subcategorySlug: "memberships" }
+  ];
+
+  for (const provider of duesProviders) {
+    const existingProvider = await ctx.db
+      .query("providers")
+      .withIndex("by_category_subcategory_name", (q) =>
+        q.eq("categoryId", duesCategory._id).eq("subcategorySlug", provider.subcategorySlug).eq("name", provider.name)
+      )
+      .first();
+    if (!existingProvider) {
+      await ctx.db.insert("providers", {
+        categoryId: duesCategory._id,
+        subcategorySlug: provider.subcategorySlug,
+        name: provider.name,
+        slug: provider.slug,
+        extractionPrompt:
+          "Extract dues/registration invoice JSON: provider_name, invoice_number, invoice_date, due_date, invoice_total_usd, original_currency, dues_subcategory, line_items[] with description,total_usd,entity_name,entity_type.",
+        expectedFields: ["invoice_number", "invoice_date", "provider_name", "invoice_total_usd", "line_items"],
+        createdAt: Date.now()
+      });
+      createdProviders += 1;
+      continue;
+    }
+    const patch: Record<string, unknown> = {};
+    if (!existingProvider.slug) patch.slug = provider.slug;
+    if (!existingProvider.subcategorySlug) patch.subcategorySlug = provider.subcategorySlug;
+    if (Object.keys(patch).length > 0) {
+      patch.updatedAt = Date.now();
+      await ctx.db.patch(existingProvider._id, patch);
+      updatedProviders += 1;
+    }
+  }
+
+  // Migrate legacy Salaries bills/providers to Admin -> Payroll.
+  const salariesCategory = await ctx.db
+    .query("categories")
+    .withIndex("by_slug", (q) => q.eq("slug", "salaries"))
+    .first();
+  if (salariesCategory) {
+    const salaryProviders = await ctx.db
+      .query("providers")
+      .withIndex("by_category", (q) => q.eq("categoryId", salariesCategory._id))
+      .collect();
+    for (const provider of salaryProviders) {
+      await ctx.db.patch(provider._id, {
+        categoryId: adminCategory._id,
+        subcategorySlug: provider.subcategorySlug ?? "payroll",
+        updatedAt: Date.now()
+      });
+      updatedProviders += 1;
+    }
+
+    const salaryBills = await ctx.db
+      .query("bills")
+      .withIndex("by_category", (q) => q.eq("categoryId", salariesCategory._id))
+      .collect();
+    for (const bill of salaryBills) {
+      await ctx.db.patch(bill._id, {
+        categoryId: adminCategory._id,
+        adminSubcategory: (bill as any).salariesSubcategory ?? "payroll",
+        salariesSubcategory: undefined
+      });
+    }
+
+    await ctx.db.delete(salariesCategory._id);
   }
 
   const suppliesCategory = await ctx.db

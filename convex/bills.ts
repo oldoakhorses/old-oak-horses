@@ -1294,6 +1294,8 @@ export const createParsingBill = internalMutation({
     housingSubcategory: v.optional(v.string()),
     horseTransportSubcategory: v.optional(v.string()),
     marketingSubcategory: v.optional(v.string()),
+    adminSubcategory: v.optional(v.string()),
+    duesSubcategory: v.optional(v.string()),
     salariesSubcategory: v.optional(v.string())
   },
   handler: async (ctx, args) => {
@@ -1311,6 +1313,8 @@ export const createParsingBill = internalMutation({
       housingSubcategory: args.housingSubcategory,
       horseTransportSubcategory: args.horseTransportSubcategory,
       marketingSubcategory: args.marketingSubcategory,
+      adminSubcategory: args.adminSubcategory,
+      duesSubcategory: args.duesSubcategory,
       salariesSubcategory: args.salariesSubcategory
     });
   }
@@ -1354,6 +1358,8 @@ export const markDone = internalMutation({
     housingSubcategory: v.optional(v.string()),
     horseTransportSubcategory: v.optional(v.string()),
     marketingSubcategory: v.optional(v.string()),
+    adminSubcategory: v.optional(v.string()),
+    duesSubcategory: v.optional(v.string()),
     salariesSubcategory: v.optional(v.string()),
     providerId: v.optional(v.id("providers")),
     customProviderName: v.optional(v.string()),
@@ -1432,6 +1438,8 @@ export const markDone = internalMutation({
       housingSubcategory: args.housingSubcategory,
       horseTransportSubcategory: args.horseTransportSubcategory,
       marketingSubcategory: args.marketingSubcategory,
+      adminSubcategory: args.adminSubcategory,
+      duesSubcategory: args.duesSubcategory,
       salariesSubcategory: args.salariesSubcategory,
       providerId: args.providerId,
       customProviderName: args.customProviderName,
@@ -1722,6 +1730,41 @@ export const saveSalaryAssignment = mutation({
       }
     }
 
+    return args.billId;
+  }
+});
+
+export const saveDuesAssignments = mutation({
+  args: {
+    billId: v.id("bills"),
+    assignments: v.array(
+      v.object({
+        lineItemIndex: v.number(),
+        entityType: v.union(v.literal("horse"), v.literal("person"), v.literal("general"), v.literal("none")),
+        entityId: v.optional(v.string()),
+        entityName: v.optional(v.string())
+      })
+    )
+  },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+    const extracted = ((bill.extractedData ?? {}) as Record<string, unknown>) ?? {};
+    const lineItems = getLineItems(extracted).map((item) => ({ ...(item as Record<string, unknown>) }));
+
+    for (const row of args.assignments) {
+      if (!lineItems[row.lineItemIndex]) continue;
+      lineItems[row.lineItemIndex].entityType = row.entityType === "none" ? null : row.entityType;
+      lineItems[row.lineItemIndex].entityId = row.entityType === "none" ? null : (row.entityId ?? null);
+      lineItems[row.lineItemIndex].entityName = row.entityType === "none" ? null : (row.entityName ?? null);
+    }
+
+    await ctx.db.patch(args.billId, {
+      extractedData: {
+        ...extracted,
+        line_items: lineItems
+      }
+    });
     return args.billId;
   }
 });
@@ -2306,7 +2349,7 @@ function getInvoiceEntities(
     const names = [...new Set((bill.assignedPeople ?? []).map((row) => peopleById.get(String(row.personId))?.name).filter(Boolean) as string[])];
     return { type: "person" as const, names };
   }
-  if (categorySlug === "salaries") {
+  if (categorySlug === "salaries" || categorySlug === "admin") {
     const names = new Set<string>();
     for (const row of bill.personAssignments ?? []) {
       if (row.personName?.trim()) names.add(row.personName.trim());
@@ -2315,6 +2358,17 @@ function getInvoiceEntities(
       for (const split of row.splits) {
         if (split.personName?.trim()) names.add(split.personName.trim());
       }
+    }
+    return { type: "person" as const, names: [...names] };
+  }
+  if (categorySlug === "dues-registrations") {
+    const names = new Set<string>();
+    const lineItems = getLineItems(bill.extractedData);
+    for (const item of lineItems) {
+      if (!item || typeof item !== "object") continue;
+      const row = item as Record<string, unknown>;
+      const entityName = pickString(row, ["entityName", "entity_name"]);
+      if (entityName) names.add(entityName);
     }
     return { type: "person" as const, names: [...names] };
   }
@@ -2345,6 +2399,8 @@ function getCategoryColor(slug: string) {
     farrier: "#14B8A6",
     bodywork: "#5B8DEF",
     "feed-bedding": "#22C583",
+    admin: "#6B7084",
+    "dues-registrations": "#22C583",
     salaries: "#4A5BDB",
     stabling: "#F59E0B",
     travel: "#EC4899",

@@ -73,6 +73,8 @@ export default defineSchema({
     housingSubcategory: v.optional(v.string()),
     horseTransportSubcategory: v.optional(v.string()),
     marketingSubcategory: v.optional(v.string()),
+    adminSubcategory: v.optional(v.string()),
+    duesSubcategory: v.optional(v.string()),
     salariesSubcategory: v.optional(v.string()),
     originalCurrency: v.optional(v.string()),
     originalTotal: v.optional(v.number()),

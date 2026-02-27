@@ -10,10 +10,12 @@ import { matchPersonName } from "./matchPerson";
 const TRAVEL_SUBCATEGORY_SLUGS = new Set(["flights", "trains", "rental-car", "gas", "meals", "hotels"]);
 const HOUSING_SUBCATEGORY_SLUGS = new Set(["rider-housing", "groom-housing"]);
 const MARKETING_SUBCATEGORY_SLUGS = new Set(["vip-tickets", "photography", "social-media"]);
+const ADMIN_SUBCATEGORY_SLUGS = new Set(["legal", "visas", "accounting", "payroll", "contractors"]);
+const DUES_SUBCATEGORY_SLUGS = new Set(["horse-registrations", "rider-registrations", "memberships"]);
 const SALARIES_SUBCATEGORY_SLUGS = new Set(["rider", "groom", "freelance"]);
 const RECLASSIFICATION_SOURCE_CATEGORIES = new Set(["stabling", "show-expenses", "feed-bedding"]);
 const HORSE_BASED_CATEGORIES = new Set(["veterinary", "farrier", "stabling", "feed-bedding", "horse-transport", "bodywork", "show-expenses"]);
-const PERSON_BASED_CATEGORIES = new Set(["travel", "housing", "salaries", "commissions"]);
+const PERSON_BASED_CATEGORIES = new Set(["travel", "housing", "admin", "salaries", "commissions"]);
 const USD_EXCHANGE_RATES: Record<string, number> = {
   CAD: 0.72,
   EUR: 1.08,
@@ -53,6 +55,12 @@ export const parseBillPdf = internalAction({
       const extractionPrompt = getExtractionPrompt({
         categorySlug: category.slug,
         travelSubcategory: bill.travelSubcategory,
+        billSubcategory:
+          bill.duesSubcategory ??
+          bill.adminSubcategory ??
+          bill.marketingSubcategory ??
+          bill.salariesSubcategory ??
+          bill.travelSubcategory,
         providerName: provider?.name,
         providerPrompt: provider?.extractionPrompt
       });
@@ -165,6 +173,8 @@ export const parseBillPdf = internalAction({
         category.slug === "housing" ||
         category.slug === "stabling" ||
         category.slug === "marketing" ||
+        category.slug === "admin" ||
+        category.slug === "dues-registrations" ||
         category.slug === "bodywork" ||
         category.slug === "feed-bedding" ||
         category.slug === "salaries";
@@ -181,9 +191,13 @@ export const parseBillPdf = internalAction({
                 ? extractHorseTransportMeta(parsed, bill.horseTransportSubcategory)
               : category.slug === "marketing"
                 ? extractMarketingMeta(parsed, bill.marketingSubcategory)
+                : category.slug === "admin"
+                  ? extractAdminMeta(parsed, bill.adminSubcategory)
+                  : category.slug === "dues-registrations"
+                    ? extractDuesMeta(parsed, bill.duesSubcategory)
                 : category.slug === "salaries"
                   ? extractSalariesMeta(parsed, bill.salariesSubcategory)
-              : {};
+                : {};
       const currencyMeta = extractCurrencyMeta(parsed);
 
       const providerContactPatch = extractProviderContactInfo(parsed);
@@ -673,6 +687,55 @@ function extractMarketingMeta(parsed: Record<string, unknown>, billSubcategory: 
   };
 }
 
+function extractAdminMeta(parsed: Record<string, unknown>, billSubcategory: string | undefined) {
+  const originalCurrency = pickString(parsed, ["original_currency", "currency"])?.toUpperCase();
+  const originalTotal = pickNumber(parsed, ["original_total", "invoice_total_original"]);
+  const exchangeRate = pickNumber(parsed, ["exchange_rate", "exchange_rate_used"]);
+  const parsedSubcategory = slugify(pickString(parsed, ["admin_subcategory", "subcategory"]) ?? "");
+  const adminSubcategory = ADMIN_SUBCATEGORY_SLUGS.has(parsedSubcategory)
+    ? parsedSubcategory
+    : billSubcategory ?? "payroll";
+
+  const lineItems = getLineItems(parsed);
+  const personAssignments = lineItems.map((item, index) => {
+    const row = item as Record<string, unknown>;
+    const personName = pickString(row, ["person_name", "employee_name", "name"]);
+    const matchedPersonId = pickString(row, ["matched_person_id", "matchedPersonId"]);
+    return {
+      lineItemIndex: index,
+      personId: matchedPersonId,
+      personName
+    };
+  });
+
+  return {
+    adminSubcategory,
+    personAssignments,
+    splitPersonLineItems: [] as any[],
+    originalCurrency,
+    originalTotal,
+    exchangeRate,
+    isApproved: false
+  };
+}
+
+function extractDuesMeta(parsed: Record<string, unknown>, billSubcategory: string | undefined) {
+  const originalCurrency = pickString(parsed, ["original_currency", "currency"])?.toUpperCase();
+  const originalTotal = pickNumber(parsed, ["original_total", "invoice_total_original"]);
+  const exchangeRate = pickNumber(parsed, ["exchange_rate", "exchange_rate_used"]);
+  const parsedSubcategory = slugify(pickString(parsed, ["dues_subcategory", "subcategory"]) ?? "");
+  const duesSubcategory = DUES_SUBCATEGORY_SLUGS.has(parsedSubcategory)
+    ? parsedSubcategory
+    : billSubcategory ?? "memberships";
+  return {
+    duesSubcategory,
+    originalCurrency,
+    originalTotal,
+    exchangeRate,
+    isApproved: false
+  };
+}
+
 function extractSalariesMeta(parsed: Record<string, unknown>, billSubcategory: string | undefined) {
   const originalCurrency = pickString(parsed, ["original_currency", "currency"])?.toUpperCase();
   const originalTotal = pickNumber(parsed, ["original_total", "invoice_total_original"]);
@@ -706,6 +769,7 @@ function extractSalariesMeta(parsed: Record<string, unknown>, billSubcategory: s
 function getExtractionPrompt(args: {
   categorySlug?: string;
   travelSubcategory?: string;
+  billSubcategory?: string;
   providerName?: string;
   providerPrompt?: string;
 }) {
@@ -718,7 +782,7 @@ function getExtractionPrompt(args: {
   if (args.providerPrompt && args.providerPrompt.trim().length > 0) {
     return `${args.providerPrompt.trim()}\n\n${PROVIDER_CONTACT_PROMPT}`;
   }
-  return genericExtractionPrompt(args.categorySlug, args.travelSubcategory);
+  return genericExtractionPrompt(args.categorySlug, args.travelSubcategory, args.billSubcategory);
 }
 
 function horseTransportExtractionPrompt(providerName?: string, providerPrompt?: string) {
@@ -799,7 +863,7 @@ Return strict JSON with invoice_number, invoice_date, provider_name, invoice_tot
 ${PROVIDER_CONTACT_PROMPT}`;
 }
 
-function genericExtractionPrompt(categorySlug?: string, travelSubcategory?: string) {
+function genericExtractionPrompt(categorySlug?: string, travelSubcategory?: string, billSubcategory?: string) {
   const base = `Extract invoice data as strict JSON with invoice_number, invoice_date, provider_name, account_number, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[].
 
 ${PROVIDER_CONTACT_PROMPT}`;
@@ -829,6 +893,64 @@ Return strict JSON only.`;
   }
   if (categorySlug === "marketing") {
     return `Extract from this marketing invoice: provider/vendor name and contact details (address, phone, email), invoice_number, invoice_date, due_date, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, quantity, unit_price, total_usd.
+
+${PROVIDER_CONTACT_PROMPT}
+Return strict JSON.`;
+  }
+  if (categorySlug === "admin") {
+    return `Extract all data from this admin/business operations invoice as strict JSON.
+
+Key fields:
+- provider_name
+- invoice_number
+- invoice_date
+- due_date
+- subtotal
+- tax_total_usd
+- invoice_total_usd
+- original_currency
+- admin_subcategory (one of legal, visas, accounting, payroll, contractors)
+
+Line items:
+- description
+- quantity (default 1 for service rows)
+- unit_price
+- total_usd
+- person_name when identifiable from description (example: "Visa processing for Sigrun Land")
+
+For payroll-style invoices, names may appear per line item. Extract person_name aggressively.
+For non-payroll admin invoices, still attempt person_name extraction when obvious.
+If admin_subcategory is unclear, use provided bill subcategory hint: ${billSubcategory ?? "unknown"}.
+
+${PROVIDER_CONTACT_PROMPT}
+Return strict JSON.`;
+  }
+  if (categorySlug === "dues-registrations") {
+    return `Extract all data from this dues, registration, or membership invoice as strict JSON.
+
+Key fields:
+- provider_name (organization, e.g. USEF, USHJA)
+- invoice_number (invoice/transaction/confirmation id)
+- invoice_date
+- due_date
+- invoice_total_usd
+- original_currency
+- dues_subcategory (horse-registrations, rider-registrations, memberships)
+
+Line items:
+- description
+- total_usd
+- quantity (optional)
+- unit_price (optional)
+- entity_name when present in description
+- entity_type: horse | person | null (best effort only)
+
+Context clues:
+- horse: horse registration/recording entries or horse names
+- person: rider registration, membership, amateur/junior or person names
+- unclear => entity_type: null
+
+If dues_subcategory is unclear, use provided bill subcategory hint: ${billSubcategory ?? "unknown"}.
 
 ${PROVIDER_CONTACT_PROMPT}
 Return strict JSON.`;

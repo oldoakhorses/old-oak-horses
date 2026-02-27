@@ -13,6 +13,8 @@ export const uploadAndParseBill: any = action({
     housingSubcategory: v.optional(v.string()),
     horseTransportSubcategory: v.optional(v.string()),
     marketingSubcategory: v.optional(v.string()),
+    adminSubcategory: v.optional(v.string()),
+    duesSubcategory: v.optional(v.string()),
     salariesSubcategory: v.optional(v.string()),
     base64Pdf: v.string(),
     uploadedAt: v.optional(v.number())
@@ -30,6 +32,8 @@ export const uploadAndParseBill: any = action({
 
     const isSubcategoryCategory =
       category.slug === "travel" || category.slug === "housing" || category.slug === "marketing" || category.slug === "salaries";
+    const isAdminCategory = category.slug === "admin";
+    const isDuesCategory = category.slug === "dues-registrations";
     const isHorseTransportCategory = category.slug === "horse-transport";
 
     if (!providerId && customProviderName && args.saveAsNew) {
@@ -42,7 +46,11 @@ export const uploadAndParseBill: any = action({
         providerId = (await ctx.runMutation(internal.providers.createProviderOnUploadInternal, {
           categoryId: args.categoryId,
           name: customProviderName,
-          subcategorySlug: isHorseTransportCategory ? args.horseTransportSubcategory : undefined
+          subcategorySlug:
+            isHorseTransportCategory ? args.horseTransportSubcategory :
+            isAdminCategory ? args.adminSubcategory :
+            isDuesCategory ? args.duesSubcategory :
+            undefined
         })) as Id<"providers">;
       }
     }
@@ -97,6 +105,14 @@ export const uploadAndParseBill: any = action({
         category.slug === "marketing"
           ? args.marketingSubcategory || (!providerId && customProviderName ? slugify(customProviderName) : undefined)
           : undefined,
+      adminSubcategory:
+        category.slug === "admin"
+          ? args.adminSubcategory || undefined
+          : undefined,
+      duesSubcategory:
+        category.slug === "dues-registrations"
+          ? args.duesSubcategory || undefined
+          : undefined,
       salariesSubcategory:
         category.slug === "salaries"
           ? args.salariesSubcategory || (!providerId && customProviderName ? slugify(customProviderName) : undefined)
@@ -128,6 +144,14 @@ export const uploadAndParseBill: any = action({
       const subSlug = args.marketingSubcategory || "other";
       redirectPath = `/marketing/${subSlug}/${billId}`;
       listPath = `/marketing/${subSlug}`;
+    } else if (category.slug === "admin") {
+      const subSlug = args.adminSubcategory || "payroll";
+      redirectPath = `/admin/${subSlug}/${providerSlug}/${billId}`;
+      listPath = `/admin/${subSlug}/${providerSlug}`;
+    } else if (category.slug === "dues-registrations") {
+      const subSlug = args.duesSubcategory || "memberships";
+      redirectPath = `/dues-registrations/${subSlug}/${providerSlug}/${billId}`;
+      listPath = `/dues-registrations/${subSlug}/${providerSlug}`;
     } else if (category.slug === "salaries") {
       const subSlug = args.salariesSubcategory || "other";
       redirectPath = `/salaries/${subSlug}/${billId}`;
