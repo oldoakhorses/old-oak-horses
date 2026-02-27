@@ -10,6 +10,7 @@ import NavBar from "@/components/NavBar";
 import HorseSelect from "@/components/HorseSelect";
 import LineItemReclassBadge from "@/components/LineItemReclassBadge";
 import ReclassificationSummary from "@/components/ReclassificationSummary";
+import UnmatchedHorseBanner from "@/components/UnmatchedHorseBanner";
 import styles from "./stablingInvoice.module.css";
 
 type SplitMode = "even" | "custom";
@@ -382,6 +383,8 @@ export default function StablingInvoicePage() {
           </div>
         </section>
 
+        {bill.hasUnmatchedHorses ? <UnmatchedHorseBanner billId={billId} unmatchedNames={bill.unmatchedHorseNames ?? []} /> : null}
+
         <section className={assignmentSaved ? styles.assignmentSavedCard : styles.assignmentCard}>
           {assignmentSaved ? (
             <div className={styles.savedRow}>
@@ -607,13 +610,25 @@ export default function StablingInvoicePage() {
           {bill.isApproved ? (
             <div className={styles.approvedBox}>✓ invoice approved</div>
           ) : (
-            <button type="button" className={assignmentSaved ? styles.approveBtn : styles.approveDisabled} disabled={!assignmentSaved} onClick={onApprove}>
+            <div style={{ flex: 1 }}>
+              <button
+                type="button"
+                className={assignmentSaved && !bill.hasUnmatchedHorses ? styles.approveBtn : styles.approveDisabled}
+                disabled={!assignmentSaved || Boolean(bill.hasUnmatchedHorses)}
+                onClick={onApprove}
+              >
               {assignmentSaved
-                ? reclassification.movedCount > 0
+                ? bill.hasUnmatchedHorses
+                  ? "assign all horses before approving"
+                  : reclassification.movedCount > 0
                   ? `approve & move ${reclassification.movedCount} items`
                   : "approve invoice"
                 : "assign horses before approving"}
-            </button>
+              </button>
+              {bill.hasUnmatchedHorses ? (
+                <div style={{ marginTop: 6, fontSize: 10, color: "#E5484D" }}>resolve all unmatched horses before approving</div>
+              ) : null}
+            </div>
           )}
 
           <button type="button" className={styles.deleteBtn} onClick={() => setShowDeleteConfirm(true)}>

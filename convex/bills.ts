@@ -5,6 +5,15 @@ import type { Id } from "./_generated/dataModel";
 import { normalizeAliasKey } from "./matchHorse";
 
 const STABLING_SUBCATEGORY_SLUGS = new Set(["board", "turnout", "bedding", "hay-feed", "facility-fees", "other"]);
+const HORSE_BASED_CATEGORY_SLUGS = new Set([
+  "veterinary",
+  "farrier",
+  "stabling",
+  "feed-bedding",
+  "horse-transport",
+  "bodywork",
+  "show-expenses"
+]);
 
 export const generateUploadUrl = mutation(async (ctx) => {
   return await ctx.storage.generateUploadUrl();
@@ -1180,7 +1189,7 @@ export const getBillFileNamesByProvider = internalQuery({
 export const getAllHorsesForMatching = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const rows = await ctx.db.query("horses").collect();
+    const rows = await ctx.db.query("horses").withIndex("by_status_name", (q) => q.eq("status", "active")).collect();
     return rows.map((row) => ({ _id: row._id, name: row.name }));
   }
 });
@@ -1410,7 +1419,9 @@ export const markDone = internalMutation({
     originalCurrency: v.optional(v.string()),
     originalTotal: v.optional(v.number()),
     exchangeRate: v.optional(v.number()),
-    isApproved: v.optional(v.boolean())
+    isApproved: v.optional(v.boolean()),
+    hasUnmatchedHorses: v.optional(v.boolean()),
+    unmatchedHorseNames: v.optional(v.array(v.string()))
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.billId, {
@@ -1429,6 +1440,8 @@ export const markDone = internalMutation({
       splitLineItems: args.splitLineItems,
       personAssignments: args.personAssignments,
       splitPersonLineItems: args.splitPersonLineItems,
+      hasUnmatchedHorses: args.hasUnmatchedHorses,
+      unmatchedHorseNames: args.unmatchedHorseNames,
       originalCurrency: args.originalCurrency,
       originalTotal: args.originalTotal,
       exchangeRate: args.exchangeRate,
@@ -1713,9 +1726,50 @@ export const saveSalaryAssignment = mutation({
   }
 });
 
+export const resolveUnmatchedHorse = mutation({
+  args: {
+    billId: v.id("bills"),
+    originalName: v.string(),
+    horseId: v.id("horses")
+  },
+  handler: async (ctx, args) => {
+    await resolveUnmatchedHorseHandler(ctx, args);
+    return args.billId;
+  }
+});
+
+export const addHorseAndResolveUnmatched = mutation({
+  args: {
+    billId: v.id("bills"),
+    originalName: v.string(),
+    horseName: v.string(),
+    owner: v.optional(v.string())
+  },
+  handler: async (ctx, args) => {
+    const horseId = await ctx.db.insert("horses", {
+      name: args.horseName.trim(),
+      owner: args.owner?.trim() || undefined,
+      status: "active",
+      createdAt: Date.now()
+    });
+    await resolveUnmatchedHorseHandler(ctx, {
+      billId: args.billId,
+      originalName: args.originalName,
+      horseId
+    });
+    return horseId;
+  }
+});
+
 async function approveBillById(ctx: any, billId: Id<"bills">) {
   const bill = await ctx.db.get(billId);
   if (!bill) throw new Error("Bill not found");
+  if (bill.hasUnmatchedHorses) {
+    const category = await ctx.db.get(bill.categoryId);
+    if (category && HORSE_BASED_CATEGORY_SLUGS.has(category.slug)) {
+      throw new Error("Resolve all unmatched horses before approving");
+    }
+  }
   await ctx.db.patch(billId, {
     isApproved: true,
     approvedAt: Date.now(),
@@ -1730,6 +1784,64 @@ export const approveBill = mutation({
     return await approveBillById(ctx, args.billId);
   }
 });
+
+async function resolveUnmatchedHorseHandler(
+  ctx: any,
+  args: {
+    billId: Id<"bills">;
+    originalName: string;
+    horseId: Id<"horses">;
+  }
+) {
+  const bill = await ctx.db.get(args.billId);
+  if (!bill) throw new Error("Bill not found");
+  const horse = await ctx.db.get(args.horseId);
+  if (!horse || horse.status !== "active") throw new Error("Active horse not found");
+
+  const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+  const lineItems = getLineItems(extracted).map((row) => ({ ...(row as Record<string, unknown>) }));
+  const target = normalizeAliasKey(args.originalName);
+  for (const row of lineItems) {
+    const rawName = pickString(row, ["horse_name_raw", "originalParsedName", "horse_name", "horseName"]);
+    const confidence = String(row.match_confidence ?? row.matchConfidence ?? "").toLowerCase();
+    if (!rawName) continue;
+    if (normalizeAliasKey(rawName) !== target) continue;
+    if (confidence !== "none" && confidence !== "") continue;
+
+    row.horse_name = horse.name;
+    row.horseName = horse.name;
+    row.matched_horse_id = String(horse._id);
+    row.matchedHorseId = String(horse._id);
+    row.match_confidence = "manual";
+    row.matchConfidence = "manual";
+    row.originalParsedName = rawName;
+  }
+
+  const unmatchedNames = collectUnmatchedHorseNamesFromLineItems(lineItems);
+  await ctx.db.patch(args.billId, {
+    extractedData: {
+      ...extracted,
+      line_items: lineItems
+    },
+    hasUnmatchedHorses: unmatchedNames.length > 0,
+    unmatchedHorseNames: unmatchedNames
+  });
+
+  const alias = normalizeAliasKey(args.originalName);
+  if (alias && alias !== normalizeAliasKey(horse.name)) {
+    const existingAlias = await ctx.db.query("horseAliases").withIndex("by_alias", (q: any) => q.eq("alias", alias)).first();
+    if (existingAlias) {
+      await ctx.db.patch(existingAlias._id, { horseId: horse._id, horseName: horse.name, updatedAt: Date.now() });
+    } else {
+      await ctx.db.insert("horseAliases", {
+        alias,
+        horseId: horse._id,
+        horseName: horse.name,
+        createdAt: Date.now()
+      });
+    }
+  }
+}
 
 export const approveInvoice = mutation({
   args: { billId: v.id("bills") },
@@ -1961,6 +2073,18 @@ function pickString(source: Record<string, unknown>, keys: string[]) {
     }
   }
   return undefined;
+}
+
+function collectUnmatchedHorseNamesFromLineItems(lineItems: Array<Record<string, unknown>>) {
+  const names = new Set<string>();
+  for (const row of lineItems) {
+    const confidence = String(row.match_confidence ?? row.matchConfidence ?? "").toLowerCase();
+    if (confidence !== "none" && confidence !== "") continue;
+    const raw = pickString(row, ["horse_name_raw", "originalParsedName", "horse_name", "horseName"]);
+    if (!raw) continue;
+    names.add(raw);
+  }
+  return [...names];
 }
 
 async function getPeopleSpend(ctx: any, categoryId: string) {

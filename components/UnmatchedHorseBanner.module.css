@@ -1,0 +1,109 @@
+.banner {
+  background: rgba(229, 72, 77, 0.06);
+  border: 1px solid rgba(229, 72, 77, 0.2);
+  border-radius: 10px;
+  padding: 16px 22px;
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #e5484d;
+  margin-bottom: 8px;
+}
+
+.text {
+  font-size: 11px;
+  color: #6b7084;
+  margin: 0 0 10px 0;
+}
+
+.rows {
+  display: grid;
+  gap: 10px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.select {
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #e8eaf0;
+  background: #f2f3f7;
+  min-width: 200px;
+  font-family: inherit;
+}
+
+.or {
+  font-size: 10px;
+  color: #9ea2b0;
+}
+
+.addBtn {
+  font-size: 10px;
+  color: #4a5bdb;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  font-family: inherit;
+}
+
+.inlineForm {
+  width: 100%;
+  background: #f2f3f7;
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.input {
+  font-size: 12px;
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: inherit;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.cancelBtn {
+  font-size: 10px;
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #6b7084;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.assignBtn {
+  font-size: 10px;
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-family: inherit;
+  cursor: pointer;
+}

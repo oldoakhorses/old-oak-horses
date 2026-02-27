@@ -10,6 +10,7 @@ import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
 import ReclassificationSummary from "@/components/ReclassificationSummary";
 import SpendBar from "@/components/SpendBar";
+import UnmatchedHorseBanner from "@/components/UnmatchedHorseBanner";
 import styles from "./invoice.module.css";
 
 type LineItem = {
@@ -67,6 +68,8 @@ export default function InvoiceReportPage() {
   const extracted = ((bill?.extractedData ?? {}) as Extracted) || {};
   const lineItems = Array.isArray(extracted.line_items) ? extracted.line_items : [];
   const isReclassCategory = categorySlug === "show-expenses";
+  const isHorseBasedCategory = ["veterinary", "farrier", "stabling", "feed-bedding", "horse-transport", "bodywork", "show-expenses"].includes(categorySlug);
+  const hasUnmatchedHorses = Boolean(isHorseBasedCategory && bill?.hasUnmatchedHorses);
 
   useEffect(() => {
     setLineCategoryDecisions(
@@ -235,6 +238,8 @@ export default function InvoiceReportPage() {
           </div>
         </section>
 
+        {hasUnmatchedHorses ? <UnmatchedHorseBanner billId={invoiceId as any} unmatchedNames={bill?.unmatchedHorseNames ?? []} /> : null}
+
         {horseGroups.map((group) => (
           <section key={group.horseName} className={styles.card}>
             <div className={styles.horseHead}>
@@ -302,7 +307,7 @@ export default function InvoiceReportPage() {
           />
         ) : null}
 
-        <div style={{ marginTop: 16, marginBottom: 20, display: "flex", gap: 10 }}>
+        <div style={{ marginTop: 16, marginBottom: 20, display: "flex", gap: 10, alignItems: "flex-start" }}>
           {bill?.status === "done" ? (
             <div
               style={{
@@ -322,14 +327,30 @@ export default function InvoiceReportPage() {
               ✓ invoice approved
             </div>
           ) : (
-            <button
-              type="button"
-              className="ui-button-filled"
-              onClick={onApprove}
-              style={{ background: "#22C583", borderColor: "#22C583" }}
-            >
-              {isReclassCategory && reclassification.movedCount > 0 ? `approve & move ${reclassification.movedCount} items` : "approve invoice"}
-            </button>
+            <div style={{ flex: 1 }}>
+              <button
+                type="button"
+                className="ui-button-filled"
+                onClick={onApprove}
+                disabled={hasUnmatchedHorses}
+                style={{
+                  width: "100%",
+                  background: hasUnmatchedHorses ? "#E8EAF0" : "#22C583",
+                  borderColor: hasUnmatchedHorses ? "#E8EAF0" : "#22C583",
+                  color: hasUnmatchedHorses ? "#9EA2B0" : "#FFFFFF",
+                  cursor: hasUnmatchedHorses ? "default" : "pointer"
+                }}
+              >
+                {hasUnmatchedHorses
+                  ? "assign all horses before approving"
+                  : isReclassCategory && reclassification.movedCount > 0
+                    ? `approve & move ${reclassification.movedCount} items`
+                    : "approve invoice"}
+              </button>
+              {hasUnmatchedHorses ? (
+                <div style={{ marginTop: 6, fontSize: 10, color: "#E5484D" }}>resolve all unmatched horses before approving</div>
+              ) : null}
+            </div>
           )}
           <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(true)}>
             delete

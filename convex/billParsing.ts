@@ -12,6 +12,8 @@ const HOUSING_SUBCATEGORY_SLUGS = new Set(["rider-housing", "groom-housing"]);
 const MARKETING_SUBCATEGORY_SLUGS = new Set(["vip-tickets", "photography", "social-media"]);
 const SALARIES_SUBCATEGORY_SLUGS = new Set(["rider", "groom", "freelance"]);
 const RECLASSIFICATION_SOURCE_CATEGORIES = new Set(["stabling", "show-expenses", "feed-bedding"]);
+const HORSE_BASED_CATEGORIES = new Set(["veterinary", "farrier", "stabling", "feed-bedding", "horse-transport", "bodywork", "show-expenses"]);
+const PERSON_BASED_CATEGORIES = new Set(["travel", "housing", "salaries", "commissions"]);
 const USD_EXCHANGE_RATES: Record<string, number> = {
   CAD: 0.72,
   EUR: 1.08,
@@ -104,9 +106,13 @@ export const parseBillPdf = internalAction({
         ctx.runQuery(internal.bills.getHorseAliasesForMatching, {}),
         ctx.runQuery(internal.bills.getPersonAliasesForMatching, {})
       ]);
-      parsed = applyEntityMatching(parsed, registeredHorses, registeredPeople, dynamicHorseAliases, dynamicPersonAliases);
+      parsed = applyEntityMatching(parsed, registeredHorses, registeredPeople, dynamicHorseAliases, dynamicPersonAliases, {
+        matchHorses: HORSE_BASED_CATEGORIES.has(category.slug),
+        matchPeople: PERSON_BASED_CATEGORIES.has(category.slug)
+      });
       parsed = ensureUsdAmounts(parsed);
       annotateSuggestedCategories(parsed, category.slug);
+      const unmatchedHorseNames = HORSE_BASED_CATEGORIES.has(category.slug) ? collectUnmatchedHorseNames(parsed) : [];
 
       let resolvedProvider = provider;
       let extractedCustomProviderName = bill.customProviderName;
@@ -187,6 +193,8 @@ export const parseBillPdf = internalAction({
         billId: bill._id,
         extractedData: parsed,
         status,
+        hasUnmatchedHorses: HORSE_BASED_CATEGORIES.has(category.slug) ? unmatchedHorseNames.length > 0 : false,
+        unmatchedHorseNames: HORSE_BASED_CATEGORIES.has(category.slug) ? unmatchedHorseNames : [],
         providerId: resolvedProvider?._id,
         customProviderName: extractedCustomProviderName,
         extractedProviderContact,
@@ -825,6 +833,41 @@ Return strict JSON only.`;
 ${PROVIDER_CONTACT_PROMPT}
 Return strict JSON.`;
   }
+  if (categorySlug === "supplies") {
+    return `Extract all data from this supplies/equipment invoice, receipt, order confirmation, or email receipt as strict JSON.
+
+Required fields:
+- provider_name: company name (prefer branded/trading name, e.g. "Horseplay")
+- invoice_number: invoice/order/receipt/transaction number (e.g. ORDER #23866 => "23866")
+- invoice_date: date of invoice/order/receipt (YYYY-MM-DD)
+- due_date: due date when present, otherwise null for receipts/paid orders
+- subtotal
+- tax_total_usd
+- invoice_total_usd
+- original_currency (default USD)
+- line_items[] with description, quantity, unit_price, total_usd
+
+Horseplay email receipt format handling:
+- Header may read "Receipt for order #XXXXX"
+- Provider is "Horseplay"
+- Date may be in email header text like "Feb 18, 2026 at 1:33PM"
+- Order number is shown as "ORDER #23866" and should be invoice_number "23866"
+- Item rows can appear as "ITEM NAME × QUANTITY" with price at right
+- Variant text below an item (for example "BLACK / HORSE", "BROWN / FULL") is NOT a separate item; append it to description in parentheses
+- Parse quantity from "× N" and do not keep "× N" in description
+- No due date for this format => due_date: null
+
+For the sample Horseplay receipt, parse:
+- provider_name: "Horseplay"
+- invoice_number: "23866"
+- invoice_date: "2026-02-18"
+- subtotal: 265.00
+- tax_total_usd: 20.55
+- invoice_total_usd: 285.55
+
+${PROVIDER_CONTACT_PROMPT}
+Return strict JSON only.`;
+  }
   if (categorySlug === "bodywork") {
     return `Extract from this bodywork/chiropractic/massage invoice: invoice_number, invoice_date, due_date, provider_name, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, horse_name (if identifiable), quantity, unit_price, total_usd.
 
@@ -956,7 +999,8 @@ function applyEntityMatching(
   registeredHorses: Array<{ _id: string; name: string }>,
   registeredPeople: Array<{ _id: string; name: string; role: string }>,
   dynamicHorseAliases: Array<{ alias: string; horseName: string }>,
-  dynamicPersonAliases: Array<{ alias: string; personName: string }>
+  dynamicPersonAliases: Array<{ alias: string; personName: string }>,
+  options: { matchHorses: boolean; matchPeople: boolean }
 ) {
   const normalized = { ...parsed };
   const horseAliasMap = Object.fromEntries(dynamicHorseAliases.map((row) => [normalizeAliasKey(row.alias), row.horseName]));
@@ -964,8 +1008,8 @@ function applyEntityMatching(
   const lineItems = getLineItems(normalized).map((item) => ({ ...(item as Record<string, unknown>) }));
 
   for (const row of lineItems) {
-    const rawHorseName = pickString(row, ["horse_name", "horseName"]);
-    if (rawHorseName) {
+    const rawHorseName = options.matchHorses ? pickString(row, ["horse_name", "horseName"]) : undefined;
+    if (options.matchHorses && rawHorseName) {
       const horseMatch = matchHorseName(rawHorseName, registeredHorses, horseAliasMap);
       row.horse_name_raw = rawHorseName;
       row.match_confidence = horseMatch.confidence;
@@ -983,8 +1027,8 @@ function applyEntityMatching(
       }
     }
 
-    const rawPersonName = pickString(row, ["person_name", "personName", "employee_name", "name"]);
-    if (rawPersonName) {
+    const rawPersonName = options.matchPeople ? pickString(row, ["person_name", "personName", "employee_name", "name"]) : undefined;
+    if (options.matchPeople && rawPersonName) {
       const personMatch = matchPersonName(rawPersonName, registeredPeople, personAliasMap);
       row.person_name_raw = rawPersonName;
       row.person_match_confidence = personMatch.confidence;
@@ -1000,8 +1044,8 @@ function applyEntityMatching(
     }
   }
 
-  const topLevelPerson = pickString(normalized, ["person_name", "driver_name", "driverName", "assigned_person_suggestion"]);
-  if (topLevelPerson) {
+  const topLevelPerson = options.matchPeople ? pickString(normalized, ["person_name", "driver_name", "driverName", "assigned_person_suggestion"]) : undefined;
+  if (options.matchPeople && topLevelPerson) {
     const match = matchPersonName(topLevelPerson, registeredPeople, personAliasMap);
     normalized.person_name_raw = topLevelPerson;
     normalized.person_match_confidence = match.confidence;
@@ -1020,6 +1064,21 @@ function applyEntityMatching(
   normalized.line_items = lineItems;
   normalized.lineItems = lineItems;
   return normalized;
+}
+
+function collectUnmatchedHorseNames(parsed: Record<string, unknown>) {
+  const lineItems = getLineItems(parsed);
+  const names = new Set<string>();
+  for (const item of lineItems) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const confidence = String(row.match_confidence ?? row.matchConfidence ?? "").toLowerCase();
+    if (confidence !== "none" && confidence !== "") continue;
+    const raw = pickString(row, ["horse_name_raw", "originalParsedName", "horse_name", "horseName"]);
+    if (!raw) continue;
+    names.add(raw);
+  }
+  return [...names];
 }
 
 function round2(value: number) {

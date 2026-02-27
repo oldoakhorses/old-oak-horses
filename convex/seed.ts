@@ -500,6 +500,78 @@ export const seedCategories = mutation(async (ctx) => {
     }
   }
 
+  const suppliesCategory = await ctx.db
+    .query("categories")
+    .withIndex("by_slug", (q) => q.eq("slug", "supplies"))
+    .first();
+  if (!suppliesCategory) {
+    throw new Error("Supplies category not found after category seed");
+  }
+
+  const suppliesProviders: Array<{
+    name: string;
+    slug: string;
+    email?: string;
+    address?: string;
+    phone?: string;
+    website?: string;
+  }> = [
+    {
+      name: "FarmVet",
+      slug: "farmvet",
+      email: "sales@farmvet.com",
+      address: "1254 Old Hillsboro Rd, Franklin, TN 37069",
+      phone: "888.837.3626",
+      website: "https://www.farmvet.com/"
+    },
+    {
+      name: "Horseplay",
+      slug: "horseplay",
+      email: "hello@horseplaybend.com"
+    },
+    {
+      name: "VDM Mobile Tack",
+      slug: "vdm-mobile-tack",
+      email: "sarah@mobiletack.com"
+    }
+  ];
+
+  for (const provider of suppliesProviders) {
+    const existingProvider = await ctx.db
+      .query("providers")
+      .withIndex("by_category_name", (q) => q.eq("categoryId", suppliesCategory._id).eq("name", provider.name))
+      .first();
+    if (!existingProvider) {
+      await ctx.db.insert("providers", {
+        categoryId: suppliesCategory._id,
+        name: provider.name,
+        slug: provider.slug,
+        email: provider.email,
+        address: provider.address,
+        phone: provider.phone,
+        website: provider.website,
+        extractionPrompt:
+          "Extract all data from this supplies/equipment invoice or receipt as strict JSON. Include provider_name, invoice_number (order or receipt number is valid), invoice_date, due_date (null for receipts), subtotal, tax_total_usd, invoice_total_usd, original_currency, and line_items[] with description, quantity, unit_price, total_usd. For email receipts (including Horseplay): parse headers like 'Receipt for order #', use ORDER # as invoice_number, parse date from email header, and treat variant lines like 'BLACK / HORSE' as details appended to the item description in parentheses rather than separate line items.",
+        expectedFields: ["invoice_number", "invoice_date", "provider_name", "invoice_total_usd", "line_items"],
+        createdAt: Date.now()
+      });
+      createdProviders += 1;
+      continue;
+    }
+
+    const patch: Record<string, unknown> = {};
+    if (!existingProvider.slug) patch.slug = provider.slug;
+    if (!existingProvider.email && provider.email) patch.email = provider.email;
+    if (!existingProvider.address && provider.address) patch.address = provider.address;
+    if (!existingProvider.phone && provider.phone) patch.phone = provider.phone;
+    if (!existingProvider.website && provider.website) patch.website = provider.website;
+    if (Object.keys(patch).length > 0) {
+      patch.updatedAt = Date.now();
+      await ctx.db.patch(existingProvider._id, patch);
+      updatedProviders += 1;
+    }
+  }
+
   return { createdCategories, createdProviders, updatedProviders, skipped: false };
 });
 

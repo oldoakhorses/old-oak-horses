@@ -158,6 +158,8 @@ export default defineSchema({
     ),
     linkedFromBillId: v.optional(v.id("bills"))
     ,
+    hasUnmatchedHorses: v.optional(v.boolean()),
+    unmatchedHorseNames: v.optional(v.array(v.string())),
     extractedProviderContact: v.optional(
       v.object({
         providerName: v.optional(v.string()),

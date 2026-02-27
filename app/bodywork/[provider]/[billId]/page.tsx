@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
+import UnmatchedHorseBanner from "@/components/UnmatchedHorseBanner";
 import styles from "./invoice.module.css";
 
 type LineItem = {
@@ -109,6 +110,8 @@ export default function BodyworkInvoicePage() {
           </div>
         </section>
 
+        {bill?.hasUnmatchedHorses ? <UnmatchedHorseBanner billId={billId as any} unmatchedNames={bill.unmatchedHorseNames ?? []} /> : null}
+
         {grouped.map((group) => (
           <section key={group.horseName} className={styles.horseCard}>
             <div className={styles.horseCardHeader}>
@@ -137,9 +140,20 @@ export default function BodyworkInvoicePage() {
           {bill?.status === "done" ? (
             <div className={styles.approvedBar}>✓ invoice approved</div>
           ) : (
-            <button type="button" className={styles.approveBtn} onClick={onApprove}>
-              approve invoice
-            </button>
+            <div style={{ flex: 1 }}>
+              <button
+                type="button"
+                className={bill?.hasUnmatchedHorses ? styles.deleteBtn : styles.approveBtn}
+                onClick={onApprove}
+                disabled={Boolean(bill?.hasUnmatchedHorses)}
+                style={bill?.hasUnmatchedHorses ? { background: "#E8EAF0", color: "#9EA2B0", borderColor: "#E8EAF0", cursor: "default" } : undefined}
+              >
+                {bill?.hasUnmatchedHorses ? "assign all horses before approving" : "approve invoice"}
+              </button>
+              {bill?.hasUnmatchedHorses ? (
+                <div style={{ marginTop: 6, fontSize: 10, color: "#E5484D" }}>resolve all unmatched horses before approving</div>
+              ) : null}
+            </div>
           )}
           <button type="button" className={styles.deleteBtn} onClick={() => setShowDeleteConfirm(true)}>
             delete

@@ -8,6 +8,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
 import Modal from "@/components/Modal";
+import UnmatchedHorseBanner from "@/components/UnmatchedHorseBanner";
 import styles from "./invoice.module.css";
 
 type AssignmentMode = "line_item" | "split";
@@ -171,7 +172,11 @@ export default function HorseTransportInvoicePage() {
   const splitValid = splitHorseIds.length >= 2 && (splitMode === "even" || Math.abs(splitDelta) <= 0.01);
   const canSave = mode === "line_item" ? allLineItemsAssigned : splitValid;
   const horsesCountForFooter = mode === "line_item" ? groupedByHorse.length : computedSplitRows.length;
-  const canApprove = bill?.status === "done" ? false : assignmentSaved && (mode === "line_item" ? allLineItemsAssigned : splitValid);
+  const hasUnmatchedHorses = Boolean(bill?.hasUnmatchedHorses);
+  const canApprove =
+    bill?.status === "done"
+      ? false
+      : assignmentSaved && !hasUnmatchedHorses && (mode === "line_item" ? allLineItemsAssigned : splitValid);
 
   if (!bill) {
     return (
@@ -270,6 +275,8 @@ export default function HorseTransportInvoicePage() {
             <div className={styles.totalAmount}>{fmtUSD(total)}</div>
           </div>
         </section>
+
+        {hasUnmatchedHorses ? <UnmatchedHorseBanner billId={billId} unmatchedNames={bill.unmatchedHorseNames ?? []} /> : null}
 
         <section className={assignmentSaved ? styles.assignmentCardComplete : styles.assignmentCard}>
           <div className={styles.assignTitle}>🐴 assign_horses</div>
@@ -491,9 +498,14 @@ export default function HorseTransportInvoicePage() {
           {bill.status === "done" ? (
             <div className={styles.approvedBar}>✓ invoice approved</div>
           ) : (
-            <button type="button" className={canApprove ? styles.approveBtn : styles.approveDisabled} disabled={!canApprove || isApproving} onClick={onApprove}>
-              {canApprove ? (isApproving ? "approving..." : "approve invoice") : "assign all horses before approving"}
-            </button>
+            <>
+              <button type="button" className={canApprove ? styles.approveBtn : styles.approveDisabled} disabled={!canApprove || isApproving} onClick={onApprove}>
+                {canApprove ? (isApproving ? "approving..." : "approve invoice") : "assign all horses before approving"}
+              </button>
+              {hasUnmatchedHorses ? (
+                <div style={{ marginTop: 6, fontSize: 10, color: "#E5484D" }}>resolve all unmatched horses before approving</div>
+              ) : null}
+            </>
           )}
           <button type="button" className={styles.deleteBtn} onClick={() => setShowDeleteConfirm(true)}>
             delete
