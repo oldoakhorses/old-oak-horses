@@ -320,7 +320,7 @@ export const seedCategories = mutation(async (ctx) => {
     { name: "Brook Ledge", slug: "brook-ledge", subcategorySlug: "ground-transport" },
     { name: "Johnson", slug: "johnson", subcategorySlug: "ground-transport" },
     { name: "Stateside", slug: "stateside", subcategorySlug: "ground-transport" },
-    { name: "Sominium", slug: "sominium", subcategorySlug: "ground-transport" },
+    { name: "Somnium Farm", slug: "somnium", subcategorySlug: "ground-transport" },
     { name: "Gelissen", slug: "gelissen", subcategorySlug: "ground-transport" },
     { name: "Dutta Corp", slug: "dutta-corp", subcategorySlug: "air-transport" },
     { name: "Apollo Equine Transport", slug: "apollo-equine-transport", subcategorySlug: "air-transport" },
@@ -354,6 +354,19 @@ export const seedCategories = mutation(async (ctx) => {
       });
       updatedProviders += 1;
     }
+  }
+
+  const legacySominium = await ctx.db
+    .query("providers")
+    .withIndex("by_category_name", (q) => q.eq("categoryId", horseTransportCategory._id).eq("name", "Sominium"))
+    .first();
+  if (legacySominium) {
+    await ctx.db.patch(legacySominium._id, {
+      name: "Somnium Farm",
+      slug: "somnium",
+      updatedAt: Date.now()
+    });
+    updatedProviders += 1;
   }
 
   const farrierCategory = await ctx.db

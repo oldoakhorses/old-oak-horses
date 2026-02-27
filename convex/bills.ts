@@ -1565,6 +1565,68 @@ export const saveHorseAssignment = mutation({
   }
 });
 
+export const saveHorseTransportAssignment = mutation({
+  args: {
+    billId: v.id("bills"),
+    mode: v.union(v.literal("line_item"), v.literal("split")),
+    horseAssignments: v.optional(
+      v.array(
+        v.object({
+          lineItemIndex: v.number(),
+          horseId: v.optional(v.id("horses")),
+          horseName: v.optional(v.string())
+        })
+      )
+    ),
+    splitLineItems: v.optional(
+      v.array(
+        v.object({
+          lineItemIndex: v.number(),
+          splits: v.array(
+            v.object({
+              horseId: v.id("horses"),
+              horseName: v.string(),
+              amount: v.number()
+            })
+          )
+        })
+      )
+    ),
+    splitType: v.optional(v.union(v.literal("single"), v.literal("split"))),
+    assignedHorses: v.optional(
+      v.array(
+        v.object({
+          horseId: v.id("horses"),
+          horseName: v.string(),
+          amount: v.number()
+        })
+      )
+    )
+  },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+
+    if (args.mode === "line_item") {
+      await ctx.db.patch(args.billId, {
+        horseAssignments: args.horseAssignments ?? [],
+        splitLineItems: args.splitLineItems ?? [],
+        horseSplitType: undefined,
+        assignedHorses: undefined
+      });
+      return args.billId;
+    }
+
+    await ctx.db.patch(args.billId, {
+      horseSplitType: args.splitType ?? "split",
+      assignedHorses: args.assignedHorses ?? [],
+      horseAssignments: undefined,
+      splitLineItems: undefined
+    });
+    return args.billId;
+  }
+});
+
 export const saveTravelAssignment = mutation({
   args: {
     billId: v.id("bills"),

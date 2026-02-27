@@ -45,7 +45,8 @@ export const getProviderBySlug = query({
   },
   handler: async (ctx, args) => {
     const slugAliases: Record<string, string> = {
-      "fred-michaelson": "fred-michelon"
+      "fred-michaelson": "fred-michelon",
+      sominium: "somnium"
     };
     const requestedSlug = slugAliases[args.providerSlug] ?? args.providerSlug;
     const category = await ctx.db
