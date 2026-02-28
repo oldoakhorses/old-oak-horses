@@ -67,7 +67,8 @@
 
 .actionOutlined,
 .actionFilled,
-.actionLink {
+.actionLink,
+.actionSignOut {
   border-radius: 6px;
   padding: 7px 16px;
   font-size: 11px;
@@ -95,6 +96,25 @@
   color: var(--color-accent);
   font-weight: 400;
   padding: 0;
+}
+
+.actionSignOut {
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #9ea2b0;
+  font-weight: 400;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.actionSignOut:hover {
+  color: #e5484d;
+  border-color: #e5484d;
+}
+
+.actionSignOut:disabled {
+  opacity: 0.65;
+  cursor: default;
 }
 
 @media (max-width: 640px) {

@@ -4,11 +4,9 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
+import splashImages from "./splash-images.json";
 
-const SPLASH_IMAGES = [
-  { src: "/login-hero.jpg", position: "center 25%" },
-  { src: "/splash-2.jpg", position: "center 35%" },
-] as const;
+const SPLASH_IMAGES = splashImages.length > 0 ? splashImages : ["/splash-1.jpg"];
 
 export default function SplashPage() {
   const router = useRouter();
@@ -50,26 +48,26 @@ export default function SplashPage() {
   return (
     <main className={styles.splash}>
       <Image
-        src={SPLASH_IMAGES[current].src}
+        src={SPLASH_IMAGES[current]}
         alt="Old Oak Horses splash"
         fill
         priority
         sizes="100vw"
         className={styles.splashImageCurrent}
         style={{
-          objectPosition: SPLASH_IMAGES[current].position,
+          objectPosition: "center 30%",
           opacity: next !== null ? 0 : 1,
         }}
       />
 
       {next !== null ? (
         <Image
-          src={SPLASH_IMAGES[next].src}
+          src={SPLASH_IMAGES[next]}
           alt="Old Oak Horses splash next"
           fill
           sizes="100vw"
           className={styles.splashImageNext}
-          style={{ objectPosition: SPLASH_IMAGES[next].position }}
+          style={{ objectPosition: "center 30%" }}
         />
       ) : null}
 
