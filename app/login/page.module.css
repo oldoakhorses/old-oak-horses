@@ -1,0 +1,253 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  background: #f8f9fb;
+}
+
+.imagePanel {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+}
+
+.imagePanel img {
+  object-fit: cover;
+  object-position: center 30%;
+}
+
+.formPanel {
+  width: 480px;
+  min-height: 100vh;
+  background: #f8f9fb;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 48px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.formInner {
+  width: 100%;
+  max-width: 340px;
+}
+
+.loginBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #9ea2b0;
+  cursor: pointer;
+  margin-bottom: 32px;
+  text-decoration: none;
+  transition: color 0.15s;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: "Space Mono", monospace;
+}
+
+.loginBack:hover {
+  color: #4a5bdb;
+}
+
+.brandMark {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 48px;
+}
+
+.brandIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #1a1a2e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #fff;
+  font-weight: 700;
+}
+
+.brandName {
+  font-style: italic;
+  font-size: 14px;
+  color: #1a1a2e;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.headerWrap {
+  margin-bottom: 32px;
+}
+
+.kicker {
+  font-size: 10px;
+  color: #9ea2b0;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 6px;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7084;
+}
+
+.errorBanner {
+  background: rgba(229, 72, 77, 0.06);
+  border: 1px solid rgba(229, 72, 77, 0.2);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.errorIcon {
+  font-size: 14px;
+}
+
+.errorText {
+  font-size: 11px;
+  font-weight: 700;
+  color: #e5484d;
+}
+
+.fieldLabel {
+  display: block;
+  font-size: 10px;
+  color: #9ea2b0;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.input {
+  font-family: "Space Mono", monospace;
+  font-size: 13px;
+  padding: 12px 16px;
+  background: #ffffff;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  color: #1a1a2e;
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #4a5bdb;
+}
+
+.passwordRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.forgot {
+  font-size: 9px;
+  color: #4a5bdb;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+}
+
+.signInBtn {
+  font-family: "Space Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #1a1a2e;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  margin-bottom: 16px;
+}
+
+.signInBtn:disabled {
+  background: #e8eaf0;
+  color: #9ea2b0;
+  cursor: default;
+}
+
+.divider {
+  height: 1px;
+  background: #e8eaf0;
+  margin-bottom: 16px;
+}
+
+.investorBtn {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  width: 100%;
+  padding: 12px 20px;
+  border-radius: 8px;
+  border: 1px solid #e8eaf0;
+  background: #ffffff;
+  color: #6b7084;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: border-color 0.15s, color 0.15s;
+  text-decoration: none;
+}
+
+.investorBtn:hover {
+  border-color: #4a5bdb;
+  color: #4a5bdb;
+}
+
+.contact {
+  display: block;
+  margin-top: 32px;
+  font-size: 11px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s;
+  text-align: center;
+}
+
+.contact:hover {
+  color: #4a5bdb;
+}
+
+.footer {
+  position: absolute;
+  bottom: 32px;
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.1em;
+}
+
+@media (max-width: 900px) {
+  .imagePanel {
+    display: none;
+  }
+
+  .formPanel {
+    width: 100%;
+    padding: 40px 28px;
+  }
+}

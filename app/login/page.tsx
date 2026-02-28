@@ -1,269 +1,125 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import Image from "next/image";
+import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvex } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import styles from "./login.module.css";
-
-type LoginView = "signIn" | "requestReset" | "verifyReset";
+import styles from "./page.module.css";
 
 export default function LoginPage() {
   const router = useRouter();
   const convex = useConvex();
   const { signIn } = useAuthActions();
 
-  const [view, setView] = useState<LoginView>("signIn");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState("lucy@oldoakhorses.com");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [resetCode, setResetCode] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [infoMessage, setInfoMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [showError, setShowError] = useState(false);
 
-  const redirectByRole = async () => {
-    const user = await convex.query(api.users.currentUser, {});
-    if (user?.role === "admin") {
-      router.replace("/dashboard");
-      return;
-    }
-    router.replace("/investor");
-  };
+  const disabled = useMemo(() => submitting || !email.trim() || !password.trim(), [email, password, submitting]);
 
-  const onSignIn = async (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setErrorMessage("");
-    setInfoMessage("");
-    setIsSubmitting(true);
-
+    if (disabled) return;
+    setSubmitting(true);
+    setShowError(false);
     try {
       const formData = new FormData();
       formData.set("flow", "signIn");
-      formData.set("email", email);
+      formData.set("email", email.trim());
       formData.set("password", password);
-
       await signIn("password", formData);
-      await redirectByRole();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Sign in failed";
-      setErrorMessage(message);
+      const user = await convex.query(api.users.currentUser, {});
+      router.replace(user?.role === "investor" ? "/investor" : "/dashboard");
+    } catch {
+      setShowError(true);
     } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const onRequestReset = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setErrorMessage("");
-    setInfoMessage("");
-    setIsSubmitting(true);
-
-    try {
-      const formData = new FormData();
-      formData.set("flow", "reset");
-      formData.set("email", email);
-
-      await signIn("password", formData);
-      setView("verifyReset");
-      setInfoMessage("Reset code sent. Check your email.");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to send reset code";
-      setErrorMessage(message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const onVerifyReset = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setErrorMessage("");
-    setInfoMessage("");
-    setIsSubmitting(true);
-
-    try {
-      const formData = new FormData();
-      formData.set("flow", "reset-verification");
-      formData.set("email", email);
-      formData.set("code", resetCode);
-      formData.set("newPassword", newPassword);
-
-      await signIn("password", formData);
-      await redirectByRole();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Password reset failed";
-      setErrorMessage(message);
-    } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
   return (
     <div className={styles.page}>
-      <div className={styles.wrap}>
-        <p className={styles.brand}>old-oak-horses</p>
-        <div className={styles.section}>// login</div>
+      <section className={styles.imagePanel}>
+        <Image src="/login-hero.jpg" alt="Show jumping" fill priority sizes="(max-width: 900px) 0px, 60vw" />
+      </section>
 
-        <section className={styles.card}>
-          {view === "signIn" ? (
-            <form className={styles.form} onSubmit={onSignIn}>
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor="email">
-                  Email
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  className={styles.input}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
+      <section className={styles.formPanel}>
+        <div className={styles.formInner}>
+          <button type="button" className={styles.loginBack} onClick={() => router.push("/")}>
+            ← back
+          </button>
 
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor="password">
-                  Password
-                </label>
-                <div className={styles.inputWrap}>
-                  <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="current-password"
-                    required
-                    className={styles.input}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <button type="button" className={styles.eye} onClick={() => setShowPassword((v) => !v)}>
-                    {showPassword ? "hide" : "show"}
-                  </button>
-                </div>
-              </div>
+          <div className={styles.brandMark}>
+            <div className={styles.brandIcon}>O</div>
+            <div className={styles.brandName}>old_oak_horses</div>
+          </div>
 
-              <button className={styles.button} type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "signing in..." : "sign in"}
-              </button>
+          <div className={styles.headerWrap}>
+            <div className={styles.kicker}>// AUTHENTICATION</div>
+            <h1 className={styles.title}>sign in</h1>
+            <p className={styles.subtitle}>enter your credentials to continue</p>
+          </div>
 
-              <button
-                className={styles.forgot}
-                type="button"
-                onClick={() => {
-                  setView("requestReset");
-                  setErrorMessage("");
-                  setInfoMessage("");
-                }}
-              >
-                forgot password?
-              </button>
-
-              {errorMessage ? <p className={styles.error}>{errorMessage}</p> : null}
-            </form>
+          {showError ? (
+            <div className={styles.errorBanner}>
+              <span className={styles.errorIcon}>⚠</span>
+              <span className={styles.errorText}>invalid email or password</span>
+            </div>
           ) : null}
 
-          {view === "requestReset" ? (
-            <form className={styles.form} onSubmit={onRequestReset}>
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor="reset-email">
-                  Email
-                </label>
-                <input
-                  id="reset-email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  className={styles.input}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <button className={styles.button} type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "sending..." : "send reset code"}
-              </button>
-              <button
-                type="button"
-                className={styles.back}
-                onClick={() => {
-                  setView("signIn");
-                  setErrorMessage("");
-                  setInfoMessage("");
-                }}
-              >
-                back to sign in
-              </button>
-              {infoMessage ? <p className={styles.info}>{infoMessage}</p> : null}
-              {errorMessage ? <p className={styles.error}>{errorMessage}</p> : null}
-            </form>
-          ) : null}
+          <form onSubmit={onSubmit}>
+            <label className={styles.fieldLabel} htmlFor="email">
+              EMAIL
+            </label>
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="lucy@oldoakhorses.com"
+              className={styles.input}
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
 
-          {view === "verifyReset" ? (
-            <form className={styles.form} onSubmit={onVerifyReset}>
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor="verify-email">
-                  Email
-                </label>
-                <input
-                  id="verify-email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  className={styles.input}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor="reset-code">
-                  Reset Code
-                </label>
-                <input
-                  id="reset-code"
-                  required
-                  className={styles.input}
-                  value={resetCode}
-                  onChange={(e) => setResetCode(e.target.value)}
-                />
-              </div>
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor="new-password">
-                  New Password
-                </label>
-                <input
-                  id="new-password"
-                  type="password"
-                  required
-                  className={styles.input}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                />
-              </div>
-              <button className={styles.button} type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "resetting..." : "reset password"}
-              </button>
-              <button
-                type="button"
-                className={styles.back}
-                onClick={() => {
-                  setView("signIn");
-                  setErrorMessage("");
-                  setInfoMessage("");
-                }}
-              >
-                back to sign in
-              </button>
-              {infoMessage ? <p className={styles.info}>{infoMessage}</p> : null}
-              {errorMessage ? <p className={styles.error}>{errorMessage}</p> : null}
-            </form>
-          ) : null}
-        </section>
+            <div className={styles.passwordRow}>
+              <label className={styles.fieldLabel} htmlFor="password">
+                PASSWORD
+              </label>
+              <a href="mailto:lucy@oldoakhorses.com" className={styles.forgot}>
+                forgot?
+              </a>
+            </div>
+            <input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              placeholder="••••••••••••"
+              className={styles.input}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
 
-        <div className={styles.footer}>OLD_OAK_HORSES // LOGIN</div>
-      </div>
+            <button type="submit" className={styles.signInBtn} disabled={disabled}>
+              {submitting ? "signing in..." : "sign in"}
+            </button>
+          </form>
+
+          <div className={styles.divider} />
+
+          <a href="/investor" className={styles.investorBtn}>
+            investor dashboard →
+          </a>
+
+          <a className={styles.contact} href="mailto:lucy@oldoakhorses.com">
+            contact us
+          </a>
+        </div>
+
+        <div className={styles.footer}>OLD_OAK_HORSES // BILL MANAGEMENT</div>
+      </section>
     </div>
   );
 }
