@@ -139,26 +139,11 @@
   margin-bottom: 14px;
 }
 
-.horsesLeft {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.horsesTitle {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-  text-transform: lowercase;
-}
-
-.horsesTitle a {
-  text-decoration: none;
-}
-
-.count {
+.viewAll {
+  font-family: "Space Mono", monospace;
   font-size: 10px;
-  color: var(--color-text-muted);
+  color: #4a5bdb;
+  text-decoration: none;
 }
 
 .grid {

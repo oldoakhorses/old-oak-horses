@@ -5,12 +5,10 @@ import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import FilterTabs from "@/components/FilterTabs";
 import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
 import styles from "./dashboard.module.css";
 
-type HorseView = "active" | "past";
 type EventProviderMode = "none" | "contact" | "custom";
 
 type HorseFormState = {
@@ -52,7 +50,6 @@ const initialEventForm: EventFormState = {
 };
 
 export default function DashboardPage() {
-  const [horseView, setHorseView] = useState<HorseView>("active");
   const [showHorseModal, setShowHorseModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
   const [horseForm, setHorseForm] = useState<HorseFormState>(initialHorseForm);
@@ -61,14 +58,13 @@ export default function DashboardPage() {
   const [formError, setFormError] = useState("");
 
   const activeHorses = useQuery(api.horses.getActiveHorses) ?? [];
-  const pastHorses = useQuery(api.horses.getInactiveHorses) ?? [];
   const contacts = useQuery(api.contacts.getAllContacts) ?? [];
   const upcomingEvents = useQuery(api.scheduleEvents.getUpcomingEvents) ?? [];
 
   const createHorse = useMutation(api.horses.createHorse);
   const createEvent = useMutation(api.scheduleEvents.createEvent);
 
-  const shownHorses = horseView === "active" ? activeHorses : pastHorses;
+  const shownHorses = activeHorses;
 
   const contactsSorted = useMemo(() => [...contacts].sort((a, b) => a.name.localeCompare(b.name)), [contacts]);
   const upcomingEventsSorted = useMemo(() => [...upcomingEvents].sort((a, b) => a.date.localeCompare(b.date)), [upcomingEvents]);
@@ -167,20 +163,10 @@ export default function DashboardPage() {
 
         <section className={styles.horsesSection}>
           <div className={styles.horsesHead}>
-            <div className={styles.horsesLeft}>
-              <h2 className={styles.horsesTitle}>
-                <Link href="/horses">horses</Link>
-              </h2>
-              <FilterTabs
-                value={horseView}
-                onChange={setHorseView}
-                options={[
-                  { key: "active", label: "active" },
-                  { key: "past", label: "past" },
-                ]}
-              />
-            </div>
-            <div className={styles.count}>{shownHorses.length} {horseView}</div>
+            <div className="ui-label">// HORSES</div>
+            <Link href="/horses" className={styles.viewAll}>
+              view all →
+            </Link>
           </div>
 
           <div className={styles.grid}>
@@ -193,18 +179,14 @@ export default function DashboardPage() {
                   <Meta label="YEAR" value={horse.yearOfBirth ? String(horse.yearOfBirth) : "—"} />
                   <Meta label="USEF #" value={horse.usefNumber || "—"} />
                   <Meta label="FEI #" value={horse.feiNumber || "—"} />
-                  {horseView === "past" && horse.isSold ? <Meta label="STATUS" value="sold" /> : null}
                 </div>
-                {horseView === "past" && horse.isSold ? <span className={styles.soldBadge}>sold</span> : null}
               </Link>
             ))}
 
-            {horseView === "active" ? (
-              <button type="button" className={styles.addCard} onClick={() => setShowHorseModal(true)}>
-                <div className={styles.plus}>+</div>
-                <div>add horse</div>
-              </button>
-            ) : null}
+            <button type="button" className={styles.addCard} onClick={() => setShowHorseModal(true)}>
+              <div className={styles.plus}>+</div>
+              <div>add horse</div>
+            </button>
           </div>
         </section>
 
