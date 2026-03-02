@@ -38,6 +38,7 @@ export const createHorse = mutation({
   args: {
     name: v.string(),
     yearOfBirth: v.optional(v.number()),
+    sex: v.optional(v.union(v.literal("gelding"), v.literal("mare"), v.literal("stallion"))),
     usefNumber: v.optional(v.string()),
     feiNumber: v.optional(v.string()),
     owner: v.optional(v.string())
@@ -46,6 +47,7 @@ export const createHorse = mutation({
     return await ctx.db.insert("horses", {
       name: args.name.trim(),
       yearOfBirth: args.yearOfBirth,
+      sex: args.sex,
       usefNumber: args.usefNumber?.trim() || undefined,
       feiNumber: args.feiNumber?.trim() || undefined,
       owner: args.owner?.trim() || undefined,
@@ -60,6 +62,7 @@ export const updateHorseProfile = mutation({
     horseId: v.id("horses"),
     name: v.optional(v.string()),
     yearOfBirth: v.optional(v.number()),
+    sex: v.optional(v.union(v.literal("gelding"), v.literal("mare"), v.literal("stallion"))),
     usefNumber: v.optional(v.string()),
     feiNumber: v.optional(v.string()),
     owner: v.optional(v.string())
@@ -73,6 +76,7 @@ export const updateHorseProfile = mutation({
     await ctx.db.patch(args.horseId, {
       name: args.name?.trim(),
       yearOfBirth: args.yearOfBirth,
+      sex: args.sex,
       usefNumber: args.usefNumber?.trim() || undefined,
       feiNumber: args.feiNumber?.trim() || undefined,
       owner: args.owner?.trim() || undefined

@@ -89,6 +89,12 @@
   border-radius: 6px;
   padding: 12px 16px;
   font-size: 13px;
+  font-family: "Space Mono", monospace;
+}
+
+.fieldInput select {
+  appearance: none;
+  cursor: pointer;
 }
 
 .actions {

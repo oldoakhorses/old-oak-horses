@@ -67,7 +67,7 @@
 .row {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr 200px 80px 100px 40px;
+  grid-template-columns: 1fr 180px 80px 80px 100px 40px;
   align-items: center;
   gap: 10px;
   padding: 14px 0;
@@ -96,6 +96,11 @@
 
 .owner,
 .year {
+  font-size: 12px;
+  color: #6b7084;
+}
+
+.sex {
   font-size: 12px;
   color: #6b7084;
 }

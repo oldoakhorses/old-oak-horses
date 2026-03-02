@@ -179,6 +179,7 @@ export default defineSchema({
   horses: defineTable({
     name: v.string(),
     yearOfBirth: v.optional(v.number()),
+    sex: v.optional(v.union(v.literal("gelding"), v.literal("mare"), v.literal("stallion"))),
     usefNumber: v.optional(v.string()),
     feiNumber: v.optional(v.string()),
     owner: v.optional(v.string()),

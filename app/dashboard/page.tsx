@@ -284,7 +284,7 @@ export default function DashboardPage() {
               <Link href={`/horses/${horse._id}`} key={horse._id} className={styles.horseCard}>
                 <div className={styles.horseAvatar}>🐴</div>
                 <h3 className={styles.horseName}>{horse.name}</h3>
-                <div className={styles.horseOwner}>{horse.owner || "—"}</div>
+                <div className={styles.horseMetaLine}>{horseOwnerSexLine(horse.owner, horse.sex)}</div>
                 <div className={styles.metaGrid}>
                   <Meta label="YEAR" value={horse.yearOfBirth ? String(horse.yearOfBirth) : "—"} />
                   <Meta label="USEF #" value={horse.usefNumber || "—"} />
@@ -454,6 +454,17 @@ export default function DashboardPage() {
       </Modal>
     </div>
   );
+}
+
+function horseOwnerSexLine(owner?: string, sex?: "gelding" | "mare" | "stallion") {
+  const parts: string[] = [];
+  if (owner) parts.push(owner);
+  if (sex) parts.push(capitalize(sex));
+  return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {

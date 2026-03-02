@@ -13,6 +13,7 @@ import styles from "./profile.module.css";
 type FormState = {
   name: string;
   yearOfBirth: string;
+  sex: "" | "gelding" | "mare" | "stallion";
   usefNumber: string;
   feiNumber: string;
   owner: string;
@@ -35,6 +36,7 @@ export default function HorseProfilePage() {
   const [form, setForm] = useState<FormState>({
     name: "",
     yearOfBirth: "",
+    sex: "",
     usefNumber: "",
     feiNumber: "",
     owner: "",
@@ -46,6 +48,7 @@ export default function HorseProfilePage() {
     setForm({
       name: horse.name ?? "",
       yearOfBirth: horse.yearOfBirth ? String(horse.yearOfBirth) : "",
+      sex: horse.sex ?? "",
       usefNumber: horse.usefNumber ?? "",
       feiNumber: horse.feiNumber ?? "",
       owner: horse.owner ?? "",
@@ -81,6 +84,7 @@ export default function HorseProfilePage() {
         horseId: horse._id,
         name: form.name || undefined,
         yearOfBirth: form.yearOfBirth ? Number(form.yearOfBirth) : undefined,
+        sex: form.sex || undefined,
         usefNumber: form.usefNumber || undefined,
         feiNumber: form.feiNumber || undefined,
         owner: form.owner || undefined,
@@ -138,14 +142,22 @@ export default function HorseProfilePage() {
             <Field label="YEAR OF BIRTH" editing={isEditing} value={horse.yearOfBirth ? String(horse.yearOfBirth) : "—"}>
               <input value={form.yearOfBirth} onChange={(e) => setForm((p) => ({ ...p, yearOfBirth: e.target.value }))} />
             </Field>
+            <Field label="SEX" editing={isEditing} value={horse.sex ? capitalize(horse.sex) : "—"}>
+              <select value={form.sex} onChange={(e) => setForm((p) => ({ ...p, sex: e.target.value as FormState["sex"] }))}>
+                <option value="">-- select --</option>
+                <option value="gelding">Gelding</option>
+                <option value="mare">Mare</option>
+                <option value="stallion">Stallion</option>
+              </select>
+            </Field>
+            <Field label="OWNER" editing={isEditing} value={horse.owner || "—"}>
+              <input value={form.owner} onChange={(e) => setForm((p) => ({ ...p, owner: e.target.value }))} />
+            </Field>
             <Field label="USEF #" editing={isEditing} value={horse.usefNumber || "—"}>
               <input value={form.usefNumber} onChange={(e) => setForm((p) => ({ ...p, usefNumber: e.target.value }))} />
             </Field>
             <Field label="FEI #" editing={isEditing} value={horse.feiNumber || "—"}>
               <input value={form.feiNumber} onChange={(e) => setForm((p) => ({ ...p, feiNumber: e.target.value }))} />
-            </Field>
-            <Field label="OWNER" editing={isEditing} value={horse.owner || "—"}>
-              <input value={form.owner} onChange={(e) => setForm((p) => ({ ...p, owner: e.target.value }))} />
             </Field>
             <Field label="STATUS" editing={isEditing} value={horse.isSold ? "sold" : horse.status}>
               <select value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as "active" | "inactive" }))}>
@@ -224,4 +236,8 @@ function Field({
 
 function formatUsd(value: number) {
   return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }

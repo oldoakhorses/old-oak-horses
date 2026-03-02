@@ -99,6 +99,7 @@ export default function HorsesPage() {
                   </Link>
                 </div>
                 <div className={styles.owner}>{horse.owner || "—"}</div>
+                <div className={styles.sex}>{horse.sex ? capitalize(horse.sex) : "—"}</div>
                 <div className={styles.year}>{horse.yearOfBirth ? String(horse.yearOfBirth) : "—"}</div>
                 <div>
                   {horse.isSold ? <span className={styles.soldBadge}>sold</span> : horse.status === "active" ? <span className={styles.activeBadge}>active</span> : <span className={styles.inactiveBadge}>inactive</span>}
@@ -153,4 +154,8 @@ export default function HorsesPage() {
       </main>
     </div>
   );
+}
+
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
