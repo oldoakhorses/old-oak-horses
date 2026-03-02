@@ -1,16 +1,17 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuthActions } from "@convex-dev/auth/react";
-import { useConvex } from "convex/react";
+import { useAction } from "convex/react";
+import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/convex/_generated/api";
 import styles from "./page.module.css";
 
 export default function LoginPage() {
   const router = useRouter();
-  const convex = useConvex();
-  const { signIn } = useAuthActions();
+  const loginAction = useAction(api.auth.login);
+  const { isAuthenticated, isLoading, login } = useAuth();
 
   const [email, setEmail] = useState("lucy@oldoakhorses.com");
   const [password, setPassword] = useState("");
@@ -19,19 +20,25 @@ export default function LoginPage() {
 
   const disabled = useMemo(() => submitting || !email.trim() || !password.trim(), [email, password, submitting]);
 
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      router.replace("/dashboard");
+    }
+  }, [isAuthenticated, isLoading, router]);
+
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (disabled) return;
     setSubmitting(true);
     setShowError(false);
     try {
-      const formData = new FormData();
-      formData.set("flow", "signIn");
-      formData.set("email", email.trim());
-      formData.set("password", password);
-      await signIn("password", formData);
-      const user = await convex.query(api.users.currentUser, {});
-      router.replace(user?.role === "investor" ? "/investor" : "/dashboard");
+      const result = await loginAction({ email: email.trim(), password });
+      if (result.success) {
+        login();
+        router.replace("/dashboard");
+      } else {
+        setShowError(true);
+      }
     } catch {
       setShowError(true);
     } finally {
@@ -46,19 +53,19 @@ export default function LoginPage() {
           ← back
         </button>
 
-        <div className={styles.brandMark}>
+        <div className={styles.brand}>
           <div className={styles.brandIcon}>O</div>
           <div className={styles.brandName}>old_oak_horses</div>
         </div>
 
-        <div className={styles.headerWrap}>
-          <div className={styles.kicker}>// AUTHENTICATION</div>
-          <h1 className={styles.title}>sign in</h1>
-          <p className={styles.subtitle}>enter your credentials to continue</p>
+        <div className={styles.header}>
+          <p className={styles.headerLabel}>// AUTHENTICATION</p>
+          <h1 className={styles.headerTitle}>sign in</h1>
+          <p className={styles.headerSubtitle}>enter your credentials to continue</p>
         </div>
 
         {showError ? (
-          <div className={styles.errorBanner}>
+          <div className={styles.loginError}>
             <span className={styles.errorIcon}>⚠</span>
             <span className={styles.errorText}>invalid email or password</span>
           </div>
@@ -73,16 +80,16 @@ export default function LoginPage() {
             type="email"
             autoComplete="email"
             placeholder="lucy@oldoakhorses.com"
-            className={styles.input}
+            className={styles.fieldInput}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
 
-          <div className={styles.passwordRow}>
+          <div className={styles.passwordLabelRow}>
             <label className={styles.fieldLabel} htmlFor="password">
               PASSWORD
             </label>
-            <a href="mailto:lucy@oldoakhorses.com" className={styles.forgot}>
+            <a href="mailto:lucy@oldoakhorses.com" className={styles.forgotLink}>
               forgot?
             </a>
           </div>
@@ -91,28 +98,28 @@ export default function LoginPage() {
             type="password"
             autoComplete="current-password"
             placeholder="••••••••••••"
-            className={styles.input}
+            className={`${styles.fieldInput} ${styles.passwordInput}`}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
 
-          <button type="submit" className={styles.signInBtn} disabled={disabled}>
+          <button type="submit" className={styles.btnSignin} disabled={disabled}>
             {submitting ? "signing in..." : "sign in"}
           </button>
         </form>
 
-        <div className={styles.divider} />
+        <div className={styles.loginDivider} />
 
-        <a href="/investor" className={styles.investorBtn}>
+        <a href="/investor" className={styles.btnInvestor}>
           investor dashboard →
         </a>
 
-        <a className={styles.contact} href="mailto:lucy@oldoakhorses.com">
+        <a className={styles.contactLink} href="mailto:lucy@oldoakhorses.com">
           contact us
         </a>
       </div>
 
-      <div className={styles.footer}>OLD_OAK_HORSES // BILL MANAGEMENT</div>
+      <div className={styles.loginFooter}>OLD_OAK_HORSES // BILL MANAGEMENT</div>
     </div>
   );
 }

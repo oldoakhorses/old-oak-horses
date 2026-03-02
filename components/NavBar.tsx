@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useAuthActions } from "@convex-dev/auth/react";
+import { useAuth } from "@/contexts/AuthContext";
 import styles from "./NavBar.module.css";
 
 export type BreadcrumbItem = {
@@ -30,15 +30,15 @@ export default function NavBar({
   showSignOut?: boolean;
 }) {
   const router = useRouter();
-  const { signOut } = useAuthActions();
+  const { logout } = useAuth();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const onSignOut = async () => {
     if (isSigningOut) return;
     setIsSigningOut(true);
     try {
-      await signOut();
-      router.replace("/");
+      logout();
+      router.replace("/login");
     } finally {
       setIsSigningOut(false);
     }
