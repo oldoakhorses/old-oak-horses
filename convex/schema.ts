@@ -37,6 +37,16 @@ export default defineSchema({
     email: v.optional(v.string()),
     website: v.optional(v.string()),
     accountNumber: v.optional(v.string()),
+    location: v.optional(
+      v.union(
+        v.literal("wellington"),
+        v.literal("thermal"),
+        v.literal("ocala"),
+        v.literal("la"),
+        v.literal("eu"),
+        v.literal("can")
+      )
+    ),
     extractionPrompt: v.string(),
     expectedFields: v.array(v.string()),
     createdAt: v.number(),
@@ -194,14 +204,29 @@ export default defineSchema({
 
   contacts: defineTable({
     name: v.string(),
+    role: v.optional(v.string()),
+    providerId: v.optional(v.id("providers")),
+    providerName: v.optional(v.string()),
     category: v.string(),
     company: v.optional(v.string()),
+    location: v.optional(
+      v.union(
+        v.literal("wellington"),
+        v.literal("thermal"),
+        v.literal("ocala"),
+        v.literal("la"),
+        v.literal("eu"),
+        v.literal("can")
+      )
+    ),
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
+    notes: v.optional(v.string()),
     createdAt: v.number()
   })
     .index("by_name", ["name"])
-    .index("by_category", ["category"]),
+    .index("by_category", ["category"])
+    .index("by_location", ["location"]),
 
   scheduleEvents: defineTable({
     type: v.string(),

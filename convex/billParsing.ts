@@ -230,6 +230,19 @@ export const parseBillPdf = internalAction({
           accountNumber: resolvedProvider.accountNumber ?? providerContactPatch.accountNumber
         });
       }
+
+      const contactCandidateName = providerContactPatch.contactName ?? providerContactPatch.primaryContactName ?? providerContactPatch.fullName;
+      if (contactCandidateName) {
+        await ctx.runMutation(internal.contacts.upsertContactFromInvoice, {
+          name: contactCandidateName,
+          providerId: resolvedProvider?._id,
+          providerName: resolvedProvider?.name ?? extractedCustomProviderName ?? providerContactPatch.fullName,
+          category: category.slug,
+          location: resolvedProvider?.location,
+          phone: providerContactPatch.phone ?? providerContactPatch.primaryContactPhone,
+          email: providerContactPatch.email
+        });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown parse error";
       await ctx.runMutation(internal.bills.markError, { billId: bill._id, errorMessage: message });

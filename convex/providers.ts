@@ -195,7 +195,17 @@ export const updateProviderContact = mutation({
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
     website: v.optional(v.string()),
-    accountNumber: v.optional(v.string())
+    accountNumber: v.optional(v.string()),
+    location: v.optional(
+      v.union(
+        v.literal("wellington"),
+        v.literal("thermal"),
+        v.literal("ocala"),
+        v.literal("la"),
+        v.literal("eu"),
+        v.literal("can")
+      )
+    )
   },
   handler: async (ctx, args) => {
     const provider = await ctx.db.get(args.providerId);

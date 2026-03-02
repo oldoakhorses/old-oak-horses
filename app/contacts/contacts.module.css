@@ -1,67 +1,347 @@
-.header {
-  margin-bottom: 14px;
+.topRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 12px;
 }
 
 .title {
   margin: 8px 0 0;
-  font-size: 32px;
+  font-size: 36px;
   font-weight: 700;
-}
-
-.listCard {
-  background: #fff;
-  border: 1px solid #e8eaf0;
-  border-radius: 12px;
-  padding: 0 20px;
-}
-
-.row {
-  display: grid;
-  grid-template-columns: 1fr 160px 160px 1fr;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 0;
-  border-bottom: 1px solid #f0f1f5;
-  text-decoration: none;
-}
-
-.row:last-child {
-  border-bottom: none;
-}
-
-.row:hover {
-  background: #fafafc;
-}
-
-.name {
-  font-size: 12px;
   color: #1a1a2e;
-  font-weight: 700;
 }
 
-.badge {
-  font-size: 9px;
-  border-radius: 4px;
-  padding: 3px 8px;
-  background: rgba(74, 91, 219, 0.08);
-  color: #4a5bdb;
-}
-
-.phone,
-.email {
+.addButton {
+  font-family: "Space Mono", monospace;
   font-size: 11px;
+  font-weight: 700;
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  cursor: pointer;
+}
+
+.addButton:hover {
+  background: #2a2a4e;
+}
+
+.filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  align-items: center;
+}
+
+.categoryTabs {
+  display: flex;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+  background: #fff;
+  max-width: calc(100% - 160px);
+}
+
+.categoryTab,
+.categoryTabActive {
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  border: none;
+  padding: 8px 12px;
+  cursor: pointer;
+  background: transparent;
   color: #6b7084;
 }
 
-.empty {
-  padding: 18px 0;
+.categoryTabActive {
+  background: #1a1a2e;
+  color: #fff;
+  font-weight: 700;
+}
+
+.locationFilter {
+  font-family: "Space Mono", monospace;
   font-size: 11px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #e8eaf0;
+  background: #fff;
+  color: #6b7084;
+  appearance: none;
+  cursor: pointer;
+}
+
+.contactsCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.newContactCard {
+  border-bottom: 1px solid #e8eaf0;
+  padding: 16px 26px;
+  background: #fafafc;
+}
+
+.newContactTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 12px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.fieldLabel {
+  font-size: 10px;
+  color: #9ea2b0;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.fieldInput {
+  font-family: "Space Mono", monospace;
+  background: #f2f3f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #1a1a2e;
+}
+
+.fieldInput:focus {
+  outline: none;
+  border-color: #4a5bdb;
+}
+
+.formError {
+  font-size: 11px;
+  color: #e5484d;
+  margin-top: 10px;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.cancelButton {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #6b7084;
+  cursor: pointer;
+}
+
+.saveButton {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  cursor: pointer;
+}
+
+.saveButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.contactsHeader {
+  display: grid;
+  grid-template-columns: 1fr 180px 100px 130px 40px;
+  padding: 12px 26px;
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e8eaf0;
+}
+
+.contactRow {
+  display: grid;
+  grid-template-columns: 1fr 180px 100px 130px 40px;
+  padding: 14px 26px;
+  align-items: center;
+  border-bottom: 1px solid #f0f1f5;
+  transition: background 0.1s;
+}
+
+.contactRow:hover {
+  background: #fafafc;
+}
+
+.contactRow:last-child {
+  border-bottom: none;
+}
+
+.contactName {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.contactEmail {
+  font-size: 10px;
+  color: #9ea2b0;
+  margin-top: 2px;
+}
+
+.contactProvider {
+  font-size: 12px;
+  color: #6b7084;
+}
+
+.locationBadge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: inline-block;
+}
+
+.locationMissing {
+  font-size: 12px;
   color: #9ea2b0;
 }
 
-@media (max-width: 900px) {
-  .row {
+.categoryBadge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: capitalize;
+  display: inline-block;
+}
+
+.menuWrap {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.rowMenuButton {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #9ea2b0;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.rowMenuButton:hover {
+  background: #f2f3f7;
+}
+
+.menuDropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  padding: 6px 0;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 20;
+}
+
+.menuItem {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: #6b7084;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.menuItem:hover {
+  background: #fafafc;
+}
+
+.menuItemDanger {
+  color: #e5484d;
+}
+
+.menuDivider {
+  border-top: 1px solid #e8eaf0;
+  margin: 4px 0;
+}
+
+.emptyState {
+  padding: 60px;
+  text-align: center;
+}
+
+.emptyTitle {
+  font-size: 12px;
+  color: #9ea2b0;
+  margin-bottom: 6px;
+}
+
+.emptySubtitle {
+  font-size: 12px;
+  color: #9ea2b0;
+}
+
+@media (max-width: 1100px) {
+  .formGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 920px) {
+  .topRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .categoryTabs {
+    max-width: 100%;
+  }
+
+  .contactsHeader {
+    display: none;
+  }
+
+  .contactRow {
     grid-template-columns: 1fr;
-    gap: 6px;
+    gap: 8px;
   }
 }
