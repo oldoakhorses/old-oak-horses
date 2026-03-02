@@ -97,17 +97,23 @@ export const listAll = query(async (ctx) => {
 
   const providerIds = [...new Set(bills.flatMap((bill) => (bill.providerId ? [bill.providerId] : [])))];
   const providerPairs = await Promise.all(providerIds.map(async (id) => [id, await ctx.db.get(id)] as const));
-  const providerMap = new Map(providerPairs.map(([id, provider]) => [id, provider?.name ?? "Unknown"]));
+  const providerMap = new Map(providerPairs.map(([id, provider]) => [id, provider]));
 
   const categoryIds = [...new Set(bills.map((bill) => bill.categoryId))];
   const categoryPairs = await Promise.all(categoryIds.map(async (id) => [id, await ctx.db.get(id)] as const));
-  const categoryMap = new Map(categoryPairs.map(([id, category]) => [id, category?.name ?? "Unknown"]));
+  const categoryMap = new Map(categoryPairs.map(([id, category]) => [id, category]));
 
-  return bills.map((bill) => ({
-    ...bill,
-    providerName: (bill.providerId ? providerMap.get(bill.providerId) : undefined) ?? bill.customProviderName ?? "Unknown",
-    categoryName: categoryMap.get(bill.categoryId) ?? "Unknown"
-  }));
+  return bills.map((bill) => {
+    const provider = bill.providerId ? providerMap.get(bill.providerId) : undefined;
+    const category = categoryMap.get(bill.categoryId);
+    return {
+      ...bill,
+      providerName: provider?.name ?? bill.customProviderName ?? "Unknown",
+      providerSlug: provider?.slug ?? slugify(provider?.name ?? bill.customProviderName ?? "unknown"),
+      categoryName: category?.name ?? "Unknown",
+      categorySlug: category?.slug ?? "unknown",
+    };
+  });
 });
 
 export const getBillsByProvider = query({

@@ -10,7 +10,7 @@
 
 .filters {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 180px));
   gap: 10px;
   margin-bottom: 16px;
 }
@@ -34,68 +34,255 @@
   border-radius: 6px;
   padding: 10px 12px;
   font-size: 12px;
+  font-family: "Space Mono", monospace;
 }
 
 .listCard {
   background: #fff;
   border: 1px solid #e8eaf0;
   border-radius: 12px;
-  padding: 0 20px;
+  overflow: hidden;
 }
 
-.row {
+.invoicesHeader,
+.invoiceRow {
   display: grid;
-  grid-template-columns: 1fr auto 120px;
+  grid-template-columns: 1fr 120px 120px 100px 40px;
+  padding: 12px 26px;
   align-items: center;
-  gap: 12px;
-  padding: 12px 0;
+}
+
+.invoicesHeader {
+  font-family: "Space Mono", monospace;
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e8eaf0;
+  user-select: none;
+}
+
+.columnHeader {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: color 0.15s;
+  background: transparent;
+  border: none;
+  text-align: left;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  padding: 0;
+}
+
+.columnHeader:hover {
+  color: #1a1a2e;
+}
+
+.columnHeaderActive {
+  color: #4a5bdb;
+}
+
+.sortArrow {
+  font-size: 8px;
+  color: #4a5bdb;
+}
+
+.invoiceRow {
   border-bottom: 1px solid #f0f1f5;
 }
 
-.row:last-child {
+.invoiceRow:last-child {
   border-bottom: none;
 }
 
-.titleText {
+.invoiceRow:hover {
+  background: #fafafc;
+  cursor: pointer;
+}
+
+.invoiceTitle {
   font-size: 12px;
   color: #1a1a2e;
   font-weight: 700;
 }
 
-.subText {
-  margin-top: 2px;
-  font-size: 10px;
-  color: #9ea2b0;
+.categoryBadge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: inline-block;
 }
 
-.statusDot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
+.dateCol {
+  font-size: 12px;
+  color: #6b7084;
+  font-variant-numeric: tabular-nums;
 }
 
-.statusDone {
-  background: #22c583;
-}
-
-.statusPending {
-  background: #f59e0b;
-}
-
-.total {
-  text-align: right;
+.amountCol {
   font-size: 12px;
   font-weight: 700;
+  color: #1a1a2e;
+  text-align: right;
+}
+
+.menuWrap {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.invoiceMenuBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #9ea2b0;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.invoiceMenuBtn:hover {
+  background: #f2f3f7;
+}
+
+.menuDropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  padding: 6px 0;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 20;
+}
+
+.menuItem {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: #6b7084;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.menuItem:hover {
+  background: #fafafc;
+}
+
+.menuItemDanger {
+  color: #e5484d;
+}
+
+.menuDivider {
+  border-top: 1px solid #e8eaf0;
+  margin: 4px 0;
 }
 
 .empty {
-  padding: 18px 0;
+  padding: 18px 26px;
   font-size: 11px;
   color: #9ea2b0;
 }
 
-@media (max-width: 760px) {
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modalCard {
+  background: #fff;
+  border-radius: 12px;
+  padding: 28px 32px;
+  max-width: 420px;
+  width: 90%;
+}
+
+.modalIcon {
+  font-size: 28px;
+  margin-bottom: 12px;
+}
+
+.modalTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 8px;
+}
+
+.modalText {
+  font-size: 12px;
+  color: #6b7084;
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+.modalButtons {
+  display: flex;
+  gap: 10px;
+}
+
+.modalBtnCancel {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  padding: 10px 20px;
+  border-radius: 6px;
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #6b7084;
+  cursor: pointer;
+  flex: 1;
+}
+
+.modalBtnDelete {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 10px 20px;
+  border-radius: 6px;
+  border: none;
+  background: #e5484d;
+  color: #fff;
+  cursor: pointer;
+  flex: 1;
+}
+
+@media (max-width: 900px) {
   .filters {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
+  }
+
+  .invoicesHeader {
+    display: none;
+  }
+
+  .invoiceRow {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .amountCol {
+    text-align: left;
   }
 }
