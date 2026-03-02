@@ -10,7 +10,6 @@ import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
 import styles from "./dashboard.module.css";
 
-type Tab = "schedule" | "contacts";
 type HorseView = "active" | "past";
 type EventProviderMode = "none" | "contact" | "custom";
 
@@ -20,14 +19,6 @@ type HorseFormState = {
   usefNumber: string;
   feiNumber: string;
   owner: string;
-};
-
-type ContactFormState = {
-  name: string;
-  category: string;
-  company: string;
-  phone: string;
-  email: string;
 };
 
 type EventFormState = {
@@ -41,7 +32,6 @@ type EventFormState = {
 };
 
 const eventTypeOptions = ["Vet", "Farrier", "Trainer", "Transport", "Stabling", "Other"];
-const contactCategoryOptions = ["Veterinary", "Farrier", "Trainer", "Feed & Bedding", "Transport", "Stabling", "Other"];
 
 const initialHorseForm: HorseFormState = {
   name: "",
@@ -49,14 +39,6 @@ const initialHorseForm: HorseFormState = {
   usefNumber: "",
   feiNumber: "",
   owner: "",
-};
-
-const initialContactForm: ContactFormState = {
-  name: "",
-  category: "Veterinary",
-  company: "",
-  phone: "",
-  email: "",
 };
 
 const initialEventForm: EventFormState = {
@@ -70,13 +52,10 @@ const initialEventForm: EventFormState = {
 };
 
 export default function DashboardPage() {
-  const [tab, setTab] = useState<Tab>("schedule");
   const [horseView, setHorseView] = useState<HorseView>("active");
   const [showHorseModal, setShowHorseModal] = useState(false);
-  const [showContactModal, setShowContactModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
   const [horseForm, setHorseForm] = useState<HorseFormState>(initialHorseForm);
-  const [contactForm, setContactForm] = useState<ContactFormState>(initialContactForm);
   const [eventForm, setEventForm] = useState<EventFormState>(initialEventForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
@@ -87,7 +66,6 @@ export default function DashboardPage() {
   const upcomingEvents = useQuery(api.scheduleEvents.getUpcomingEvents) ?? [];
 
   const createHorse = useMutation(api.horses.createHorse);
-  const createContact = useMutation(api.contacts.createContact);
   const createEvent = useMutation(api.scheduleEvents.createEvent);
 
   const shownHorses = horseView === "active" ? activeHorses : pastHorses;
@@ -116,32 +94,6 @@ export default function DashboardPage() {
       setShowHorseModal(false);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Failed to add horse");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function onSubmitContact(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!contactForm.name.trim()) {
-      setFormError("Name is required.");
-      return;
-    }
-
-    setFormError("");
-    setIsSubmitting(true);
-    try {
-      await createContact({
-        name: contactForm.name.trim(),
-        category: contactForm.category,
-        company: contactForm.company || undefined,
-        phone: contactForm.phone || undefined,
-        email: contactForm.email || undefined,
-      });
-      setContactForm(initialContactForm);
-      setShowContactModal(false);
-    } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Failed to add contact");
     } finally {
       setIsSubmitting(false);
     }
@@ -189,76 +141,28 @@ export default function DashboardPage() {
 
       <main className="page-main">
         <section className={styles.card}>
-          <div className={styles.tabRow}>
-            <button type="button" className={tab === "schedule" ? styles.tabActive : styles.tab} onClick={() => setTab("schedule")}>
-              Schedule
-            </button>
-            <button type="button" className={tab === "contacts" ? styles.tabActive : styles.tab} onClick={() => setTab("contacts")}>
-              Contacts
+          <div className="ui-label">// UPCOMING</div>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>upcoming</h2>
+            <button type="button" className="ui-button-outlined" onClick={() => setShowEventModal(true)}>
+              + add event
             </button>
           </div>
 
-          {tab === "schedule" ? (
-            <div>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>schedule</h2>
-                <button type="button" className="ui-button-outlined" onClick={() => setShowEventModal(true)}>
-                  + add event
-                </button>
-              </div>
+          {upcomingEventsSorted.length === 0 ? <div className={styles.empty}>no upcoming events</div> : null}
 
-              {upcomingEventsSorted.length === 0 ? <div className={styles.empty}>no upcoming events</div> : null}
-
-              {upcomingEventsSorted.map((item) => (
-                <div key={item._id} className={styles.row}>
-                  <div className={styles.icon}>{eventEmoji(item.type)}</div>
-                  <div>
-                    <div className={styles.rowTitle}>
-                      {item.type} · {item.horseName}
-                    </div>
-                    <div className={styles.rowSub}>{item.providerName || "provider not set"}</div>
-                  </div>
-                  <div className={styles.datePill}>{item.date}</div>
+          {upcomingEventsSorted.map((item) => (
+            <div key={item._id} className={styles.row}>
+              <div className={styles.icon}>{eventEmoji(item.type)}</div>
+              <div>
+                <div className={styles.rowTitle}>
+                  {item.type} · {item.horseName}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>contacts</h2>
-                <button type="button" className="ui-button-outlined" onClick={() => setShowContactModal(true)}>
-                  + add contact
-                </button>
+                <div className={styles.rowSub}>{item.providerName || "provider not set"}</div>
               </div>
-
-              {contactsSorted.length === 0 ? <div className={styles.empty}>no contacts yet</div> : null}
-
-              {contactsSorted.map((contact) => (
-                <div key={contact._id} className={styles.row}>
-                  <div className={styles.avatar}>{initials(contact.name)}</div>
-                  <div>
-                    <div className={styles.rowTitle}>
-                      {contact.name}
-                      <span className={styles.tag}>{contact.category}</span>
-                    </div>
-                    <div className={styles.rowSub}>{contact.company || "no company"}</div>
-                  </div>
-                  <div className={styles.rowActions}>
-                    {contact.phone ? (
-                      <a href={`tel:${contact.phone}`} className={styles.iconBtn}>
-                        ☎
-                      </a>
-                    ) : null}
-                    {contact.email ? (
-                      <a href={`mailto:${contact.email}`} className={styles.iconBtn}>
-                        ✉
-                      </a>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
+              <div className={styles.datePill}>{item.date}</div>
             </div>
-          )}
+          ))}
         </section>
 
         <section className={styles.horsesSection}>
@@ -332,35 +236,6 @@ export default function DashboardPage() {
             <input className={styles.input} value={horseForm.owner} onChange={(e) => setHorseForm((p) => ({ ...p, owner: e.target.value }))} />
           </Field>
           <ModalActions loading={isSubmitting} submitLabel="add horse" onCancel={() => setShowHorseModal(false)} error={formError} />
-        </form>
-      </Modal>
-
-      <Modal open={showContactModal} title="add contact" onClose={() => setShowContactModal(false)}>
-        <form className={styles.form} onSubmit={onSubmitContact}>
-          <Field label="name *">
-            <input className={styles.input} value={contactForm.name} onChange={(e) => setContactForm((p) => ({ ...p, name: e.target.value }))} />
-          </Field>
-          <Field label="category *">
-            <select className={styles.input} value={contactForm.category} onChange={(e) => setContactForm((p) => ({ ...p, category: e.target.value }))}>
-              {contactCategoryOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="company">
-            <input className={styles.input} value={contactForm.company} onChange={(e) => setContactForm((p) => ({ ...p, company: e.target.value }))} />
-          </Field>
-          <div className={styles.twoCol}>
-            <Field label="phone">
-              <input className={styles.input} value={contactForm.phone} onChange={(e) => setContactForm((p) => ({ ...p, phone: e.target.value }))} />
-            </Field>
-            <Field label="email">
-              <input className={styles.input} value={contactForm.email} onChange={(e) => setContactForm((p) => ({ ...p, email: e.target.value }))} />
-            </Field>
-          </div>
-          <ModalActions loading={isSubmitting} submitLabel="add contact" onCancel={() => setShowContactModal(false)} error={formError} />
         </form>
       </Modal>
 
@@ -509,15 +384,6 @@ function ModalActions({
       </div>
     </>
   );
-}
-
-function initials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
 }
 
 function eventEmoji(type: string) {
