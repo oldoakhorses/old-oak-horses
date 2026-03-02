@@ -39,7 +39,8 @@ export default function LoginPage() {
       } else {
         setShowError(true);
       }
-    } catch {
+    } catch (error) {
+      console.error("Login error:", error);
       setShowError(true);
     } finally {
       setSubmitting(false);

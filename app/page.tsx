@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
 import splashImages from "./splash-images.json";
@@ -11,65 +11,41 @@ const SPLASH_IMAGES = splashImages.length > 0 ? splashImages : ["/splash-1.jpg"]
 export default function SplashPage() {
   const router = useRouter();
   const [current, setCurrent] = useState(0);
-  const [next, setNext] = useState<number | null>(null);
-  const [transitioning, setTransitioning] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const startTransition = (toIndex: number) => {
-    if (transitioning || toIndex === current) return;
-    setNext(toIndex);
-    setTransitioning(true);
-    setTimeout(() => {
-      setCurrent(toIndex);
-      setNext(null);
-      setTransitioning(false);
-    }, 1200);
-  };
 
   useEffect(() => {
     if (SPLASH_IMAGES.length <= 1) return;
-    timerRef.current = setInterval(() => {
-      if (!transitioning) {
-        const nextIdx = (current + 1) % SPLASH_IMAGES.length;
-        startTransition(nextIdx);
-      }
+    const interval = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % SPLASH_IMAGES.length);
     }, 5500);
+    return () => clearInterval(interval);
+  }, []);
 
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [current, transitioning]);
-
-  const goTo = (index: number) => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    startTransition(index);
-  };
+  const goTo = (index: number) => setCurrent(index);
 
   return (
     <main className={styles.splash}>
-      <Image
-        src={SPLASH_IMAGES[current]}
-        alt="Old Oak Horses splash"
-        fill
-        priority
-        sizes="100vw"
-        className={styles.splashImageCurrent}
-        style={{
-          objectPosition: "center 30%",
-          opacity: next !== null ? 0 : 1,
-        }}
-      />
-
-      {next !== null ? (
-        <Image
-          src={SPLASH_IMAGES[next]}
-          alt="Old Oak Horses splash next"
-          fill
-          sizes="100vw"
-          className={styles.splashImageNext}
-          style={{ objectPosition: "center 30%" }}
-        />
-      ) : null}
+      <div className={styles.splashViewport}>
+        <div
+          className={styles.splashTrack}
+          style={{
+            width: `${SPLASH_IMAGES.length * 100}%`,
+            transform: `translateX(-${current * (100 / SPLASH_IMAGES.length)}%)`,
+          }}
+        >
+          {SPLASH_IMAGES.map((src, index) => (
+            <div key={`${src}-${index}`} className={styles.splashSlide} style={{ width: `${100 / SPLASH_IMAGES.length}%` }}>
+              <Image
+                src={src}
+                alt=""
+                fill
+                priority={index === 0}
+                sizes="100vw"
+                className={styles.splashImage}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div className={styles.splashOverlay} />
 
@@ -83,7 +59,7 @@ export default function SplashPage() {
       {SPLASH_IMAGES.length > 1 ? (
         <div className={styles.splashDots}>
           {SPLASH_IMAGES.map((_, index) => {
-            const isActive = index === current && next === null;
+            const isActive = index === current;
             return (
               <button
                 key={`dot-${index}`}

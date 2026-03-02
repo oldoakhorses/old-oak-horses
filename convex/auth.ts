@@ -8,12 +8,20 @@ export const login = action({
   handler: async (_ctx, args) => {
     const email = process.env.ADMIN_EMAIL || "lucy@oldoakhorses.com";
     const password = process.env.ADMIN_PASSWORD;
+    const attemptedEmail = args.email.trim().toLowerCase();
+    const expectedEmail = email.trim().toLowerCase();
+
+    console.log("Login attempt:", attemptedEmail);
+    console.log("Expected email:", expectedEmail);
+    console.log("Password set:", !!password);
+    console.log("Email match:", attemptedEmail === expectedEmail);
+    console.log("Password match:", args.password === password);
 
     if (!password) {
-      return { success: false as const, error: "ADMIN_PASSWORD not set" };
+      return { success: false as const, error: "ADMIN_PASSWORD env var not set" };
     }
 
-    if (args.email === email && args.password === password) {
+    if (attemptedEmail === expectedEmail && args.password === password) {
       return { success: true as const };
     }
 
