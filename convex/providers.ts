@@ -11,6 +11,27 @@ export const getProvidersByCategory = query({
   }
 });
 
+export const getAllProvidersWithCategory = query({
+  args: {},
+  handler: async (ctx) => {
+    const providers = await ctx.db.query("providers").withIndex("by_name").collect();
+    const categoryIds = [...new Set(providers.map((p) => p.categoryId))];
+    const categories = await Promise.all(categoryIds.map((id) => ctx.db.get(id)));
+    const categoryMap = new Map(categories.filter(Boolean).map((c: any) => [String(c._id), c]));
+
+    return providers
+      .map((provider) => {
+        const category = categoryMap.get(String(provider.categoryId));
+        return {
+          ...provider,
+          categoryName: category?.name ?? "Unknown",
+          categorySlug: category?.slug ?? "unknown",
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+});
+
 export const getProvidersByCategoryAndSubcategory = query({
   args: {
     categoryId: v.id("categories"),
