@@ -5,36 +5,84 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
 import styles from "./horses.module.css";
 
 type StatusFilter = "active" | "inactive" | "all";
 
+type HorseFormState = {
+  name: string;
+  yearOfBirth: string;
+  sex: "" | "gelding" | "mare" | "stallion";
+  usefNumber: string;
+  feiNumber: string;
+  owner: string;
+};
+
+const EMPTY_FORM: HorseFormState = {
+  name: "",
+  yearOfBirth: "",
+  sex: "",
+  usefNumber: "",
+  feiNumber: "",
+  owner: "",
+};
+
 export default function HorsesPage() {
   const horses = useQuery(api.horses.getAllHorses) ?? [];
+  const createHorse = useMutation(api.horses.createHorse);
   const setHorseStatus = useMutation(api.horses.setHorseStatus);
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
-  const [yearFilter, setYearFilter] = useState<string>("all");
   const [openMenuHorseId, setOpenMenuHorseId] = useState<string>("");
   const [confirmSoldHorseId, setConfirmSoldHorseId] = useState<string>("");
-
-  const years = useMemo(() => {
-    const values = [...new Set(horses.map((horse) => horse.yearOfBirth).filter((year): year is number => typeof year === "number"))];
-    return values.sort((a, b) => b - a);
-  }, [horses]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [form, setForm] = useState<HorseFormState>(EMPTY_FORM);
 
   const filtered = useMemo(() => {
     return horses
-      .filter((horse) => (statusFilter === "all" ? true : horse.status === statusFilter))
-      .filter((horse) => (yearFilter === "all" ? true : String(horse.yearOfBirth ?? "") === yearFilter))
+      .filter((horse) => {
+        if (statusFilter === "all") return true;
+        if (statusFilter === "active") return horse.status === "active";
+        return horse.status !== "active";
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [horses, statusFilter, yearFilter]);
+  }, [horses, statusFilter]);
 
   async function updateStatus(horseId: Id<"horses">, status: "active" | "inactive", isSold?: boolean) {
     await setHorseStatus({ horseId, status, isSold });
     setOpenMenuHorseId("");
     setConfirmSoldHorseId("");
+  }
+
+  async function onSubmitHorse(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!form.name.trim()) {
+      setFormError("name is required");
+      return;
+    }
+
+    setFormError("");
+    setIsSubmitting(true);
+    try {
+      await createHorse({
+        name: form.name.trim(),
+        yearOfBirth: form.yearOfBirth ? Number(form.yearOfBirth) : undefined,
+        sex: form.sex || undefined,
+        usefNumber: form.usefNumber || undefined,
+        feiNumber: form.feiNumber || undefined,
+        owner: form.owner || undefined,
+      });
+      setForm(EMPTY_FORM);
+      setShowAddModal(false);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "failed to add horse");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -54,14 +102,17 @@ export default function HorsesPage() {
           ← cd /dashboard
         </Link>
 
-        <div className={styles.header}>
+        <section className={styles.headerRow}>
           <div>
-            <div className="ui-label">// horses</div>
+            <div className="ui-label">// HORSES</div>
             <h1 className={styles.title}>horses</h1>
           </div>
-        </div>
+          <button type="button" className={styles.addButton} onClick={() => setShowAddModal(true)}>
+            + add horse
+          </button>
+        </section>
 
-        <div className={styles.filters}>
+        <section className={styles.filterRow}>
           <div className={styles.tabs}>
             <button type="button" className={statusFilter === "active" ? styles.tabActive : styles.tab} onClick={() => setStatusFilter("active")}>
               Active
@@ -73,36 +124,37 @@ export default function HorsesPage() {
               All
             </button>
           </div>
-          <label className={styles.yearFilter}>
-            <span>YEAR</span>
-            <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
-              <option value="all">All</option>
-              {years.map((year) => (
-                <option key={year} value={String(year)}>
-                  {year}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        </section>
 
-        <section className={styles.tableCard}>
+        <section className={styles.horsesCard}>
+          <div className={styles.horsesHeader}>
+            <div>HORSE</div>
+            <div>OWNER</div>
+            <div>SEX</div>
+            <div>YOB</div>
+            <div>STATUS</div>
+            <div />
+          </div>
           {filtered.map((horse) => {
             const menuOpen = openMenuHorseId === String(horse._id);
             const confirmOpen = confirmSoldHorseId === String(horse._id);
             return (
-              <div key={horse._id} className={styles.row}>
-                <div className={styles.nameCell}>
-                  <span>🐴</span>
-                  <Link href={`/horses/${horse._id}`} className={styles.horseLink}>
-                    {horse.name}
-                  </Link>
-                </div>
+              <div key={horse._id} className={styles.horseRow}>
+                <Link href={`/horses/${horse._id}`} className={styles.horseName}>
+                  <span className={styles.horseEmoji}>🐴</span>
+                  {horse.name}
+                </Link>
                 <div className={styles.owner}>{horse.owner || "—"}</div>
                 <div className={styles.sex}>{horse.sex ? capitalize(horse.sex) : "—"}</div>
-                <div className={styles.year}>{horse.yearOfBirth ? String(horse.yearOfBirth) : "—"}</div>
+                <div className={styles.yob}>{horse.yearOfBirth ? String(horse.yearOfBirth) : "—"}</div>
                 <div>
-                  {horse.isSold ? <span className={styles.soldBadge}>sold</span> : horse.status === "active" ? <span className={styles.activeBadge}>active</span> : <span className={styles.inactiveBadge}>inactive</span>}
+                  {horse.isSold ? (
+                    <span className={styles.statusSold}>sold</span>
+                  ) : horse.status === "active" ? (
+                    <span className={styles.statusActive}>active</span>
+                  ) : (
+                    <span className={styles.statusInactive}>inactive</span>
+                  )}
                 </div>
                 <div className={styles.menuWrap}>
                   <button type="button" className={styles.menuButton} onClick={() => setOpenMenuHorseId(menuOpen ? "" : String(horse._id))}>
@@ -150,8 +202,58 @@ export default function HorsesPage() {
               </div>
             );
           })}
+          {filtered.length === 0 ? <div className={styles.empty}>no horses found</div> : null}
         </section>
+
+        <div className="ui-footer">OLD_OAK_HORSES // HORSES</div>
       </main>
+
+      <Modal open={showAddModal} title="add horse" onClose={() => setShowAddModal(false)}>
+        <form className={styles.form} onSubmit={onSubmitHorse}>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>NAME *</span>
+            <input className={styles.input} value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+          </label>
+          <div className={styles.twoCol}>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>YEAR OF BIRTH</span>
+              <input className={styles.input} value={form.yearOfBirth} onChange={(e) => setForm((p) => ({ ...p, yearOfBirth: e.target.value }))} />
+            </label>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>SEX</span>
+              <select className={styles.input} value={form.sex} onChange={(e) => setForm((p) => ({ ...p, sex: e.target.value as HorseFormState["sex"] }))}>
+                <option value="">-- select --</option>
+                <option value="gelding">Gelding</option>
+                <option value="mare">Mare</option>
+                <option value="stallion">Stallion</option>
+              </select>
+            </label>
+          </div>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>OWNER</span>
+            <input className={styles.input} value={form.owner} onChange={(e) => setForm((p) => ({ ...p, owner: e.target.value }))} />
+          </label>
+          <div className={styles.twoCol}>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>USEF #</span>
+              <input className={styles.input} value={form.usefNumber} onChange={(e) => setForm((p) => ({ ...p, usefNumber: e.target.value }))} />
+            </label>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>FEI #</span>
+              <input className={styles.input} value={form.feiNumber} onChange={(e) => setForm((p) => ({ ...p, feiNumber: e.target.value }))} />
+            </label>
+          </div>
+          {formError ? <p className={styles.error}>{formError}</p> : null}
+          <div className={styles.modalActions}>
+            <button type="button" className="ui-button-outlined" onClick={() => setShowAddModal(false)}>
+              cancel
+            </button>
+            <button type="submit" className="ui-button-filled" disabled={isSubmitting}>
+              {isSubmitting ? "saving..." : "add horse"}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

@@ -188,6 +188,79 @@ export const getHorseSpendSummary = query({
   }
 });
 
+export const getInvoicesByHorse = query({
+  args: { horseId: v.id("horses") },
+  handler: async (ctx, args) => {
+    return await collectHorseInvoices(ctx, args.horseId);
+  },
+});
+
+export const getHorseSpendByCategory = query({
+  args: { horseId: v.id("horses") },
+  handler: async (ctx, args) => {
+    const invoices = await collectHorseInvoices(ctx, args.horseId);
+    const totals = new Map<string, { category: string; amount: number }>();
+    for (const row of invoices) {
+      const current = totals.get(row.category) ?? { category: row.category, amount: 0 };
+      current.amount += row.amount;
+      totals.set(row.category, current);
+    }
+
+    const total = [...totals.values()].reduce((sum, row) => sum + row.amount, 0);
+    return [...totals.values()]
+      .map((row) => ({
+        category: row.category,
+        amount: round2(row.amount),
+        pct: total > 0 ? (row.amount / total) * 100 : 0,
+      }))
+      .sort((a, b) => b.amount - a.amount);
+  },
+});
+
+export const getHorseSpendMeta = query({
+  args: { horseId: v.id("horses") },
+  handler: async (ctx, args) => {
+    const invoices = await collectHorseInvoices(ctx, args.horseId);
+    const now = new Date();
+    const monthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+    const prevMonthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1);
+
+    let thisMonth = 0;
+    let lastMonth = 0;
+    for (const row of invoices) {
+      const parsed = row.date ? Date.parse(row.date) : NaN;
+      if (Number.isNaN(parsed)) continue;
+      if (parsed >= monthStart) {
+        thisMonth += row.amount;
+      } else if (parsed >= prevMonthStart && parsed < monthStart) {
+        lastMonth += row.amount;
+      }
+    }
+
+    const totalSpend = invoices.reduce((sum, row) => sum + row.amount, 0);
+    return {
+      totalSpend: round2(totalSpend),
+      thisMonth: round2(thisMonth),
+      lastMonth: round2(lastMonth),
+      momPct: lastMonth > 0 ? ((thisMonth - lastMonth) / lastMonth) * 100 : 0,
+    };
+  },
+});
+
+export const getHorseRecordCounts = query({
+  args: { horseId: v.id("horses") },
+  handler: async (ctx, args) => {
+    const invoices = await collectHorseInvoices(ctx, args.horseId);
+    const countFor = (keys: string[]) => invoices.filter((row) => keys.includes(row.category)).length;
+    return {
+      veterinary: countFor(["veterinary"]),
+      farrier: countFor(["farrier", "bodywork"]),
+      health: countFor(["veterinary", "dues-registrations"]),
+      registration: countFor(["dues-registrations"]),
+    };
+  },
+});
+
 function amountForHorseInBill(horseNamesToMatch: Set<string>, bill: any) {
   let total = 0;
 
@@ -274,4 +347,89 @@ function includesAlias(aliases: Set<string>, value: string) {
     if (value.includes(alias)) return true;
   }
   return false;
+}
+
+async function collectHorseInvoices(ctx: any, horseId: any) {
+  const horse = await ctx.db.get(horseId);
+  if (!horse) return [];
+
+  const bills = await ctx.db.query("bills").collect();
+  const categories = await ctx.db.query("categories").collect();
+  const categoryById = new Map(categories.map((row: any) => [String(row._id), row]));
+
+  const horseNamesToMatch = new Set([horse.name.toLowerCase(), ...horseAliases(horse.name)]);
+  const rows: Array<{
+    _id: string;
+    category: string;
+    categoryName: string;
+    providerName: string;
+    providerSlug: string;
+    invoiceNumber: string;
+    date: string | null;
+    amount: number;
+    status: "pending" | "approved";
+    href: string;
+  }> = [];
+
+  for (const bill of bills) {
+    if (bill.status === "error" || !bill.extractedData) continue;
+    const category = categoryById.get(String(bill.categoryId)) as { slug: string; name: string } | undefined;
+    if (!category) continue;
+    const amount = amountForHorseInBill(horseNamesToMatch, bill);
+    if (amount <= 0) continue;
+
+    const provider = bill.providerId ? await ctx.db.get(bill.providerId) : null;
+    const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+    const invoiceDate = typeof extracted.invoice_date === "string" ? extracted.invoice_date : null;
+    const providerName = provider?.name ?? bill.customProviderName ?? "Unknown";
+    const providerSlug = provider?.slug ?? slugify(providerName);
+
+    rows.push({
+      _id: String(bill._id),
+      category: category.slug,
+      categoryName: category.name,
+      providerName,
+      providerSlug,
+      invoiceNumber: String(extracted.invoice_number ?? bill.fileName ?? ""),
+      date: invoiceDate,
+      amount: round2(amount),
+      status: bill.status === "done" && bill.isApproved ? "approved" : "pending",
+      href: buildInvoiceHref(category.slug, providerSlug, String(bill._id), bill),
+    });
+  }
+
+  return rows.sort((a, b) => {
+    const aDate = a.date ? Date.parse(a.date) : 0;
+    const bDate = b.date ? Date.parse(b.date) : 0;
+    if (aDate !== bDate) return bDate - aDate;
+    return b.amount - a.amount;
+  });
+}
+
+function buildInvoiceHref(categorySlug: string, providerSlug: string, billId: string, bill: any) {
+  if (categorySlug === "admin") {
+    const sub = bill.adminSubcategory ?? "legal";
+    return `/admin/${sub}/${providerSlug}/${billId}`;
+  }
+  if (categorySlug === "dues-registrations") {
+    const sub = bill.duesSubcategory ?? "memberships";
+    return `/dues-registrations/${sub}/${providerSlug}/${billId}`;
+  }
+  if (categorySlug === "horse-transport") {
+    const sub = bill.horseTransportSubcategory ?? "ground-transport";
+    return `/horse-transport/${sub}/${providerSlug}/${billId}`;
+  }
+  if (categorySlug === "travel") {
+    const sub = bill.travelSubcategory ?? "rental-car";
+    return `/travel/${sub}/${billId}`;
+  }
+  if (categorySlug === "housing") {
+    const sub = bill.housingSubcategory ?? "rider-housing";
+    return `/housing/${sub}/${billId}`;
+  }
+  if (categorySlug === "marketing") {
+    const sub = bill.marketingSubcategory ?? providerSlug;
+    return `/marketing/${sub}/${billId}`;
+  }
+  return `/${categorySlug}/${providerSlug}/${billId}`;
 }

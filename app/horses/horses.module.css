@@ -1,19 +1,38 @@
-.header {
-  margin-bottom: 18px;
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
 }
 
 .title {
   margin: 8px 0 0;
+  font-family: "Space Mono", monospace;
   font-size: 36px;
   font-weight: 700;
+  color: #1a1a2e;
 }
 
-.filters {
-  margin-bottom: 16px;
+.addButton {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  cursor: pointer;
+}
+
+.addButton:hover {
+  background: #2a2a4e;
+}
+
+.filterRow {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
   gap: 12px;
+  margin-bottom: 20px;
 }
 
 .tabs {
@@ -25,12 +44,16 @@
 
 .tab,
 .tabActive {
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  padding: 8px 16px;
   border: none;
-  background: #fff;
-  color: #9ea2b0;
-  padding: 7px 16px;
-  font-size: 11px;
   cursor: pointer;
+}
+
+.tab {
+  background: transparent;
+  color: #6b7084;
 }
 
 .tabActive {
@@ -39,96 +62,95 @@
   font-weight: 700;
 }
 
-.yearFilter {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 10px;
-  color: #9ea2b0;
-  letter-spacing: 0.1em;
-}
-
-.yearFilter select {
-  background: #f2f3f7;
-  border: 1px solid #e8eaf0;
-  border-radius: 6px;
-  padding: 8px 10px;
-  font-size: 12px;
-  color: #1a1a2e;
-}
-
-.tableCard {
+.horsesCard {
   background: #fff;
   border: 1px solid #e8eaf0;
   border-radius: 12px;
-  padding: 0 26px;
+  overflow: hidden;
 }
 
-.row {
-  position: relative;
+.horsesHeader {
   display: grid;
-  grid-template-columns: 1fr 180px 80px 80px 100px 40px;
+  grid-template-columns: 1fr 140px 80px 80px 100px 40px;
+  padding: 12px 26px;
+  font-family: "Space Mono", monospace;
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e8eaf0;
+}
+
+.horseRow {
+  display: grid;
+  grid-template-columns: 1fr 140px 80px 80px 100px 40px;
+  padding: 14px 26px;
   align-items: center;
-  gap: 10px;
-  padding: 14px 0;
   border-bottom: 1px solid #f0f1f5;
+  transition: background 0.1s;
 }
 
-.row:last-child {
-  border-bottom: none;
-}
-
-.row:hover {
+.horseRow:hover {
   background: #fafafc;
 }
 
-.nameCell {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+.horseRow:last-child {
+  border-bottom: none;
 }
 
-.horseLink {
-  text-decoration: none;
+.horseName {
+  font-family: "Space Mono", monospace;
   font-size: 13px;
   font-weight: 700;
+  color: #1a1a2e;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.horseName:hover {
+  color: #4a5bdb;
+}
+
+.horseEmoji {
+  font-size: 14px;
 }
 
 .owner,
-.year {
-  font-size: 12px;
-  color: #6b7084;
-}
-
 .sex {
   font-size: 12px;
   color: #6b7084;
 }
 
-.year {
-  font-family: "Space Mono", monospace;
+.yob {
+  font-size: 12px;
+  color: #6b7084;
+  font-variant-numeric: tabular-nums;
 }
 
-.activeBadge,
-.inactiveBadge,
-.soldBadge {
-  font-size: 10px;
+.statusActive,
+.statusInactive,
+.statusSold {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 8px;
   border-radius: 4px;
-  padding: 2px 8px;
-  text-transform: lowercase;
+  text-transform: uppercase;
 }
 
-.activeBadge {
+.statusActive {
   background: rgba(34, 197, 131, 0.08);
   color: #22c583;
 }
 
-.inactiveBadge {
+.statusInactive {
   background: #f0f1f5;
   color: #9ea2b0;
 }
 
-.soldBadge {
+.statusSold {
   background: rgba(229, 72, 77, 0.08);
   color: #e5484d;
 }
@@ -176,9 +198,6 @@
   cursor: pointer;
   width: 100%;
   text-align: left;
-  display: flex;
-  align-items: center;
-  gap: 8px;
   text-decoration: none;
 }
 
@@ -208,5 +227,58 @@
 
 .confirmActions {
   display: flex;
+  gap: 8px;
+}
+
+.empty {
+  padding: 40px;
+  text-align: center;
+  font-size: 12px;
+  color: #9ea2b0;
+}
+
+.form {
+  display: grid;
+  gap: 10px;
+}
+
+.twoCol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+.fieldLabel {
+  font-size: 10px;
+  color: #9ea2b0;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.input {
+  font-family: "Space Mono", monospace;
+  font-size: 12px;
+  padding: 10px 14px;
+  background: #f2f3f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  color: #1a1a2e;
+}
+
+.error {
+  margin: 0;
+  font-size: 11px;
+  color: #e5484d;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
   gap: 8px;
 }

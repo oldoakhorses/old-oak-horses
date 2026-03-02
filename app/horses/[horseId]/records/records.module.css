@@ -1,0 +1,29 @@
+.header {
+  margin-bottom: 24px;
+}
+
+.title {
+  margin: 8px 0 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+}
+
+.icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.line1,
+.line2 {
+  font-size: 12px;
+  color: #9ea2b0;
+}

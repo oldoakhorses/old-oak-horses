@@ -29,38 +29,49 @@
   background: #2a2a4e;
 }
 
-.filters {
+.filterRow {
   display: flex;
   gap: 12px;
-  margin-bottom: 20px;
   align-items: center;
+  margin-bottom: 20px;
 }
 
-.categoryTabs {
-  display: flex;
+.searchWrapper {
+  position: relative;
+  flex: 1;
+  max-width: 400px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  color: #9ea2b0;
+  pointer-events: none;
+}
+
+.searchInput {
+  font-family: "Space Mono", monospace;
+  font-size: 12px;
+  padding: 10px 14px 10px 36px;
+  background: #fff;
   border: 1px solid #e8eaf0;
   border-radius: 8px;
-  overflow-x: auto;
-  white-space: nowrap;
-  background: #fff;
-  max-width: calc(100% - 160px);
+  color: #1a1a2e;
+  width: 100%;
+  max-width: 400px;
+  box-sizing: border-box;
+  outline: none;
 }
 
-.categoryTab,
-.categoryTabActive {
-  font-family: "Space Mono", monospace;
-  font-size: 10px;
-  border: none;
-  padding: 8px 12px;
-  cursor: pointer;
-  background: transparent;
-  color: #6b7084;
+.searchInput:focus {
+  border-color: #4a5bdb;
 }
 
-.categoryTabActive {
-  background: #1a1a2e;
-  color: #fff;
-  font-weight: 700;
+.searchInput::placeholder {
+  color: #c4c7d0;
 }
 
 .locationFilter {
@@ -174,11 +185,39 @@
   display: grid;
   grid-template-columns: 1fr 180px 100px 130px 40px;
   padding: 12px 26px;
+  border-bottom: 1px solid #e8eaf0;
+  align-items: center;
+}
+
+.columnHeader {
+  font-family: "Space Mono", monospace;
   font-size: 9px;
   color: #9ea2b0;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  border-bottom: 1px solid #e8eaf0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+  transition: color 0.15s;
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 0;
+}
+
+.columnHeader:hover {
+  color: #1a1a2e;
+}
+
+.columnHeaderActive {
+  color: #4a5bdb;
+}
+
+.sortArrow {
+  font-size: 8px;
+  color: #4a5bdb;
 }
 
 .contactRow {
@@ -188,10 +227,17 @@
   align-items: center;
   border-bottom: 1px solid #f0f1f5;
   transition: background 0.1s;
+  cursor: pointer;
 }
 
 .contactRow:hover {
   background: #fafafc;
+}
+
+.contactRowExpanded {
+  background: #fafafc;
+  border-left: 3px solid #4a5bdb;
+  padding-left: 23px;
 }
 
 .contactRow:last-child {
@@ -299,6 +345,148 @@
   margin: 4px 0;
 }
 
+.contactDetail {
+  background: #f8f9fb;
+  padding: 20px 26px;
+  border-bottom: 1px solid #f0f1f5;
+}
+
+.detailFields {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.detailField {
+  min-width: 120px;
+}
+
+.detailNotes {
+  max-width: 250px;
+}
+
+.detailLabel {
+  font-family: "Space Mono", monospace;
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.detailValue,
+.detailValueEmpty {
+  font-family: "Space Mono", monospace;
+  font-size: 12px;
+  color: #1a1a2e;
+  line-height: 1.5;
+}
+
+.detailValueEmpty {
+  color: #c4c7d0;
+  font-style: italic;
+}
+
+.detailLink {
+  font-family: "Space Mono", monospace;
+  font-size: 12px;
+  color: #4a5bdb;
+  text-decoration: none;
+}
+
+.detailLink:hover {
+  text-decoration: underline;
+}
+
+.detailActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 12px;
+  border-top: 1px solid #e8eaf0;
+}
+
+.btnEditContact {
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #6b7084;
+  cursor: pointer;
+}
+
+.btnEditContact:hover {
+  border-color: #4a5bdb;
+  color: #4a5bdb;
+}
+
+.btnCloseDetail {
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #9ea2b0;
+  cursor: pointer;
+}
+
+.btnCloseDetail:hover {
+  color: #1a1a2e;
+}
+
+.detailInput,
+.detailTextarea {
+  font-family: "Space Mono", monospace;
+  font-size: 12px;
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  width: 100%;
+  box-sizing: border-box;
+  color: #1a1a2e;
+}
+
+.detailInput:focus,
+.detailTextarea:focus {
+  outline: none;
+  border-color: #4a5bdb;
+}
+
+.detailTextarea {
+  min-height: 60px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.btnSaveDetail {
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  cursor: pointer;
+}
+
+.btnCancelDetail {
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #6b7084;
+  cursor: pointer;
+}
+
 .emptyState {
   padding: 60px;
   text-align: center;
@@ -327,13 +515,13 @@
     align-items: stretch;
   }
 
-  .filters {
+  .filterRow {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .categoryTabs {
-    max-width: 100%;
+  .searchWrapper {
+    max-width: none;
   }
 
   .contactsHeader {

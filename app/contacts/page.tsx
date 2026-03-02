@@ -9,6 +9,8 @@ import NavBar from "@/components/NavBar";
 import styles from "./contacts.module.css";
 
 type LocationValue = "all" | "wellington" | "thermal" | "ocala" | "la" | "eu" | "can";
+type SortColumn = "name" | "providerName" | "location" | "category" | null;
+type SortDirection = "asc" | "desc";
 
 type ContactFormState = {
   name: string;
@@ -21,8 +23,7 @@ type ContactFormState = {
   role: string;
 };
 
-const CATEGORY_TABS = [
-  { key: "all", label: "All" },
+const CATEGORY_OPTIONS = [
   { key: "veterinary", label: "Veterinary" },
   { key: "farrier", label: "Farrier" },
   { key: "stabling", label: "Stabling" },
@@ -34,6 +35,7 @@ const CATEGORY_TABS = [
   { key: "feed_bedding", label: "Feed & Bedding" },
   { key: "horse_transport", label: "Horse Transport" },
   { key: "dues_registrations", label: "Dues & Registrations" },
+  { key: "marketing", label: "Marketing" },
 ];
 
 const LOCATION_LABELS: Record<Exclude<LocationValue, "all">, string> = {
@@ -51,13 +53,13 @@ const CATEGORY_COLORS: Record<string, { bg: string; color: string; label: string
   stabling: { bg: "rgba(245,158,11,0.08)", color: "#F59E0B", label: "Stabling" },
   travel: { bg: "rgba(236,72,153,0.08)", color: "#EC4899", label: "Travel" },
   housing: { bg: "rgba(167,139,250,0.08)", color: "#A78BFA", label: "Housing" },
-  show_expenses: { bg: "rgba(236,72,153,0.08)", color: "#EC4899", label: "Show Expenses" },
   horse_transport: { bg: "rgba(74,91,219,0.08)", color: "#4A5BDB", label: "Horse Transport" },
   marketing: { bg: "rgba(167,139,250,0.08)", color: "#A78BFA", label: "Marketing" },
   bodywork: { bg: "rgba(167,139,250,0.08)", color: "#A78BFA", label: "Bodywork" },
   feed_bedding: { bg: "rgba(34,197,131,0.08)", color: "#22C583", label: "Feed & Bedding" },
   admin: { bg: "rgba(107,112,132,0.08)", color: "#6B7084", label: "Admin" },
   dues_registrations: { bg: "rgba(74,91,219,0.08)", color: "#4A5BDB", label: "Dues & Registrations" },
+  supplies: { bg: "rgba(107,112,132,0.08)", color: "#6B7084", label: "Supplies" },
 };
 
 const LOCATION_COLORS: Record<Exclude<LocationValue, "all">, { bg: string; color: string }> = {
@@ -81,18 +83,22 @@ const EMPTY_FORM: ContactFormState = {
 };
 
 export default function ContactsPage() {
-  const [categoryFilter, setCategoryFilter] = useState("all");
   const [locationFilter, setLocationFilter] = useState<LocationValue>("all");
+  const [search, setSearch] = useState("");
+  const [sortColumn, setSortColumn] = useState<SortColumn>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [isAdding, setIsAdding] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [editingContactId, setEditingContactId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [detailEditId, setDetailEditId] = useState<string | null>(null);
+  const [detailSaving, setDetailSaving] = useState(false);
+  const [detailForm, setDetailForm] = useState({ email: "", phone: "", role: "", notes: "" });
   const [form, setForm] = useState<ContactFormState>(EMPTY_FORM);
   const [error, setError] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
   const contacts =
     useQuery(api.contacts.listContacts, {
-      category: categoryFilter === "all" ? undefined : categoryFilter,
       location: locationFilter,
     }) ?? [];
   const providers = useQuery(api.providers.getAllProvidersWithCategory) ?? [];
@@ -101,25 +107,53 @@ export default function ContactsPage() {
   const updateContact = useMutation(api.contacts.updateContact);
   const deleteContact = useMutation(api.contacts.deleteContact);
 
-  const sortedContacts = useMemo(
-    () =>
-      [...contacts].sort((a, b) => {
-        const aName = a.name.toLowerCase();
-        const bName = b.name.toLowerCase();
-        if (aName !== bName) return aName.localeCompare(bName);
-        return b.createdAt - a.createdAt;
-      }),
-    [contacts]
-  );
+  const providerLookup = useMemo(() => new Map(providers.map((provider) => [String(provider._id), provider])), [providers]);
 
-  const providerLookup = useMemo(() => {
-    return new Map(providers.map((provider) => [String(provider._id), provider]));
-  }, [providers]);
+  const filteredContacts = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return contacts;
+    return contacts.filter((contact) => {
+      const provider = contact.providerId ? providerLookup.get(String(contact.providerId)) : null;
+      const providerName = contact.providerName ?? contact.company ?? provider?.name ?? "";
+      const location = (contact.location as Exclude<LocationValue, "all"> | undefined) ?? "";
+      const locationLabel = location ? LOCATION_LABELS[location] : "";
+      const category = categoryLabel(contact.category ?? "");
+      const haystack = [contact.name, providerName, locationLabel, category].join(" ").toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [contacts, providerLookup, search]);
+
+  const sortedContacts = useMemo(() => {
+    const rows = [...filteredContacts];
+    if (!sortColumn) {
+      return rows.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    rows.sort((a, b) => {
+      const aVal = getSortValue(a, sortColumn, providerLookup).toLowerCase();
+      const bVal = getSortValue(b, sortColumn, providerLookup).toLowerCase();
+      const cmp = aVal.localeCompare(bVal);
+      return sortDirection === "asc" ? cmp : -cmp;
+    });
+    return rows;
+  }, [filteredContacts, providerLookup, sortColumn, sortDirection]);
+
+  function handleSort(column: Exclude<SortColumn, null>) {
+    if (sortColumn === column) {
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else {
+        setSortColumn(null);
+        setSortDirection("asc");
+      }
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  }
 
   function resetForm() {
     setForm(EMPTY_FORM);
     setError("");
-    setEditingContactId(null);
   }
 
   function startAdd() {
@@ -130,22 +164,6 @@ export default function ContactsPage() {
   function closeAdd() {
     setIsAdding(false);
     resetForm();
-  }
-
-  function startEdit(contact: (typeof contacts)[number]) {
-    setEditingContactId(String(contact._id));
-    setIsAdding(true);
-    setError("");
-    setForm({
-      name: contact.name,
-      providerName: contact.providerName ?? contact.company ?? "",
-      providerId: contact.providerId ? String(contact.providerId) : "",
-      location: (contact.location as LocationValue | undefined) ?? "all",
-      category: contact.category ?? "veterinary",
-      email: contact.email ?? "",
-      phone: contact.phone ?? "",
-      role: contact.role ?? "",
-    });
   }
 
   async function handleSaveContact(event: React.FormEvent) {
@@ -169,14 +187,7 @@ export default function ContactsPage() {
         phone: form.phone || undefined,
         email: form.email || undefined,
       };
-      if (editingContactId) {
-        await updateContact({
-          contactId: editingContactId as Id<"contacts">,
-          ...payload,
-        });
-      } else {
-        await createContact(payload);
-      }
+      await createContact(payload);
       closeAdd();
     } catch (err) {
       setError(err instanceof Error ? err.message : "failed to save contact");
@@ -188,6 +199,51 @@ export default function ContactsPage() {
   async function handleDeleteContact(contactId: string) {
     setOpenMenuId(null);
     await deleteContact({ contactId: contactId as Id<"contacts"> });
+  }
+
+  function handleRowClick(contactId: string) {
+    setExpandedId((prev) => (prev === contactId ? null : contactId));
+    setDetailEditId(null);
+  }
+
+  function startDetailEdit(contact: (typeof contacts)[number]) {
+    setDetailEditId(String(contact._id));
+    setDetailForm({
+      email: contact.email ?? "",
+      phone: contact.phone ?? "",
+      role: contact.role ?? "",
+      notes: contact.notes ?? "",
+    });
+  }
+
+  function closeDetail(contactId?: string) {
+    if (!contactId) {
+      setExpandedId(null);
+    } else {
+      setExpandedId((prev) => (prev === contactId ? null : prev));
+    }
+    setDetailEditId(null);
+  }
+
+  async function saveDetail(contact: (typeof contacts)[number], providerName: string) {
+    setDetailSaving(true);
+    try {
+      await updateContact({
+        contactId: contact._id,
+        name: contact.name,
+        category: contact.category,
+        providerId: contact.providerId,
+        providerName,
+        location: contact.location as "wellington" | "thermal" | "ocala" | "la" | "eu" | "can" | undefined,
+        email: detailForm.email || undefined,
+        phone: detailForm.phone || undefined,
+        role: detailForm.role || undefined,
+        notes: detailForm.notes || undefined,
+      });
+      setDetailEditId(null);
+    } finally {
+      setDetailSaving(false);
+    }
   }
 
   return (
@@ -218,18 +274,15 @@ export default function ContactsPage() {
           </button>
         </section>
 
-        <section className={styles.filters}>
-          <div className={styles.categoryTabs}>
-            {CATEGORY_TABS.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                className={tab.key === categoryFilter ? styles.categoryTabActive : styles.categoryTab}
-                onClick={() => setCategoryFilter(tab.key)}
-              >
-                {tab.label}
-              </button>
-            ))}
+        <section className={styles.filterRow}>
+          <div className={styles.searchWrapper}>
+            <span className={styles.searchIcon}>⌕</span>
+            <input
+              className={styles.searchInput}
+              placeholder="search contacts..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
           </div>
           <select
             className={styles.locationFilter}
@@ -252,12 +305,7 @@ export default function ContactsPage() {
               <div className={styles.newContactTitle}>+ new contact</div>
               <div className={styles.formGrid}>
                 <Field label="NAME">
-                  <input
-                    className={styles.fieldInput}
-                    value={form.name}
-                    onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                    required
-                  />
+                  <input className={styles.fieldInput} value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} required />
                 </Field>
                 <Field label="PROVIDER">
                   <input
@@ -273,11 +321,7 @@ export default function ContactsPage() {
                   </datalist>
                 </Field>
                 <Field label="LOCATION">
-                  <select
-                    className={styles.fieldInput}
-                    value={form.location}
-                    onChange={(event) => setForm((prev) => ({ ...prev, location: event.target.value as LocationValue }))}
-                  >
+                  <select className={styles.fieldInput} value={form.location} onChange={(event) => setForm((prev) => ({ ...prev, location: event.target.value as LocationValue }))}>
                     <option value="all">select</option>
                     <option value="wellington">Wellington</option>
                     <option value="thermal">Thermal</option>
@@ -288,12 +332,8 @@ export default function ContactsPage() {
                   </select>
                 </Field>
                 <Field label="CATEGORY">
-                  <select
-                    className={styles.fieldInput}
-                    value={form.category}
-                    onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
-                  >
-                    {CATEGORY_TABS.filter((row) => row.key !== "all").map((row) => (
+                  <select className={styles.fieldInput} value={form.category} onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}>
+                    {CATEGORY_OPTIONS.map((row) => (
                       <option key={row.key} value={row.key}>
                         {row.label}
                       </option>
@@ -301,26 +341,13 @@ export default function ContactsPage() {
                   </select>
                 </Field>
                 <Field label="EMAIL">
-                  <input
-                    className={styles.fieldInput}
-                    value={form.email}
-                    onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
-                    type="email"
-                  />
+                  <input className={styles.fieldInput} value={form.email} onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))} type="email" />
                 </Field>
                 <Field label="PHONE">
-                  <input
-                    className={styles.fieldInput}
-                    value={form.phone}
-                    onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
-                  />
+                  <input className={styles.fieldInput} value={form.phone} onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))} />
                 </Field>
                 <Field label="ROLE">
-                  <input
-                    className={styles.fieldInput}
-                    value={form.role}
-                    onChange={(event) => setForm((prev) => ({ ...prev, role: event.target.value }))}
-                  />
+                  <input className={styles.fieldInput} value={form.role} onChange={(event) => setForm((prev) => ({ ...prev, role: event.target.value }))} />
                 </Field>
               </div>
               {error ? <div className={styles.formError}>{error}</div> : null}
@@ -336,10 +363,18 @@ export default function ContactsPage() {
           ) : null}
 
           <div className={styles.contactsHeader}>
-            <div>NAME</div>
-            <div>PROVIDER</div>
-            <div>LOCATION</div>
-            <div>CATEGORY</div>
+            <button type="button" className={headerClass(sortColumn === "name", styles)} onClick={() => handleSort("name")}>
+              NAME {sortArrow(sortColumn === "name", sortDirection, styles)}
+            </button>
+            <button type="button" className={headerClass(sortColumn === "providerName", styles)} onClick={() => handleSort("providerName")}>
+              PROVIDER {sortArrow(sortColumn === "providerName", sortDirection, styles)}
+            </button>
+            <button type="button" className={headerClass(sortColumn === "location", styles)} onClick={() => handleSort("location")}>
+              LOCATION {sortArrow(sortColumn === "location", sortDirection, styles)}
+            </button>
+            <button type="button" className={headerClass(sortColumn === "category", styles)} onClick={() => handleSort("category")}>
+              CATEGORY {sortArrow(sortColumn === "category", sortDirection, styles)}
+            </button>
             <div />
           </div>
 
@@ -357,58 +392,159 @@ export default function ContactsPage() {
               const categoryKey = contact.category?.toLowerCase() ?? "other";
               const categoryColor = CATEGORY_COLORS[categoryKey] ?? { bg: "rgba(107,112,132,0.08)", color: "#6B7084", label: titleCase(categoryKey) };
               return (
-                <div key={contactId} className={styles.contactRow}>
-                  <div>
-                    <div className={styles.contactName}>{contact.name}</div>
-                    {contact.email ? <div className={styles.contactEmail}>{contact.email}</div> : null}
-                  </div>
-                  <div className={styles.contactProvider}>{providerName}</div>
-                  <div>
-                    {location ? (
-                      <span
-                        className={styles.locationBadge}
-                        style={{
-                          background: LOCATION_COLORS[location].bg,
-                          color: LOCATION_COLORS[location].color,
-                        }}
-                      >
-                        {LOCATION_LABELS[location]}
+                <div key={contactId}>
+                  <div
+                    className={`${styles.contactRow} ${expandedId === contactId ? styles.contactRowExpanded : ""}`}
+                    onClick={() => handleRowClick(contactId)}
+                  >
+                    <div>
+                      <div className={styles.contactName}>{contact.name}</div>
+                      {contact.email ? <div className={styles.contactEmail}>{contact.email}</div> : null}
+                    </div>
+                    <div className={styles.contactProvider}>{providerName}</div>
+                    <div>
+                      {location ? (
+                        <span className={styles.locationBadge} style={{ background: LOCATION_COLORS[location].bg, color: LOCATION_COLORS[location].color }}>
+                          {LOCATION_LABELS[location]}
+                        </span>
+                      ) : (
+                        <span className={styles.locationMissing}>—</span>
+                      )}
+                    </div>
+                    <div>
+                      <span className={styles.categoryBadge} style={{ background: categoryColor.bg, color: categoryColor.color }}>
+                        {categoryColor.label}
                       </span>
-                    ) : (
-                      <span className={styles.locationMissing}>—</span>
-                    )}
+                    </div>
+                    <div className={styles.menuWrap} onClick={(event) => event.stopPropagation()}>
+                      <button type="button" className={styles.rowMenuButton} onClick={() => setOpenMenuId((prev) => (prev === contactId ? null : contactId))}>
+                        ⋮
+                      </button>
+                      {openMenuId === contactId ? (
+                        <div className={styles.menuDropdown} onClick={(event) => event.stopPropagation()}>
+                          <button
+                            type="button"
+                            className={styles.menuItem}
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              setExpandedId(contactId);
+                            }}
+                          >
+                            View Contact
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.menuItem}
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              setExpandedId(contactId);
+                              startDetailEdit(contact);
+                            }}
+                          >
+                            Edit Contact
+                          </button>
+                          <div className={styles.menuDivider} />
+                          <button type="button" className={`${styles.menuItem} ${styles.menuItemDanger}`} onClick={() => handleDeleteContact(contactId)}>
+                            Delete
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
-                  <div>
-                    <span className={styles.categoryBadge} style={{ background: categoryColor.bg, color: categoryColor.color }}>
-                      {categoryColor.label}
-                    </span>
-                  </div>
-                  <div className={styles.menuWrap}>
-                    <button type="button" className={styles.rowMenuButton} onClick={() => setOpenMenuId((prev) => (prev === contactId ? null : contactId))}>
-                      ⋮
-                    </button>
-                    {openMenuId === contactId ? (
-                      <div className={styles.menuDropdown}>
-                        <button type="button" className={styles.menuItem}>
-                          View Contact
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.menuItem}
-                          onClick={() => {
-                            setOpenMenuId(null);
-                            startEdit(contact);
-                          }}
-                        >
-                          Edit Contact
-                        </button>
-                        <div className={styles.menuDivider} />
-                        <button type="button" className={`${styles.menuItem} ${styles.menuItemDanger}`} onClick={() => handleDeleteContact(contactId)}>
-                          Delete
-                        </button>
+                  {expandedId === contactId ? (
+                    <div className={styles.contactDetail} onClick={(event) => event.stopPropagation()}>
+                      <div className={styles.detailFields}>
+                        <div className={styles.detailField}>
+                          <div className={styles.detailLabel}>EMAIL</div>
+                          {detailEditId === contactId ? (
+                            <input
+                              className={styles.detailInput}
+                              value={detailForm.email}
+                              onChange={(event) => setDetailForm((prev) => ({ ...prev, email: event.target.value }))}
+                            />
+                          ) : contact.email ? (
+                            <a className={styles.detailLink} href={`mailto:${contact.email}`}>
+                              {contact.email}
+                            </a>
+                          ) : (
+                            <div className={styles.detailValueEmpty}>—</div>
+                          )}
+                        </div>
+                        <div className={styles.detailField}>
+                          <div className={styles.detailLabel}>PHONE</div>
+                          {detailEditId === contactId ? (
+                            <input
+                              className={styles.detailInput}
+                              value={detailForm.phone}
+                              onChange={(event) => setDetailForm((prev) => ({ ...prev, phone: event.target.value }))}
+                            />
+                          ) : contact.phone ? (
+                            <a className={styles.detailLink} href={`tel:${contact.phone}`}>
+                              {contact.phone}
+                            </a>
+                          ) : (
+                            <div className={styles.detailValueEmpty}>—</div>
+                          )}
+                        </div>
+                        <div className={styles.detailField}>
+                          <div className={styles.detailLabel}>ROLE</div>
+                          {detailEditId === contactId ? (
+                            <input
+                              className={styles.detailInput}
+                              value={detailForm.role}
+                              onChange={(event) => setDetailForm((prev) => ({ ...prev, role: event.target.value }))}
+                            />
+                          ) : (
+                            <div className={contact.role ? styles.detailValue : styles.detailValueEmpty}>{contact.role || "—"}</div>
+                          )}
+                        </div>
+                        <div className={`${styles.detailField} ${styles.detailNotes}`}>
+                          <div className={styles.detailLabel}>NOTES</div>
+                          {detailEditId === contactId ? (
+                            <textarea
+                              className={styles.detailTextarea}
+                              value={detailForm.notes}
+                              onChange={(event) => setDetailForm((prev) => ({ ...prev, notes: event.target.value }))}
+                            />
+                          ) : (
+                            <div className={contact.notes ? styles.detailValue : styles.detailValueEmpty}>{contact.notes || "—"}</div>
+                          )}
+                        </div>
                       </div>
-                    ) : null}
-                  </div>
+                      <div className={styles.detailActions}>
+                        {detailEditId === contactId ? (
+                          <>
+                            <button
+                              type="button"
+                              className={styles.btnCancelDetail}
+                              onClick={() => {
+                                setDetailEditId(null);
+                              }}
+                            >
+                              cancel
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.btnSaveDetail}
+                              disabled={detailSaving}
+                              onClick={() => saveDetail(contact, providerName)}
+                            >
+                              {detailSaving ? "saving..." : "save changes"}
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" className={styles.btnEditContact} onClick={() => startDetailEdit(contact)}>
+                              edit contact
+                            </button>
+                            <button type="button" className={styles.btnCloseDetail} onClick={() => closeDetail(contactId)}>
+                              close
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               );
             })
@@ -420,13 +556,31 @@ export default function ContactsPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className={styles.fieldGroup}>
-      <span className={styles.fieldLabel}>{label}</span>
-      {children}
-    </label>
-  );
+function headerClass(active: boolean, css: Record<string, string>) {
+  return active ? `${css.columnHeader} ${css.columnHeaderActive}` : css.columnHeader;
+}
+
+function sortArrow(active: boolean, direction: SortDirection, css: Record<string, string>) {
+  if (!active) return null;
+  return <span className={css.sortArrow}>{direction === "asc" ? "↑" : "↓"}</span>;
+}
+
+function getSortValue(contact: any, column: Exclude<SortColumn, null>, providerLookup: Map<string, any>) {
+  if (column === "name") return contact.name ?? "";
+  if (column === "providerName") {
+    const provider = contact.providerId ? providerLookup.get(String(contact.providerId)) : null;
+    return contact.providerName ?? contact.company ?? provider?.name ?? "";
+  }
+  if (column === "location") {
+    const location = contact.location as Exclude<LocationValue, "all"> | undefined;
+    return location ? LOCATION_LABELS[location] : "";
+  }
+  return categoryLabel(contact.category ?? "");
+}
+
+function categoryLabel(value: string) {
+  const key = (value ?? "").toLowerCase();
+  return CATEGORY_COLORS[key]?.label ?? titleCase(key);
 }
 
 function titleCase(value: string) {
@@ -435,4 +589,13 @@ function titleCase(value: string) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className={styles.fieldGroup}>
+      <span className={styles.fieldLabel}>{label}</span>
+      {children}
+    </label>
+  );
 }

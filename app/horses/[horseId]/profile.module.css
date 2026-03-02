@@ -1,49 +1,352 @@
-.header {
-  margin-bottom: 18px;
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
 }
 
 .titleRow {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .title {
   margin: 8px 0 0;
-  font-size: 32px;
+  font-size: 36px;
   font-weight: 700;
+  color: #1a1a2e;
+  font-family: "Space Mono", monospace;
 }
 
-.owner {
-  margin-top: 6px;
-  font-size: 13px;
+.subtitle {
+  margin-top: 4px;
+  font-size: 12px;
   color: #6b7084;
+  font-family: "Space Mono", monospace;
 }
 
-.activeBadge,
-.inactiveBadge,
-.soldBadge {
-  font-size: 10px;
+.statusActive,
+.statusInactive,
+.statusSold {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 8px;
   border-radius: 4px;
-  padding: 2px 8px;
+  text-transform: uppercase;
 }
 
-.activeBadge {
+.statusActive {
   background: rgba(34, 197, 131, 0.08);
   color: #22c583;
 }
 
-.inactiveBadge {
+.statusInactive {
   background: #f0f1f5;
   color: #9ea2b0;
 }
 
-.soldBadge {
+.statusSold {
   background: rgba(229, 72, 77, 0.08);
   color: #e5484d;
 }
 
-.card {
+.btnEdit {
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #6b7084;
+  cursor: pointer;
+}
+
+.btnEdit:hover {
+  border-color: #4a5bdb;
+  color: #4a5bdb;
+}
+
+.profileCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 26px 30px;
+  margin-bottom: 20px;
+}
+
+.profileFields {
+  display: flex;
+  gap: 40px;
+  flex-wrap: wrap;
+}
+
+.fieldLabel {
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.fieldValue,
+.fieldValueEmpty {
+  font-size: 13px;
+  color: #1a1a2e;
+  font-weight: 700;
+}
+
+.fieldValueEmpty {
+  color: #c4c7d0;
+}
+
+.fieldInput input,
+.fieldInput select {
+  background: #f2f3f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-family: "Space Mono", monospace;
+  color: #1a1a2e;
+  min-width: 160px;
+}
+
+.editActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f1f5;
+}
+
+.btnCancel {
+  font-size: 10px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #6b7084;
+  font-family: "Space Mono", monospace;
+  cursor: pointer;
+}
+
+.btnSave {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  font-family: "Space Mono", monospace;
+  cursor: pointer;
+}
+
+.spendRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.spendTotalCard,
+.spendBreakdownCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 22px 26px;
+}
+
+.spendLabel {
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.spendTotal {
+  font-size: 28px;
+  font-weight: 700;
+  margin-top: 4px;
+  color: #1a1a2e;
+}
+
+.momUp,
+.momDown {
+  font-size: 10px;
+  margin-top: 6px;
+  font-weight: 700;
+}
+
+.momUp {
+  color: #e5484d;
+}
+
+.momDown {
+  color: #22c583;
+}
+
+.breakdownList {
+  margin-top: 10px;
+}
+
+.breakdownRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.breakdownName {
+  font-size: 10px;
+  color: #6b7084;
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.breakdownTrack {
+  height: 6px;
+  border-radius: 3px;
+  flex: 1;
+  background: #f0f1f5;
+  overflow: hidden;
+}
+
+.breakdownFill {
+  height: 100%;
+  border-radius: 3px;
+  display: block;
+}
+
+.breakdownAmount {
+  font-size: 10px;
+  font-weight: 700;
+  color: #1a1a2e;
+  width: 70px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.invoicesSection {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.invoicesHeader {
+  padding: 18px 26px;
+  border-bottom: 1px solid #e8eaf0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.invoicesTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.invoiceTabs {
+  display: inline-flex;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.invoiceTab,
+.invoiceTabActive {
+  font-family: "Space Mono", monospace;
+  font-size: 9px;
+  padding: 5px 10px;
+  border: none;
+  cursor: pointer;
+}
+
+.invoiceTab {
+  background: transparent;
+  color: #6b7084;
+}
+
+.invoiceTabActive {
+  background: #1a1a2e;
+  color: #fff;
+  font-weight: 700;
+}
+
+.invoiceRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 26px;
+  border-bottom: 1px solid #f0f1f5;
+  text-decoration: none;
+}
+
+.invoiceRow:hover {
+  background: #fafafc;
+  cursor: pointer;
+}
+
+.invoiceLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dotApproved,
+.dotPending {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.dotApproved {
+  background: #22c583;
+}
+
+.dotPending {
+  background: #d0d2d8;
+}
+
+.invoiceLabel {
+  font-size: 12px;
+  color: #1a1a2e;
+}
+
+.invoiceAmount {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.emptyInvoices {
+  text-align: center;
+  font-size: 12px;
+  color: #9ea2b0;
+  padding: 40px;
+}
+
+.viewAll {
+  font-size: 10px;
+  color: #4a5bdb;
+  text-align: center;
+  padding: 12px;
+  cursor: pointer;
+  border-top: 1px solid #f0f1f5;
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  width: 100%;
+  font-family: "Space Mono", monospace;
+}
+
+.recordsCard {
   background: #fff;
   border: 1px solid #e8eaf0;
   border-radius: 12px;
@@ -51,90 +354,65 @@
   margin-bottom: 20px;
 }
 
-.cardHead {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 14px;
+.recordsTitle {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 12px;
 }
 
-.cardTitle {
+.recordRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f1f5;
+}
+
+.recordRow:last-child {
+  border-bottom: none;
+}
+
+.recordLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.recordIcon {
+  font-size: 14px;
+}
+
+.recordLabel {
   font-size: 12px;
+  color: #1a1a2e;
   font-weight: 700;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.fieldLabel {
+.recordCount {
   font-size: 10px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
-.fieldValue {
-  margin-top: 4px;
-  font-size: 13px;
-}
-
-.fieldInput input,
-.fieldInput select {
-  width: 100%;
-  background: #f2f3f7;
-  border: 1px solid #e8eaf0;
-  border-radius: 6px;
-  padding: 12px 16px;
-  font-size: 13px;
-  font-family: "Space Mono", monospace;
-}
-
-.fieldInput select {
-  appearance: none;
+.recordView {
+  font-size: 10px;
+  color: #4a5bdb;
   cursor: pointer;
-}
-
-.actions {
-  margin-top: 14px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.totalSpend {
-  font-size: 32px;
-  font-weight: 700;
-}
-
-.breakdown {
-  margin-top: 12px;
-  display: grid;
-  gap: 6px;
-}
-
-.breakdownRow {
-  display: flex;
-  justify-content: space-between;
-  border-bottom: 1px solid #f0f1f5;
-  padding: 8px 0;
-}
-
-.invoices {
-  margin-top: 12px;
-}
-
-.invoiceRow {
-  display: grid;
-  grid-template-columns: 1fr 140px 140px;
-  gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid #f0f1f5;
   text-decoration: none;
 }
 
-.invoiceRow:hover {
-  background: #fafafc;
+@media (max-width: 920px) {
+  .headerRow {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .spendRow {
+    grid-template-columns: 1fr;
+  }
+
+  .invoicesHeader {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
 }
