@@ -16,7 +16,7 @@ export default function SplashPage() {
     if (SPLASH_IMAGES.length <= 1) return;
     const interval = setInterval(() => {
       setCurrent((prev) => (prev + 1) % SPLASH_IMAGES.length);
-    }, 5500);
+    }, 2000);
     return () => clearInterval(interval);
   }, []);
 
