@@ -8,6 +8,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
 import NavBar from "@/components/NavBar";
+import FeedPlan from "./FeedPlan";
 import styles from "./profile.module.css";
 
 type InvoiceFilter = "all" | "pending" | "approved";
@@ -279,6 +280,8 @@ export default function HorseProfilePage() {
           <RecordRow horseId={horse._id} type="health" icon="💉" label="Health & Vaccinations" count={recordCounts.health} />
           <RecordRow horseId={horse._id} type="registration" icon="📄" label="Registration Documents" count={recordCounts.registration} />
         </section>
+
+        <FeedPlan horseId={horse._id} horseName={horse.name} />
 
         <div className="ui-footer">OLD_OAK_HORSES // HORSES // {horse.name.toUpperCase()}</div>
       </main>

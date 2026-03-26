@@ -274,5 +274,44 @@ export default defineSchema({
     createdAt: v.number()
   })
     .index("by_category", ["categoryId"])
-    .index("by_category_slug", ["categoryId", "slug"])
+    .index("by_category_slug", ["categoryId", "slug"]),
+
+  feedPlans: defineTable({
+    horseId: v.id("horses"),
+    sections: v.object({
+      hay: v.object({
+        am: v.array(v.object({ product: v.string(), amount: v.number(), unit: v.string() })),
+        lunch: v.array(v.object({ product: v.string(), amount: v.number(), unit: v.string() })),
+        pm: v.array(v.object({ product: v.string(), amount: v.number(), unit: v.string() })),
+        notes: v.optional(v.string()),
+      }),
+      grain: v.object({
+        am: v.array(v.object({ product: v.string(), amount: v.number(), unit: v.string() })),
+        lunch: v.array(v.object({ product: v.string(), amount: v.number(), unit: v.string() })),
+        pm: v.array(v.object({ product: v.string(), amount: v.number(), unit: v.string() })),
+        notes: v.optional(v.string()),
+      }),
+      supplements: v.object({
+        am: v.array(v.object({ product: v.string(), amount: v.number(), unit: v.string() })),
+        lunch: v.array(v.object({ product: v.string(), amount: v.number(), unit: v.string() })),
+        pm: v.array(v.object({ product: v.string(), amount: v.number(), unit: v.string() })),
+        notes: v.optional(v.string()),
+      }),
+      meds: v.object({
+        am: v.array(v.object({ product: v.string(), amount: v.number(), unit: v.string() })),
+        lunch: v.array(v.object({ product: v.string(), amount: v.number(), unit: v.string() })),
+        pm: v.array(v.object({ product: v.string(), amount: v.number(), unit: v.string() })),
+        notes: v.optional(v.string()),
+      }),
+    }),
+    updatedAt: v.number(),
+  }).index("by_horse", ["horseId"]),
+
+  feedPlanHistory: defineTable({
+    horseId: v.id("horses"),
+    feedPlanId: v.id("feedPlans"),
+    changeDescription: v.string(),
+    previousSections: v.optional(v.any()),
+    changedAt: v.number(),
+  }).index("by_horse", ["horseId"]),
 });
