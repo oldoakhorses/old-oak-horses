@@ -100,19 +100,69 @@ export default function StatementReconcilePage() {
     : tab === "assigned" ? txns.filter((t) => t.assignType)
     : txns.filter((t) => t.isApproved);
 
+  // Smart bill suggestions: score bills by relevance to the selected transaction
+  const matchTxn = matchModal ? txns.find((t) => String(t._id) === matchModal) : null;
+  const scoredBills = useMemo(() => {
+    if (!matchTxn) return matchableBills;
+    const absAmount = Math.round(Math.abs(matchTxn.amount) * 100) / 100;
+    const txnKeywords = matchTxn.description.toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim().split(" ").filter((w) => w.length > 2);
+    const txnDateStr = matchTxn.postingDate;
+
+    return matchableBills.map((b) => {
+      let score = 0;
+      // Amount match
+      const amountDiff = Math.abs(b.amount - absAmount);
+      if (amountDiff < 0.02) score += 100;
+      else if (amountDiff / Math.max(absAmount, 1) < 0.05) score += 60;
+      else if (amountDiff / Math.max(absAmount, 1) < 0.15) score += 20;
+
+      // Keyword match
+      const billKw = (b.providerKeywords ?? []) as string[];
+      const common = txnKeywords.filter((kw) => billKw.some((bk) => bk.includes(kw) || kw.includes(bk)));
+      score += common.length * 30;
+
+      // Date proximity (within 30 days)
+      if (b.invoiceDate && txnDateStr) {
+        try {
+          const txnDate = new Date(txnDateStr).getTime();
+          const invDate = new Date(b.invoiceDate).getTime();
+          const daysDiff = Math.abs(txnDate - invDate) / 86400000;
+          if (daysDiff < 3) score += 40;
+          else if (daysDiff < 14) score += 20;
+          else if (daysDiff < 30) score += 10;
+        } catch {}
+      }
+
+      return { ...b, score };
+    }).sort((a, b) => b.score - a.score);
+  }, [matchTxn, matchableBills]);
+
   const filteredBills = billSearch
-    ? matchableBills.filter((b) =>
+    ? scoredBills.filter((b) =>
         b.fileName.toLowerCase().includes(billSearch.toLowerCase()) ||
         b.providerName.toLowerCase().includes(billSearch.toLowerCase())
       )
-    : matchableBills.slice(0, 20);
+    : scoredBills;
+
+  // Split into suggestions (score > 0) and the rest
+  const suggestedBills = filteredBills.filter((b) => b.score > 50);
+  const otherBills = filteredBills.filter((b) => b.score <= 50);
 
   function openAssignModal(txnId: string, amount: number) {
+    const txn = txns.find((t) => String(t._id) === txnId);
     setAssignModal(txnId);
-    setAssignType("business");
-    setSelectedHorses([]);
-    setSelectedPeople([]);
-    setAssignCategory("");
+    // Pre-populate from existing assignments (may have been carried over from matched invoice)
+    if (txn?.assignType) {
+      setAssignType(txn.assignType);
+      setSelectedHorses((txn.assignedHorses ?? []).map((h) => ({ horseId: h.horseId as Id<"horses">, horseName: h.horseName, amount: h.amount })));
+      setSelectedPeople((txn.assignedPeople ?? []).map((p) => ({ personId: p.personId as Id<"people">, personName: p.personName, role: p.role, amount: p.amount })));
+      setAssignCategory(txn.category ?? "");
+    } else {
+      setAssignType("business");
+      setSelectedHorses([]);
+      setSelectedPeople([]);
+      setAssignCategory("");
+    }
   }
 
   async function handleAssign() {
@@ -340,19 +390,57 @@ export default function StatementReconcilePage() {
             onChange={(e) => setBillSearch(e.target.value)}
           />
           <div className={styles.billList}>
-            <button
-              type="button"
-              className={styles.billOption}
-              onClick={async () => {
-                if (matchModal) {
-                  await updateMatch({ transactionId: matchModal as Id<"ccTransactions"> });
-                  setMatchModal(null);
-                }
-              }}
-            >
-              <span style={{ color: "#EF4444" }}>clear match</span>
-            </button>
-            {filteredBills.map((bill) => (
+            {matchTxn?.matchedBillId ? (
+              <button
+                type="button"
+                className={styles.billOption}
+                onClick={async () => {
+                  if (matchModal) {
+                    await updateMatch({ transactionId: matchModal as Id<"ccTransactions"> });
+                    setMatchModal(null);
+                  }
+                }}
+              >
+                <span style={{ color: "#EF4444" }}>clear match</span>
+              </button>
+            ) : null}
+            {suggestedBills.length > 0 && !billSearch ? (
+              <>
+                <div className={styles.billSectionLabel}>suggested matches</div>
+                {suggestedBills.map((bill) => (
+                  <button
+                    key={bill._id}
+                    type="button"
+                    className={`${styles.billOption} ${styles.billSuggested}`}
+                    onClick={async () => {
+                      if (matchModal) {
+                        await updateMatch({
+                          transactionId: matchModal as Id<"ccTransactions">,
+                          matchedBillId: bill._id,
+                          matchedBillName: bill.fileName,
+                        });
+                        setMatchModal(null);
+                      }
+                    }}
+                  >
+                    <div className={styles.billOptionInfo}>
+                      <div className={styles.billOptionName}>{bill.fileName}</div>
+                      <div className={styles.billOptionMeta}>
+                        {bill.providerName}{bill.invoiceDate ? ` · ${bill.invoiceDate}` : ""}{bill.categorySlug ? ` · ${bill.categorySlug}` : ""}
+                      </div>
+                      {(bill.hasHorseAssignments || bill.hasPersonAssignments) && (
+                        <div className={styles.billOptionAssigned}>
+                          {bill.hasHorseAssignments ? "🐴 horses assigned" : "👤 people assigned"}
+                        </div>
+                      )}
+                    </div>
+                    <div className={styles.billOptionAmount}>{fmtUSD(bill.amount)}</div>
+                  </button>
+                ))}
+                {otherBills.length > 0 && <div className={styles.billSectionLabel}>all invoices</div>}
+              </>
+            ) : null}
+            {(billSearch ? filteredBills : otherBills).slice(0, 30).map((bill) => (
               <button
                 key={bill._id}
                 type="button"
@@ -371,7 +459,7 @@ export default function StatementReconcilePage() {
                 <div className={styles.billOptionInfo}>
                   <div className={styles.billOptionName}>{bill.fileName}</div>
                   <div className={styles.billOptionMeta}>
-                    {bill.providerName} &middot; {bill.billingPeriod}
+                    {bill.providerName}{bill.invoiceDate ? ` · ${bill.invoiceDate}` : ""} &middot; {bill.billingPeriod}
                   </div>
                 </div>
                 <div className={styles.billOptionAmount}>{fmtUSD(bill.amount)}</div>

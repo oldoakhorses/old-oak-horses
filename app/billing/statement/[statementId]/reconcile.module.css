@@ -412,6 +412,30 @@
   margin-left: 12px;
 }
 
+.billSectionLabel {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ea2b0;
+  padding: 10px 14px 4px;
+}
+
+.billSuggested {
+  background: rgba(34, 197, 131, 0.04);
+  border-left: 3px solid #22C583;
+}
+.billSuggested:hover {
+  background: rgba(34, 197, 131, 0.08);
+}
+
+.billOptionAssigned {
+  font-size: 9px;
+  color: #4A5BDB;
+  margin-top: 2px;
+  font-weight: 600;
+}
+
 /* Assign modal */
 .assignTypeRow {
   display: flex;

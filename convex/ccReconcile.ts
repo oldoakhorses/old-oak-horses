@@ -214,7 +214,8 @@ export const uploadStatement = mutation({
   },
 });
 
-/** Update a transaction's match */
+/** Update a transaction's match — manual matches are always "exact" confidence.
+ *  When matching to a bill, auto-carry-over the invoice's horse/person assignments and category. */
 export const updateTransactionMatch = mutation({
   args: {
     transactionId: v.id("ccTransactions"),
@@ -222,11 +223,57 @@ export const updateTransactionMatch = mutation({
     matchedBillName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.transactionId, {
+    const patch: Record<string, unknown> = {
       matchedBillId: args.matchedBillId,
       matchedBillName: args.matchedBillName,
-      matchConfidence: args.matchedBillId ? "high" : "none",
-    });
+      matchConfidence: args.matchedBillId ? "exact" : "none",
+    };
+
+    // Auto-carry-over assignments from the matched invoice
+    if (args.matchedBillId) {
+      const bill = await ctx.db.get(args.matchedBillId);
+      if (bill) {
+        // Carry over category
+        if (bill.categoryId) {
+          const category = await ctx.db.get(bill.categoryId);
+          if (category) {
+            patch.category = category.slug;
+          }
+        }
+
+        // Carry over horse assignments
+        if (bill.assignedHorses && bill.assignedHorses.length > 0) {
+          patch.assignType = "horse";
+          patch.assignedHorses = bill.assignedHorses.map((h) => ({
+            horseId: h.horseId,
+            horseName: h.horseName,
+            amount: h.amount,
+          }));
+        }
+        // Carry over person assignments
+        else if (bill.assignedPeople && bill.assignedPeople.length > 0) {
+          const people = await ctx.db.query("people").collect();
+          patch.assignType = "person";
+          patch.assignedPeople = bill.assignedPeople.map((p) => {
+            const person = people.find((pe) => String(pe._id) === String(p.personId));
+            return {
+              personId: p.personId,
+              personName: person?.name ?? "Unknown",
+              role: person?.role,
+              amount: p.amount,
+            };
+          });
+        }
+      }
+    } else {
+      // Clearing match — also clear carried-over assignments
+      patch.assignType = undefined;
+      patch.assignedHorses = undefined;
+      patch.assignedPeople = undefined;
+      patch.category = undefined;
+    }
+
+    await ctx.db.patch(args.transactionId, patch);
   },
 });
 
@@ -314,6 +361,9 @@ export const deleteStatement = mutation({
 export const getMatchableBills = query({
   handler: async (ctx) => {
     const bills = await ctx.db.query("bills").collect();
+    const contacts = await ctx.db.query("contacts").collect();
+    const providers = await ctx.db.query("providers").collect();
+    const categories = await ctx.db.query("categories").collect();
     return bills
       .filter((b) => b.status === "done" && b.isApproved)
       .map((b) => {
@@ -322,12 +372,29 @@ export const getMatchableBills = query({
           : typeof extracted.invoice_total_usd === "number" ? extracted.invoice_total_usd
           : typeof extracted.invoiceTotalUsd === "number" ? extracted.invoiceTotalUsd
           : 0;
+        const pName = String(extracted.provider_name ?? extracted.providerName ?? "");
+        let contactName = "";
+        if (b.contactId) {
+          const c = contacts.find((c) => String(c._id) === String(b.contactId));
+          if (c) contactName = c.name;
+        }
+        if (!contactName && b.providerId) {
+          const p = providers.find((p) => String(p._id) === String(b.providerId));
+          if (p) contactName = p.name;
+        }
+        const invoiceDate = String(extracted.invoice_date ?? extracted.invoiceDate ?? "");
+        const category = b.categoryId ? categories.find((c) => String(c._id) === String(b.categoryId)) : null;
         return {
           _id: b._id,
           fileName: b.fileName,
           amount: round2(Math.abs(total)),
-          providerName: String(extracted.provider_name ?? extracted.providerName ?? ""),
+          providerName: pName || contactName,
+          providerKeywords: extractKeywords([pName, contactName, b.fileName].filter(Boolean).join(" ")),
           billingPeriod: b.billingPeriod,
+          invoiceDate,
+          categorySlug: category?.slug ?? "",
+          hasHorseAssignments: (b.assignedHorses?.length ?? 0) > 0,
+          hasPersonAssignments: (b.assignedPeople?.length ?? 0) > 0,
         };
       })
       .sort((a, b) => b.billingPeriod.localeCompare(a.billingPeriod) || a.fileName.localeCompare(b.fileName));
