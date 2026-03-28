@@ -307,23 +307,9 @@ export default function InvoiceReportPage() {
           />
         ) : null}
 
-        <div style={{ marginTop: 16, marginBottom: 20, display: "flex", gap: 10, alignItems: "flex-start" }}>
+        <div className={styles.approvalRow}>
           {bill?.status === "done" ? (
-            <div
-              style={{
-                flex: 1,
-                background: "rgba(34, 197, 131, 0.08)",
-                border: "1px solid #22C583",
-                borderRadius: 8,
-                padding: "14px 20px",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 12,
-                fontWeight: 700,
-                color: "#22C583"
-              }}
-            >
+            <div className={styles.approvedBox}>
               ✓ invoice approved
             </div>
           ) : (
@@ -352,6 +338,14 @@ export default function InvoiceReportPage() {
               ) : null}
             </div>
           )}
+          {bill?.assignedHorses?.length ? (
+            <Link
+              href={`/horses/${bill.assignedHorses[0].horseId}/records/${categorySlug}`}
+              className={styles.linkRecordBtn}
+            >
+              link to record →
+            </Link>
+          ) : null}
           <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(true)}>
             delete
           </button>

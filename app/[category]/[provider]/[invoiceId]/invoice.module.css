@@ -250,6 +250,48 @@
   color: #fff;
 }
 
+.approvalRow {
+  margin-top: 24px;
+  margin-bottom: 28px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.approvedBox {
+  flex: 1;
+  background: rgba(34, 197, 131, 0.08);
+  border: 1px solid #22c583;
+  border-radius: 8px;
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #22c583;
+}
+
+.linkRecordBtn {
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 18px 16px;
+  border-radius: 8px;
+  border: 1px solid #e8eaf0;
+  background: #fff;
+  color: #4a5bdb;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.linkRecordBtn:hover {
+  border-color: #4a5bdb;
+  background: rgba(74, 91, 219, 0.04);
+}
+
 @media (max-width: 860px) {
   .headerCard {
     flex-direction: column;
@@ -310,5 +352,15 @@
 
   .itemList {
     padding: 10px 14px;
+  }
+
+  .approvalRow {
+    flex-direction: column;
+  }
+
+  .linkRecordBtn {
+    width: 100%;
+    text-align: center;
+    padding: 14px 16px;
   }
 }
