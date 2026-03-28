@@ -434,6 +434,116 @@
   text-decoration: none;
 }
 
+.prizeSection {
+  background: var(--color-card, #fff);
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+
+.prizeHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.prizeTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+  text-transform: lowercase;
+}
+
+.addPrizeBtn {
+  background: none;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #4a5bdb;
+  cursor: pointer;
+  font-family: "Space Mono", monospace;
+}
+
+.addPrizeBtn:hover {
+  background: rgba(74, 91, 219, 0.06);
+}
+
+.prizeFormGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.prizeInput {
+  background: #f8f9fc;
+  border: 1px solid #e8eaf0;
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-family: "Space Mono", monospace;
+  color: #1a1a2e;
+}
+
+.prizeInput:focus {
+  outline: none;
+  border-color: #4a5bdb;
+}
+
+.prizeEntryRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f1f5;
+}
+
+.prizeEntryRow:last-child {
+  border-bottom: none;
+}
+
+.prizeEntryLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.prizeEntryAmount {
+  font-size: 13px;
+  font-weight: 700;
+  color: #22c583;
+}
+
+.prizeEntryDesc {
+  font-size: 11px;
+  color: #6b7084;
+}
+
+.prizeEntryDate {
+  font-size: 10px;
+  color: #9ea2b0;
+}
+
+.prizeDeleteBtn {
+  background: none;
+  border: none;
+  color: #9ea2b0;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.prizeDeleteBtn:hover {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+}
+
 @media (max-width: 920px) {
   .headerRow {
     flex-direction: column;

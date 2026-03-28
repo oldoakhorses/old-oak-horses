@@ -20,7 +20,15 @@ type FormState = {
   usefNumber: string;
   feiNumber: string;
   owner: string;
-  prizeMoney: string;
+};
+
+type PrizeForm = {
+  amount: string;
+  description: string;
+  showName: string;
+  className: string;
+  placing: string;
+  date: string;
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -51,7 +59,10 @@ export default function HorseProfilePage() {
   const spendByCategory = useQuery(api.horses.getHorseSpendByCategory, horseId ? { horseId } : "skip") ?? [];
   const invoices = useQuery(api.horses.getInvoicesByHorse, horseId ? { horseId } : "skip") ?? [];
   const recordCounts = useQuery(api.horses.getHorseRecordCounts, horseId ? { horseId } : "skip");
+  const prizeMoneyData = useQuery(api.incomeEntries.getHorsePrizeMoney, horseId ? { horseId } : "skip");
   const updateHorseProfile = useMutation(api.horses.updateHorseProfile);
+  const addIncomeEntry = useMutation(api.incomeEntries.addEntry);
+  const deleteIncomeEntry = useMutation(api.incomeEntries.deleteEntry);
 
   const [isEditing, setIsEditing] = useState(startsInEditMode);
   const [isSaving, setIsSaving] = useState(false);
@@ -64,7 +75,10 @@ export default function HorseProfilePage() {
     usefNumber: "",
     feiNumber: "",
     owner: "",
-    prizeMoney: "",
+  });
+  const [showPrizeForm, setShowPrizeForm] = useState(false);
+  const [prizeForm, setPrizeForm] = useState<PrizeForm>({
+    amount: "", description: "", showName: "", className: "", placing: "", date: "",
   });
 
   useEffect(() => {
@@ -76,7 +90,6 @@ export default function HorseProfilePage() {
       usefNumber: horse.usefNumber ?? "",
       feiNumber: horse.feiNumber ?? "",
       owner: horse.owner ?? "",
-      prizeMoney: horse.prizeMoney ? String(horse.prizeMoney) : "",
     });
   }, [horse]);
 
@@ -119,7 +132,7 @@ export default function HorseProfilePage() {
         usefNumber: form.usefNumber || undefined,
         feiNumber: form.feiNumber || undefined,
         owner: form.owner || undefined,
-        prizeMoney: form.prizeMoney ? Number(form.prizeMoney) : undefined,
+        prizeMoney: undefined,
       });
       setIsEditing(false);
     } finally {
@@ -195,8 +208,8 @@ export default function HorseProfilePage() {
             <Field label="FEI #" value={horse.feiNumber || "—"} editing={isEditing}>
               <input value={form.feiNumber} onChange={(event) => setForm((prev) => ({ ...prev, feiNumber: event.target.value }))} />
             </Field>
-            <Field label="PRIZE MONEY" value={horse.prizeMoney ? formatUsd(horse.prizeMoney) : "—"} editing={isEditing}>
-              <input type="number" step="0.01" placeholder="0.00" value={form.prizeMoney} onChange={(event) => setForm((prev) => ({ ...prev, prizeMoney: event.target.value }))} />
+            <Field label="PRIZE MONEY" value={(prizeMoneyData?.total ?? 0) > 0 ? formatUsd(prizeMoneyData!.total) : "—"} editing={false}>
+              <span />
             </Field>
           </div>
           {isEditing ? (
@@ -219,15 +232,15 @@ export default function HorseProfilePage() {
               {spendMeta.momPct >= 0 ? "↗" : "↘"} {spendMeta.momPct >= 0 ? "+" : ""}
               {Math.abs(spendMeta.momPct).toFixed(1)}% vs last month
             </div>
-            {(horse.prizeMoney ?? 0) > 0 ? (
+            {(prizeMoneyData?.total ?? 0) > 0 ? (
               <>
                 <div className={styles.prizeMoneyRow}>
                   <span className={styles.prizeMoneyLabel}>PRIZE MONEY</span>
-                  <span className={styles.prizeMoneyValue}>+{formatUsd(horse.prizeMoney!)}</span>
+                  <span className={styles.prizeMoneyValue}>+{formatUsd(prizeMoneyData!.total)}</span>
                 </div>
                 <div className={styles.netCostRow}>
                   <span className={styles.netCostLabel}>NET COST</span>
-                  <span className={styles.netCostValue}>{formatUsd(spendMeta.totalSpend - (horse.prizeMoney ?? 0))}</span>
+                  <span className={styles.netCostValue}>{formatUsd(spendMeta.totalSpend - prizeMoneyData!.total)}</span>
                 </div>
               </>
             ) : null}
@@ -290,6 +303,58 @@ export default function HorseProfilePage() {
               {showAllInvoices ? "show less" : "view all"}
             </button>
           ) : null}
+        </section>
+
+        <section className={styles.prizeSection}>
+          <div className={styles.prizeHeader}>
+            <div className={styles.prizeTitle}>prize money</div>
+            <button type="button" className={styles.addPrizeBtn} onClick={() => setShowPrizeForm((prev) => !prev)}>
+              {showPrizeForm ? "cancel" : "+ add"}
+            </button>
+          </div>
+          {showPrizeForm ? (
+            <div className={styles.prizeFormGrid}>
+              <input className={styles.prizeInput} type="number" step="0.01" placeholder="Amount ($)" value={prizeForm.amount} onChange={(e) => setPrizeForm((p) => ({ ...p, amount: e.target.value }))} />
+              <input className={styles.prizeInput} placeholder="Show name" value={prizeForm.showName} onChange={(e) => setPrizeForm((p) => ({ ...p, showName: e.target.value }))} />
+              <input className={styles.prizeInput} placeholder="Class" value={prizeForm.className} onChange={(e) => setPrizeForm((p) => ({ ...p, className: e.target.value }))} />
+              <input className={styles.prizeInput} placeholder="Placing (e.g. 1st)" value={prizeForm.placing} onChange={(e) => setPrizeForm((p) => ({ ...p, placing: e.target.value }))} />
+              <input className={styles.prizeInput} type="date" value={prizeForm.date} onChange={(e) => setPrizeForm((p) => ({ ...p, date: e.target.value }))} />
+              <input className={styles.prizeInput} placeholder="Description" value={prizeForm.description} onChange={(e) => setPrizeForm((p) => ({ ...p, description: e.target.value }))} />
+              <button type="button" className={styles.btnSave} onClick={async () => {
+                if (!prizeForm.amount) return;
+                await addIncomeEntry({
+                  horseId: horse._id,
+                  type: "prize_money",
+                  amount: Number(prizeForm.amount),
+                  description: prizeForm.description || `Prize money${prizeForm.showName ? ` - ${prizeForm.showName}` : ""}`,
+                  showName: prizeForm.showName || undefined,
+                  className: prizeForm.className || undefined,
+                  placing: prizeForm.placing || undefined,
+                  date: prizeForm.date || undefined,
+                });
+                setPrizeForm({ amount: "", description: "", showName: "", className: "", placing: "", date: "" });
+                setShowPrizeForm(false);
+              }}>save</button>
+            </div>
+          ) : null}
+          {(prizeMoneyData?.entries ?? []).length === 0 && !showPrizeForm ? (
+            <div className={styles.emptyInvoices}>no prize money recorded</div>
+          ) : (
+            (prizeMoneyData?.entries ?? []).map((entry) => (
+              <div key={entry._id} className={styles.prizeEntryRow}>
+                <div className={styles.prizeEntryLeft}>
+                  <span className={styles.prizeEntryAmount}>+{formatUsd(entry.amount)}</span>
+                  <span className={styles.prizeEntryDesc}>
+                    {entry.showName ?? entry.description}
+                    {entry.className ? ` · ${entry.className}` : ""}
+                    {entry.placing ? ` · ${entry.placing}` : ""}
+                  </span>
+                  {entry.date ? <span className={styles.prizeEntryDate}>{entry.date}</span> : null}
+                </div>
+                <button type="button" className={styles.prizeDeleteBtn} onClick={() => deleteIncomeEntry({ entryId: entry._id })}>×</button>
+              </div>
+            ))
+          )}
         </section>
 
         <section className={styles.recordsCard}>

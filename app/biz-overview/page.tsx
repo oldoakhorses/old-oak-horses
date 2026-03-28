@@ -24,7 +24,7 @@ export default function BizOverviewPage() {
   const [page, setPage] = useState(1);
 
   const data = useQuery(api.bills.getBizOverview, { period });
-  const prizeData = useQuery(api.horses.getTotalPrizeMoney);
+  const prizeData = useQuery(api.incomeEntries.getTotalPrizeMoney);
 
   const filteredInvoices = useMemo(() => {
     const rows = data?.recentInvoices ?? [];

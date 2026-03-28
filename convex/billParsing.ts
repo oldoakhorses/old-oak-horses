@@ -243,6 +243,17 @@ export const parseBillPdf = internalAction({
           email: providerContactPatch.email
         });
       }
+
+      // Auto-create income entries for prize money line items in show-expenses
+      if (category.slug === "show-expenses") {
+        const prizeEntries = extractPrizeMoneyEntries(parsed, bill._id);
+        if (prizeEntries.length > 0) {
+          await ctx.runMutation(internal.incomeEntries.createFromBill, {
+            billId: bill._id,
+            entries: prizeEntries,
+          });
+        }
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown parse error";
       await ctx.runMutation(internal.bills.markError, { billId: bill._id, errorMessage: message });
@@ -1042,8 +1053,31 @@ Never guess "bedding" unless one of the explicit bedding words appears.
 
 ${PROVIDER_CONTACT_PROMPT}`;
   }
-  if (categorySlug === "stabling" || categorySlug === "show-expenses") {
-    return `${base} For each line item include suggestedCategory as null if it belongs in ${categorySlug}, or one of: feed_bedding, stabling, farrier, supplies, veterinary.`;
+  if (categorySlug === "stabling") {
+    return `${base} For each line item include suggestedCategory as null if it belongs in stabling, or one of: feed_bedding, stabling, farrier, supplies, veterinary.`;
+  }
+  if (categorySlug === "show-expenses") {
+    return `Extract invoice/statement data as strict JSON with invoice_number, invoice_date, provider_name, account_number, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[].
+
+IMPORTANT: Horse show statements often contain BOTH expenses (entry fees, office charges, facility fees, drug testing, etc.) AND income/credits (prize money, prize winnings, awards).
+
+For each line item include:
+- description: the line item description
+- quantity, unit_price, total_usd: amounts
+- horse_name: the horse this item is for (if identifiable)
+- item_type: "expense" for charges/fees, or "prize_money" for prize winnings/awards/credits
+- class_name: the class/division name if applicable (e.g. "Class 366A", "1.30m Jumpers")
+- placing: the placing if mentioned (e.g. "3rd", "1st")
+- suggestedCategory: null if it belongs in show-expenses, or one of: feed_bedding, stabling, farrier, supplies, veterinary
+
+For prize money / winnings / credits:
+- Set item_type to "prize_money"
+- Set total_usd as a POSITIVE number (the amount won)
+- Extract the class name and placing if available
+- The invoice_total_usd should reflect the NET amount (expenses minus credits/prize money)
+
+${PROVIDER_CONTACT_PROMPT}
+Return strict JSON only.`;
   }
   if (categorySlug === "salaries") {
     return `Extract from this salary/payroll invoice: invoice_number, invoice_date, due_date, provider_name, pay_period, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, person_name (if identifiable), quantity, unit_price, total_usd.
@@ -1320,4 +1354,51 @@ function preferBrandedProviderName(parsed: Record<string, unknown>) {
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractPrizeMoneyEntries(
+  parsed: Record<string, unknown>,
+  billId: string
+) {
+  const lineItems = getLineItems(parsed);
+  const invoiceDate = pickString(parsed, ["invoice_date", "invoiceDate"]);
+  const showName = pickString(parsed, ["provider_name", "providerName"]);
+  const entries: Array<{
+    horseId: string;
+    amount: number;
+    description: string;
+    className?: string;
+    placing?: string;
+    showName?: string;
+    date?: string;
+  }> = [];
+
+  for (const item of lineItems) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const itemType = String(record.item_type ?? record.itemType ?? "").toLowerCase();
+    if (itemType !== "prize_money") continue;
+
+    const horseId = pickString(record, ["matched_horse_id", "matchedHorseId"]);
+    if (!horseId) continue;
+
+    const amount = typeof record.total_usd === "number"
+      ? Math.abs(record.total_usd)
+      : typeof record.totalUsd === "number"
+        ? Math.abs(record.totalUsd)
+        : 0;
+    if (amount <= 0) continue;
+
+    entries.push({
+      horseId,
+      amount,
+      description: String(record.description ?? "Prize money"),
+      className: pickString(record, ["class_name", "className"]) ?? undefined,
+      placing: pickString(record, ["placing"]) ?? undefined,
+      showName: showName ?? undefined,
+      date: invoiceDate ?? undefined,
+    });
+  }
+
+  return entries;
 }
