@@ -103,7 +103,7 @@ export default function StatementReconcilePage() {
   // Smart bill suggestions: score bills by relevance to the selected transaction
   const matchTxn = matchModal ? txns.find((t) => String(t._id) === matchModal) : null;
   const scoredBills = useMemo(() => {
-    if (!matchTxn) return matchableBills;
+    if (!matchTxn) return matchableBills.map((b) => ({ ...b, score: 0 }));
     const absAmount = Math.round(Math.abs(matchTxn.amount) * 100) / 100;
     const txnKeywords = matchTxn.description.toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim().split(" ").filter((w) => w.length > 2);
     const txnDateStr = matchTxn.postingDate;

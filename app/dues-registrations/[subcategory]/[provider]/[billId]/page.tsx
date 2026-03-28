@@ -8,6 +8,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Modal from "@/components/Modal";
 import InvoiceNotesCard from "@/components/InvoiceNotesCard";
+import LogRecordFromInvoice from "@/components/LogRecordFromInvoice";
 import NavBar from "@/components/NavBar";
 import { formatInvoiceName } from "@/lib/formatInvoiceName";
 
@@ -301,6 +302,17 @@ export default function DuesInvoicePage() {
         </section>
 
         {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
+
+        {bill?.isApproved ? (
+          <LogRecordFromInvoice
+            billId={bill._id}
+            categorySlug="dues-registrations"
+            providerName={String(provider?.name ?? bill.providerName ?? bill.customProviderName ?? "Provider")}
+            invoiceDate={String(extracted.invoice_date ?? "")}
+            assignedHorses={(bill.assignedHorses ?? []) as any}
+            lineItems={lineItems}
+          />
+        ) : null}
 
         <div style={{ display: "flex", gap: 10, marginTop: 16, marginBottom: 16 }}>
           {bill.isApproved ? (

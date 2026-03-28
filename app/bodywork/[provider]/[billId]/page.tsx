@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Modal from "@/components/Modal";
 import InvoiceNotesCard from "@/components/InvoiceNotesCard";
+import LogRecordFromInvoice from "@/components/LogRecordFromInvoice";
 import NavBar from "@/components/NavBar";
 import UnmatchedHorseBanner from "@/components/UnmatchedHorseBanner";
 import styles from "./invoice.module.css";
@@ -138,6 +139,17 @@ export default function BodyworkInvoicePage() {
         ))}
 
         {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
+
+        {bill?.status === "done" ? (
+          <LogRecordFromInvoice
+            billId={bill._id}
+            categorySlug="bodywork"
+            providerName={providerName}
+            invoiceDate={String(extracted.invoice_date ?? "")}
+            assignedHorses={(bill.assignedHorses ?? []) as any}
+            lineItems={lineItems}
+          />
+        ) : null}
 
         <div className={styles.approveDeleteRow}>
           {bill?.status === "done" ? (

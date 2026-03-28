@@ -8,6 +8,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
 import InvoiceNotesCard from "@/components/InvoiceNotesCard";
+import LogRecordFromInvoice from "@/components/LogRecordFromInvoice";
 import { formatInvoiceName } from "@/lib/formatInvoiceName";
 import Modal from "@/components/Modal";
 import UnmatchedHorseBanner from "@/components/UnmatchedHorseBanner";
@@ -511,6 +512,17 @@ export default function HorseTransportInvoicePage() {
         )}
 
         {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
+
+        {bill?.status === "done" ? (
+          <LogRecordFromInvoice
+            billId={bill._id}
+            categorySlug="horse-transport"
+            providerName={providerName}
+            invoiceDate={String(extracted.invoice_date ?? "")}
+            assignedHorses={(bill.assignedHorses ?? []) as any}
+            lineItems={lineItems}
+          />
+        ) : null}
 
         <div className={styles.approvalRow}>
           {bill.status === "done" ? (

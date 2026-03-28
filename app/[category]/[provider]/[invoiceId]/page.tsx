@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import LineItemReclassBadge from "@/components/LineItemReclassBadge";
 import InvoiceNotesCard from "@/components/InvoiceNotesCard";
+import LogRecordFromInvoice from "@/components/LogRecordFromInvoice";
 import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
 import { formatInvoiceName } from "@/lib/formatInvoiceName";
@@ -406,6 +407,17 @@ export default function InvoiceReportPage() {
         ) : null}
 
         {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
+
+        {bill?.status === "done" ? (
+          <LogRecordFromInvoice
+            billId={bill._id}
+            categorySlug={categorySlug}
+            providerName={provider?.fullName || provider?.name || providerSlug}
+            invoiceDate={String(extracted.invoice_date ?? "")}
+            assignedHorses={(bill.assignedHorses ?? []) as any}
+            lineItems={lineItems}
+          />
+        ) : null}
 
         <div style={{ marginTop: 16, marginBottom: 20, display: "flex", gap: 10, alignItems: "flex-start" }}>
           {bill?.status === "done" ? (
