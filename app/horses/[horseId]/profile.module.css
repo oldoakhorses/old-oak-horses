@@ -188,6 +188,40 @@
   color: #22c583;
 }
 
+.prizeMoneyRow,
+.netCostRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  margin-top: 8px;
+  border-top: 1px solid #f0f1f5;
+}
+
+.prizeMoneyLabel,
+.netCostLabel {
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.prizeMoneyValue {
+  font-size: 14px;
+  font-weight: 700;
+  color: #22c583;
+}
+
+.netCostRow {
+  border-top: 1px dashed #e8eaf0;
+}
+
+.netCostValue {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
 .breakdownList {
   margin-top: 10px;
 }

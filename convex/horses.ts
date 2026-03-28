@@ -65,7 +65,8 @@ export const updateHorseProfile = mutation({
     sex: v.optional(v.union(v.literal("gelding"), v.literal("mare"), v.literal("stallion"))),
     usefNumber: v.optional(v.string()),
     feiNumber: v.optional(v.string()),
-    owner: v.optional(v.string())
+    owner: v.optional(v.string()),
+    prizeMoney: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const horse = await ctx.db.get(args.horseId);
@@ -79,7 +80,8 @@ export const updateHorseProfile = mutation({
       sex: args.sex,
       usefNumber: args.usefNumber?.trim() || undefined,
       feiNumber: args.feiNumber?.trim() || undefined,
-      owner: args.owner?.trim() || undefined
+      owner: args.owner?.trim() || undefined,
+      prizeMoney: args.prizeMoney,
     });
 
     return args.horseId;
@@ -258,6 +260,22 @@ export const getHorseRecordCounts = query({
       health: countFor(["veterinary", "dues-registrations"]),
       registration: countFor(["dues-registrations"]),
     };
+  },
+});
+
+export const getTotalPrizeMoney = query({
+  args: {},
+  handler: async (ctx) => {
+    const horses = await ctx.db.query("horses").collect();
+    let total = 0;
+    const byHorse: Array<{ horseId: string; name: string; prizeMoney: number }> = [];
+    for (const horse of horses) {
+      if (horse.prizeMoney && horse.prizeMoney > 0) {
+        total += horse.prizeMoney;
+        byHorse.push({ horseId: String(horse._id), name: horse.name, prizeMoney: horse.prizeMoney });
+      }
+    }
+    return { total: round2(total), byHorse };
   },
 });
 

@@ -193,6 +193,7 @@ export default defineSchema({
     usefNumber: v.optional(v.string()),
     feiNumber: v.optional(v.string()),
     owner: v.optional(v.string()),
+    prizeMoney: v.optional(v.number()),
     status: v.union(v.literal("active"), v.literal("inactive"), v.literal("past")),
     isSold: v.optional(v.boolean()),
     soldDate: v.optional(v.number()),

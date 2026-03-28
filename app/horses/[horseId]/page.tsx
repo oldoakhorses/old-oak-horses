@@ -20,6 +20,7 @@ type FormState = {
   usefNumber: string;
   feiNumber: string;
   owner: string;
+  prizeMoney: string;
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -63,6 +64,7 @@ export default function HorseProfilePage() {
     usefNumber: "",
     feiNumber: "",
     owner: "",
+    prizeMoney: "",
   });
 
   useEffect(() => {
@@ -74,6 +76,7 @@ export default function HorseProfilePage() {
       usefNumber: horse.usefNumber ?? "",
       feiNumber: horse.feiNumber ?? "",
       owner: horse.owner ?? "",
+      prizeMoney: horse.prizeMoney ? String(horse.prizeMoney) : "",
     });
   }, [horse]);
 
@@ -116,6 +119,7 @@ export default function HorseProfilePage() {
         usefNumber: form.usefNumber || undefined,
         feiNumber: form.feiNumber || undefined,
         owner: form.owner || undefined,
+        prizeMoney: form.prizeMoney ? Number(form.prizeMoney) : undefined,
       });
       setIsEditing(false);
     } finally {
@@ -191,6 +195,9 @@ export default function HorseProfilePage() {
             <Field label="FEI #" value={horse.feiNumber || "—"} editing={isEditing}>
               <input value={form.feiNumber} onChange={(event) => setForm((prev) => ({ ...prev, feiNumber: event.target.value }))} />
             </Field>
+            <Field label="PRIZE MONEY" value={horse.prizeMoney ? formatUsd(horse.prizeMoney) : "—"} editing={isEditing}>
+              <input type="number" step="0.01" placeholder="0.00" value={form.prizeMoney} onChange={(event) => setForm((prev) => ({ ...prev, prizeMoney: event.target.value }))} />
+            </Field>
           </div>
           {isEditing ? (
             <div className={styles.editActions}>
@@ -212,6 +219,18 @@ export default function HorseProfilePage() {
               {spendMeta.momPct >= 0 ? "↗" : "↘"} {spendMeta.momPct >= 0 ? "+" : ""}
               {Math.abs(spendMeta.momPct).toFixed(1)}% vs last month
             </div>
+            {(horse.prizeMoney ?? 0) > 0 ? (
+              <>
+                <div className={styles.prizeMoneyRow}>
+                  <span className={styles.prizeMoneyLabel}>PRIZE MONEY</span>
+                  <span className={styles.prizeMoneyValue}>+{formatUsd(horse.prizeMoney!)}</span>
+                </div>
+                <div className={styles.netCostRow}>
+                  <span className={styles.netCostLabel}>NET COST</span>
+                  <span className={styles.netCostValue}>{formatUsd(spendMeta.totalSpend - (horse.prizeMoney ?? 0))}</span>
+                </div>
+              </>
+            ) : null}
           </div>
           <div className={styles.spendBreakdownCard}>
             <div className={styles.spendLabel}>SPEND BY CATEGORY</div>
