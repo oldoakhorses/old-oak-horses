@@ -1173,7 +1173,9 @@ export default function InvoicePreviewPage() {
   }
 
   async function onSaveRecord() {
-    if (recordForm.horseIds.length === 0 || !recordForm.date || !recordForm.recordType) return;
+    // Only save for IDs that are real horses (exist in the horses list)
+    const validHorseIds = recordForm.horseIds.filter((id) => horses.some((h) => String(h._id) === id));
+    if (validHorseIds.length === 0 || !recordForm.date || !recordForm.recordType) return;
     setSavingRecord(true);
     try {
       const dateTs = new Date(`${recordForm.date}T00:00:00`).getTime();
@@ -1194,7 +1196,8 @@ export default function InvoicePreviewPage() {
         attachmentName = recordAttachment.name;
       }
 
-      for (const hId of recordForm.horseIds) {
+      let saved = 0;
+      for (const hId of validHorseIds) {
         const autoNotes = buildHorseNotes(hId);
         const combinedNotes = [autoNotes, recordForm.notes].filter(Boolean).join("\n") || undefined;
         await createHorseRecord({
@@ -1213,9 +1216,12 @@ export default function InvoicePreviewPage() {
           attachmentName,
           billId
         });
+        saved++;
       }
       setShowRecordModal(false);
-      setRecordSavedCount(recordForm.horseIds.length);
+      setRecordSavedCount(saved);
+      setRecordForm((prev) => ({ ...prev, horseIds: [], notes: "" }));
+      setRecordAttachment(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save record");
     } finally {
@@ -1598,13 +1604,12 @@ export default function InvoicePreviewPage() {
               />
               <div className={styles.notesFooter}>
                 <span className={styles.notesHint}>optional</span>
-                {recordSavedCount > 0 ? (
+                {recordSavedCount > 0 && (
                   <span className={styles.recordSavedLabel}>{recordSavedCount === 1 ? "record logged" : `${recordSavedCount} records logged`}</span>
-                ) : (
-                  <button type="button" className={styles.logRecordBtn} onClick={openRecordModal}>
-                    + log record
-                  </button>
                 )}
+                <button type="button" className={styles.logRecordBtn} onClick={openRecordModal}>
+                  + log record
+                </button>
               </div>
             </div>
 

@@ -10,6 +10,9 @@
 
 .card {
   width: min(500px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: 12px;
