@@ -25,6 +25,7 @@ import type * as horseAliases from "../horseAliases.js";
 import type * as horseRecords from "../horseRecords.js";
 import type * as horses from "../horses.js";
 import type * as http from "../http.js";
+import type * as incomeEntries from "../incomeEntries.js";
 import type * as invoiceDetect from "../invoiceDetect.js";
 import type * as matchHorse from "../matchHorse.js";
 import type * as matchPerson from "../matchPerson.js";
@@ -66,6 +67,7 @@ declare const fullApi: ApiFromModules<{
   horseRecords: typeof horseRecords;
   horses: typeof horses;
   http: typeof http;
+  incomeEntries: typeof incomeEntries;
   invoiceDetect: typeof invoiceDetect;
   matchHorse: typeof matchHorse;
   matchPerson: typeof matchPerson;
