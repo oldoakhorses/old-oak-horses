@@ -2,6 +2,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { matchHorseName, normalizeAliasKey } from "./matchHorse";
@@ -410,7 +411,7 @@ export const parseBillPdf = internalAction({
       }
 
       // Auto-create income entries for prize money line items in show-expenses
-      if (category.slug === "show-expenses") {
+      if (category && category.slug === "show-expenses") {
         const prizeEntries = extractPrizeMoneyEntries(parsed, bill._id);
         if (prizeEntries.length > 0) {
           await ctx.runMutation(internal.incomeEntries.createFromBill, {
@@ -2369,7 +2370,7 @@ function extractPrizeMoneyEntries(
   const invoiceDate = pickString(parsed, ["invoice_date", "invoiceDate"]);
   const showName = pickString(parsed, ["provider_name", "providerName"]);
   const entries: Array<{
-    horseId: string;
+    horseId: Id<"horses">;
     amount: number;
     description: string;
     className?: string;
@@ -2395,7 +2396,7 @@ function extractPrizeMoneyEntries(
     if (amount <= 0) continue;
 
     entries.push({
-      horseId,
+      horseId: horseId as Id<"horses">,
       amount,
       description: String(record.description ?? "Prize money"),
       className: pickString(record, ["class_name", "className"]) ?? undefined,
