@@ -59,8 +59,12 @@ export const detectReportFromPdf = action({
             {
               type: "text",
               text:
-                "You will receive text extracted from a horse bodywork report. Return strict JSON only with keys: horseName, reportDate, providerName, treatmentNotes, sessionNumber. " +
-                "reportDate must be YYYY-MM-DD when possible. treatmentNotes must exclude disclaimers such as 'don't replace veterinarian care and advices'. " +
+                "You will receive text extracted from a horse bodywork/treatment report. Return strict JSON only with keys: horseName, reportDate, providerName, treatmentNotes, sessionNumber.\n\n" +
+                "reportDate must be YYYY-MM-DD when possible.\n\n" +
+                "For treatmentNotes: Write a clean, readable summary of the treatment findings and work done. " +
+                "Remove any raw timestamps, file metadata, session IDs, disclaimers (like 'don't replace veterinarian care'), and formatting artifacts. " +
+                "Keep the clinical observations and treatment details in plain, readable sentences. " +
+                "Use natural language — not raw extracted text. Keep it concise but include all relevant findings.\n\n" +
                 "If missing, use null for values.\n\nTEXT:\n" +
                 extractedText
             }

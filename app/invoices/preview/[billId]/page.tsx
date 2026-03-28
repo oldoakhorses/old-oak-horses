@@ -1134,19 +1134,18 @@ export default function InvoicePreviewPage() {
   }
 
   function buildHorseNotes(horseId: string): string {
-    const parts: string[] = [];
+    const descriptions: string[] = [];
     lineItems.forEach((item, index) => {
       const state = lineStates[index];
       if (!state?.confirmed) return;
       const assigned = state.assignees.includes(horseId) || state.assignees.includes(SPLIT_ALL);
       if (!assigned) return;
       const desc = String(item.description ?? "").trim();
-      const amt = item.total_usd ?? item.amount ?? null;
-      if (desc) {
-        parts.push(amt != null ? `${desc} ($${Number(amt).toFixed(2)})` : desc);
-      }
+      if (desc) descriptions.push(desc);
     });
-    return parts.join("\n");
+    if (descriptions.length === 0) return "";
+    if (descriptions.length === 1) return descriptions[0];
+    return descriptions.join(", ");
   }
 
   function openRecordModal() {
@@ -1759,7 +1758,7 @@ export default function InvoicePreviewPage() {
                   if (previews.length === 0) return null;
                   return (
                     <div className={styles.recordModalField}>
-                      <div className={styles.recordModalLabel}>line items (auto-included)</div>
+                      <div className={styles.recordModalLabel}>services (auto-included)</div>
                       <div className={styles.autoNotesPreview}>
                         {previews.map((p, i) => (
                           <div key={i} className={styles.autoNotesHorse}>

@@ -17,7 +17,8 @@ type HorseFormState = {
   sex: "" | "gelding" | "mare" | "stallion";
   usefNumber: string;
   feiNumber: string;
-  owner: string;
+  ownerSelection: string; // owner ID, "__other", or ""
+  newOwnerName: string;
 };
 
 const EMPTY_FORM: HorseFormState = {
@@ -26,11 +27,13 @@ const EMPTY_FORM: HorseFormState = {
   sex: "",
   usefNumber: "",
   feiNumber: "",
-  owner: "",
+  ownerSelection: "",
+  newOwnerName: "",
 };
 
 export default function HorsesPage() {
   const horses = useQuery(api.horses.getAllHorses) ?? [];
+  const owners = useQuery(api.owners.list) ?? [];
   const createHorse = useMutation(api.horses.createHorse);
   const setHorseStatus = useMutation(api.horses.setHorseStatus);
 
@@ -68,13 +71,19 @@ export default function HorsesPage() {
     setFormError("");
     setIsSubmitting(true);
     try {
+      const isOther = form.ownerSelection === "__other";
+      const selectedOwnerId = !isOther && form.ownerSelection ? form.ownerSelection as Id<"owners"> : undefined;
+      const selectedOwner = selectedOwnerId ? owners.find((o) => String(o._id) === form.ownerSelection) : undefined;
+
       await createHorse({
         name: form.name.trim(),
         yearOfBirth: form.yearOfBirth ? Number(form.yearOfBirth) : undefined,
         sex: form.sex || undefined,
         usefNumber: form.usefNumber || undefined,
         feiNumber: form.feiNumber || undefined,
-        owner: form.owner || undefined,
+        owner: selectedOwner ? selectedOwner.name : undefined,
+        ownerId: selectedOwnerId,
+        newOwnerName: isOther ? form.newOwnerName.trim() || undefined : undefined,
       });
       setForm(EMPTY_FORM);
       setShowAddModal(false);
@@ -227,8 +236,29 @@ export default function HorsesPage() {
           </div>
           <label className={styles.field}>
             <span className={styles.fieldLabel}>OWNER</span>
-            <input className={styles.input} value={form.owner} onChange={(e) => setForm((p) => ({ ...p, owner: e.target.value }))} />
+            <select
+              className={styles.input}
+              value={form.ownerSelection}
+              onChange={(e) => setForm((p) => ({ ...p, ownerSelection: e.target.value, newOwnerName: "" }))}
+            >
+              <option value="">-- select owner --</option>
+              {owners.filter((o) => o.isActive).map((o) => (
+                <option key={String(o._id)} value={String(o._id)}>{o.name}</option>
+              ))}
+              <option value="__other">+ add new owner</option>
+            </select>
           </label>
+          {form.ownerSelection === "__other" && (
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>NEW OWNER NAME *</span>
+              <input
+                className={styles.input}
+                value={form.newOwnerName}
+                onChange={(e) => setForm((p) => ({ ...p, newOwnerName: e.target.value }))}
+                placeholder="enter owner name..."
+              />
+            </label>
+          )}
           <div className={styles.twoCol}>
             <label className={styles.field}>
               <span className={styles.fieldLabel}>USEF #</span>

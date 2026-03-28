@@ -41,16 +41,32 @@ export const createHorse = mutation({
     sex: v.optional(v.union(v.literal("gelding"), v.literal("mare"), v.literal("stallion"))),
     usefNumber: v.optional(v.string()),
     feiNumber: v.optional(v.string()),
-    owner: v.optional(v.string())
+    owner: v.optional(v.string()),
+    ownerId: v.optional(v.id("owners")),
+    newOwnerName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    let ownerId = args.ownerId;
+    let ownerName = args.owner?.trim() || undefined;
+
+    // If a new owner name is provided, create the owner record
+    if (args.newOwnerName?.trim()) {
+      ownerId = await ctx.db.insert("owners", {
+        name: args.newOwnerName.trim(),
+        isActive: true,
+        createdAt: Date.now(),
+      });
+      ownerName = args.newOwnerName.trim();
+    }
+
     return await ctx.db.insert("horses", {
       name: args.name.trim(),
       yearOfBirth: args.yearOfBirth,
       sex: args.sex,
       usefNumber: args.usefNumber?.trim() || undefined,
       feiNumber: args.feiNumber?.trim() || undefined,
-      owner: args.owner?.trim() || undefined,
+      owner: ownerName,
+      ownerId,
       status: "active",
       createdAt: Date.now()
     });
