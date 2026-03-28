@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
-import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
+import { formatInvoiceName, toIsoDateString } from "@/lib/formatInvoiceName";
 
 export default function BodyworkOverviewPage() {
   const categories = useQuery(api.categories.getAllCategories) ?? [];
@@ -47,7 +47,7 @@ export default function BodyworkOverviewPage() {
           { label: "bodywork", current: true }
         ]}
         actions={[
-          { label: "upload invoices", href: "/upload", variant: "outlined" },
+          { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
           { label: "biz overview", href: "/biz-overview", variant: "filled" }
         ]}
       />
@@ -83,7 +83,7 @@ export default function BodyworkOverviewPage() {
               return (
                 <li key={bill._id} style={{ marginBottom: 8 }}>
                   <Link href={`/bodywork/${providerSlug}/${bill._id}`}>
-                    {formatInvoiceTitle({
+                    {formatInvoiceName({
                       category: "bodywork",
                       providerName: provider?.name ?? bill.customProviderName ?? "Unknown",
                       date: String(extracted.invoice_date ?? ""),

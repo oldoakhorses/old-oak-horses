@@ -1,7 +1,6 @@
 .loginPage {
   min-height: 100vh;
   background: #f8f9fb;
-  font-family: "Space Mono", monospace;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -16,7 +15,6 @@
 }
 
 .loginBack {
-  font-family: "Space Mono", monospace;
   font-size: 11px;
   color: #9ea2b0;
   cursor: pointer;
@@ -50,19 +48,17 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  font-family: "Space Mono", monospace;
   font-size: 18px;
   color: #fff;
   font-weight: 700;
 }
 
 .brandName {
-  font-family: "Space Mono", monospace;
   font-style: italic;
   font-size: 14px;
   color: #1a1a2e;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
 }
 
 .header {
@@ -70,16 +66,14 @@
 }
 
 .headerLabel {
-  font-family: "Space Mono", monospace;
   font-size: 10px;
   color: #9ea2b0;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin: 0 0 8px;
 }
 
 .headerTitle {
-  font-family: "Space Mono", monospace;
   font-size: 28px;
   font-weight: 700;
   color: #1a1a2e;
@@ -87,7 +81,6 @@
 }
 
 .headerSubtitle {
-  font-family: "Space Mono", monospace;
   font-size: 12px;
   color: #6b7084;
   margin: 0;
@@ -116,16 +109,14 @@
 
 .fieldLabel {
   display: block;
-  font-family: "Space Mono", monospace;
   font-size: 10px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 6px;
 }
 
 .fieldInput {
-  font-family: "Space Mono", monospace;
   font-size: 13px;
   padding: 12px 16px;
   background: #ffffff;
@@ -154,7 +145,6 @@
 }
 
 .forgotLink {
-  font-family: "Space Mono", monospace;
   font-size: 9px;
   color: #4a5bdb;
   letter-spacing: 0.05em;
@@ -170,7 +160,6 @@
 }
 
 .btnSignin {
-  font-family: "Space Mono", monospace;
   font-size: 12px;
   font-weight: 700;
   width: 100%;
@@ -197,7 +186,6 @@
 }
 
 .btnInvestor {
-  font-family: "Space Mono", monospace;
   font-size: 11px;
   width: 100%;
   padding: 12px 20px;
@@ -222,7 +210,6 @@
 .contactLink {
   display: block;
   text-align: center;
-  font-family: "Space Mono", monospace;
   font-size: 11px;
   color: #9ea2b0;
   letter-spacing: 0.05em;
@@ -239,8 +226,7 @@
 .loginFooter {
   position: absolute;
   bottom: 32px;
-  font-family: "Space Mono", monospace;
   font-size: 9px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
 }

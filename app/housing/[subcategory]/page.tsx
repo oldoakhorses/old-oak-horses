@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
-import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
+import { formatInvoiceName, toIsoDateString } from "@/lib/formatInvoiceName";
 import styles from "./subcategory.module.css";
 
 const PAGE_SIZE = 8;
@@ -68,7 +68,7 @@ export default function HousingSubcategoryPage() {
           { label: subcategory, current: true }
         ]}
         actions={[
-          { label: "upload invoices", href: "/upload", variant: "outlined" },
+          { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
           { label: "biz overview", href: "/biz-overview", variant: "filled" }
         ]}
       />
@@ -116,7 +116,7 @@ export default function HousingSubcategoryPage() {
               <Link key={bill._id} href={`/housing/${subcategory}/${bill._id}`} className={styles.row}>
                 <div>
                   <div className={styles.provider}>
-                    {formatInvoiceTitle({
+                    {formatInvoiceName({
                       category: "housing",
                       providerName: bill.providerName,
                       subcategory,

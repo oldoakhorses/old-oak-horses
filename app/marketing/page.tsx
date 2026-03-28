@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
-import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
+import { formatInvoiceName, toIsoDateString } from "@/lib/formatInvoiceName";
 
 const SUBCATEGORY_LABELS: Record<string, string> = {
   "vip-tickets": "VIP Tickets",
@@ -30,7 +30,7 @@ export default function MarketingOverviewPage() {
           { label: "marketing", current: true }
         ]}
         actions={[
-          { label: "upload invoices", href: "/upload", variant: "outlined" },
+          { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
           { label: "biz overview", href: "/biz-overview", variant: "filled" }
         ]}
       />
@@ -84,7 +84,7 @@ export default function MarketingOverviewPage() {
               {bills.map((bill) => (
                 <li key={bill._id} style={{ marginBottom: 8 }}>
                   <Link href={`/marketing/${bill.marketingSubcategory ?? "other"}/${bill._id}`}>
-                    {formatInvoiceTitle({
+                    {formatInvoiceName({
                       category: "marketing",
                       providerName: bill.providerName,
                       subcategory: bill.marketingSubcategory ?? "other",

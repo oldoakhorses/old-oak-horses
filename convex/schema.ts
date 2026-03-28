@@ -25,6 +25,7 @@ export default defineSchema({
 
   providers: defineTable({
     categoryId: v.id("categories"),
+    category: v.optional(v.string()),
     subcategorySlug: v.optional(v.string()),
     name: v.string(),
     slug: v.optional(v.string()),
@@ -61,9 +62,17 @@ export default defineSchema({
 
   bills: defineTable({
     providerId: v.optional(v.id("providers")),
-    categoryId: v.id("categories"),
+    contactId: v.optional(v.id("contacts")),
+    categoryId: v.optional(v.id("categories")),
+    /** Denormalized list of category slugs found across line items */
+    lineItemCategories: v.optional(v.array(v.string())),
     fileId: v.id("_storage"),
     fileName: v.string(),
+    notes: v.optional(v.string()),
+    assignType: v.optional(v.union(v.literal("horse"), v.literal("person"))),
+    assignMode: v.optional(v.union(v.literal("line"), v.literal("whole"))),
+    providerDetected: v.optional(v.boolean()),
+    providerConfirmed: v.optional(v.boolean()),
     status: v.union(
       v.literal("uploading"),
       v.literal("parsing"),
@@ -87,6 +96,7 @@ export default defineSchema({
     originalCurrency: v.optional(v.string()),
     originalTotal: v.optional(v.number()),
     exchangeRate: v.optional(v.number()),
+    discount: v.optional(v.number()),
     isApproved: v.optional(v.boolean()),
     approvedAt: v.optional(v.number()),
     isSplit: v.optional(v.boolean()),
@@ -104,7 +114,9 @@ export default defineSchema({
         v.object({
           horseId: v.id("horses"),
           horseName: v.string(),
-          amount: v.number()
+          amount: v.number(),
+          direct: v.optional(v.number()),
+          shared: v.optional(v.number())
         })
       )
     ),
@@ -180,10 +192,12 @@ export default defineSchema({
         website: v.optional(v.string()),
         accountNumber: v.optional(v.string())
       })
-    )
+    ),
+    dropboxPath: v.optional(v.string())
   })
     .index("by_uploadedAt", ["uploadedAt"])
     .index("by_provider", ["providerId"])
+    .index("by_contact", ["contactId"])
     .index("by_category", ["categoryId"]),
 
   horses: defineTable({
@@ -194,6 +208,7 @@ export default defineSchema({
     feiNumber: v.optional(v.string()),
     owner: v.optional(v.string()),
     prizeMoney: v.optional(v.number()),
+    ownerId: v.optional(v.id("owners")),
     status: v.union(v.literal("active"), v.literal("inactive"), v.literal("past")),
     isSold: v.optional(v.boolean()),
     soldDate: v.optional(v.number()),
@@ -205,11 +220,24 @@ export default defineSchema({
 
   contacts: defineTable({
     name: v.string(),
+    slug: v.optional(v.string()),
+    fullName: v.optional(v.string()),
+    type: v.optional(
+      v.union(
+        v.literal("vendor"),
+        v.literal("person"),
+        v.literal("company")
+      )
+    ),
     role: v.optional(v.string()),
     providerId: v.optional(v.id("providers")),
     providerName: v.optional(v.string()),
-    category: v.string(),
+    category: v.optional(v.string()),
     company: v.optional(v.string()),
+    contactName: v.optional(v.string()),
+    primaryContactName: v.optional(v.string()),
+    primaryContactPhone: v.optional(v.string()),
+    address: v.optional(v.string()),
     location: v.optional(
       v.union(
         v.literal("wellington"),
@@ -222,11 +250,18 @@ export default defineSchema({
     ),
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
+    website: v.optional(v.string()),
+    accountNumber: v.optional(v.string()),
+    extractionPrompt: v.optional(v.string()),
+    expectedFields: v.optional(v.array(v.string())),
     notes: v.optional(v.string()),
-    createdAt: v.number()
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number())
   })
     .index("by_name", ["name"])
+    .index("by_slug", ["slug"])
     .index("by_category", ["category"])
+    .index("by_type", ["type"])
     .index("by_location", ["location"]),
 
   scheduleEvents: defineTable({
@@ -241,6 +276,57 @@ export default defineSchema({
     .index("by_date", ["date"])
     .index("by_horse", ["horseId"])
     .index("by_type", ["type"]),
+
+  horseRecords: defineTable({
+    horseId: v.id("horses"),
+    type: v.union(
+      v.literal("veterinary"),
+      v.literal("medication"),
+      v.literal("farrier"),
+      v.literal("bodywork"),
+      v.literal("other")
+    ),
+    customType: v.optional(v.string()),
+    date: v.number(),
+    nextVisitDate: v.optional(v.number()),
+    providerName: v.optional(v.string()),
+    visitType: v.optional(v.union(v.literal("vaccination"), v.literal("treatment"))),
+    vaccineName: v.optional(v.string()),
+    treatmentDescription: v.optional(v.string()),
+    serviceType: v.optional(v.string()),
+    isUpcoming: v.optional(v.boolean()),
+    linkedRecordId: v.optional(v.id("horseRecords")),
+    notes: v.optional(v.string()),
+    attachmentStorageId: v.optional(v.string()),
+    attachmentName: v.optional(v.string()),
+    billId: v.optional(v.id("bills")),
+    dropboxPath: v.optional(v.string())
+  })
+    .index("by_horse", ["horseId"])
+    .index("by_type", ["type"])
+    .index("by_horse_and_type", ["horseId", "type"])
+    .index("by_bill", ["billId"]),
+
+  documents: defineTable({
+    name: v.string(),
+    tag: v.union(
+      v.literal("coggins"),
+      v.literal("health_certificate"),
+      v.literal("horse_agreement"),
+      v.literal("insurance"),
+      v.literal("registration"),
+      v.literal("other")
+    ),
+    horseId: v.id("horses"),
+    fileStorageId: v.id("_storage"),
+    fileName: v.string(),
+    fileType: v.optional(v.string()),
+    fileSize: v.optional(v.number()),
+    uploadedAt: v.number(),
+    notes: v.optional(v.string())
+  })
+    .index("by_horse", ["horseId"])
+    .index("by_tag", ["tag"]),
 
   people: defineTable({
     name: v.string(),
@@ -266,6 +352,30 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.optional(v.number())
   }).index("by_alias", ["alias"]),
+
+  providerAliases: defineTable({
+    alias: v.string(),
+    providerName: v.string(),
+    providerId: v.id("providers"),
+    category: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number())
+  }).index("by_alias", ["alias"]),
+
+  contactAliases: defineTable({
+    alias: v.string(),
+    contactName: v.string(),
+    contactId: v.id("contacts"),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number())
+  }).index("by_alias", ["alias"]),
+
+  vetSubcategories: defineTable({
+    slug: v.string(),
+    label: v.string(),
+    color: v.optional(v.string()),
+    isDefault: v.boolean()
+  }).index("by_slug", ["slug"]),
 
   customSubcategories: defineTable({
     categoryId: v.id("categories"),
@@ -307,6 +417,102 @@ export default defineSchema({
     }),
     updatedAt: v.number(),
   }).index("by_horse", ["horseId"]),
+
+  owners: defineTable({
+    name: v.string(),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    address: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_name", ["name"]),
+
+  ownerInvoices: defineTable({
+    ownerId: v.id("owners"),
+    billingPeriod: v.string(), // "2026-03"
+    status: v.union(v.literal("draft"), v.literal("finalized"), v.literal("sent"), v.literal("paid")),
+    totalAmount: v.number(),
+    approvedAmount: v.number(),
+    lineItemCount: v.number(),
+    approvedLineItemCount: v.number(),
+    notes: v.optional(v.string()),
+    createdAt: v.number(),
+    finalizedAt: v.optional(v.number()),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_period", ["billingPeriod"])
+    .index("by_owner_period", ["ownerId", "billingPeriod"]),
+
+  ownerInvoiceLineItems: defineTable({
+    ownerInvoiceId: v.id("ownerInvoices"),
+    sourceBillId: v.id("bills"),
+    horseId: v.optional(v.id("horses")),
+    horseName: v.optional(v.string()),
+    description: v.string(),
+    category: v.optional(v.string()),
+    subcategory: v.optional(v.string()),
+    amount: v.number(),
+    sourceLineItemIndex: v.optional(v.number()),
+    isApproved: v.boolean(),
+    approvedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_owner_invoice", ["ownerInvoiceId"])
+    .index("by_source_bill", ["sourceBillId"]),
+
+  ccStatements: defineTable({
+    fileName: v.string(),
+    accountLast4: v.optional(v.string()),
+    uploadedAt: v.number(),
+    transactionCount: v.number(),
+    matchedCount: v.number(),
+    unmatchedCount: v.number(),
+    totalDebits: v.number(),
+    totalCredits: v.number(),
+    status: v.union(
+      v.literal("uploaded"),
+      v.literal("matching"),
+      v.literal("review"),
+      v.literal("approved"),
+    ),
+  }),
+
+  ccTransactions: defineTable({
+    statementId: v.id("ccStatements"),
+    postingDate: v.string(),
+    description: v.string(),
+    amount: v.number(),
+    type: v.string(),
+    balance: v.optional(v.number()),
+
+    // Matching
+    matchedBillId: v.optional(v.id("bills")),
+    matchedBillName: v.optional(v.string()),
+    matchConfidence: v.optional(v.union(v.literal("exact"), v.literal("high"), v.literal("medium"), v.literal("low"), v.literal("none"))),
+
+    // Assignment (step 2)
+    assignType: v.optional(v.union(v.literal("horse"), v.literal("person"), v.literal("business"), v.literal("personal"), v.literal("ignore"))),
+    assignedHorses: v.optional(v.array(v.object({
+      horseId: v.id("horses"),
+      horseName: v.string(),
+      amount: v.number(),
+    }))),
+    assignedPeople: v.optional(v.array(v.object({
+      personId: v.id("people"),
+      personName: v.string(),
+      role: v.optional(v.string()),
+      amount: v.number(),
+    }))),
+    category: v.optional(v.string()),
+    subcategory: v.optional(v.string()),
+
+    // Approval
+    isApproved: v.boolean(),
+    approvedAt: v.optional(v.number()),
+  })
+    .index("by_statement", ["statementId"])
+    .index("by_matched_bill", ["matchedBillId"]),
 
   feedPlanHistory: defineTable({
     horseId: v.id("horses"),

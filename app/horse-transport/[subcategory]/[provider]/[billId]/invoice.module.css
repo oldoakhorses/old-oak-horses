@@ -20,7 +20,7 @@
 .label {
   font-size: 10px;
   color: #9ea2b0;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
@@ -40,7 +40,7 @@
 .detailLabel {
   font-size: 9px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 4px;
 }
@@ -57,7 +57,7 @@
 .totalLabel {
   font-size: 9px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 4px;
 }
@@ -244,6 +244,27 @@
   text-transform: uppercase;
 }
 
+.summaryList {
+  margin-top: 12px;
+}
+
+.summaryRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  font-size: 13px;
+  color: #1a1a2e;
+}
+
+.summaryRow + .summaryRow {
+  border-top: 1px solid #f0f1f5;
+}
+
+.summaryName {
+  font-weight: 500;
+}
+
 .splitContent {
   margin-top: 6px;
 }
@@ -251,7 +272,7 @@
 .fieldLabel {
   font-size: 10px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 8px;
 }
@@ -464,7 +485,7 @@
 .footerLabel {
   font-size: 8px;
   color: #6b7084;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 4px;
 }

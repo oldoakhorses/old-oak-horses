@@ -1,0 +1,444 @@
+.loading {
+
+  font-size: 12px;
+  color: #9ea2b0;
+  text-align: center;
+  padding: 60px 20px;
+}
+
+/* Header card */
+.headerCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 28px 28px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.headerLabel {
+
+  font-size: 10px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.ownerName {
+
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 8px;
+}
+
+.headerMeta {
+
+  font-size: 11px;
+  color: #6b7084;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.headerRight {
+  text-align: right;
+}
+
+.totalLabel {
+
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.totalAmount {
+
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.approvedLabel {
+
+  font-size: 10px;
+  color: #22C583;
+  margin-top: 4px;
+}
+
+.statusBadge {
+
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Actions */
+.actionsRow {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.btnApproveAll {
+
+  font-size: 11px;
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  background: #22C583;
+  color: #fff;
+  cursor: pointer;
+}
+
+.btnFinalize {
+
+  font-size: 11px;
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  background: #4A5BDB;
+  color: #fff;
+  cursor: pointer;
+}
+
+.btnSent {
+
+  font-size: 11px;
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  background: #14B8A6;
+  color: #fff;
+  cursor: pointer;
+}
+
+.btnPaid {
+
+  font-size: 11px;
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  background: #22C583;
+  color: #fff;
+  cursor: pointer;
+}
+
+.btnDelete {
+
+  font-size: 10px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+  background: transparent;
+  color: #dc2626;
+  cursor: pointer;
+}
+
+.btnDelete:hover {
+  background: #fef2f2;
+}
+
+/* Horse cards */
+.horseCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.horseHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 22px;
+  border-bottom: 1px solid #e8eaf0;
+  background: #fafafc;
+}
+
+.horseHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.horseEmoji {
+  font-size: 22px;
+}
+
+.horseName {
+
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.horseLink {
+  color: #1a1a2e;
+  text-decoration: none;
+}
+
+.horseLink:hover {
+  color: #4A5BDB;
+}
+
+.horseSub {
+
+  font-size: 10px;
+  color: #9ea2b0;
+  margin-top: 2px;
+}
+
+.horseTotal {
+
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+/* Bill group rows */
+.billGroup {
+  border-bottom: 1px solid #e8eaf0;
+}
+
+.billGroup:last-child {
+  border-bottom: none;
+}
+
+.billRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 22px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.billRow:hover {
+  background: #fafafc;
+}
+
+.expandArrow {
+  font-size: 12px;
+  color: #9ea2b0;
+  flex-shrink: 0;
+  width: 14px;
+}
+
+.billInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.billName {
+
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a2e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.billMeta {
+
+  font-size: 10px;
+  color: #9ea2b0;
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.allApprovedBadge {
+
+  font-size: 9px;
+  font-weight: 700;
+  color: #22C583;
+  background: rgba(34, 197, 131, 0.1);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.pendingBadge {
+
+  font-size: 9px;
+  color: #F59E0B;
+  background: rgba(245, 158, 11, 0.1);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.invoiceLink {
+
+  font-size: 10px;
+  font-weight: 700;
+  color: #4A5BDB;
+  text-decoration: none;
+  padding: 4px 10px;
+  border: 1px solid rgba(74, 91, 219, 0.2);
+  border-radius: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.invoiceLink:hover {
+  background: rgba(74, 91, 219, 0.06);
+  border-color: #4A5BDB;
+}
+
+.billTotal {
+
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+  flex-shrink: 0;
+  min-width: 80px;
+  text-align: right;
+}
+
+.lineItemsContainer {
+  background: #f8f9fb;
+  border-top: 1px solid #f0f1f5;
+}
+
+/* Line item rows */
+.lineItemRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 22px 12px 48px;
+  border-bottom: 1px solid #ecedf1;
+  transition: background 0.1s;
+}
+
+.lineItemRow:last-child {
+  border-bottom: none;
+}
+
+.lineItemApproved {
+  background: rgba(34, 197, 131, 0.04);
+}
+
+.checkbox {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 2px solid #d1d5db;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: transparent;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.checkbox:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.checkboxChecked {
+  border-color: #22C583;
+  background: #22C583;
+  color: #fff;
+}
+
+.lineItemInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.lineItemDesc {
+
+  font-size: 13px;
+  color: #1a1a2e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.catPill {
+
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 3px;
+  margin-top: 4px;
+  display: inline-block;
+}
+
+.lineItemAmount {
+
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+  flex-shrink: 0;
+}
+
+/* Summary card */
+.summaryCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+
+.summaryRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+
+  font-size: 12px;
+  color: #6b7084;
+}
+
+.summaryTotal {
+  border-top: 2px solid #1a1a2e;
+  margin-top: 8px;
+  padding-top: 12px;
+  font-size: 14px;
+  color: #1a1a2e;
+}
+
+.summaryBold {
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+@media (max-width: 640px) {
+  .headerCard {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .headerRight {
+    text-align: left;
+  }
+  .ownerName {
+    font-size: 22px;
+  }
+  .totalAmount {
+    font-size: 22px;
+  }
+}

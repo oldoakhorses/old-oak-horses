@@ -6,8 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import InvoiceNotesCard from "@/components/InvoiceNotesCard";
 import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
+import { formatInvoiceName } from "@/lib/formatInvoiceName";
 
 type SplitMode = "even" | "custom";
 type AssignMode = "whole" | "line";
@@ -158,7 +160,7 @@ export default function AdminInvoicePage() {
   async function onDelete() {
     if (!bill) return;
     await deleteBill({ billId });
-    router.push(`/admin/${subcategory}/${providerSlug}`);
+    router.push("/invoices");
   }
 
   if (!bill) {
@@ -177,7 +179,7 @@ export default function AdminInvoicePage() {
           { label: "admin", href: "/admin" },
           { label: subcategory, href: `/admin/${subcategory}` },
           { label: providerSlug, href: `/admin/${subcategory}/${providerSlug}` },
-          { label: String(extracted.invoice_number ?? "invoice"), current: true }
+          { label: formatInvoiceName({ providerName: String((extracted as any).provider_name ?? bill?.provider?.name ?? bill?.customProviderName ?? "Unassigned Invoice"), date: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "") }), current: true }
         ]}
         actions={bill.originalPdfUrl ? [{ label: "view original PDF", href: bill.originalPdfUrl, variant: "link", newTab: true }] : []}
       />
@@ -189,7 +191,7 @@ export default function AdminInvoicePage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 24 }}>
             <div>
               <div className="ui-label">ADMIN INVOICE</div>
-              <h1 style={{ fontSize: 24, margin: "8px 0 16px" }}>{provider?.name ?? bill.customProviderName ?? "Provider"}</h1>
+              <h1 style={{ fontSize: 24, margin: "8px 0 16px" }}>{provider?.name ?? bill.providerName ?? bill.customProviderName ?? "Provider"}</h1>
               <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
                 <Detail label="INVOICE #" value={String(extracted.invoice_number ?? "—")} />
                 <Detail label="DATE" value={formatDate(extracted.invoice_date)} />
@@ -217,7 +219,7 @@ export default function AdminInvoicePage() {
                       setLineAssignments((prev) => ({ ...prev, [index]: event.target.value }));
                       setDirty(true);
                     }}
-                    style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, padding: "6px 10px", borderRadius: 6, border: "1px solid #E8EAF0", background: "#F2F3F7" }}
+                    style={{ fontFamily: "inherit", fontSize: 11, padding: "6px 10px", borderRadius: 6, border: "1px solid #E8EAF0", background: "#F2F3F7" }}
                   >
                     <option value="">select person...</option>
                     {people.map((person) => (
@@ -231,92 +233,109 @@ export default function AdminInvoicePage() {
           </div>
         </section>
 
-        <section className="ui-card" style={{ marginTop: 16, borderColor: hasSavedAssignment ? "#22C583" : "#4A5BDB" }}>
-          <div style={{ fontWeight: 700, marginBottom: 10 }}>assign_people</div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <button type="button" className="ui-button-outlined" onClick={() => { setAssignMode("whole"); setDirty(true); }} style={{ background: assignMode === "whole" ? "#1A1A2E" : "transparent", color: assignMode === "whole" ? "#fff" : "#6B7084" }}>whole invoice</button>
-            <button type="button" className="ui-button-outlined" onClick={() => { setAssignMode("line"); setDirty(true); }} style={{ background: assignMode === "line" ? "#1A1A2E" : "transparent", color: assignMode === "line" ? "#fff" : "#6B7084" }}>per line item</button>
-          </div>
-
-          {assignMode === "whole" ? (
-            <>
-              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                <button type="button" className="ui-button-outlined" onClick={() => { setWholeMode("single"); setDirty(true); }} style={{ background: wholeMode === "single" ? "#1A1A2E" : "transparent", color: wholeMode === "single" ? "#fff" : "#6B7084" }}>one person</button>
-                <button type="button" className="ui-button-outlined" onClick={() => { setWholeMode("split"); setDirty(true); }} style={{ background: wholeMode === "split" ? "#1A1A2E" : "transparent", color: wholeMode === "split" ? "#fff" : "#6B7084" }}>split across people</button>
-              </div>
-
-              {wholeMode === "single" ? (
-                <select value={singlePersonId} onChange={(event) => { setSinglePersonId(event.target.value); setDirty(true); }} style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, padding: "8px 10px", borderRadius: 6, border: "1px solid #E8EAF0", background: "#F2F3F7", maxWidth: 320 }}>
-                  <option value="">assign person...</option>
-                  {people.map((person) => (
-                    <option key={person._id} value={String(person._id)}>{person.name}</option>
-                  ))}
-                </select>
-              ) : (
-                <div style={{ display: "grid", gap: 8 }}>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <select value="" onChange={(event) => {
-                      const id = event.target.value;
-                      if (!id) return;
-                      setSplitPersonIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
-                      setDirty(true);
-                    }} style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, padding: "8px 10px", borderRadius: 6, border: "1px solid #E8EAF0", background: "#F2F3F7", maxWidth: 320 }}>
-                      <option value="">+ add person...</option>
-                      {availableSplitPeople.map((person) => (
-                        <option key={person._id} value={String(person._id)}>{person.name}</option>
-                      ))}
-                    </select>
-                    <button type="button" className="ui-button-outlined" onClick={() => { setSplitMode("even"); setDirty(true); }} style={{ background: splitMode === "even" ? "#1A1A2E" : "transparent", color: splitMode === "even" ? "#fff" : "#6B7084" }}>even</button>
-                    <button type="button" className="ui-button-outlined" onClick={() => { setSplitMode("custom"); setDirty(true); }} style={{ background: splitMode === "custom" ? "#1A1A2E" : "transparent", color: splitMode === "custom" ? "#fff" : "#6B7084" }}>custom</button>
-                  </div>
-                  {splitPreview.map((row) => {
-                    const person = people.find((entry) => String(entry._id) === row.personId);
-                    return (
-                      <div key={row.personId} style={{ display: "flex", alignItems: "center", gap: 8, background: "#F2F3F7", borderRadius: 6, padding: "8px 10px" }}>
-                        <button type="button" onClick={() => {
-                          setSplitPersonIds((prev) => prev.filter((id) => id !== row.personId));
-                          setCustomAmounts((prev) => {
-                            const next = { ...prev };
-                            delete next[row.personId];
-                            return next;
-                          });
-                          setDirty(true);
-                        }} style={{ border: "none", background: "transparent", color: "#9EA2B0", cursor: "pointer" }}>×</button>
-                        <div style={{ flex: 1 }}>{person?.name ?? "Unknown"}</div>
-                        {splitMode === "custom" ? (
-                          <input value={customAmounts[row.personId] ?? ""} onChange={(event) => { setCustomAmounts((prev) => ({ ...prev, [row.personId]: event.target.value })); setDirty(true); }} placeholder="0.00" style={{ width: 100, textAlign: "right", fontFamily: "'Space Mono', monospace", fontSize: 12, padding: "4px 8px", borderRadius: 4, border: "1px solid #E8EAF0", background: "#fff" }} />
-                        ) : (
-                          <strong>{fmtUSD(row.amount)}</strong>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {splitMode === "custom" ? (
-                    <div style={{ fontSize: 11, color: splitBalanced ? "#22C583" : "#E5484D" }}>
-                      {splitBalanced ? "✓ balanced" : `${fmtUSD(round2(total - splitPreview.reduce((sum, row) => sum + row.amount, 0)))} remaining`}
-                    </div>
-                  ) : null}
+        {bill.isApproved && hasSavedAssignment ? (
+          <section className="ui-card" style={{ marginTop: 16, borderColor: "#22C583" }}>
+            <div style={{ fontWeight: 700, marginBottom: 10 }}>assigned people</div>
+            {(bill.assignedPeople ?? []).map((row) => {
+              const person = people.find((entry) => String(entry._id) === String(row.personId));
+              return (
+                <div key={String(row.personId)} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #F0F1F5", fontSize: 13 }}>
+                  <span style={{ fontWeight: 500 }}>{person?.name ?? "Unknown"}</span>
+                  <strong>{fmtUSD(row.amount)}</strong>
                 </div>
-              )}
-            </>
-          ) : (
-            <div style={{ fontSize: 11, color: "#6B7084" }}>tag each line item to a person in the table above.</div>
-          )}
+              );
+            })}
+          </section>
+        ) : (
+          <section className="ui-card" style={{ marginTop: 16, borderColor: hasSavedAssignment ? "#22C583" : "#4A5BDB" }}>
+            <div style={{ fontWeight: 700, marginBottom: 10 }}>assign_people</div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <button type="button" className="ui-button-outlined" onClick={() => { setAssignMode("whole"); setDirty(true); }} style={{ background: assignMode === "whole" ? "#1A1A2E" : "transparent", color: assignMode === "whole" ? "#fff" : "#6B7084" }}>whole invoice</button>
+              <button type="button" className="ui-button-outlined" onClick={() => { setAssignMode("line"); setDirty(true); }} style={{ background: assignMode === "line" ? "#1A1A2E" : "transparent", color: assignMode === "line" ? "#fff" : "#6B7084" }}>per line item</button>
+            </div>
 
-          <button type="button" className="ui-button-filled" disabled={!canSave || saving} onClick={onSaveAssignment} style={{ marginTop: 12, opacity: canSave ? 1 : 0.5 }}>
-            {saving ? "saving..." : "save assignment"}
-          </button>
-        </section>
+            {assignMode === "whole" ? (
+              <>
+                <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                  <button type="button" className="ui-button-outlined" onClick={() => { setWholeMode("single"); setDirty(true); }} style={{ background: wholeMode === "single" ? "#1A1A2E" : "transparent", color: wholeMode === "single" ? "#fff" : "#6B7084" }}>one person</button>
+                  <button type="button" className="ui-button-outlined" onClick={() => { setWholeMode("split"); setDirty(true); }} style={{ background: wholeMode === "split" ? "#1A1A2E" : "transparent", color: wholeMode === "split" ? "#fff" : "#6B7084" }}>split across people</button>
+                </div>
+
+                {wholeMode === "single" ? (
+                  <select value={singlePersonId} onChange={(event) => { setSinglePersonId(event.target.value); setDirty(true); }} style={{ fontFamily: "inherit", fontSize: 12, padding: "8px 10px", borderRadius: 6, border: "1px solid #E8EAF0", background: "#F2F3F7", maxWidth: 320 }}>
+                    <option value="">assign person...</option>
+                    {people.map((person) => (
+                      <option key={person._id} value={String(person._id)}>{person.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <select value="" onChange={(event) => {
+                        const id = event.target.value;
+                        if (!id) return;
+                        setSplitPersonIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+                        setDirty(true);
+                      }} style={{ fontFamily: "inherit", fontSize: 12, padding: "8px 10px", borderRadius: 6, border: "1px solid #E8EAF0", background: "#F2F3F7", maxWidth: 320 }}>
+                        <option value="">+ add person...</option>
+                        {availableSplitPeople.map((person) => (
+                          <option key={person._id} value={String(person._id)}>{person.name}</option>
+                        ))}
+                      </select>
+                      <button type="button" className="ui-button-outlined" onClick={() => { setSplitMode("even"); setDirty(true); }} style={{ background: splitMode === "even" ? "#1A1A2E" : "transparent", color: splitMode === "even" ? "#fff" : "#6B7084" }}>even</button>
+                      <button type="button" className="ui-button-outlined" onClick={() => { setSplitMode("custom"); setDirty(true); }} style={{ background: splitMode === "custom" ? "#1A1A2E" : "transparent", color: splitMode === "custom" ? "#fff" : "#6B7084" }}>custom</button>
+                    </div>
+                    {splitPreview.map((row) => {
+                      const person = people.find((entry) => String(entry._id) === row.personId);
+                      return (
+                        <div key={row.personId} style={{ display: "flex", alignItems: "center", gap: 8, background: "#F2F3F7", borderRadius: 6, padding: "8px 10px" }}>
+                          <button type="button" onClick={() => {
+                            setSplitPersonIds((prev) => prev.filter((id) => id !== row.personId));
+                            setCustomAmounts((prev) => {
+                              const next = { ...prev };
+                              delete next[row.personId];
+                              return next;
+                            });
+                            setDirty(true);
+                          }} style={{ border: "none", background: "transparent", color: "#9EA2B0", cursor: "pointer" }}>×</button>
+                          <div style={{ flex: 1 }}>{person?.name ?? "Unknown"}</div>
+                          {splitMode === "custom" ? (
+                            <input value={customAmounts[row.personId] ?? ""} onChange={(event) => { setCustomAmounts((prev) => ({ ...prev, [row.personId]: event.target.value })); setDirty(true); }} placeholder="0.00" style={{ width: 100, textAlign: "right", fontFamily: "inherit", fontSize: 12, padding: "4px 8px", borderRadius: 4, border: "1px solid #E8EAF0", background: "#fff" }} />
+                          ) : (
+                            <strong>{fmtUSD(row.amount)}</strong>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {splitMode === "custom" ? (
+                      <div style={{ fontSize: 11, color: splitBalanced ? "#22C583" : "#E5484D" }}>
+                        {splitBalanced ? "✓ balanced" : `${fmtUSD(round2(total - splitPreview.reduce((sum, row) => sum + row.amount, 0)))} remaining`}
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{ fontSize: 11, color: "#6B7084" }}>tag each line item to a person in the table above.</div>
+            )}
+
+            <button type="button" className="ui-button-filled" disabled={!canSave || saving} onClick={onSaveAssignment} style={{ marginTop: 12, opacity: canSave ? 1 : 0.5 }}>
+              {saving ? "saving..." : "save assignment"}
+            </button>
+          </section>
+        )}
+
+        {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
 
         <div style={{ display: "flex", gap: 10, marginTop: 16, marginBottom: 16 }}>
           {bill.isApproved ? (
             <div style={{ flex: 1, padding: "14px 20px", borderRadius: 8, background: "rgba(34,197,131,0.08)", border: "1px solid #22C583", color: "#22C583", fontWeight: 700 }}>✓ invoice approved</div>
           ) : (
-            <button type="button" onClick={onApprove} disabled={approveDisabled} style={{ flex: 1, fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, padding: "14px 20px", borderRadius: 8, border: "none", background: approveDisabled ? "#E8EAF0" : "#22C583", color: approveDisabled ? "#9EA2B0" : "#fff" }}>
+            <button type="button" onClick={onApprove} disabled={approveDisabled} style={{ flex: 1, fontFamily: "inherit", fontSize: 12, fontWeight: 700, padding: "14px 20px", borderRadius: 8, border: "none", background: approveDisabled ? "#E8EAF0" : "#22C583", color: approveDisabled ? "#9EA2B0" : "#fff" }}>
               {approveDisabled ? "complete or save assignment before approving" : "approve invoice"}
             </button>
           )}
-          <button type="button" onClick={() => setShowDeleteConfirm(true)} style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, padding: "14px 20px", borderRadius: 8, border: "1px solid #E8EAF0", background: "transparent", color: "#6B7084" }}>delete</button>
+          <button type="button" onClick={() => setShowDeleteConfirm(true)} style={{ fontFamily: "inherit", fontSize: 12, padding: "14px 20px", borderRadius: 8, border: "1px solid #E8EAF0", background: "transparent", color: "#6B7084" }}>delete</button>
         </div>
 
         <section style={{ background: "#1A1A2E", color: "#fff", borderRadius: 10, padding: "20px 26px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -336,7 +355,7 @@ export default function AdminInvoicePage() {
 
         <Modal open={showDeleteConfirm} title="delete invoice?" onClose={() => setShowDeleteConfirm(false)}>
           <p style={{ marginTop: 0, color: "var(--ui-text-secondary)" }}>
-            this will permanently delete invoice <strong>{String(extracted.invoice_number ?? billId)}</strong> from {provider?.name ?? providerSlug}.
+            this will permanently delete invoice <strong>{formatInvoiceName({ providerName: String((extracted as any).provider_name ?? bill?.provider?.name ?? bill?.customProviderName ?? "Unassigned Invoice"), date: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "") })}</strong> from {provider?.name ?? providerSlug}.
           </p>
           <p style={{ color: "var(--ui-text-muted)" }}>this action cannot be undone.</p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
@@ -352,7 +371,7 @@ export default function AdminInvoicePage() {
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div style={{ fontSize: 9, color: "#9EA2B0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 9, color: "#9EA2B0", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 12 }}>{value}</div>
     </div>
   );
@@ -361,7 +380,7 @@ function Detail({ label, value }: { label: string; value: string }) {
 function Summary({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div style={{ fontSize: 8, color: "#6B7084", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 8, color: "#6B7084", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 13, fontWeight: 700 }}>{value}</div>
     </div>
   );

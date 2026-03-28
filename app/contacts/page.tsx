@@ -23,6 +23,17 @@ type ContactFormState = {
   role: string;
 };
 
+type DetailFormState = {
+  name: string;
+  providerName: string;
+  location: LocationValue;
+  category: string;
+  email: string;
+  phone: string;
+  role: string;
+  notes: string;
+};
+
 const CATEGORY_OPTIONS = [
   { key: "veterinary", label: "Veterinary" },
   { key: "farrier", label: "Farrier" },
@@ -35,6 +46,7 @@ const CATEGORY_OPTIONS = [
   { key: "feed_bedding", label: "Feed & Bedding" },
   { key: "horse_transport", label: "Horse Transport" },
   { key: "dues_registrations", label: "Dues & Registrations" },
+  { key: "show_expenses", label: "Show Expenses" },
   { key: "marketing", label: "Marketing" },
 ];
 
@@ -92,7 +104,16 @@ export default function ContactsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [detailEditId, setDetailEditId] = useState<string | null>(null);
   const [detailSaving, setDetailSaving] = useState(false);
-  const [detailForm, setDetailForm] = useState({ email: "", phone: "", role: "", notes: "" });
+  const [detailForm, setDetailForm] = useState<DetailFormState>({
+    name: "",
+    providerName: "",
+    location: "all",
+    category: "",
+    email: "",
+    phone: "",
+    role: "",
+    notes: "",
+  });
   const [form, setForm] = useState<ContactFormState>(EMPTY_FORM);
   const [error, setError] = useState<string>("");
   const [saving, setSaving] = useState(false);
@@ -207,8 +228,13 @@ export default function ContactsPage() {
   }
 
   function startDetailEdit(contact: (typeof contacts)[number]) {
+    const provider = contact.providerId ? providerLookup.get(String(contact.providerId)) : null;
     setDetailEditId(String(contact._id));
     setDetailForm({
+      name: contact.name ?? "",
+      providerName: contact.providerName ?? contact.company ?? provider?.name ?? "",
+      location: (contact.location as Exclude<LocationValue, "all"> | undefined) ?? "all",
+      category: contact.category ?? "",
       email: contact.email ?? "",
       phone: contact.phone ?? "",
       role: contact.role ?? "",
@@ -225,16 +251,15 @@ export default function ContactsPage() {
     setDetailEditId(null);
   }
 
-  async function saveDetail(contact: (typeof contacts)[number], providerName: string) {
+  async function saveDetail(contact: (typeof contacts)[number]) {
     setDetailSaving(true);
     try {
       await updateContact({
         contactId: contact._id,
-        name: contact.name,
-        category: contact.category,
-        providerId: contact.providerId,
-        providerName,
-        location: contact.location as "wellington" | "thermal" | "ocala" | "la" | "eu" | "can" | undefined,
+        name: detailForm.name || undefined,
+        providerName: detailForm.providerName || undefined,
+        location: detailForm.location === "all" ? "" : detailForm.location,
+        category: detailForm.category || undefined,
         email: detailForm.email || undefined,
         phone: detailForm.phone || undefined,
         role: detailForm.role || undefined,
@@ -254,7 +279,7 @@ export default function ContactsPage() {
           { label: "contacts", current: true },
         ]}
         actions={[
-          { label: "upload invoices", href: "/upload", variant: "outlined" },
+          { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
           { label: "biz overview", href: "/biz-overview", variant: "filled" },
         ]}
       />
@@ -453,64 +478,120 @@ export default function ContactsPage() {
                   </div>
                   {expandedId === contactId ? (
                     <div className={styles.contactDetail} onClick={(event) => event.stopPropagation()}>
-                      <div className={styles.detailFields}>
-                        <div className={styles.detailField}>
-                          <div className={styles.detailLabel}>EMAIL</div>
-                          {detailEditId === contactId ? (
+                      {detailEditId === contactId ? (
+                        <div className={styles.editFields}>
+                          <EditField label="NAME">
                             <input
-                              className={styles.detailInput}
+                              className={styles.editInput}
+                              value={detailForm.name}
+                              onChange={(event) => setDetailForm((prev) => ({ ...prev, name: event.target.value }))}
+                              placeholder="contact name"
+                            />
+                          </EditField>
+                          <EditField label="PROVIDER">
+                            <input
+                              className={styles.editInput}
+                              value={detailForm.providerName}
+                              onChange={(event) => setDetailForm((prev) => ({ ...prev, providerName: event.target.value }))}
+                              placeholder="company or business name"
+                            />
+                          </EditField>
+                          <EditField label="LOCATION">
+                            <select
+                              className={styles.editInput}
+                              value={detailForm.location}
+                              onChange={(event) => setDetailForm((prev) => ({ ...prev, location: event.target.value as LocationValue }))}
+                            >
+                              <option value="all">select...</option>
+                              <option value="wellington">Wellington</option>
+                              <option value="thermal">Thermal</option>
+                              <option value="ocala">Ocala</option>
+                              <option value="la">LA</option>
+                              <option value="eu">EU</option>
+                              <option value="can">CAN</option>
+                            </select>
+                          </EditField>
+                          <EditField label="CATEGORY">
+                            <select
+                              className={styles.editInput}
+                              value={detailForm.category}
+                              onChange={(event) => setDetailForm((prev) => ({ ...prev, category: event.target.value }))}
+                            >
+                              <option value="">select...</option>
+                              {CATEGORY_OPTIONS.map((row) => (
+                                <option key={row.key} value={row.key}>
+                                  {row.label}
+                                </option>
+                              ))}
+                            </select>
+                          </EditField>
+                          <EditField label="EMAIL">
+                            <input
+                              className={styles.editInput}
                               value={detailForm.email}
                               onChange={(event) => setDetailForm((prev) => ({ ...prev, email: event.target.value }))}
+                              placeholder="email address"
+                              type="email"
                             />
-                          ) : contact.email ? (
-                            <a className={styles.detailLink} href={`mailto:${contact.email}`}>
-                              {contact.email}
-                            </a>
-                          ) : (
-                            <div className={styles.detailValueEmpty}>—</div>
-                          )}
-                        </div>
-                        <div className={styles.detailField}>
-                          <div className={styles.detailLabel}>PHONE</div>
-                          {detailEditId === contactId ? (
+                          </EditField>
+                          <EditField label="PHONE">
                             <input
-                              className={styles.detailInput}
+                              className={styles.editInput}
                               value={detailForm.phone}
                               onChange={(event) => setDetailForm((prev) => ({ ...prev, phone: event.target.value }))}
+                              placeholder="phone number"
+                              type="tel"
                             />
-                          ) : contact.phone ? (
-                            <a className={styles.detailLink} href={`tel:${contact.phone}`}>
-                              {contact.phone}
-                            </a>
-                          ) : (
-                            <div className={styles.detailValueEmpty}>—</div>
-                          )}
-                        </div>
-                        <div className={styles.detailField}>
-                          <div className={styles.detailLabel}>ROLE</div>
-                          {detailEditId === contactId ? (
+                          </EditField>
+                          <EditField label="ROLE">
                             <input
-                              className={styles.detailInput}
+                              className={styles.editInput}
                               value={detailForm.role}
                               onChange={(event) => setDetailForm((prev) => ({ ...prev, role: event.target.value }))}
+                              placeholder="e.g., Veterinarian, Farrier, Sales Rep"
                             />
-                          ) : (
-                            <div className={contact.role ? styles.detailValue : styles.detailValueEmpty}>{contact.role || "—"}</div>
-                          )}
-                        </div>
-                        <div className={`${styles.detailField} ${styles.detailNotes}`}>
-                          <div className={styles.detailLabel}>NOTES</div>
-                          {detailEditId === contactId ? (
+                          </EditField>
+                          <EditField label="NOTES" fullWidth>
                             <textarea
-                              className={styles.detailTextarea}
+                              className={styles.editInput}
                               value={detailForm.notes}
                               onChange={(event) => setDetailForm((prev) => ({ ...prev, notes: event.target.value }))}
+                              placeholder="any additional details..."
                             />
-                          ) : (
-                            <div className={contact.notes ? styles.detailValue : styles.detailValueEmpty}>{contact.notes || "—"}</div>
-                          )}
+                          </EditField>
                         </div>
-                      </div>
+                      ) : (
+                        <div className={styles.detailFields}>
+                          <div className={styles.detailField}>
+                            <div className={styles.detailLabel}>EMAIL</div>
+                            {contact.email ? (
+                              <a className={styles.detailLink} href={`mailto:${contact.email}`}>
+                                {contact.email}
+                              </a>
+                            ) : (
+                              <div className={styles.detailValueEmpty}>—</div>
+                            )}
+                          </div>
+                          <div className={styles.detailField}>
+                            <div className={styles.detailLabel}>PHONE</div>
+                            {contact.phone ? (
+                              <a className={styles.detailLink} href={`tel:${contact.phone}`}>
+                                {contact.phone}
+                              </a>
+                            ) : (
+                              <div className={styles.detailValueEmpty}>—</div>
+                            )}
+                          </div>
+                          <div className={styles.detailField}>
+                            <div className={styles.detailLabel}>ROLE</div>
+                            <div className={contact.role ? styles.detailValue : styles.detailValueEmpty}>{contact.role || "—"}</div>
+                          </div>
+                          <div className={`${styles.detailField} ${styles.detailNotes}`}>
+                            <div className={styles.detailLabel}>NOTES</div>
+                            <div className={contact.notes ? styles.detailValue : styles.detailValueEmpty}>{contact.notes || "—"}</div>
+                          </div>
+                        </div>
+                      )}
                       <div className={styles.detailActions}>
                         {detailEditId === contactId ? (
                           <>
@@ -526,8 +607,8 @@ export default function ContactsPage() {
                             <button
                               type="button"
                               className={styles.btnSaveDetail}
-                              disabled={detailSaving}
-                              onClick={() => saveDetail(contact, providerName)}
+                              disabled={detailSaving || !detailForm.name.trim()}
+                              onClick={() => saveDetail(contact)}
                             >
                               {detailSaving ? "saving..." : "save changes"}
                             </button>
@@ -591,10 +672,19 @@ function titleCase(value: string) {
     .join(" ");
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, fullWidth = false }: { label: string; children: React.ReactNode; fullWidth?: boolean }) {
   return (
-    <label className={styles.fieldGroup}>
+    <label className={`${styles.fieldGroup} ${fullWidth ? styles.fieldGroupFull : ""}`}>
       <span className={styles.fieldLabel}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function EditField({ label, children, fullWidth = false }: { label: string; children: React.ReactNode; fullWidth?: boolean }) {
+  return (
+    <label className={`${styles.fieldGroup} ${fullWidth ? styles.fieldGroupFull : ""}`}>
+      <span className={styles.editLabel}>{label}</span>
       {children}
     </label>
   );

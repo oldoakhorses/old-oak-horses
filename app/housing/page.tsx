@@ -6,7 +6,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
 import SpendBar from "@/components/SpendBar";
-import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
+import { formatInvoiceName, toIsoDateString } from "@/lib/formatInvoiceName";
 import styles from "./housing.module.css";
 
 const SUBCATEGORY_ORDER = ["rider-housing", "groom-housing"] as const;
@@ -50,7 +50,7 @@ export default function HousingOverviewPage() {
           { label: "housing", current: true }
         ]}
         actions={[
-          { label: "upload invoices", href: "/upload", variant: "outlined" },
+          { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
           { label: "biz overview", href: "/biz-overview", variant: "filled" }
         ]}
       />
@@ -116,7 +116,7 @@ export default function HousingOverviewPage() {
                 <div>
                   <div className={styles.invoiceTop}>
                     <span className={styles.provider}>
-                      {formatInvoiceTitle({
+                      {formatInvoiceName({
                         category: "housing",
                         providerName: bill.providerName,
                         subcategory: bill.housingSubcategory || "housing",

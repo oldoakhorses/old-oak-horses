@@ -35,7 +35,7 @@ export default function DuesOverviewPage() {
           { label: "dues_registrations", current: true }
         ]}
         actions={[
-          { label: "upload invoices", href: "/upload", variant: "outlined" },
+          { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
           { label: "biz overview", href: "/biz-overview", variant: "filled" }
         ]}
       />

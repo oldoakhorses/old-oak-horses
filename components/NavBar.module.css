@@ -99,7 +99,6 @@
   padding: 7px 16px;
   font-size: 11px;
   text-decoration: none;
-  font-family: "Space Mono", "SF Mono", Menlo, monospace;
 }
 
 .actionOutlined {
@@ -198,7 +197,6 @@
   transition: transform 0.25s ease;
   display: flex;
   flex-direction: column;
-  font-family: "Space Mono", monospace;
 }
 
 .sidebarOpen {
@@ -240,7 +238,7 @@
   font-size: 12px;
   color: #1a1a2e;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
 }
 
 .closeBtn {
@@ -264,14 +262,13 @@
 .navSectionLabel {
   font-size: 9px;
   color: #9ea2b0;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   padding: 0 16px;
   margin-bottom: 8px;
 }
 
 .navItem {
-  font-family: "Space Mono", monospace;
   font-size: 12px;
   color: #6b7084;
   padding: 12px 16px;
@@ -316,7 +313,6 @@
 }
 
 .sidebarSignOut {
-  font-family: "Space Mono", monospace;
   font-size: 11px;
   color: #9ea2b0;
   background: none;
@@ -336,6 +332,6 @@
 .sidebarCopyright {
   font-size: 9px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   margin-top: 12px;
 }

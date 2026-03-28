@@ -23,7 +23,7 @@
 .detailLabel {
   font-size: 10px;
   color: var(--color-text-muted);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -58,7 +58,7 @@
 .statLabel {
   font-size: 10px;
   color: var(--color-text-muted);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 

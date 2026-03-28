@@ -6,6 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
+import InvoiceNotesCard from "@/components/InvoiceNotesCard";
+import { formatInvoiceName } from "@/lib/formatInvoiceName";
 import Modal from "@/components/Modal";
 
 const COLORS: Record<string, string> = {
@@ -51,7 +53,7 @@ export default function MarketingInvoicePage() {
   async function onDelete() {
     if (!bill) return;
     await deleteBill({ billId: bill._id });
-    router.push(`/marketing/${subcategory}`);
+    router.push("/invoices");
   }
 
   return (
@@ -61,7 +63,7 @@ export default function MarketingInvoicePage() {
           { label: "old-oak-horses", href: "/dashboard", brand: true },
           { label: "marketing", href: "/marketing" },
           { label: subcategory, href: `/marketing/${subcategory}` },
-          { label: String(extracted.invoice_number ?? "invoice"), current: true }
+          { label: formatInvoiceName({ providerName: String((extracted as any).provider_name ?? bill?.provider?.name ?? bill?.customProviderName ?? "Unassigned Invoice"), date: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "") }), current: true }
         ]}
         actions={bill?.originalPdfUrl ? [{ label: "view original PDF", href: bill.originalPdfUrl, variant: "link", newTab: true }] : []}
       />
@@ -119,6 +121,8 @@ export default function MarketingInvoicePage() {
           )}
         </section>
 
+        {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
+
         <div style={{ marginTop: 16, marginBottom: 20, display: "flex", gap: 10 }}>
           {bill?.status === "done" ? (
             <div
@@ -175,7 +179,7 @@ export default function MarketingInvoicePage() {
 
         <Modal open={showDeleteConfirm} title="delete invoice?" onClose={() => setShowDeleteConfirm(false)}>
           <p style={{ marginTop: 0, color: "var(--ui-text-secondary)" }}>
-            this will permanently delete invoice <strong>{String(extracted.invoice_number ?? billId)}</strong> from {providerName}.
+            this will permanently delete invoice <strong>{formatInvoiceName({ providerName: String((extracted as any).provider_name ?? bill?.provider?.name ?? bill?.customProviderName ?? "Unassigned Invoice"), date: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "") })}</strong> from {providerName}.
           </p>
           <p style={{ color: "var(--ui-text-muted)" }}>this action cannot be undone.</p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>

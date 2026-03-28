@@ -6,6 +6,7 @@ import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { matchHorseName, normalizeAliasKey } from "./matchHorse";
 import { matchPersonName } from "./matchPerson";
+import { matchProvider } from "./providerMatching";
 
 const TRAVEL_SUBCATEGORY_SLUGS = new Set(["flights", "trains", "rental-car", "gas", "meals", "hotels"]);
 const HOUSING_SUBCATEGORY_SLUGS = new Set(["rider-housing", "groom-housing"]);
@@ -14,7 +15,16 @@ const ADMIN_SUBCATEGORY_SLUGS = new Set(["legal", "visas", "accounting", "payrol
 const DUES_SUBCATEGORY_SLUGS = new Set(["horse-registrations", "rider-registrations", "memberships"]);
 const SALARIES_SUBCATEGORY_SLUGS = new Set(["rider", "groom", "freelance"]);
 const RECLASSIFICATION_SOURCE_CATEGORIES = new Set(["stabling", "show-expenses", "feed-bedding"]);
-const HORSE_BASED_CATEGORIES = new Set(["veterinary", "farrier", "stabling", "feed-bedding", "horse-transport", "bodywork", "show-expenses"]);
+const HORSE_BASED_CATEGORIES = new Set([
+  "veterinary",
+  "farrier",
+  "stabling",
+  "feed-bedding",
+  "horse-transport",
+  "bodywork",
+  "show-expenses",
+  "dues-registrations",
+]);
 const PERSON_BASED_CATEGORIES = new Set(["travel", "housing", "admin", "salaries", "commissions"]);
 const USD_EXCHANGE_RATES: Record<string, number> = {
   CAD: 0.72,
@@ -37,8 +47,11 @@ export const parseBillPdf = internalAction({
     if (!bill) throw new Error("Bill not found");
 
     const provider = bill.providerId ? await ctx.runQuery(internal.bills.getProvider, { providerId: bill.providerId }) : null;
-    const category = await ctx.runQuery(internal.bills.getCategory, { categoryId: bill.categoryId });
-    if (!category) throw new Error("Category not found");
+    const category = bill.categoryId
+      ? await ctx.runQuery(internal.bills.getCategory, { categoryId: bill.categoryId })
+      : null;
+    // Category is now optional — if missing, we auto-detect per line item
+    const categorySlug = category?.slug ?? null;
 
     try {
       const blob = await ctx.storage.get(bill.fileId);
@@ -52,8 +65,42 @@ export const parseBillPdf = internalAction({
         throw new Error("ANTHROPIC_API_KEY is not set in Convex environment");
       }
       const client = new Anthropic({ apiKey: anthropicApiKey });
+      console.log("2. Extracting text from PDF...");
+      const textExtractionResponse = await client.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1600,
+        temperature: 0,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "document",
+                source: {
+                  type: "base64",
+                  media_type: "application/pdf",
+                  data: base64Pdf
+                }
+              },
+              {
+                type: "text",
+                text: "Extract visible text from this invoice PDF. Return plain text only."
+              }
+            ]
+          }
+        ]
+      });
+      const extractedTextBlock = textExtractionResponse.content.find((c) => c.type === "text");
+      const extractedPdfText = extractedTextBlock && extractedTextBlock.type === "text" ? extractedTextBlock.text : "";
+      console.log("3. Extracted text length:", extractedPdfText.length);
+      console.log("4. Extracted text preview:", extractedPdfText.substring(0, 500));
+      console.log("=== RAW PDF TEXT ===");
+      console.log(extractedPdfText);
+      console.log("=== END RAW TEXT ===");
+      console.log("Text length:", extractedPdfText.length);
+
       const extractionPrompt = getExtractionPrompt({
-        categorySlug: category.slug,
+        categorySlug: categorySlug ?? "auto-detect",
         travelSubcategory: bill.travelSubcategory,
         billSubcategory:
           bill.duesSubcategory ??
@@ -62,11 +109,12 @@ export const parseBillPdf = internalAction({
           bill.salariesSubcategory ??
           bill.travelSubcategory,
         providerName: provider?.name,
-        providerPrompt: provider?.extractionPrompt
+        providerPrompt: provider?.extractionPrompt,
+        extractedPdfText
       });
       const prompt = `${extractionPrompt}\n\nReturn strict JSON.`;
       console.log(
-        `[billParsing] bill=${String(bill._id)} category=${category.slug} travelSubcategory=${bill.travelSubcategory ?? "-"} sending PDF as base64 document to Anthropic`
+        `[billParsing] bill=${String(bill._id)} category=${categorySlug ?? "auto-detect"} travelSubcategory=${bill.travelSubcategory ?? "-"} sending PDF as base64 document to Anthropic`
       );
 
       const response = await client.messages.create({
@@ -97,14 +145,34 @@ export const parseBillPdf = internalAction({
       }
 
       const parsedRaw = JSON.parse(stripCodeFences(textBlock.text)) as Record<string, unknown>;
+      console.log("6. Parsed invoice data:", JSON.stringify(parsedRaw, null, 2));
+      console.log("=== PARSED RESULT ===");
+      console.log(JSON.stringify(parsedRaw, null, 2));
+      console.log("=== END PARSED ===");
       let parsed = normalizeParsedPayload(parsedRaw);
-      if (category.slug === "travel" && bill.travelSubcategory === "rental-car") {
+      if (categorySlug === "dues-registrations" && isUsefProviderSignal(provider?.name, pickString(parsed, ["provider_name", "providerName"]))) {
+        parsed = normalizeUsefDuesParse(parsed, bill.duesSubcategory);
+      }
+      if (categorySlug === "horse-transport" && isBrookLedgeProviderSignal(provider?.name, pickString(parsed, ["provider_name", "providerName"]))) {
+        parsed = normalizeBrookLedgeHorseTransportParse(parsed);
+      }
+      const eqSportsSignal = isEqSportsProviderSignal(
+        provider?.name,
+        pickString(parsed, ["provider_name", "providerName"]),
+        extractedPdfText
+      );
+      const multiPatientInvoice = isMultiPatientInvoice(extractedPdfText);
+      const parsedHasPatientSections = Array.isArray((parsed as any).patientSections);
+      if (eqSportsSignal || multiPatientInvoice || parsedHasPatientSections) {
+        parsed = normalizeEqSportsVeterinaryParse(parsed, extractedPdfText, { forceEqSportsProvider: eqSportsSignal });
+      }
+      if (categorySlug === "travel" && bill.travelSubcategory === "rental-car") {
         parsed = enrichTravelRentalCarParse(parsed);
       }
-      if (category.slug === "feed-bedding") {
+      if (categorySlug === "feed-bedding") {
         parsed = enforceFeedBeddingClassification(parsed);
       }
-      if (category.slug === "bodywork") {
+      if (categorySlug === "bodywork") {
         parsed = splitBodyworkEmbeddedHorseItems(parsed);
         parsed = preferBrandedProviderName(parsed);
       }
@@ -114,108 +182,200 @@ export const parseBillPdf = internalAction({
         ctx.runQuery(internal.bills.getHorseAliasesForMatching, {}),
         ctx.runQuery(internal.bills.getPersonAliasesForMatching, {})
       ]);
+      // When no bill-level category, match both horses and people (per-line-item categories will guide usage)
+      const matchHorses = categorySlug ? HORSE_BASED_CATEGORIES.has(categorySlug) : true;
+      const matchPeople = categorySlug ? PERSON_BASED_CATEGORIES.has(categorySlug) : true;
       parsed = applyEntityMatching(parsed, registeredHorses, registeredPeople, dynamicHorseAliases, dynamicPersonAliases, {
-        matchHorses: HORSE_BASED_CATEGORIES.has(category.slug),
-        matchPeople: PERSON_BASED_CATEGORIES.has(category.slug)
+        matchHorses,
+        matchPeople
       });
       parsed = ensureUsdAmounts(parsed);
-      annotateSuggestedCategories(parsed, category.slug);
-      const unmatchedHorseNames = HORSE_BASED_CATEGORIES.has(category.slug) ? collectUnmatchedHorseNames(parsed) : [];
+      if (categorySlug) annotateSuggestedCategories(parsed, categorySlug);
+      // Collect unique line-item categories and store on the bill
+      const lineItemCategories = collectLineItemCategories(parsed);
+      const unmatchedHorseNames = matchHorses ? collectUnmatchedHorseNames(parsed) : [];
 
       let resolvedProvider = provider;
       let extractedCustomProviderName = bill.customProviderName;
-      if (category.slug === "marketing" && !resolvedProvider && !bill.customProviderName) {
+      if (categorySlug === "marketing" && !resolvedProvider && !bill.customProviderName && bill.categoryId) {
         const extractedProviderName = pickString(parsed, ["provider_name", "vendor_name", "supplier_name", "merchant_name"]);
         if (extractedProviderName) {
           const existingProvider = await ctx.runQuery(internal.providers.getProviderByNameInCategoryInternal, {
-            categoryId: bill.categoryId,
+            categoryId: bill.categoryId!,
             name: extractedProviderName
           });
           const providerId =
             existingProvider?._id ??
             (await ctx.runMutation(internal.providers.createProviderOnUploadInternal, {
-              categoryId: bill.categoryId,
+              categoryId: bill.categoryId!,
               name: extractedProviderName
             }));
           resolvedProvider = existingProvider ?? (await ctx.runQuery(internal.bills.getProvider, { providerId }));
         }
       }
-      if (!resolvedProvider) {
-        const extractedProviderName = pickString(parsed, [
-          "provider_name",
-          "providerName",
-          "vendor_name",
-          "vendorName",
-          "supplier_name",
-          "merchant_name"
-        ]);
-        if (extractedProviderName) {
-          extractedCustomProviderName = extractedProviderName;
+      const extractedProviderName = pickString(parsed, [
+        "provider_name",
+        "providerName",
+        "vendor_name",
+        "vendorName",
+        "supplier_name",
+        "merchant_name"
+      ]);
+      if (!resolvedProvider && extractedProviderName) {
+        const targetSubcategory =
+          bill.duesSubcategory ??
+          bill.adminSubcategory ??
+          bill.horseTransportSubcategory ??
+          bill.marketingSubcategory ??
+          bill.travelSubcategory ??
+          bill.housingSubcategory ??
+          bill.salariesSubcategory;
+        const allProviders = await ctx.runQuery(internal.providers.listAllForMatching, {});
+        const categoryProviders = allProviders.filter((candidate: any) => candidate.categorySlug === categorySlug);
+        const subcategoryScopedProviders = targetSubcategory
+          ? categoryProviders.filter((candidate: any) => candidate.subcategorySlug === targetSubcategory)
+          : categoryProviders;
+        const providerCandidates = subcategoryScopedProviders.length > 0 ? subcategoryScopedProviders : categoryProviders;
+        console.log("Checking provider match for text containing:", extractedPdfText.substring(0, 200));
+        console.log("All providers:", providerCandidates.map((candidate: any) => candidate.name));
+
+        if (providerCandidates.length > 0) {
+          const providerMatch = await matchProvider(ctx, extractedProviderName, providerCandidates);
+          console.log("Provider match result:", providerMatch);
+          if (providerMatch.matched && providerMatch.providerId) {
+            resolvedProvider = await ctx.runQuery(internal.bills.getProvider, {
+              providerId: providerMatch.providerId as any,
+            });
+          }
         }
+      }
+      if (!resolvedProvider && isEqSportsProviderSignal(extractedPdfText)) {
+        const allProviders = await ctx.runQuery(internal.providers.listAllForMatching, {});
+        const eqSportsProvider = allProviders.find(
+          (candidate: any) => normalizeAliasKey(String(candidate.name ?? "")) === "eq sports medicine group"
+        );
+        if (eqSportsProvider?._id) {
+          resolvedProvider = await ctx.runQuery(internal.bills.getProvider, { providerId: eqSportsProvider._id });
+        }
+      }
+      if (!resolvedProvider && extractedProviderName) {
+        extractedCustomProviderName = extractedProviderName;
       }
 
       const expectedFields = resolvedProvider?.expectedFields ?? [];
+      const isEQSportsFormat =
+        Array.isArray((parsed as any).patientSections) ||
+        (categorySlug === "veterinary" && (eqSportsSignal || multiPatientInvoice));
+
+      if (isEQSportsFormat) {
+        const sectionCount = extractSectionsFromParsedPayload(parsed).length;
+        if (sectionCount === 0 && getLineItems(parsed).length === 0) {
+          throw new Error("EQ Sports invoice parsed but no patient sections found");
+        }
+        console.log(`EQ Sports format: ${sectionCount} patient sections found`);
+      }
+
       const missingFields = expectedFields.filter((field: string) => {
+        if (isEQSportsFormat && (field === "date" || field === "services" || field === "total_due")) {
+          return false;
+        }
         if (field === "horse_name") {
           return !hasHorseNameInLineItems(parsed);
+        }
+        if (field === "date") {
+          const value =
+            pickString(parsed, ["date", "invoice_date", "invoiceDate"]) ??
+            pickNumber(parsed, ["date_timestamp", "date"]);
+          return value === undefined || value === null || value === "";
+        }
+        if (field === "services") {
+          return getLineItems(parsed).length === 0;
+        }
+        if (field === "total_due") {
+          const total = pickNumber(parsed, ["total_due", "total", "invoice_total_usd", "invoiceTotalUsd", "amount_due", "grandTotal"]);
+          return total === undefined || total === null;
         }
         const value = parsed[field];
         return value === undefined || value === null || value === "";
       });
 
       if (missingFields.length > 0) {
-        throw new Error(`Missing expected parsed fields: ${missingFields.join(", ")}`);
+        console.warn(`Missing some expected parsed fields, continuing with what we have: ${missingFields.join(", ")}`);
       }
 
-      const needsApproval =
-        category.slug === "farrier" ||
-        category.slug === "travel" ||
-        category.slug === "housing" ||
-        category.slug === "stabling" ||
-        category.slug === "marketing" ||
-        category.slug === "admin" ||
-        category.slug === "dues-registrations" ||
-        category.slug === "bodywork" ||
-        category.slug === "feed-bedding" ||
-        category.slug === "salaries";
-      const needsApprovalWithTransport = needsApproval || category.slug === "horse-transport";
-      const status = needsApprovalWithTransport ? "pending" : "done";
+      // All invoices require approval (always go to pending)
+      const status: "pending" | "done" = "pending";
       const categoryMeta =
-        category.slug === "travel"
+        categorySlug === "travel"
           ? extractTravelMeta(parsed, resolvedProvider?.slug ?? resolvedProvider?.name)
-          : category.slug === "housing"
+          : categorySlug === "housing"
             ? extractHousingMeta(parsed, resolvedProvider?.slug ?? resolvedProvider?.name)
-            : category.slug === "stabling"
+            : categorySlug === "stabling"
               ? extractStablingMeta(parsed)
-              : category.slug === "horse-transport"
+              : categorySlug === "horse-transport"
                 ? extractHorseTransportMeta(parsed, bill.horseTransportSubcategory)
-              : category.slug === "marketing"
+              : categorySlug === "marketing"
                 ? extractMarketingMeta(parsed, bill.marketingSubcategory)
-                : category.slug === "admin"
+                : categorySlug === "admin"
                   ? extractAdminMeta(parsed, bill.adminSubcategory)
-                  : category.slug === "dues-registrations"
+                  : categorySlug === "dues-registrations"
                     ? extractDuesMeta(parsed, bill.duesSubcategory)
-                : category.slug === "salaries"
+                : categorySlug === "salaries"
                   ? extractSalariesMeta(parsed, bill.salariesSubcategory)
                 : {};
       const currencyMeta = extractCurrencyMeta(parsed);
+      const billDiscount = pickNumber(parsed, ["discount", "professional_discount", "professionalDiscount"]);
 
       const providerContactPatch = extractProviderContactInfo(parsed);
       const extractedProviderContact = buildExtractedProviderContact(providerContactPatch);
+      const parsedLineItemsForLog = getLineItems(parsed);
+      const parsedTotalForLog = pickNumber(parsed, ["invoice_total_usd", "invoiceTotalUsd", "total", "subtotal"]);
+      console.log("=== SAVING BILL ===");
+      console.log("total:", parsedTotalForLog ?? null);
+      console.log("lineItems count:", parsedLineItemsForLog.length);
+      console.log("lineItems:", JSON.stringify(parsedLineItemsForLog, null, 2));
+      console.log("=== END BILL ===");
+
+      // Resolve contactId from the matched provider
+      let resolvedContactId: string | undefined;
+      if (resolvedProvider) {
+        const contact = await ctx.runQuery(internal.contacts.getContactByNameInternal, { name: resolvedProvider.name });
+        resolvedContactId = contact?._id ?? undefined;
+      }
 
       await ctx.runMutation(internal.bills.markDone, {
         billId: bill._id,
         extractedData: parsed,
         status,
-        hasUnmatchedHorses: HORSE_BASED_CATEGORIES.has(category.slug) ? unmatchedHorseNames.length > 0 : false,
-        unmatchedHorseNames: HORSE_BASED_CATEGORIES.has(category.slug) ? unmatchedHorseNames : [],
+        lineItemCategories: lineItemCategories.length > 0 ? lineItemCategories : undefined,
+        hasUnmatchedHorses: matchHorses ? unmatchedHorseNames.length > 0 : false,
+        unmatchedHorseNames: matchHorses ? unmatchedHorseNames : [],
         providerId: resolvedProvider?._id,
+        contactId: resolvedContactId as any,
         customProviderName: extractedCustomProviderName,
         extractedProviderContact,
         ...currencyMeta,
+        discount: typeof billDiscount === "number" ? round2(billDiscount) : undefined,
         ...categoryMeta
       });
 
+      // Update contact with extracted invoice info
+      if (resolvedContactId && Object.values(providerContactPatch).some((value) => value !== undefined)) {
+        await ctx.runMutation(internal.contacts.updateContactFromInvoice, {
+          contactId: resolvedContactId as any,
+          fullName: providerContactPatch.fullName,
+          contactName: providerContactPatch.contactName,
+          primaryContactName: providerContactPatch.primaryContactName,
+          primaryContactPhone: providerContactPatch.primaryContactPhone,
+          address: providerContactPatch.address,
+          phone: providerContactPatch.phone,
+          email: providerContactPatch.email,
+          website: providerContactPatch.website,
+          accountNumber: providerContactPatch.accountNumber
+        });
+      }
+
+      // Also update provider (legacy, will be removed in Phase 6)
       if (resolvedProvider && Object.values(providerContactPatch).some((value) => value !== undefined)) {
         await ctx.runMutation(internal.bills.updateProviderContactInfo, {
           providerId: resolvedProvider._id,
@@ -231,13 +391,18 @@ export const parseBillPdf = internalAction({
         });
       }
 
-      const contactCandidateName = providerContactPatch.contactName ?? providerContactPatch.primaryContactName ?? providerContactPatch.fullName;
-      if (contactCandidateName) {
+      const contactCandidateName =
+        providerContactPatch.contactName ??
+        providerContactPatch.primaryContactName ??
+        providerContactPatch.fullName ??
+        resolvedProvider?.name ??
+        extractedCustomProviderName;
+      if (!resolvedContactId && contactCandidateName && (resolvedProvider?.name || extractedCustomProviderName)) {
         await ctx.runMutation(internal.contacts.upsertContactFromInvoice, {
           name: contactCandidateName,
           providerId: resolvedProvider?._id,
           providerName: resolvedProvider?.name ?? extractedCustomProviderName ?? providerContactPatch.fullName,
-          category: category.slug,
+          category: categorySlug ?? (lineItemCategories.length > 0 ? lineItemCategories[0] : "other"),
           location: resolvedProvider?.location,
           phone: providerContactPatch.phone ?? providerContactPatch.primaryContactPhone,
           email: providerContactPatch.email
@@ -502,13 +667,24 @@ function normalizeLineItem(item: unknown) {
     "your_percent_due",
     "your_pct_due",
     "your_due",
-    "%_due"
+    "%_due",
+    "your % due",
+    "Your % Due"
   ]);
   const amountUsd = pickNumber(row, ["total_usd", "amount_usd", "amountUsd", "total"]);
   const horseName = pickString(row, ["horse_name", "horseName", "horse"]);
   const personName = pickString(row, ["person_name", "personName", "employee_name"]);
   const taxCode = pickString(row, ["tax_code", "taxCode"]);
-  const ownershipPercent = pickNumber(row, ["ownership_percent", "owned_percent", "percent_owned", "%_owned", "percent"]);
+  const ownershipPercent = pickNumber(row, [
+    "ownership_percent",
+    "owned_percent",
+    "percent_owned",
+    "%_owned",
+    "percent",
+    "percentOwned",
+    "% Owned",
+    "Percent Owned"
+  ]);
   const normalized: Record<string, unknown> = {
     ...row,
     description
@@ -796,7 +972,11 @@ function getExtractionPrompt(args: {
   billSubcategory?: string;
   providerName?: string;
   providerPrompt?: string;
+  extractedPdfText?: string;
 }) {
+  if (isEqSportsProviderSignal(args.providerName, args.extractedPdfText) || isMultiPatientInvoice(args.extractedPdfText ?? "")) {
+    return eqSportsVeterinaryExtractionPrompt(args.providerPrompt);
+  }
   if (args.categorySlug === "horse-transport") {
     return horseTransportExtractionPrompt(args.providerName, args.providerPrompt);
   }
@@ -806,12 +986,148 @@ function getExtractionPrompt(args: {
   if (args.providerPrompt && args.providerPrompt.trim().length > 0) {
     return `${args.providerPrompt.trim()}\n\n${PROVIDER_CONTACT_PROMPT}`;
   }
+  if (args.categorySlug === "auto-detect") {
+    return autoDetectCategoryExtractionPrompt();
+  }
   return genericExtractionPrompt(args.categorySlug, args.travelSubcategory, args.billSubcategory);
+}
+
+function autoDetectCategoryExtractionPrompt() {
+  return `Parse this invoice PDF and extract structured data as JSON.
+
+For the overall invoice, extract:
+- provider_name: Name of the company/person who issued the invoice
+- contact_name: Specific contact person on the invoice (if different from provider)
+- address: Provider's address
+- phone: Provider's phone number
+- email: Provider's email
+- website: Provider's website
+- account_number: Account number
+- invoice_number: Invoice or reference number
+- invoice_date: Date on the invoice (MM/DD/YYYY)
+- due_date: Due date if shown
+- invoice_total_usd: Total amount in USD
+- tax: Tax amount if shown
+- subtotal: Subtotal before tax if shown
+
+For each line item, extract into a "line_items" array:
+- description: What the item/service is
+- quantity: Number of units (default 1)
+- rate: Per-unit price
+- total_usd: Total for this line item
+- horse_name: If the line item is for a specific horse, extract the horse name. Otherwise null.
+- person_name: If the line item is for a specific person (travel, housing, etc.), extract the person name. Otherwise null.
+- category: Classify this line item into ONE of these categories:
+  veterinary, farrier, stabling, travel, housing, horse-transport, feed-bedding, bodywork, marketing, admin, dues-registrations, show-expenses, salaries, supplies, commissions
+  Choose the most specific match. If unclear, use "supplies".
+- subcategory: Optional more specific classification within the category (e.g., "medication", "joint_injections" for veterinary; "flights", "hotels" for travel; "hay", "grain" for feed-bedding; "grooming", "stable", "tack" for supplies)
+
+${PROVIDER_CONTACT_PROMPT}`;
+}
+
+function eqSportsVeterinaryExtractionPrompt(providerPrompt?: string) {
+  const custom = providerPrompt?.trim() ? `${providerPrompt.trim()}\n\n` : "";
+  return `${custom}This is a veterinary invoice from EQ Sports Medicine Group. It contains MULTIPLE patient sections; each section is a separate sub-invoice for a different horse.
+
+Parse EVERY patient section. Each section starts with "Patient ID:" and contains:
+- Patient ID number
+- Patient name (format: "[Horse Name] Davis" — extract just the horse name before "Davis")
+- Sex, Birth Date, Species, Breed
+- Invoice Date for that section
+- Invoice Number for that section
+- Provider name (usually "Morgan Geller")
+- A Product / Service table with Quantity, Price (Exc), Tax, Amount columns
+- An "Invoice Total" for that section
+
+Patient mappings:
+- "Ben 431 Davis" => horseName "Ben"
+- "Carlin Davis" => horseName "Carlin"
+- "Gigi Davis" => horseName "Gigi"
+- "Valentina Davis" => horseName "Valentina"
+- "Barn group Davis" => shared barn supplies (not a horse)
+
+Footer fields (document-level):
+- Subtotal
+- Professional Discount (if present)
+- Tax
+- AMOUNT DUE
+- INVOICE BALANCE
+
+Return strict JSON:
+{
+  "providerName": "EQ Sports Medicine Group",
+  "providerDoctor": "Morgan Geller",
+  "grandTotal": <number>,
+  "subtotal": <number>,
+  "discount": <number|null>,
+  "tax": <number>,
+  "patientSections": [
+    {
+      "patientId": "<string>",
+      "patientName": "<string>",
+      "horseName": "<string>",
+      "sex": "<string>",
+      "birthDate": "<string|null>",
+      "invoiceDate": "<string>",
+      "invoiceNumber": "<string>",
+      "sectionTotal": <number>,
+      "lineItems": [
+        {
+          "description": "<string>",
+          "quantity": <number>,
+          "unitPrice": <number>,
+          "tax": "<string|number>",
+          "amount": <number>
+        }
+      ]
+    }
+  ]
+}
+
+Parse ALL patient sections. Do not skip any. Do not merge sections.
+
+${PROVIDER_CONTACT_PROMPT}`;
 }
 
 function horseTransportExtractionPrompt(providerName?: string, providerPrompt?: string) {
   const providerHint = providerName ? `Provider hint: ${providerName}.` : "";
   const custom = providerPrompt?.trim() ? `${providerPrompt.trim()}\n\n` : "";
+  if (isBrookLedgeProviderSignal(providerName)) {
+    return `${custom}${providerHint}
+Extract this Brook Ledge horse transport invoice as strict JSON.
+
+Expected structure:
+- invoice_number from "Invoice [NUMBER]"
+- invoice_date from "Invoice Date:" at top (YYYY-MM-DD)
+- ship_date from "Ship Date:"
+- customer_number from "Customer ID:"
+- terms from "Terms:"
+- origin from "Origin:" (keep full text, including pipes like "OAK VIEW FARM | MORRISTON, FL")
+- destination from "Destination:" (keep full text, including pipes)
+- route as "ORIGIN -> DESTINATION"
+- invoice_total_usd from "Please Pay This Amount:"
+- provider_name should be "Brook Ledge"
+- provider_email should be "billing@brookledge.com" when shown in Remit To
+- provider_phone should include "610-987-6284" when shown
+- provider_address should include "PO Box 56, Oley, PA 19547-0056" when shown
+
+Description of Charges table:
+Columns: % Owned | Horse | Stall Desc | Your % Due
+Each table row is one horse transport line item.
+For each row return:
+- description: "Transport — <Horse>"
+- horse_name: value from Horse column
+- ownership_percent: numeric percent from % Owned (e.g. 100.0000% => 100)
+- total_usd: numeric value from Your % Due
+
+Critical:
+- The Horse column is the horse name; do not treat rows as generic items.
+- "Please Pay This Amount" is authoritative total.
+- Keep non-horse fees as separate line items with horse_name: null.
+
+${PROVIDER_CONTACT_PROMPT}
+Return strict JSON only.`;
+  }
   return `${custom}${providerHint}
 Extract all data from this horse transport invoice as strict JSON.
 
@@ -833,11 +1149,21 @@ Horse transport invoices list horses being transported with per-horse costs.
 Format A (Brook Ledge style): table with "% Owned | Horse | Stall Desc | Your % Due"
 - each row = one horse
 - "100.0000% BEN ... 105.00" => horse_name: "BEN", total_usd: 105.00, ownership_percent: 100.0000
+- use "Please Pay This Amount" as invoice_total_usd
+- extract Origin and Destination blocks exactly when present
 
-Format B (general): per-horse charge table
+Format B (Stateside Horse Transportation style): rows with date | product/service | description | qty | rate | amount
+- horse names are embedded in description:
+  example: "Transport for Gaby De Courcel from LAX to Coachella CA"
+- extract horse_name from description
+- extract route text into description notes (origin/destination if present)
+- if description is a non-transport charge (for example "Credit Card Charge", "Credit Card Processing Fee", admin fee):
+  set horse_name to null and keep as a separate fee line item
+
+Format C (general): per-horse charge table
 - each row => horse_name + per-horse amount
 
-Format C (lump sum): horse names listed, one total
+Format D (lump sum): horse names listed, one total
 - split total evenly across detected horses
 
 For each line item extract:
@@ -891,6 +1217,36 @@ function genericExtractionPrompt(categorySlug?: string, travelSubcategory?: stri
   const base = `Extract invoice data as strict JSON with invoice_number, invoice_date, provider_name, account_number, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[].
 
 ${PROVIDER_CONTACT_PROMPT}`;
+  if (categorySlug === "veterinary") {
+    return `Extract all data from this veterinary invoice as strict JSON.
+
+This may contain MULTIPLE patient sections in one PDF. If there are multiple "Patient ID:" blocks:
+- Parse each patient section separately.
+- Each section has its own Patient name, Invoice Date, Invoice Number, Product/Service table, and Invoice Total.
+- Combine all section line items into one flat line_items array.
+- Include section metadata on each line item: patient_name, invoice_number, invoice_date.
+- Use footer "AMOUNT DUE" or "INVOICE BALANCE" as invoice_total_usd.
+- Capture footer Subtotal, Tax, and Professional Discount when present.
+
+For each line item extract:
+- description
+- quantity
+- unit_price
+- tax (if present)
+- total_usd (use Amount column value as authoritative)
+- horse_name when inferable from patient/description
+
+Return strict JSON only with:
+- provider_name
+- invoice_number (best global identifier, optional if section-level only)
+- invoice_date (latest date across sections)
+- subtotal
+- tax_total_usd
+- discount (negative number when present)
+- invoice_total_usd
+- sections[] when multiple patient sections are present
+- line_items[] flattened across all sections`;
+  }
   if (categorySlug === "travel" && travelSubcategory === "rental-car") {
     return `Extract this travel rental-car invoice as strict JSON.
 Sixt Rental Car requirements:
@@ -976,6 +1332,18 @@ Context clues:
 
 If dues_subcategory is unclear, use provided bill subcategory hint: ${billSubcategory ?? "unknown"}.
 
+USEF-specific rules (when receipt is from United States Equestrian Federation / USEF Payment Services):
+- Date comes from the top receipt line like "Feb 23, 2026 at 5:39PM" (return invoice_date as YYYY-MM-DD)
+- invoice_number should be Transaction ID from Payment Information when present
+- Parse each table row in Item/Name/Description/Qty/Unit Price/Item Total
+- For each line item, set dues_subcategory using Name+Description:
+  - horse registration / horse recording / late entry / international entry => horse_registrations
+  - membership / member => memberships
+  - rider / amateur / junior => rider_registrations
+- Extract horse name from Description when pattern includes "for <horse name>" (stop before "with" when present)
+- If horse found: set entity_type="horse", entity_name="<horse>", horse_name="<horse>"
+- If no horse found: set entity_type=null, entity_name=null
+
 ${PROVIDER_CONTACT_PROMPT}
 Return strict JSON.`;
   }
@@ -991,7 +1359,8 @@ Required fields:
 - tax_total_usd
 - invoice_total_usd
 - original_currency (default USD)
-- line_items[] with description, quantity, unit_price, total_usd
+- line_items[] with description, quantity, unit_price, total_usd, subcategory
+  Classify each line item subcategory as one of: "grooming" (grooming supplies, brushes, shampoos, sprays), "stable" (stable supplies, buckets, hooks, barn equipment), "tack" (saddles, bridles, boots, girths, pads, reins, bits, halters), or "other"
 
 Horseplay email receipt format handling:
 - Header may read "Receipt for order #XXXXX"
@@ -1111,6 +1480,631 @@ function annotateSuggestedCategories(parsed: Record<string, unknown>, categorySl
   }
 }
 
+/**
+ * Collect unique category slugs from line items.
+ * Each line item may have a `category` field set by the AI or during normalization.
+ */
+const VALID_LINE_ITEM_CATEGORIES = new Set([
+  "veterinary", "farrier", "stabling", "travel", "housing", "horse-transport",
+  "feed-bedding", "bodywork", "marketing", "admin", "dues-registrations",
+  "show-expenses", "salaries", "supplies", "commissions",
+]);
+const LINE_ITEM_CATEGORY_ALIASES: Record<string, string> = {
+  general: "supplies",
+  feed_bedding: "feed-bedding",
+  "feed-and-bedding": "feed-bedding",
+  horse_transport: "horse-transport",
+  "horse transport": "horse-transport",
+  show_expenses: "show-expenses",
+  dues_registrations: "dues-registrations",
+  tack: "supplies",
+  equipment: "supplies",
+  grooming: "supplies",
+};
+
+function normalizeLineItemCategory(raw: string): string {
+  const lower = raw.toLowerCase().replace(/\s+/g, "-");
+  if (VALID_LINE_ITEM_CATEGORIES.has(lower)) return lower;
+  return LINE_ITEM_CATEGORY_ALIASES[lower] ?? lower;
+}
+
+function collectLineItemCategories(parsed: Record<string, unknown>): string[] {
+  const lineItems = getLineItems(parsed);
+  const categories = new Set<string>();
+  for (const item of lineItems) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const raw = typeof record.category === "string" ? record.category.toLowerCase().replace(/\s+/g, "-") : null;
+    if (raw) {
+      const normalized = normalizeLineItemCategory(raw);
+      categories.add(normalized);
+      // Also fix the item's category in-place so downstream code sees the normalized value
+      record.category = normalized;
+    }
+  }
+  return [...categories];
+}
+
+function isUsefProviderSignal(...values: Array<string | undefined>) {
+  const joined = values.filter(Boolean).join(" ").toLowerCase();
+  if (!joined) return false;
+  return joined.includes("usef") || joined.includes("united states equestrian federation");
+}
+
+function isBrookLedgeProviderSignal(...values: Array<string | undefined>) {
+  const joined = values.filter(Boolean).join(" ").toLowerCase();
+  if (!joined) return false;
+  return joined.includes("brook ledge") || joined.includes("brookledge");
+}
+
+function isEqSportsProviderSignal(...values: Array<string | undefined>) {
+  const joined = values.filter(Boolean).join(" ").toLowerCase();
+  if (!joined) return false;
+  return (
+    joined.includes("eq sports medicine group") ||
+    joined.includes("eq sports") ||
+    joined.includes("sports medicine group") ||
+    joined.includes("idexx neo")
+  );
+}
+
+function normalizeUsefDuesParse(parsed: Record<string, unknown>, billSubcategory?: string) {
+  const normalized = { ...parsed };
+  const lineItems = getLineItems(normalized).map((item) => ({ ...(item as Record<string, unknown>) }));
+  const subcategoryCounts: Record<string, number> = {};
+
+  for (const row of lineItems) {
+    const name = pickString(row, ["name", "item_name", "title"]) ?? "";
+    const description = pickString(row, ["description", "detail", "details"]) ?? "";
+    const lineSubcategory = detectUsefSubcategory(name, description);
+    subcategoryCounts[lineSubcategory] = (subcategoryCounts[lineSubcategory] ?? 0) + 1;
+
+    row.subcategory = lineSubcategory;
+    row.dues_subcategory = lineSubcategory;
+
+    const extractedHorse = extractUsefHorseFromDescription(description);
+    if (extractedHorse) {
+      row.entity_type = "horse";
+      row.entityType = "horse";
+      row.entity_name = extractedHorse;
+      row.entityName = extractedHorse;
+      row.horse_name = extractedHorse;
+      row.horseName = extractedHorse;
+    } else {
+      row.entity_type = null;
+      row.entityType = null;
+      row.entity_name = null;
+      row.entityName = null;
+    }
+  }
+
+  const topDate = pickString(normalized, ["invoice_date", "invoiceDate", "date", "datetime"]);
+  const normalizedDate = normalizeReceiptDate(topDate);
+  if (normalizedDate) {
+    normalized.invoice_date = normalizedDate;
+    normalized.invoiceDate = normalizedDate;
+  }
+
+  const transactionId = pickString(normalized, ["transaction_id", "transactionId", "payment_transaction_id"]);
+  if (transactionId) {
+    normalized.invoice_number = transactionId;
+    normalized.invoiceNumber = transactionId;
+  }
+
+  const topSubcategory = resolveTopUsefSubcategory(subcategoryCounts, billSubcategory);
+  normalized.dues_subcategory = topSubcategory;
+  normalized.subcategory = topSubcategory;
+  normalized.provider_name = "USEF";
+  normalized.providerName = "USEF";
+  normalized.line_items = lineItems;
+  normalized.lineItems = lineItems;
+  return normalized;
+}
+
+function detectUsefSubcategory(itemName: string, description: string) {
+  const text = `${itemName} ${description}`.toLowerCase();
+  if (text.includes("horse registration") || text.includes("horse recording")) {
+    return "horse_registrations";
+  }
+  if (text.includes("membership") || text.includes("member")) {
+    return "memberships";
+  }
+  if (text.includes("rider") || text.includes("amateur") || text.includes("junior")) {
+    return "rider_registrations";
+  }
+  return "horse_registrations";
+}
+
+function extractUsefHorseFromDescription(description: string) {
+  const direct = description.match(/\bfor\s+(.+?)(?:\s+with\b|$)/i);
+  const reg = description.match(/\breg(?:istration)?\s+for\s+(.+?)(?:\s+with\b|$)/i);
+  const candidate = (direct?.[1] ?? reg?.[1] ?? "").trim();
+  if (!candidate) return undefined;
+  const cleaned = candidate.replace(/[*.,;:()[\]"]/g, " ").replace(/\s+/g, " ").trim();
+  return cleaned.length > 0 ? cleaned : undefined;
+}
+
+function normalizeReceiptDate(value?: string) {
+  if (!value) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const dmyMatch = value.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if (dmyMatch) {
+    const monthMap: Record<string, string> = {
+      jan: "01",
+      feb: "02",
+      mar: "03",
+      apr: "04",
+      may: "05",
+      jun: "06",
+      jul: "07",
+      aug: "08",
+      sep: "09",
+      oct: "10",
+      nov: "11",
+      dec: "12",
+    };
+    const month = monthMap[dmyMatch[2].toLowerCase()];
+    if (month) {
+      return `${dmyMatch[3]}-${month}-${dmyMatch[1].padStart(2, "0")}`;
+    }
+  }
+  const match = value.match(/[A-Za-z]{3,9}\s+\d{1,2},\s+\d{4}/);
+  const parsed = new Date(match ? match[0] : value);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed.toISOString().slice(0, 10);
+}
+
+function resolveTopUsefSubcategory(counts: Record<string, number>, billSubcategory?: string) {
+  const entries = Object.entries(counts);
+  if (entries.length === 0) {
+    return billSubcategory ? billSubcategory.replace(/-/g, "_") : "horse_registrations";
+  }
+  const sorted = entries.sort((a, b) => b[1] - a[1]);
+  const [topName, topCount] = sorted[0];
+  const ties = sorted.filter((entry) => entry[1] === topCount);
+  if (ties.length > 1) return "horse_registrations";
+  return topName;
+}
+
+function normalizeBrookLedgeHorseTransportParse(parsed: Record<string, unknown>) {
+  const normalized = { ...parsed };
+  const lineItems = getLineItems(normalized).map((item) => ({ ...(item as Record<string, unknown>) }));
+  const transformed = lineItems.map((row) => {
+    const horseName = pickString(row, ["horse_name", "horseName", "horse", "Horse"]);
+    const ownershipPercent =
+      pickNumber(row, ["ownership_percent", "owned_percent", "percent_owned", "percentOwned", "% Owned", "Percent Owned"]) ??
+      undefined;
+    const amount =
+      pickNumber(row, ["total_usd", "amount", "total", "your_percent_due", "your % due", "Your % Due"]) ?? undefined;
+    const description = horseName ? `Transport — ${horseName}` : pickString(row, ["description"]) ?? "Line item";
+    const next: Record<string, unknown> = {
+      ...row,
+      description,
+      horse_name: horseName ?? undefined,
+      horseName: horseName ?? undefined
+    };
+    if (typeof ownershipPercent === "number") {
+      const percent = ownershipPercent > 1 ? ownershipPercent : ownershipPercent * 100;
+      next.ownership_percent = round2(percent);
+      next.percentOwned = round2(percent);
+    }
+    if (typeof amount === "number") {
+      next.total_usd = round2(amount);
+      next.amount = round2(amount);
+    }
+    return next;
+  });
+
+  const origin = pickString(normalized, ["origin", "Origin"]);
+  const destination = pickString(normalized, ["destination", "Destination"]);
+  const invoiceDate = normalizeReceiptDate(pickString(normalized, ["invoice_date", "invoiceDate", "invoice date", "Invoice Date"]));
+  const shipDate = normalizeReceiptDate(pickString(normalized, ["ship_date", "shipDate", "ship date", "Ship Date"]));
+  const terms = pickString(normalized, ["terms", "Terms"]);
+  const customerNumber = pickString(normalized, ["customer_number", "customerNumber", "customer_id", "Customer ID"]);
+  const invoiceNumber = pickString(normalized, ["invoice_number", "invoiceNumber", "invoice", "Invoice"]);
+  if (invoiceDate) {
+    normalized.invoice_date = invoiceDate;
+    normalized.invoiceDate = invoiceDate;
+  }
+  if (shipDate) {
+    normalized.ship_date = shipDate;
+    normalized.shipDate = shipDate;
+  }
+  if (terms) normalized.terms = terms;
+  if (customerNumber) {
+    normalized.customer_number = customerNumber;
+    normalized.customerNumber = customerNumber;
+  }
+  if (invoiceNumber) {
+    normalized.invoice_number = invoiceNumber;
+    normalized.invoiceNumber = invoiceNumber;
+  }
+  if (origin) normalized.origin = origin;
+  if (destination) normalized.destination = destination;
+  if (origin && destination) normalized.route = `${origin} -> ${destination}`;
+  normalized.provider_name = "Brook Ledge";
+  normalized.providerName = "Brook Ledge";
+
+  const pleasePay =
+    pickNumber(normalized, ["please_pay_this_amount", "pleasePayThisAmount"]) ??
+    transformed.reduce((sum, row) => sum + (pickNumber(row, ["total_usd", "amount", "total"]) ?? 0), 0);
+  if (typeof pleasePay === "number" && pleasePay > 0) {
+    normalized.invoice_total_usd = round2(pleasePay);
+    normalized.invoiceTotalUsd = round2(pleasePay);
+    normalized.total = round2(pleasePay);
+  }
+
+  normalized.line_items = transformed;
+  normalized.lineItems = transformed;
+  return normalized;
+}
+
+function normalizeEqSportsVeterinaryParse(
+  parsed: Record<string, unknown>,
+  extractedText: string,
+  options?: { forceEqSportsProvider?: boolean }
+) {
+  const normalized = { ...parsed };
+  const transformed = transformEQSportsInvoice(normalized, extractedText);
+  let lineItems = transformed.lineItems;
+
+  if (lineItems.length === 0) {
+    lineItems = getLineItems(normalized).map((item) => ({ ...(item as Record<string, unknown>) }));
+    lineItems = lineItems.map((row) => {
+      const rawHorseName = pickString(row, ["horse_name", "horseName", "patient_name", "patientName"]);
+      const mappedHorseName = mapEqSportsPatientToHorse(rawHorseName);
+      if (!mappedHorseName) return row;
+      return {
+        ...row,
+        horse_name: mappedHorseName,
+        horseName: mappedHorseName
+      };
+    });
+  }
+
+  if (typeof transformed.total === "number") {
+    normalized.invoice_total_usd = round2(transformed.total);
+    normalized.invoiceTotalUsd = round2(transformed.total);
+    normalized.total = round2(transformed.total);
+  }
+  if (typeof transformed.subtotal === "number") normalized.subtotal = round2(transformed.subtotal);
+  if (typeof transformed.tax === "number") {
+    normalized.tax = round2(transformed.tax);
+    normalized.tax_total_usd = round2(transformed.tax);
+  }
+  if (typeof transformed.discount === "number") {
+    normalized.discount = round2(transformed.discount);
+    normalized.professional_discount = round2(transformed.discount);
+  }
+  if (typeof transformed.date === "number") {
+    const date = new Date(transformed.date).toISOString().slice(0, 10);
+    normalized.invoice_date = date;
+    normalized.invoiceDate = date;
+  }
+
+  const totalFromItems = lineItems.reduce((sum, row) => sum + (pickNumber(row, ["total_usd", "amount"]) ?? 0), 0);
+  if (!pickNumber(normalized, ["invoice_total_usd", "invoiceTotalUsd", "total"]) && totalFromItems > 0) {
+    normalized.invoice_total_usd = round2(totalFromItems);
+    normalized.invoiceTotalUsd = round2(totalFromItems);
+    normalized.total = round2(totalFromItems);
+  }
+
+  const shouldForceEqSports =
+    options?.forceEqSportsProvider === true ||
+    isEqSportsProviderSignal(
+      pickString(normalized, ["provider_name", "providerName"]),
+      extractedText
+    );
+  if (shouldForceEqSports) {
+    normalized.provider_name = "EQ Sports Medicine Group";
+    normalized.providerName = "EQ Sports Medicine Group";
+    normalized.provider_email = pickString(normalized, ["provider_email", "email"]) ?? "eqsportsmedicinegroup@gmail.com";
+    normalized.provider_phone = pickString(normalized, ["provider_phone", "phone"]) ?? "310-944-0570";
+    normalized.provider_address =
+      pickString(normalized, ["provider_address", "address"]) ?? "PO Box 1573, Rancho Santa Fe, CA 92067";
+    normalized.contact_name = pickString(normalized, ["contact_name", "contactName"]) ?? "Morgan Geller";
+    normalized.provider_doctor = pickString(normalized, ["provider_doctor", "providerDoctor"]) ?? "Morgan Geller";
+  }
+  normalized.line_items = lineItems;
+  normalized.lineItems = lineItems;
+  return normalized;
+}
+
+function detectVetSubcategory(description: string) {
+  const text = description.toLowerCase();
+  if (text.includes("vaccination") || text.includes("vaccine")) return "vaccinations";
+  if (text.includes("sedation") || text.includes("xylazine") || text.includes("dormosedan")) return "sedation";
+  if (text.includes("shockwave")) return "shockwave";
+  if (text.includes("inject") || text.includes("injection") || text.includes("stifle") || text.includes("hock")) return "joint_injections";
+  if (text.includes("exam") || text.includes("consult") || text.includes("telemedicine")) return "exams_diagnostics";
+  if (text.includes("saa") || text.includes("lab") || text.includes("bloodwork") || text.includes("blood work")) return "lab_work";
+  if (text.includes("fee") || text.includes("stable call")) return "fees";
+  if (
+    text.includes("prp") ||
+    text.includes("emcyte") ||
+    text.includes("aniprin") ||
+    text.includes("regumate") ||
+    text.includes("adequan") ||
+    text.includes("nexha") ||
+    text.includes("gastrogard")
+  ) {
+    return "medication";
+  }
+  return "other";
+}
+
+function transformEQSportsInvoice(parsed: Record<string, unknown>, extractedText: string) {
+  const parsedSections = extractSectionsFromParsedPayload(parsed);
+  const sections = parsedSections.length > 0 ? parsedSections : parseEqSportsSections(extractedText);
+  const allLineItems: Array<Record<string, unknown>> = [];
+
+  for (const section of sections) {
+    const patientName = section.patientName ?? "";
+    const isBarnGroup = patientName.toLowerCase().includes("barn group");
+    const horseName = isBarnGroup ? "__split_all__" : mapEqSportsPatientToHorse(patientName);
+
+    for (const item of section.lineItems || []) {
+      allLineItems.push({
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        unitPrice: item.unitPrice,
+        total_usd: item.amount,
+        amount: item.amount,
+        tax: item.tax,
+        horse_name: horseName ?? null,
+        horseName: horseName ?? null,
+        patient_name: patientName,
+        patient_id: section.patientId,
+        invoice_number: section.invoiceNumber,
+        invoiceNumber: section.invoiceNumber,
+        invoice_date: section.invoiceDate,
+        invoiceDate: section.invoiceDate,
+        provider_doctor: section.providerDoctor,
+        percentOwned: item.percentOwned,
+        subcategory: detectVetSubcategory(item.description),
+        subcategoryAutoDetected: true,
+      });
+    }
+  }
+
+  const footer = parseEqSportsFooter(extractedText);
+  const latestSectionDate = sections
+    .map((row) => normalizeReceiptDate(row.invoiceDate))
+    .filter((value): value is string => Boolean(value))
+    .map((value) => new Date(`${value}T00:00:00`).getTime())
+    .sort((a, b) => b - a)[0];
+  const total =
+    pickNumber(parsed, ["grandTotal", "grand_total", "amount_due", "invoice_total_usd", "invoiceTotalUsd", "total"]) ??
+    footer.amountDue ??
+    undefined;
+  const subtotal = pickNumber(parsed, ["subtotal"]) ?? footer.subtotal ?? undefined;
+  const discount = pickNumber(parsed, ["discount", "professional_discount"]) ?? footer.discount ?? undefined;
+  const tax = pickNumber(parsed, ["tax", "tax_total_usd"]) ?? footer.tax ?? undefined;
+
+  return {
+    providerName: "EQ Sports Medicine Group",
+    category: "veterinary",
+    date: latestSectionDate,
+    total,
+    subtotal,
+    discount: typeof discount === "number" ? -Math.abs(discount) : undefined,
+    tax,
+    lineItems: allLineItems,
+  };
+}
+
+function isMultiPatientInvoice(text: string) {
+  const matches = text.match(/Patient ID:/gi);
+  return matches !== null && matches.length > 1;
+}
+
+function extractSectionsFromParsedPayload(parsed: Record<string, unknown>) {
+  const candidate = Array.isArray(parsed.patientSections) ? parsed.patientSections : parsed.sections;
+  if (!Array.isArray(candidate)) {
+    return [] as Array<{
+      patientId?: string;
+      patientName?: string;
+      invoiceDate?: string;
+      invoiceNumber?: string;
+      providerDoctor?: string;
+      lineItems: Array<{
+        description: string;
+        quantity?: number;
+        unitPrice?: number;
+        tax?: number;
+        amount: number;
+        percentOwned?: number;
+      }>;
+    }>;
+  }
+
+  return candidate
+    .map((section) => {
+      if (!section || typeof section !== "object") return null;
+      const row = section as Record<string, unknown>;
+      const sectionLineItemsRaw = row.lineItems ?? row.line_items;
+      const normalizedLineItems = Array.isArray(sectionLineItemsRaw)
+        ? sectionLineItemsRaw
+            .map((item) => {
+              if (!item || typeof item !== "object") return null;
+              const value = item as Record<string, unknown>;
+              const description = pickString(value, ["description", "service", "item"]) ?? "";
+              const amount = pickNumber(value, ["amount", "total_usd", "total"]);
+              if (!description || typeof amount !== "number" || Number.isNaN(amount)) return null;
+              return {
+                description,
+                quantity: pickNumber(value, ["quantity", "qty"]),
+                unitPrice: pickNumber(value, ["unit_price", "unitPrice", "price_exc", "price"]),
+                tax: pickNumber(value, ["tax"]),
+                amount,
+                percentOwned: pickNumber(value, ["percentOwned", "ownership_percent"])
+              };
+            })
+            .filter((item): item is NonNullable<typeof item> => item !== null)
+        : [];
+      if (normalizedLineItems.length === 0) return null;
+      const sectionHorseName = pickString(row, ["horseName", "horse_name"]);
+      const derivedPatientName =
+        pickString(row, ["patientName", "patient_name"]) ??
+        (sectionHorseName ? `${sectionHorseName} Davis` : undefined);
+      return {
+        patientId: pickString(row, ["patientId", "patient_id"]),
+        patientName: derivedPatientName,
+        invoiceDate: pickString(row, ["invoiceDate", "invoice_date"]),
+        invoiceNumber: pickString(row, ["invoiceNumber", "invoice_number"]),
+        providerDoctor: pickString(row, ["providerDoctor", "provider_doctor", "provider"]),
+        lineItems: normalizedLineItems
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+}
+
+function parseEqSportsSections(text: string) {
+  if (!text) return [] as Array<{
+    patientId?: string;
+    patientName?: string;
+    invoiceDate?: string;
+    invoiceNumber?: string;
+    providerDoctor?: string;
+    lineItems: Array<{
+      description: string;
+      quantity?: number;
+      unitPrice?: number;
+      tax?: number;
+      amount: number;
+      percentOwned?: number;
+    }>;
+  }>;
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const sections: Array<{
+    patientId?: string;
+    patientName?: string;
+    invoiceDate?: string;
+    invoiceNumber?: string;
+    providerDoctor?: string;
+    lineItems: Array<{
+      description: string;
+      quantity?: number;
+      unitPrice?: number;
+      tax?: number;
+      amount: number;
+      percentOwned?: number;
+    }>;
+  }> = [];
+
+  let current: (typeof sections)[number] | null = null;
+  for (const line of lines) {
+    if (/^Patient ID:/i.test(line)) {
+      if (current && current.lineItems.length > 0) sections.push(current);
+      current = { patientId: line.replace(/^Patient ID:\s*/i, "").trim(), lineItems: [] };
+      continue;
+    }
+    if (!current) continue;
+    if (/^(Subtotal|AMOUNT DUE|INVOICE BALANCE)/i.test(line)) break;
+
+    if (/^Patient:/i.test(line)) {
+      const rawPatient = line.replace(/^Patient:\s*/i, "");
+      current.patientName = rawPatient.split(/\bSex:/i)[0]?.trim();
+      continue;
+    }
+    if (/^Invoice Date:/i.test(line)) {
+      current.invoiceDate = line.replace(/^Invoice Date:\s*/i, "").trim();
+      continue;
+    }
+    if (/^Invoice Number:/i.test(line)) {
+      current.invoiceNumber = line.replace(/^Invoice Number:\s*/i, "").trim();
+      continue;
+    }
+    if (/^Provider:/i.test(line)) {
+      current.providerDoctor = line.replace(/^Provider:\s*/i, "").trim();
+      continue;
+    }
+    if (/^Invoice Total/i.test(line) || /^Product \/ Service/i.test(line) || /^Species:/i.test(line) || /^Breed:/i.test(line)) {
+      continue;
+    }
+
+    const parsedRow = parseEqSportsLineItem(line);
+    if (parsedRow) current.lineItems.push(parsedRow);
+  }
+
+  if (current && current.lineItems.length > 0) sections.push(current);
+  return sections;
+}
+
+function parseEqSportsLineItem(line: string) {
+  // Handles rows like:
+  // "Musculoskeletal Recheck Exam 1.00 180.00 0.00 180.00"
+  const cleanedLine = line.replace(/\$/g, "").replace(/,/g, "").trim();
+  const withTax = cleanedLine.match(
+    /^(.*?)\s+(\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?%?)\s+(-?\d+(?:\.\d+)?)$/
+  );
+  if (withTax) {
+    const description = withTax[1].trim();
+    if (!description) return null;
+    return {
+      description,
+      quantity: Number(withTax[2]),
+      unitPrice: Number(withTax[3]),
+      tax: Number(String(withTax[4]).replace("%", "")),
+      amount: Number(withTax[5]),
+    };
+  }
+  // Fallback for shorter OCR rows.
+  const amountOnly = cleanedLine.match(/^(.*?)\s+(-?\d+(?:\.\d+)?)$/);
+  if (amountOnly) {
+    const description = amountOnly[1].trim();
+    if (!description || /^Invoice Total$/i.test(description)) return null;
+    return {
+      description,
+      amount: Number(amountOnly[2]),
+    };
+  }
+  return null;
+}
+
+function parseEqSportsFooter(text: string) {
+  const read = (label: string) => {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`${escaped}\\s*:?[\\s$]*\\(?(-?[\\d,]+(?:\\.\\d+)?)\\)?`, "gi");
+    const matches = [...text.matchAll(regex)];
+    if (matches.length === 0) return undefined;
+    const match = matches[matches.length - 1];
+    return Number(String(match[1]).replace(/,/g, ""));
+  };
+  const subtotal = read("Subtotal");
+  const discountRaw = read("Professional Discount");
+  const tax = read("Tax");
+  const amountDue = read("AMOUNT DUE") ?? read("INVOICE BALANCE");
+  return {
+    subtotal,
+    discount: typeof discountRaw === "number" ? -Math.abs(discountRaw) : undefined,
+    tax,
+    amountDue
+  };
+}
+
+function mapEqSportsPatientToHorse(patientName?: string) {
+  if (!patientName) return undefined;
+  const key = normalizeAliasKey(patientName);
+  if (key === "barn group davis" || key === "barn group") return "__split_all__";
+  if (key === "ben 431 davis" || key === "ben 431" || key === "ben davis") return "Ben";
+  if (key === "carlin davis") return "Carlin";
+  if (key === "gigi davis") return "Gigi";
+  if (key === "valentina davis" || key === "valentina") return "Numero Valentina Z";
+  const strippedDavis = patientName.replace(/\s+davis$/i, "").trim();
+  if (strippedDavis.toLowerCase() === "barn group") return "__split_all__";
+  if (strippedDavis.toLowerCase().startsWith("ben")) return "Ben";
+  if (strippedDavis.toLowerCase().startsWith("carlin")) return "Carlin";
+  if (strippedDavis.toLowerCase().startsWith("gigi")) return "Gigi";
+  if (strippedDavis.toLowerCase().startsWith("valentina")) return "Numero Valentina Z";
+  return strippedDavis || patientName;
+}
+
 function inferCategoryFromLineItem(item: Record<string, unknown>, currentCategory: string) {
   const description = String(item.description ?? "").toLowerCase();
   const subcategory = String(item.stabling_subcategory ?? item.subcategory ?? "").toLowerCase();
@@ -1118,7 +2112,7 @@ function inferCategoryFromLineItem(item: Record<string, unknown>, currentCategor
 
   if (matchesAny(text, ["shoe", "shoeing", "trim", "trimming", "farrier", "horseshoe"])) return "farrier";
   if (matchesAny(text, ["inject", "exam", "vaccine", "medication", "xray", "radiograph", "vet"])) return "veterinary";
-  if (matchesAny(text, ["blanket", "bridle", "saddle", "boot", "tack", "equipment", "repair"])) return "supplies";
+  if (matchesAny(text, ["blanket", "bridle", "saddle", "boot", "tack", "equipment", "repair", "reins", "girth", "halter", "bit ", "martingale", "crop", "spur", "pad", "grooming", "brush"])) return "supplies";
   if (matchesAny(text, ["hay", "grain", "alfalfa", "feed", "beet pulp", "supplement", "bedding", "shavings", "straw", "wood chip", "sawdust"])) return "feed_bedding";
   if (matchesAny(text, ["board", "stall", "turnout", "paddock", "facility"])) return "stabling";
   return currentCategory;
@@ -1179,6 +2173,16 @@ function applyEntityMatching(
   for (const row of lineItems) {
     const rawHorseName = options.matchHorses ? pickString(row, ["horse_name", "horseName"]) : undefined;
     if (options.matchHorses && rawHorseName) {
+      const normalizedHorseName = normalizeAliasKey(rawHorseName);
+      if (normalizedHorseName === "__split_all__" || normalizedHorseName === "barn group davis" || normalizedHorseName === "barn group") {
+        row.horse_name_raw = rawHorseName;
+        row.match_confidence = "alias";
+        row.matchConfidence = "alias";
+        row.horse_name = "__split_all__";
+        row.horseName = "__split_all__";
+        row.auto_detected = true;
+        continue;
+      }
       const horseMatch = matchHorseName(rawHorseName, registeredHorses, horseAliasMap);
       row.horse_name_raw = rawHorseName;
       row.match_confidence = horseMatch.confidence;
@@ -1245,6 +2249,7 @@ function collectUnmatchedHorseNames(parsed: Record<string, unknown>) {
     if (confidence !== "none" && confidence !== "") continue;
     const raw = pickString(row, ["horse_name_raw", "originalParsedName", "horse_name", "horseName"]);
     if (!raw) continue;
+    if (normalizeAliasKey(raw) === "__split_all__") continue;
     names.add(raw);
   }
   return [...names];

@@ -23,7 +23,10 @@ type NavAction = {
 const NAV_ITEMS = [
   { label: "dashboard", href: "/dashboard", icon: "📊" },
   { label: "horses", href: "/horses", icon: "🐴" },
+  { label: "records", href: "/records", icon: "📋" },
   { label: "invoices", href: "/invoices", icon: "📄" },
+  { label: "owners", href: "/owners", icon: "👥" },
+  { label: "billing", href: "/billing", icon: "💰" },
   { label: "contacts", href: "/contacts", icon: "👤" },
 ] as const;
 
@@ -66,6 +69,11 @@ export default function NavBar({
     setMenuOpen(false);
     router.push(href);
   };
+
+  const visibleActions = actions.filter((action) => {
+    const normalized = action.label.trim().toLowerCase();
+    return normalized !== "upload invoices" && normalized !== "upload invoice";
+  });
 
   return (
     <>
@@ -143,7 +151,7 @@ export default function NavBar({
         </div>
 
         <div className={styles.actions}>
-          {actions.map((action) => (
+          {visibleActions.map((action) => (
             <Link
               key={action.label}
               href={action.href}

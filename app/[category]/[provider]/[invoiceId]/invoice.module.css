@@ -48,7 +48,7 @@
 .detailLabel {
   font-size: 10px;
   color: var(--color-text-muted);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -213,6 +213,20 @@
 .itemAmount {
   font-size: 12px;
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sharedBadge {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #e8eaff;
+  color: #4A5BDB;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .summaryBar {

@@ -7,6 +7,8 @@ import { useMutation, useQuery } from "convex/react";
 import type { Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
+import InvoiceNotesCard from "@/components/InvoiceNotesCard";
+import { formatInvoiceName } from "@/lib/formatInvoiceName";
 import Modal from "@/components/Modal";
 import UnmatchedHorseBanner from "@/components/UnmatchedHorseBanner";
 import styles from "./invoice.module.css";
@@ -233,7 +235,7 @@ export default function HorseTransportInvoicePage() {
 
   async function onDelete() {
     await deleteBill({ billId });
-    router.push(`/horse-transport/${subcategory}/${providerSlug}`);
+    router.push("/invoices");
   }
 
   const providerName = extracted.provider_name || provider?.fullName || provider?.name || providerSlug;
@@ -247,7 +249,7 @@ export default function HorseTransportInvoicePage() {
           { label: "horse_transport", href: "/horse-transport" },
           { label: subcategory, href: `/horse-transport/${subcategory}` },
           { label: providerSlug, href: `/horse-transport/${subcategory}/${providerSlug}` },
-          { label: extracted.invoice_number ?? "invoice", current: true }
+          { label: formatInvoiceName({ providerName: String((extracted as any).provider_name ?? bill?.provider?.name ?? bill?.customProviderName ?? "Unassigned Invoice"), date: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "") }), current: true }
         ]}
         actions={bill.originalPdfUrl ? [{ label: "view original PDF", href: bill.originalPdfUrl, variant: "link", newTab: true }] : []}
       />
@@ -278,221 +280,237 @@ export default function HorseTransportInvoicePage() {
 
         {hasUnmatchedHorses ? <UnmatchedHorseBanner billId={billId} unmatchedNames={bill.unmatchedHorseNames ?? []} /> : null}
 
-        <section className={assignmentSaved ? styles.assignmentCardComplete : styles.assignmentCard}>
-          <div className={styles.assignTitle}>🐴 assign_horses</div>
-          <div className={styles.assignQuestion}>how should transport costs be assigned?</div>
-          <div className={styles.modeToggle}>
-            <button
-              type="button"
-              className={mode === "line_item" ? styles.modeBtnActive : styles.modeBtn}
-              onClick={() => {
-                setMode("line_item");
-                setAssignmentSaved(false);
-              }}
-            >
-              by line item
-            </button>
-            <button
-              type="button"
-              className={mode === "split" ? styles.modeBtnActive : styles.modeBtn}
-              onClick={() => {
-                setMode("split");
-                setAssignmentSaved(false);
-              }}
-            >
-              split across horses
-            </button>
-          </div>
+        {bill.status === "done" && assignmentSaved ? (
+          <section className={styles.assignmentCardComplete}>
+            <div className={styles.assignTitle}>🐴 assigned horses</div>
+            <div className={styles.summaryList}>
+              {(mode === "split" ? computedSplitRows : groupedByHorse.map((g) => ({ horseId: "", horseName: g.horseName, amount: g.total }))).map((row) => (
+                <div key={row.horseName} className={styles.summaryRow}>
+                  <span className={styles.summaryName}>{row.horseName}</span>
+                  <span className={styles.lineAmount}>{fmtUSD(row.amount)}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : (
+          <section className={assignmentSaved ? styles.assignmentCardComplete : styles.assignmentCard}>
+            <div className={styles.assignTitle}>🐴 assign_horses</div>
+            <div className={styles.assignQuestion}>how should transport costs be assigned?</div>
+            <div className={styles.modeToggle}>
+              <button
+                type="button"
+                className={mode === "line_item" ? styles.modeBtnActive : styles.modeBtn}
+                onClick={() => {
+                  setMode("line_item");
+                  setAssignmentSaved(false);
+                }}
+              >
+                by line item
+              </button>
+              <button
+                type="button"
+                className={mode === "split" ? styles.modeBtnActive : styles.modeBtn}
+                onClick={() => {
+                  setMode("split");
+                  setAssignmentSaved(false);
+                }}
+              >
+                split across horses
+              </button>
+            </div>
 
-          {mode === "line_item" ? (
-            <div>
-              {groupedByHorse.map((group) => {
-                const isEditingCard = cardEditing[group.horseName] === true;
-                return (
-                  <section key={group.horseName} className={styles.horseCard}>
+            {mode === "line_item" ? (
+              <div>
+                {groupedByHorse.map((group) => {
+                  const isEditingCard = cardEditing[group.horseName] === true;
+                  return (
+                    <section key={group.horseName} className={styles.horseCard}>
+                      <div className={styles.horseHeader}>
+                        <div className={styles.horseHeaderLeft}>
+                          <span className={styles.horseEmoji}>🐴</span>
+                          <span className={styles.horseName}>{group.horseName}</span>
+                          {group.rows.some((row) => row.confidence === "exact" || row.confidence === "alias") ? <span className={styles.autoBadge}>auto</span> : null}
+                          {group.rows.some((row) => row.confidence === "fuzzy") ? <span className={styles.fuzzyBadge}>fuzzy</span> : null}
+                        </div>
+                        <div className={styles.horseHeaderRight}>
+                          <span className={styles.horseTotal}>{fmtUSD(group.total)}</span>
+                          <button
+                            type="button"
+                            className={styles.editBtn}
+                            onClick={() => setCardEditing((prev) => ({ ...prev, [group.horseName]: !isEditingCard }))}
+                          >
+                            edit
+                          </button>
+                        </div>
+                      </div>
+
+                      {group.rows.map((row) => (
+                        <div key={`line-${row.index}`} className={styles.horseLine}>
+                          <div>
+                            <div>{row.description}</div>
+                            {row.confidence === "fuzzy" && row.parsedRaw && normalize(row.parsedRaw) !== normalize(row.parsedHorse || "") ? (
+                              <div className={styles.rawText}>(parsed as "{row.parsedRaw}")</div>
+                            ) : null}
+                          </div>
+                          <div className={styles.lineRight}>
+                            {isEditingCard ? (
+                              <select
+                                className={styles.inlineSelect}
+                                value={row.assignedHorseId}
+                                onChange={(event) => {
+                                  setAssignmentSaved(false);
+                                  setLineAssignments((prev) => ({ ...prev, [row.index]: event.target.value }));
+                                }}
+                              >
+                                <option value="">assign horse...</option>
+                                {horses.map((horse) => (
+                                  <option key={horse._id} value={String(horse._id)}>
+                                    {horse.name}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : null}
+                            <span className={styles.lineAmount}>{fmtUSD(row.amount)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </section>
+                  );
+                })}
+
+                {unassignedRows.length > 0 ? (
+                  <section className={styles.horseCard}>
                     <div className={styles.horseHeader}>
                       <div className={styles.horseHeaderLeft}>
                         <span className={styles.horseEmoji}>🐴</span>
-                        <span className={styles.horseName}>{group.horseName}</span>
-                        {group.rows.some((row) => row.confidence === "exact" || row.confidence === "alias") ? <span className={styles.autoBadge}>auto</span> : null}
-                        {group.rows.some((row) => row.confidence === "fuzzy") ? <span className={styles.fuzzyBadge}>fuzzy</span> : null}
-                      </div>
-                      <div className={styles.horseHeaderRight}>
-                        <span className={styles.horseTotal}>{fmtUSD(group.total)}</span>
-                        <button
-                          type="button"
-                          className={styles.editBtn}
-                          onClick={() => setCardEditing((prev) => ({ ...prev, [group.horseName]: !isEditingCard }))}
-                        >
-                          edit
-                        </button>
+                        <span className={styles.horseName}>unassigned</span>
+                        <span className={styles.unmatchedBadge}>unmatched</span>
                       </div>
                     </div>
 
-                    {group.rows.map((row) => (
-                      <div key={`line-${row.index}`} className={styles.horseLine}>
+                    {unassignedRows.map((row) => (
+                      <div key={`unassigned-${row.index}`} className={styles.horseLine}>
                         <div>
                           <div>{row.description}</div>
-                          {row.confidence === "fuzzy" && row.parsedRaw && normalize(row.parsedRaw) !== normalize(row.parsedHorse || "") ? (
-                            <div className={styles.rawText}>(parsed as "{row.parsedRaw}")</div>
-                          ) : null}
+                          {row.parsedHorse ? <div className={styles.rawText}>parsed horse: {row.parsedHorse}</div> : null}
                         </div>
                         <div className={styles.lineRight}>
-                          {isEditingCard ? (
-                            <select
-                              className={styles.inlineSelect}
-                              value={row.assignedHorseId}
-                              onChange={(event) => {
-                                setAssignmentSaved(false);
-                                setLineAssignments((prev) => ({ ...prev, [row.index]: event.target.value }));
-                              }}
-                            >
-                              <option value="">assign horse...</option>
-                              {horses.map((horse) => (
-                                <option key={horse._id} value={String(horse._id)}>
-                                  {horse.name}
-                                </option>
-                              ))}
-                            </select>
-                          ) : null}
+                          <select
+                            className={styles.inlineSelect}
+                            value={row.assignedHorseId}
+                            onChange={(event) => {
+                              setAssignmentSaved(false);
+                              setLineAssignments((prev) => ({ ...prev, [row.index]: event.target.value }));
+                            }}
+                          >
+                            <option value="">assign horse...</option>
+                            {horses.map((horse) => (
+                              <option key={horse._id} value={String(horse._id)}>
+                                {horse.name}
+                              </option>
+                            ))}
+                          </select>
                           <span className={styles.lineAmount}>{fmtUSD(row.amount)}</span>
                         </div>
                       </div>
                     ))}
                   </section>
-                );
-              })}
-
-              {unassignedRows.length > 0 ? (
-                <section className={styles.horseCard}>
-                  <div className={styles.horseHeader}>
-                    <div className={styles.horseHeaderLeft}>
-                      <span className={styles.horseEmoji}>🐴</span>
-                      <span className={styles.horseName}>unassigned</span>
-                      <span className={styles.unmatchedBadge}>unmatched</span>
-                    </div>
-                  </div>
-
-                  {unassignedRows.map((row) => (
-                    <div key={`unassigned-${row.index}`} className={styles.horseLine}>
-                      <div>
-                        <div>{row.description}</div>
-                        {row.parsedHorse ? <div className={styles.rawText}>parsed horse: {row.parsedHorse}</div> : null}
-                      </div>
-                      <div className={styles.lineRight}>
-                        <select
-                          className={styles.inlineSelect}
-                          value={row.assignedHorseId}
-                          onChange={(event) => {
-                            setAssignmentSaved(false);
-                            setLineAssignments((prev) => ({ ...prev, [row.index]: event.target.value }));
-                          }}
-                        >
-                          <option value="">assign horse...</option>
-                          {horses.map((horse) => (
-                            <option key={horse._id} value={String(horse._id)}>
-                              {horse.name}
-                            </option>
-                          ))}
-                        </select>
-                        <span className={styles.lineAmount}>{fmtUSD(row.amount)}</span>
-                      </div>
-                    </div>
-                  ))}
-                </section>
-              ) : null}
-            </div>
-          ) : (
-            <div className={styles.splitContent}>
-              <div className={styles.fieldLabel}>ADD HORSES TO SPLIT {fmtUSD(total)}</div>
-              <div className={styles.addRow}>
-                <select
-                  className={styles.splitSelect}
-                  value=""
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    if (!value || splitHorseIds.includes(value)) return;
-                    setAssignmentSaved(false);
-                    setSplitHorseIds((prev) => [...prev, value]);
-                  }}
-                >
-                  <option value="">+ add horse...</option>
-                  {horses
-                    .filter((horse) => !splitHorseIds.includes(String(horse._id)))
-                    .map((horse) => (
-                      <option key={horse._id} value={String(horse._id)}>
-                        {horse.name}
-                      </option>
-                    ))}
-                </select>
-
-                <div className={styles.splitModeToggle}>
-                  <button type="button" className={splitMode === "even" ? styles.splitModeActive : styles.splitModeBtn} onClick={() => setSplitMode("even")}>
-                    even split
-                  </button>
-                  <button
-                    type="button"
-                    className={splitMode === "custom" ? styles.splitModeActive : styles.splitModeBtn}
-                    onClick={() => setSplitMode("custom")}
-                  >
-                    custom split
-                  </button>
-                </div>
-              </div>
-
-              <div className={styles.splitList}>
-                {computedSplitRows.map((row) => (
-                  <div key={`split-${row.horseId}`} className={styles.splitRow}>
-                    <div className={styles.splitLeft}>
-                      <button
-                        type="button"
-                        className={styles.removeBtn}
-                        onClick={() => {
-                          setAssignmentSaved(false);
-                          setSplitHorseIds((prev) => prev.filter((id) => id !== row.horseId));
-                        }}
-                      >
-                        ×
-                      </button>
-                      <span>{row.horseName}</span>
-                    </div>
-                    {splitMode === "custom" ? (
-                      <input
-                        className={styles.amountInput}
-                        type="number"
-                        step="0.01"
-                        value={customAmounts[row.horseId] ?? ""}
-                        onChange={(event) => {
-                          setAssignmentSaved(false);
-                          setCustomAmounts((prev) => ({ ...prev, [row.horseId]: event.target.value }));
-                        }}
-                      />
-                    ) : (
-                      <span className={styles.lineAmount}>{fmtUSD(row.amount)}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <div className={styles.splitSummary}>
-                <span>
-                  {splitHorseIds.length} horses · {splitMode} split
-                </span>
-                {splitMode === "custom" ? (
-                  Math.abs(splitDelta) <= 0.01 ? (
-                    <span className={styles.balanced}>✓ balanced</span>
-                  ) : (
-                    <span className={styles.unbalanced}>{fmtUSD(Math.abs(splitDelta))} remaining</span>
-                  )
                 ) : null}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className={styles.splitContent}>
+                <div className={styles.fieldLabel}>ADD HORSES TO SPLIT {fmtUSD(total)}</div>
+                <div className={styles.addRow}>
+                  <select
+                    className={styles.splitSelect}
+                    value=""
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (!value || splitHorseIds.includes(value)) return;
+                      setAssignmentSaved(false);
+                      setSplitHorseIds((prev) => [...prev, value]);
+                    }}
+                  >
+                    <option value="">+ add horse...</option>
+                    {horses
+                      .filter((horse) => !splitHorseIds.includes(String(horse._id)))
+                      .map((horse) => (
+                        <option key={horse._id} value={String(horse._id)}>
+                          {horse.name}
+                        </option>
+                      ))}
+                  </select>
 
-          <button type="button" className={canSave ? styles.saveBtn : styles.saveBtnDisabled} disabled={!canSave || isSaving} onClick={onSave}>
-            {isSaving ? "saving..." : mode === "line_item" ? "save line-item assignment" : "save split assignment"}
-          </button>
-        </section>
+                  <div className={styles.splitModeToggle}>
+                    <button type="button" className={splitMode === "even" ? styles.splitModeActive : styles.splitModeBtn} onClick={() => setSplitMode("even")}>
+                      even split
+                    </button>
+                    <button
+                      type="button"
+                      className={splitMode === "custom" ? styles.splitModeActive : styles.splitModeBtn}
+                      onClick={() => setSplitMode("custom")}
+                    >
+                      custom split
+                    </button>
+                  </div>
+                </div>
+
+                <div className={styles.splitList}>
+                  {computedSplitRows.map((row) => (
+                    <div key={`split-${row.horseId}`} className={styles.splitRow}>
+                      <div className={styles.splitLeft}>
+                        <button
+                          type="button"
+                          className={styles.removeBtn}
+                          onClick={() => {
+                            setAssignmentSaved(false);
+                            setSplitHorseIds((prev) => prev.filter((id) => id !== row.horseId));
+                          }}
+                        >
+                          ×
+                        </button>
+                        <span>{row.horseName}</span>
+                      </div>
+                      {splitMode === "custom" ? (
+                        <input
+                          className={styles.amountInput}
+                          type="number"
+                          step="0.01"
+                          value={customAmounts[row.horseId] ?? ""}
+                          onChange={(event) => {
+                            setAssignmentSaved(false);
+                            setCustomAmounts((prev) => ({ ...prev, [row.horseId]: event.target.value }));
+                          }}
+                        />
+                      ) : (
+                        <span className={styles.lineAmount}>{fmtUSD(row.amount)}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className={styles.splitSummary}>
+                  <span>
+                    {splitHorseIds.length} horses · {splitMode} split
+                  </span>
+                  {splitMode === "custom" ? (
+                    Math.abs(splitDelta) <= 0.01 ? (
+                      <span className={styles.balanced}>✓ balanced</span>
+                    ) : (
+                      <span className={styles.unbalanced}>{fmtUSD(Math.abs(splitDelta))} remaining</span>
+                    )
+                  ) : null}
+                </div>
+              </div>
+            )}
+
+            <button type="button" className={canSave ? styles.saveBtn : styles.saveBtnDisabled} disabled={!canSave || isSaving} onClick={onSave}>
+              {isSaving ? "saving..." : mode === "line_item" ? "save line-item assignment" : "save split assignment"}
+            </button>
+          </section>
+        )}
+
+        {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
 
         <div className={styles.approvalRow}>
           {bill.status === "done" ? (
@@ -529,7 +547,7 @@ export default function HorseTransportInvoicePage() {
 
         <Modal open={showDeleteConfirm} title="delete invoice?" onClose={() => setShowDeleteConfirm(false)}>
           <p style={{ marginTop: 0, color: "var(--ui-text-secondary)" }}>
-            this will permanently delete invoice <strong>{String(extracted.invoice_number ?? billId)}</strong> from {providerName}.
+            this will permanently delete invoice <strong>{formatInvoiceName({ providerName: String((extracted as any).provider_name ?? bill?.provider?.name ?? bill?.customProviderName ?? "Unassigned Invoice"), date: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "") })}</strong> from {providerName}.
           </p>
           <p style={{ color: "var(--ui-text-muted)" }}>this action cannot be undone.</p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>

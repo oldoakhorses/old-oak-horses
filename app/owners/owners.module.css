@@ -1,0 +1,164 @@
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.title {
+  margin: 8px 0 0;
+  font-size: 36px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.addButton {
+
+  font-size: 11px;
+  font-weight: 700;
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  cursor: pointer;
+}
+
+.addButton:hover {
+  background: #2a2a4e;
+}
+
+.addButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ownersList {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+}
+
+.listHeader {
+  display: grid;
+  grid-template-columns: 1fr 100px 180px 140px;
+  padding: 12px 26px;
+
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e8eaf0;
+}
+
+.ownerRow {
+  display: grid;
+  grid-template-columns: 1fr 100px 180px 140px;
+  padding: 16px 26px;
+  border-bottom: 1px solid #f0f1f5;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.ownerRow:last-child {
+  border-bottom: none;
+}
+
+.ownerRow:hover {
+  background: #fafafc;
+}
+
+.ownerName {
+
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.ownerHorses {
+
+  font-size: 11px;
+  color: #6b7084;
+  display: flex;
+  align-items: center;
+}
+
+.ownerEmail {
+
+  font-size: 11px;
+  color: #6b7084;
+  display: flex;
+  align-items: center;
+}
+
+.ownerPhone {
+
+  font-size: 11px;
+  color: #6b7084;
+  display: flex;
+  align-items: center;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 60px 24px;
+}
+
+.emptyTitle {
+
+  font-size: 14px;
+  font-weight: 700;
+  color: #9ea2b0;
+}
+
+.emptySub {
+
+  font-size: 12px;
+  color: #9ea2b0;
+  margin-top: 6px;
+}
+
+/* Form */
+.formGroup {
+  margin-bottom: 14px;
+}
+
+.formLabel {
+
+  font-size: 10px;
+  font-weight: 700;
+  color: #6b7084;
+  display: block;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.formInput {
+
+  width: 100%;
+  font-size: 13px;
+  padding: 10px 12px;
+  background: #f5f5f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  color: #1a1a2e;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.formInput:focus {
+  border-color: #4a5bdb;
+}
+
+@media (max-width: 640px) {
+  .listHeader {
+    grid-template-columns: 1fr 80px;
+  }
+  .listHeader > *:nth-child(n+3) { display: none; }
+  .ownerRow {
+    grid-template-columns: 1fr 80px;
+  }
+  .ownerRow > *:nth-child(n+3) { display: none; }
+}

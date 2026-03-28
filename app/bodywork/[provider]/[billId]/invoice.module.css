@@ -12,7 +12,7 @@
 .invoiceLabel {
   font-size: 10px;
   color: #9ea2b0;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 8px;
 }
@@ -32,7 +32,7 @@
 .detailLabel {
   font-size: 9px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 4px;
 }
@@ -49,7 +49,7 @@
 .totalLabel {
   font-size: 9px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 4px;
 }
@@ -121,7 +121,6 @@
 }
 
 .horseEditBtn {
-  font-family: "Space Mono", "SF Mono", Menlo, monospace;
   font-size: 9px;
   padding: 4px 10px;
   border-radius: 4px;
@@ -160,7 +159,6 @@
   color: #ffffff;
   font-weight: 700;
   font-size: 12px;
-  font-family: "Space Mono", "SF Mono", Menlo, monospace;
   cursor: pointer;
 }
 
@@ -171,7 +169,6 @@
   background: transparent;
   color: #6b7084;
   font-size: 12px;
-  font-family: "Space Mono", "SF Mono", Menlo, monospace;
   cursor: pointer;
 }
 
@@ -212,7 +209,7 @@
 .footerStatLabel {
   font-size: 8px;
   color: #6b7084;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 4px;
 }
@@ -230,7 +227,7 @@
 .totalDueLabel {
   font-size: 8px;
   color: #6b7084;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 4px;
 }

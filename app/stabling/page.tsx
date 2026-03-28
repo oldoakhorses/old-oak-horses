@@ -6,7 +6,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
 import SpendBar from "@/components/SpendBar";
-import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
+import { formatInvoiceName, toIsoDateString } from "@/lib/formatInvoiceName";
 import styles from "./stabling.module.css";
 
 const SUBCATEGORY_ORDER = ["board", "turnout", "bedding", "hay-feed", "facility-fees", "other"] as const;
@@ -59,7 +59,7 @@ export default function StablingOverviewPage() {
           { label: "stabling", current: true }
         ]}
         actions={[
-          { label: "upload invoices", href: "/upload", variant: "outlined" },
+          { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
           { label: "biz overview", href: "/biz-overview", variant: "filled" }
         ]}
       />
@@ -125,7 +125,7 @@ export default function StablingOverviewPage() {
                 <div>
                   <div className={styles.invoiceTop}>
                     <span className={styles.provider}>
-                      {formatInvoiceTitle({
+                      {formatInvoiceName({
                         category: "stabling",
                         providerName: bill.providerName,
                         date: (bill.extractedData as any)?.invoice_date || "",

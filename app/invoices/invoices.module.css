@@ -23,7 +23,7 @@
 .filters span {
   font-size: 10px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
 }
 
 .filters select,
@@ -34,14 +34,12 @@
   border-radius: 6px;
   padding: 10px 12px;
   font-size: 12px;
-  font-family: "Space Mono", monospace;
 }
 
 .listCard {
   background: #fff;
   border: 1px solid #e8eaf0;
   border-radius: 12px;
-  overflow: hidden;
 }
 
 .invoicesHeader,
@@ -53,10 +51,9 @@
 }
 
 .invoicesHeader {
-  font-family: "Space Mono", monospace;
   font-size: 9px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   border-bottom: 1px solid #e8eaf0;
   user-select: none;
@@ -109,6 +106,147 @@
   font-size: 12px;
   color: #1a1a2e;
   font-weight: 700;
+}
+
+.invoiceCol {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.invoiceNameLink {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a2e;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.invoiceNameLink:hover {
+  color: #4a5bdb;
+  text-decoration: underline;
+}
+
+.expandChevron {
+  color: #9ea2b0;
+  font-size: 11px;
+}
+
+.invoiceRowExpanded {
+  border-left: 3px solid #4a5bdb;
+  padding-left: 23px;
+  background: #fafafc;
+}
+
+.invoiceExpanded {
+  background: #f8f9fb;
+  padding: 16px 26px;
+  border-bottom: 1px solid #f0f1f5;
+}
+
+.notesBlock {
+  margin-bottom: 14px;
+}
+
+.detailLabel {
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.notesText {
+  font-size: 11px;
+  color: #1a1a2e;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.noNotes {
+  font-size: 11px;
+  color: #c4c7d0;
+  font-style: italic;
+  margin-bottom: 14px;
+}
+
+.quickInfo {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.detailValue {
+  font-size: 11px;
+  color: #1a1a2e;
+}
+
+.expandedActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 12px;
+  border-top: 1px solid #e8eaf0;
+}
+
+.viewInvoiceBtn,
+.secondaryAction,
+.primaryAction {
+  font-size: 10px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.viewInvoiceBtn {
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #4a5bdb;
+  font-weight: 700;
+}
+
+.secondaryAction {
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #6b7084;
+}
+
+.primaryAction {
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  font-weight: 700;
+}
+
+.notesEditor {
+  margin-bottom: 14px;
+}
+
+.notesTextarea {
+  font-size: 11px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  color: #1a1a2e;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  resize: vertical;
+  min-height: 60px;
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+
+.notesTextarea:focus {
+  border-color: #4a5bdb;
+}
+
+.notesButtons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .categoryBadge {
@@ -171,7 +309,6 @@
 }
 
 .menuItem {
-  font-family: "Space Mono", monospace;
   font-size: 11px;
   padding: 8px 16px;
   border: none;
@@ -244,7 +381,6 @@
 }
 
 .modalBtnCancel {
-  font-family: "Space Mono", monospace;
   font-size: 11px;
   padding: 10px 20px;
   border-radius: 6px;
@@ -256,7 +392,6 @@
 }
 
 .modalBtnDelete {
-  font-family: "Space Mono", monospace;
   font-size: 11px;
   font-weight: 700;
   padding: 10px 20px;

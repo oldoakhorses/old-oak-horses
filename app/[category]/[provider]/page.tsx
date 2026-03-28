@@ -128,7 +128,7 @@ export default function ProviderOverviewPage() {
           { label: providerSlug, current: true },
         ]}
         actions={[
-          { label: "upload invoice", href: "/upload", variant: "outlined" },
+          { label: "upload invoice", href: "/dashboard?panel=invoice", variant: "outlined" },
           { label: "biz overview", href: "/biz-overview", variant: "filled" },
         ]}
       />

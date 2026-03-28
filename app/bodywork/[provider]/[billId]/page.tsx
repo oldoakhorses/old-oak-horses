@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Modal from "@/components/Modal";
+import InvoiceNotesCard from "@/components/InvoiceNotesCard";
 import NavBar from "@/components/NavBar";
 import UnmatchedHorseBanner from "@/components/UnmatchedHorseBanner";
 import styles from "./invoice.module.css";
@@ -67,7 +68,7 @@ export default function BodyworkInvoicePage() {
   async function onDelete() {
     if (!bill) return;
     await deleteBill({ billId: bill._id });
-    router.push(`/bodywork/${providerSlug}`);
+    router.push("/invoices");
   }
 
   return (
@@ -135,6 +136,8 @@ export default function BodyworkInvoicePage() {
             ))}
           </section>
         ))}
+
+        {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
 
         <div className={styles.approveDeleteRow}>
           {bill?.status === "done" ? (

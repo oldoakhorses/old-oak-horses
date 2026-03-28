@@ -6,7 +6,9 @@ import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import InvoiceNotesCard from "@/components/InvoiceNotesCard";
 import NavBar from "@/components/NavBar";
+import { formatInvoiceName } from "@/lib/formatInvoiceName";
 import styles from "./housingInvoice.module.css";
 
 type PersonAssignRow = { personId: Id<"people">; amount: number };
@@ -136,7 +138,7 @@ export default function HousingInvoicePage() {
 
   async function onDelete() {
     await deleteBill({ billId });
-    router.push(`/housing/${subcategory}`);
+    router.push("/invoices");
   }
 
   return (
@@ -146,7 +148,7 @@ export default function HousingInvoicePage() {
           { label: "old-oak-horses", href: "/dashboard", brand: true },
           { label: "housing", href: "/housing" },
           { label: subcategory, href: `/housing/${subcategory}` },
-          { label: extracted.invoice_number || "invoice", current: true }
+          { label: formatInvoiceName({ providerName: String((extracted as any).provider_name ?? bill?.provider?.name ?? bill?.customProviderName ?? "Unassigned Invoice"), date: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "") }), current: true }
         ]}
         actions={bill.originalPdfUrl ? [{ label: "view original PDF", href: bill.originalPdfUrl, variant: "link", newTab: true }] : []}
       />
@@ -199,9 +201,11 @@ export default function HousingInvoicePage() {
                   })}
                 </div>
               </div>
-              <button type="button" className="ui-button-outlined" onClick={() => setEditing(true)}>
-                edit
-              </button>
+              {!bill.isApproved ? (
+                <button type="button" className="ui-button-outlined" onClick={() => setEditing(true)}>
+                  edit
+                </button>
+              ) : null}
             </div>
           ) : (
             <>
@@ -318,6 +322,8 @@ export default function HousingInvoicePage() {
           </div>
         </section>
 
+        {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
+
         <section className={styles.approvalRow}>
           {bill.isApproved ? (
             <div className={styles.approvedBox}>✓ invoice approved</div>
@@ -354,7 +360,7 @@ export default function HousingInvoicePage() {
           <div className={styles.modalCard}>
             <div className={styles.modalTitle}>⚠ delete invoice?</div>
             <p className={styles.modalBody}>
-              this will permanently delete invoice <strong>{extracted.invoice_number || bill.fileName}</strong> from {extracted.provider_name || bill.provider?.name || "provider"}.
+              this will permanently delete invoice <strong>{formatInvoiceName({ providerName: String((extracted as any).provider_name ?? bill?.provider?.name ?? bill?.customProviderName ?? "Unassigned Invoice"), date: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "") })}</strong> from {extracted.provider_name || bill.provider?.name || "provider"}.
             </p>
             <p className={styles.modalSub}>this action cannot be undone.</p>
             <div className={styles.modalActions}>

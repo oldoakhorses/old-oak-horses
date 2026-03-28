@@ -1,0 +1,516 @@
+/* Feed Plan wrapper */
+.wrapper {
+  background: transparent;
+  margin-bottom: 20px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.title {
+  font-family: 'Space Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.subtitle {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: #9ea2b0;
+  margin-top: 3px;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+}
+
+.btnEdit {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #e8eaf0;
+  background: #fff;
+  color: #4a5bdb;
+  cursor: pointer;
+}
+
+.btnEdit:hover {
+  border-color: #4a5bdb;
+}
+
+.btnCancel {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #e8eaf0;
+  background: #fff;
+  color: #6b7084;
+  cursor: pointer;
+}
+
+.btnSave {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  cursor: pointer;
+}
+
+.btnSave:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Empty state */
+.emptyState {
+  text-align: center;
+  padding: 40px 18px;
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+}
+
+.emptyTitle {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: #9ea2b0;
+}
+
+.emptySub {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  color: #9ea2b0;
+  margin-top: 4px;
+}
+
+/* Time tabs */
+.timeTabs {
+  display: flex;
+  gap: 0;
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.timeTab {
+  flex: 1;
+  font-family: 'Space Mono', monospace;
+  padding: 14px 8px 12px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  border-right: 1px solid #e8eaf0;
+  transition: background 0.15s;
+}
+
+.timeTab:last-child {
+  border-right: none;
+}
+
+.timeTabActive {
+  background: #1a1a2e;
+  color: #ffffff;
+}
+
+.timeTabInactive {
+  background: transparent;
+  color: #6b7084;
+}
+
+.timeTabIcon {
+  font-size: 14px;
+}
+
+.timeTabLabel {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+}
+
+.timeTabActive .timeTabLabel {
+  font-weight: 700;
+}
+
+.timeTabCount {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+/* Section cards */
+.sectionCard {
+  background: #ffffff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.sectionHeader {
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sectionHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sectionIconBox {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.sectionName {
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.sectionCount {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  color: #9ea2b0;
+  margin-left: 8px;
+}
+
+.notesBadge {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  color: #4a5bdb;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(74, 91, 219, 0.06);
+  cursor: pointer;
+  border: none;
+}
+
+/* Read-mode items */
+.itemRow {
+  padding: 14px 18px;
+  border-top: 1px solid #f0f1f5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.itemName {
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  color: #1a1a2e;
+}
+
+.itemRight {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.itemAmount {
+  font-family: 'Space Mono', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.itemUnit {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: #9ea2b0;
+  margin-left: 4px;
+}
+
+.emptySection {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  color: #c4c7d0;
+  font-style: italic;
+  padding: 16px 18px;
+  border-top: 1px solid #f0f1f5;
+}
+
+/* Read-mode notes */
+.notesRead {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  color: #6b7084;
+  line-height: 1.6;
+  padding: 12px 18px;
+  background: #fafafc;
+  border-top: 1px solid #e8eaf0;
+  white-space: pre-wrap;
+}
+
+/* Edit-mode items */
+.itemEditCard {
+  margin: 10px 14px;
+  padding: 12px;
+  background: #fafafc;
+  border-radius: 8px;
+  position: relative;
+}
+
+.removeBtn {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 12px;
+  color: #e5484d;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.editInput {
+  font-family: 'Space Mono', monospace;
+  width: 100%;
+  font-size: 13px;
+  padding: 10px 12px;
+  background: #f2f3f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  color: #1a1a2e;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.editInput:focus {
+  border-color: #4a5bdb;
+}
+
+.editInput::placeholder {
+  color: #c4c7d0;
+}
+
+.editAmountRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.editAmount {
+  width: 35%;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.editUnit {
+  width: 65%;
+  font-size: 12px;
+}
+
+.addBtn {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  border-style: dashed;
+  border-width: 1px;
+  border-radius: 8px;
+  padding: 12px;
+  width: calc(100% - 28px);
+  margin: 10px 14px;
+  cursor: pointer;
+  text-align: center;
+  background: transparent;
+}
+
+/* Edit-mode notes */
+.notesEditWrap {
+  padding: 10px 14px;
+  border-top: 1px solid #e8eaf0;
+}
+
+.notesTextarea {
+  font-family: 'Space Mono', monospace;
+  width: 100%;
+  font-size: 11px;
+  padding: 10px 12px;
+  background: #f2f3f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  color: #1a1a2e;
+  box-sizing: border-box;
+  outline: none;
+  min-height: 50px;
+  resize: vertical;
+}
+
+.notesTextarea:focus {
+  border-color: #4a5bdb;
+}
+
+.addNotesLink {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  color: #9ea2b0;
+  padding: 10px 18px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  text-align: left;
+  border-top: 1px solid #f0f1f5;
+}
+
+.addNotesLink:hover {
+  color: #4a5bdb;
+}
+
+/* Daily summary */
+.dailySummary {
+  background: #ffffff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+
+.dailySummaryTitle {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 12px;
+}
+
+.summaryGroup {
+  margin-bottom: 10px;
+}
+
+.summaryGroup:last-child {
+  margin-bottom: 0;
+}
+
+.summaryGroupLabel {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.summaryRow {
+  font-family: 'Space Mono', monospace;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0 4px 22px;
+}
+
+.summaryProduct {
+  font-size: 11px;
+  color: #6b7084;
+}
+
+.summaryAmount {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+/* History */
+.btnHistory {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid #e8eaf0;
+  background: #fff;
+  color: #6b7084;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.btnHistory:hover {
+  border-color: #4a5bdb;
+  color: #4a5bdb;
+}
+
+.historyCard {
+  background: #ffffff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+
+.historyEntry {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f1f5;
+}
+
+.historyEntry:last-child {
+  border-bottom: none;
+}
+
+.historyDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+.historyText {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  color: #1a1a2e;
+  line-height: 1.4;
+}
+
+.historyDate {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: #9ea2b0;
+  margin-top: 3px;
+}
+
+.historyEmpty {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  color: #9ea2b0;
+  text-align: center;
+  padding: 12px;
+}

@@ -1,5 +1,5 @@
-import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { query, mutation } from "./_generated/server";
 
 export const getByHorse = query({
   args: { horseId: v.id("horses") },
@@ -24,6 +24,7 @@ export const save = mutation({
       .first();
 
     if (existing) {
+      // Save history entry with previous state
       await ctx.db.insert("feedPlanHistory", {
         horseId: args.horseId,
         feedPlanId: existing._id,
@@ -32,17 +33,20 @@ export const save = mutation({
         changedAt: Date.now(),
       });
 
+      // Update the plan
       await ctx.db.patch(existing._id, {
         sections: args.sections,
         updatedAt: Date.now(),
       });
     } else {
+      // Create new plan
       const planId = await ctx.db.insert("feedPlans", {
         horseId: args.horseId,
         sections: args.sections,
         updatedAt: Date.now(),
       });
 
+      // Save initial history entry
       await ctx.db.insert("feedPlanHistory", {
         horseId: args.horseId,
         feedPlanId: planId,

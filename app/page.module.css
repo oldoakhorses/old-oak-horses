@@ -3,7 +3,6 @@
   width: 100%;
   height: 100vh;
   overflow: hidden;
-  font-family: "Space Mono", monospace;
   background: #0a0a14;
 }
 
@@ -49,21 +48,19 @@
 }
 
 .splashTitle {
-  font-family: "Space Mono", monospace;
   font-size: 56px;
   font-weight: 700;
   color: #ffffff;
-  letter-spacing: 0.04em;
+  letter-spacing: -0.01em;
   line-height: 1.1;
   margin: 0 0 64px;
   text-shadow: 0 2px 40px rgba(0, 0, 0, 0.3);
 }
 
 .splashEnter {
-  font-family: "Space Mono", monospace;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 16px 52px;
   border-radius: 8px;

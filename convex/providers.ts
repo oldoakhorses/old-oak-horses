@@ -11,6 +11,25 @@ export const getProvidersByCategory = query({
   }
 });
 
+export const listByCategory = query({
+  args: { category: v.string() },
+  handler: async (ctx, args) => {
+    const slug = args.category.trim().toLowerCase();
+    if (!slug) return [];
+
+    const category = await ctx.db
+      .query("categories")
+      .withIndex("by_slug", (q) => q.eq("slug", slug))
+      .first();
+    if (!category) return [];
+
+    return await ctx.db
+      .query("providers")
+      .withIndex("by_category_name", (q) => q.eq("categoryId", category._id))
+      .collect();
+  }
+});
+
 export const getAllProvidersWithCategory = query({
   args: {},
   handler: async (ctx) => {
@@ -30,6 +49,31 @@ export const getAllProvidersWithCategory = query({
       })
       .sort((a, b) => a.name.localeCompare(b.name));
   }
+});
+
+export const listAllForMatching = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const providers = await ctx.db.query("providers").withIndex("by_name").collect();
+    const categories = await ctx.db.query("categories").collect();
+    const categoryMap = new Map(categories.map((category) => [String(category._id), category]));
+
+    return providers.map((provider) => {
+      const category = categoryMap.get(String(provider.categoryId));
+      return {
+        _id: provider._id,
+        categoryId: provider.categoryId,
+        name: provider.name,
+        slug: provider.slug ?? undefined,
+        email: provider.email ?? undefined,
+        phone: provider.phone ?? undefined,
+        website: provider.website ?? undefined,
+        address: provider.address ?? undefined,
+        categorySlug: category?.slug ?? "unknown",
+        subcategorySlug: provider.subcategorySlug ?? undefined,
+      };
+    });
+  },
 });
 
 export const getProvidersByCategoryAndSubcategory = query({
@@ -153,6 +197,7 @@ export const createProvider = mutation({
 
     return await ctx.db.insert("providers", {
       categoryId: args.categoryId,
+      category: category.slug,
       subcategorySlug: args.subcategorySlug,
       name: args.name,
       slug: slugify(args.name),
@@ -244,6 +289,25 @@ export const createProviderOnUploadInternal = internalMutation({
   }
 });
 
+export const backfillProviderCategoryField = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const providers = await ctx.db.query("providers").collect();
+    let updated = 0;
+    for (const provider of providers) {
+      if (provider.category) continue;
+      const category = await ctx.db.get(provider.categoryId);
+      if (!category) continue;
+      await ctx.db.patch(provider._id, {
+        category: category.slug,
+        updatedAt: Date.now(),
+      });
+      updated += 1;
+    }
+    return { updated };
+  },
+});
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -254,6 +318,8 @@ function slugify(value: string) {
 }
 
 async function createProviderOnUploadImpl(ctx: any, name: string, categoryId: string, subcategorySlug?: string) {
+  const category = await ctx.db.get(categoryId);
+  if (!category) throw new Error("Category not found");
   const cleanName = name.trim();
   const baseSlug = slugify(cleanName);
   const existing = await ctx.db
@@ -262,13 +328,33 @@ async function createProviderOnUploadImpl(ctx: any, name: string, categoryId: st
     .first();
 
   const slug = existing ? `${baseSlug}-${Date.now().toString(36).slice(-4)}` : baseSlug;
-  return await ctx.db.insert("providers", {
+  const providerId = await ctx.db.insert("providers", {
     name: cleanName,
     slug,
     categoryId,
+    category: category.slug,
     subcategorySlug,
     extractionPrompt: "",
     expectedFields: [],
     createdAt: Date.now()
   });
+
+  // Also create a corresponding contact
+  const existingContact = await ctx.db
+    .query("contacts")
+    .withIndex("by_slug", (q: any) => q.eq("slug", slug))
+    .first();
+  if (!existingContact) {
+    await ctx.db.insert("contacts", {
+      name: cleanName,
+      slug,
+      type: "vendor",
+      providerId,
+      providerName: cleanName,
+      category: category.slug,
+      createdAt: Date.now(),
+    });
+  }
+
+  return providerId;
 }

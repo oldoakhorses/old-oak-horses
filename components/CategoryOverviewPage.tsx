@@ -199,7 +199,7 @@ export default function CategoryOverviewPage({
           { label: categorySlug, current: true },
         ]}
         actions={[
-          { label: "upload invoices", href: "/upload", variant: "outlined" },
+          { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
           { label: "biz overview", href: "/biz-overview", variant: "filled" },
         ]}
       />

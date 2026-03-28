@@ -78,7 +78,7 @@ export default function HorseRecordTypePage() {
           { label: meta.label.toLowerCase(), current: true },
         ]}
         actions={[
-          { label: "upload invoices", href: "/upload", variant: "outlined" },
+          { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
           { label: "biz overview", href: "/biz-overview", variant: "filled" },
         ]}
       />

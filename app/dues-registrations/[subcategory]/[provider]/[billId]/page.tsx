@@ -7,7 +7,9 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Modal from "@/components/Modal";
+import InvoiceNotesCard from "@/components/InvoiceNotesCard";
 import NavBar from "@/components/NavBar";
+import { formatInvoiceName } from "@/lib/formatInvoiceName";
 
 type EntityType = "none" | "horse" | "person" | "general";
 
@@ -166,7 +168,7 @@ export default function DuesInvoicePage() {
 
   async function onDelete() {
     await deleteBill({ billId });
-    router.push(`/dues-registrations/${subcategory}/${providerSlug}`);
+    router.push("/invoices");
   }
 
   return (
@@ -177,7 +179,7 @@ export default function DuesInvoicePage() {
           { label: "dues_registrations", href: "/dues-registrations" },
           { label: subcategory, href: `/dues-registrations/${subcategory}` },
           { label: providerSlug, href: `/dues-registrations/${subcategory}/${providerSlug}` },
-          { label: String(extracted.invoice_number ?? "invoice"), current: true }
+          { label: formatInvoiceName({ providerName: String((extracted as any).provider_name ?? bill?.provider?.name ?? bill?.customProviderName ?? "Unassigned Invoice"), date: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "") }), current: true }
         ]}
         actions={bill.originalPdfUrl ? [{ label: "view original PDF", href: bill.originalPdfUrl, variant: "link", newTab: true }] : []}
       />
@@ -189,7 +191,7 @@ export default function DuesInvoicePage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 24 }}>
             <div>
               <div className="ui-label">DUES & REGISTRATIONS INVOICE</div>
-              <h1 style={{ fontSize: 24, margin: "8px 0 16px" }}>{provider?.name ?? bill.customProviderName ?? "Provider"}</h1>
+              <h1 style={{ fontSize: 24, margin: "8px 0 16px" }}>{provider?.name ?? bill.providerName ?? bill.customProviderName ?? "Provider"}</h1>
               <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
                 <Detail label="INVOICE #" value={String(extracted.invoice_number ?? "—")} />
                 <Detail label="DATE" value={formatDate(extracted.invoice_date)} />
@@ -204,61 +206,91 @@ export default function DuesInvoicePage() {
           </div>
         </section>
 
-        <section className="ui-card" style={{ marginTop: 16 }}>
-          <div style={{ fontWeight: 700, marginBottom: 10 }}>line_items</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 220px 90px", gap: 10, alignItems: "center", paddingBottom: 10, borderBottom: "1px solid #E8EAF0", fontSize: 9, color: "#9EA2B0", letterSpacing: "0.1em" }}>
-            <div>DESCRIPTION</div><div>TYPE</div><div>ASSIGN TO</div><div style={{ textAlign: "right" }}>AMOUNT</div>
-          </div>
-          <div>
-            {lineItems.map((row, index) => {
-              const type = entityTypes[index] ?? "none";
-              return (
-                <div key={`${index}-${String(row?.description ?? "line")}`} style={{ display: "grid", gridTemplateColumns: "1fr 100px 220px 90px", gap: 10, alignItems: "center", padding: "12px 0", borderBottom: "1px solid #F0F1F5" }}>
-                  <div style={{ fontSize: 12 }}>{String(row?.description ?? "—")}</div>
-                  <select
-                    value={type}
-                    onChange={(event) => {
-                      setEntityTypes((prev) => ({ ...prev, [index]: event.target.value as EntityType }));
-                      if (event.target.value === "general" || event.target.value === "none") {
-                        setEntityIds((prev) => ({ ...prev, [index]: "" }));
-                      }
-                      setDirty(true);
-                    }}
-                    style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, padding: "6px 8px", borderRadius: 6, border: "1px solid #E8EAF0", background: "#F2F3F7" }}
-                  >
-                    <option value="none">—</option>
-                    <option value="horse">🐴 horse</option>
-                    <option value="person">👤 person</option>
-                    <option value="general">📋 general</option>
-                  </select>
+        {bill.isApproved ? (
+          <section className="ui-card" style={{ marginTop: 16, borderColor: "#22C583" }}>
+            <div style={{ fontWeight: 700, marginBottom: 10 }}>line_items</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 90px", gap: 10, alignItems: "center", paddingBottom: 10, borderBottom: "1px solid #E8EAF0", fontSize: 9, color: "#9EA2B0", letterSpacing: "0.05em" }}>
+              <div>DESCRIPTION</div><div>ASSIGNED TO</div><div style={{ textAlign: "right" }}>AMOUNT</div>
+            </div>
+            <div>
+              {lineItems.map((row, index) => {
+                const type = entityTypes[index] ?? "none";
+                const id = entityIds[index];
+                const assignLabel =
+                  type === "horse"
+                    ? `🐴 ${horses.find((h) => String(h._id) === id)?.name ?? "Horse"}`
+                    : type === "person"
+                      ? `👤 ${people.find((p) => String(p._id) === id)?.name ?? "Person"}`
+                      : type === "general"
+                        ? "📋 General"
+                        : "—";
+                return (
+                  <div key={`${index}-${String(row?.description ?? "line")}`} style={{ display: "grid", gridTemplateColumns: "1fr 140px 90px", gap: 10, alignItems: "center", padding: "12px 0", borderBottom: "1px solid #F0F1F5" }}>
+                    <div style={{ fontSize: 12 }}>{String(row?.description ?? "—")}</div>
+                    <div style={{ fontSize: 12, fontWeight: 500 }}>{assignLabel}</div>
+                    <strong style={{ textAlign: "right", fontSize: 12 }}>{fmtUSD(pickAmount(row))}</strong>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ) : (
+          <section className="ui-card" style={{ marginTop: 16 }}>
+            <div style={{ fontWeight: 700, marginBottom: 10 }}>line_items</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 220px 90px", gap: 10, alignItems: "center", paddingBottom: 10, borderBottom: "1px solid #E8EAF0", fontSize: 9, color: "#9EA2B0", letterSpacing: "0.05em" }}>
+              <div>DESCRIPTION</div><div>TYPE</div><div>ASSIGN TO</div><div style={{ textAlign: "right" }}>AMOUNT</div>
+            </div>
+            <div>
+              {lineItems.map((row, index) => {
+                const type = entityTypes[index] ?? "none";
+                return (
+                  <div key={`${index}-${String(row?.description ?? "line")}`} style={{ display: "grid", gridTemplateColumns: "1fr 100px 220px 90px", gap: 10, alignItems: "center", padding: "12px 0", borderBottom: "1px solid #F0F1F5" }}>
+                    <div style={{ fontSize: 12 }}>{String(row?.description ?? "—")}</div>
+                    <select
+                      value={type}
+                      onChange={(event) => {
+                        setEntityTypes((prev) => ({ ...prev, [index]: event.target.value as EntityType }));
+                        if (event.target.value === "general" || event.target.value === "none") {
+                          setEntityIds((prev) => ({ ...prev, [index]: "" }));
+                        }
+                        setDirty(true);
+                      }}
+                      style={{ fontFamily: "inherit", fontSize: 11, padding: "6px 8px", borderRadius: 6, border: "1px solid #E8EAF0", background: "#F2F3F7" }}
+                    >
+                      <option value="none">—</option>
+                      <option value="horse">🐴 horse</option>
+                      <option value="person">👤 person</option>
+                      <option value="general">📋 general</option>
+                    </select>
 
-                  <select
-                    value={entityIds[index] ?? ""}
-                    disabled={type !== "horse" && type !== "person"}
-                    onChange={(event) => {
-                      setEntityIds((prev) => ({ ...prev, [index]: event.target.value }));
-                      setDirty(true);
-                    }}
-                    style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, padding: "6px 8px", borderRadius: 6, border: "1px solid #E8EAF0", background: "#F2F3F7" }}
-                  >
-                    <option value="">{type === "horse" || type === "person" ? "select..." : "select type first"}</option>
-                    {type === "horse"
-                      ? horses.map((horse) => <option key={horse._id} value={String(horse._id)}>{horse.name}</option>)
-                      : null}
-                    {type === "person"
-                      ? people.map((person) => <option key={person._id} value={String(person._id)}>{person.name}</option>)
-                      : null}
-                  </select>
+                    <select
+                      value={entityIds[index] ?? ""}
+                      disabled={type !== "horse" && type !== "person"}
+                      onChange={(event) => {
+                        setEntityIds((prev) => ({ ...prev, [index]: event.target.value }));
+                        setDirty(true);
+                      }}
+                      style={{ fontFamily: "inherit", fontSize: 11, padding: "6px 8px", borderRadius: 6, border: "1px solid #E8EAF0", background: "#F2F3F7" }}
+                    >
+                      <option value="">{type === "horse" || type === "person" ? "select..." : "select type first"}</option>
+                      {type === "horse"
+                        ? horses.map((horse) => <option key={horse._id} value={String(horse._id)}>{horse.name}</option>)
+                        : null}
+                      {type === "person"
+                        ? people.map((person) => <option key={person._id} value={String(person._id)}>{person.name}</option>)
+                        : null}
+                    </select>
 
-                  <strong style={{ textAlign: "right", fontSize: 12 }}>{fmtUSD(pickAmount(row))}</strong>
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
-            <button type="button" className="ui-button-filled" onClick={onSave} disabled={saving}>{saving ? "saving..." : "save assignment"}</button>
-          </div>
-        </section>
+                    <strong style={{ textAlign: "right", fontSize: 12 }}>{fmtUSD(pickAmount(row))}</strong>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+              <button type="button" className="ui-button-filled" onClick={onSave} disabled={saving}>{saving ? "saving..." : "save assignment"}</button>
+            </div>
+          </section>
+        )}
 
         <section className="ui-card" style={{ marginTop: 16 }}>
           <div style={{ color: "#22C583", fontWeight: 700, marginBottom: 10 }}>✓ assignment summary</div>
@@ -268,15 +300,17 @@ export default function DuesInvoicePage() {
           <SummaryGroup title="⚠ Unassigned" rows={assignmentSummary.unassignedRows} total={assignmentSummary.unassignedTotal} color="#F59E0B" />
         </section>
 
+        {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
+
         <div style={{ display: "flex", gap: 10, marginTop: 16, marginBottom: 16 }}>
           {bill.isApproved ? (
             <div style={{ flex: 1, padding: "14px 20px", borderRadius: 8, background: "rgba(34,197,131,0.08)", border: "1px solid #22C583", color: "#22C583", fontWeight: 700 }}>✓ invoice approved</div>
           ) : (
-            <button type="button" onClick={onApprove} disabled={!completion || dirty} style={{ flex: 1, fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, padding: "14px 20px", borderRadius: 8, border: "none", background: !completion || dirty ? "#E8EAF0" : "#22C583", color: !completion || dirty ? "#9EA2B0" : "#fff" }}>
+            <button type="button" onClick={onApprove} disabled={!completion || dirty} style={{ flex: 1, fontFamily: "inherit", fontSize: 12, fontWeight: 700, padding: "14px 20px", borderRadius: 8, border: "none", background: !completion || dirty ? "#E8EAF0" : "#22C583", color: !completion || dirty ? "#9EA2B0" : "#fff" }}>
               {!completion ? "assign all line items before approving" : dirty ? "save assignment before approving" : "approve invoice"}
             </button>
           )}
-          <button type="button" onClick={() => setShowDeleteConfirm(true)} style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, padding: "14px 20px", borderRadius: 8, border: "1px solid #E8EAF0", background: "transparent", color: "#6B7084" }}>delete</button>
+          <button type="button" onClick={() => setShowDeleteConfirm(true)} style={{ fontFamily: "inherit", fontSize: 12, padding: "14px 20px", borderRadius: 8, border: "1px solid #E8EAF0", background: "transparent", color: "#6B7084" }}>delete</button>
         </div>
 
         <section style={{ background: "#1A1A2E", color: "#fff", borderRadius: 10, padding: "20px 26px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -297,7 +331,7 @@ export default function DuesInvoicePage() {
 
         <Modal open={showDeleteConfirm} title="delete invoice?" onClose={() => setShowDeleteConfirm(false)}>
           <p style={{ marginTop: 0, color: "var(--ui-text-secondary)" }}>
-            this will permanently delete invoice <strong>{String(extracted.invoice_number ?? billId)}</strong> from {provider?.name ?? providerSlug}.
+            this will permanently delete invoice <strong>{formatInvoiceName({ providerName: String((extracted as any).provider_name ?? bill?.provider?.name ?? bill?.customProviderName ?? "Unassigned Invoice"), date: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "") })}</strong> from {provider?.name ?? providerSlug}.
           </p>
           <p style={{ color: "var(--ui-text-muted)" }}>this action cannot be undone.</p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
@@ -333,7 +367,7 @@ function SummaryGroup({ title, rows, total, color }: { title: string; rows: Arra
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div style={{ fontSize: 9, color: "#9EA2B0", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 9, color: "#9EA2B0", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 12 }}>{value}</div>
     </div>
   );
@@ -342,7 +376,7 @@ function Detail({ label, value }: { label: string; value: string }) {
 function SummaryStat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div style={{ fontSize: 8, color: "#6B7084", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 8, color: "#6B7084", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 13, fontWeight: 700 }}>{value}</div>
     </div>
   );

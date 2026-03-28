@@ -67,7 +67,7 @@ export const uploadAndParseBill: any = action({
     const uploadedAt = args.uploadedAt ?? Date.now();
     const uploadDate = new Date(uploadedAt).toISOString().slice(0, 10);
     const displayName = provider?.name ?? customProviderName ?? "Other";
-    const baseName = `${category.name} - ${displayName} - ${uploadDate}`;
+    const baseName = `${category?.name ?? "Invoice"} - ${displayName} - ${uploadDate}`;
     const existingFileNames = providerId
       ? ((await ctx.runQuery(internal.bills.getBillFileNamesByProvider, {
           providerId
@@ -161,6 +161,114 @@ export const uploadAndParseBill: any = action({
     }
 
     return { billId, fileName, redirectPath, listPath };
+  }
+});
+
+export const parseUploadedInvoice: any = action({
+  args: {
+    fileStorageId: v.id("_storage"),
+    categoryId: v.optional(v.id("categories")),
+    providerId: v.optional(v.id("providers")),
+    customProviderName: v.optional(v.string()),
+    saveAsNew: v.optional(v.boolean()),
+    adminSubcategory: v.optional(v.string()),
+    duesSubcategory: v.optional(v.string()),
+    uploadedAt: v.optional(v.number()),
+  },
+  handler: async (ctx, args): Promise<{ billId: Id<"bills">; fileName: string; redirectPath: string; listPath: string }> => {
+    const category = args.categoryId
+      ? ((await ctx.runQuery(internal.bills.getCategory, { categoryId: args.categoryId })) as
+          | { name: string; slug?: string }
+          | null)
+      : null;
+
+    let providerId = args.providerId;
+    const customProviderName = args.customProviderName?.trim() || undefined;
+    const isAdminCategory = category?.slug === "admin";
+    const isDuesCategory = category?.slug === "dues-registrations";
+
+    if (!providerId && customProviderName && args.saveAsNew && args.categoryId) {
+      providerId = (await ctx.runMutation(internal.providers.createProviderOnUploadInternal, {
+        categoryId: args.categoryId,
+        name: customProviderName,
+        subcategorySlug: isAdminCategory ? args.adminSubcategory : isDuesCategory ? args.duesSubcategory : undefined,
+      })) as Id<"providers">;
+    }
+
+    const provider = providerId
+      ? ((await ctx.runQuery(internal.bills.getProvider, { providerId })) as
+          | { categoryId: Id<"categories">; name: string }
+          | null)
+      : null;
+
+    const uploadedAt = args.uploadedAt ?? Date.now();
+    const uploadDate = new Date(uploadedAt).toISOString().slice(0, 10);
+    const displayName = provider?.name ?? customProviderName ?? "Other";
+    const baseName = `${category?.name ?? "Invoice"} - ${displayName} - ${uploadDate}`;
+    const existingFileNames = providerId
+      ? ((await ctx.runQuery(internal.bills.getBillFileNamesByProvider, { providerId })) as string[])
+      : [];
+    const fileName = nextAvailableFileName(existingFileNames, baseName);
+    const originalPdfUrl = (await ctx.storage.getUrl(args.fileStorageId)) ?? undefined;
+    console.log("1. PDF uploaded, storageId:", String(args.fileStorageId));
+
+    const billId = (await ctx.runMutation(internal.bills.createParsingBill, {
+      providerId,
+      categoryId: args.categoryId,
+      fileId: args.fileStorageId,
+      fileName,
+      billingPeriod: uploadDate.slice(0, 7),
+      uploadedAt,
+      customProviderName: !providerId ? customProviderName : undefined,
+      originalPdfUrl,
+      adminSubcategory: isAdminCategory ? args.adminSubcategory || undefined : undefined,
+      duesSubcategory: isDuesCategory ? args.duesSubcategory || undefined : undefined,
+    })) as Id<"bills">;
+    console.log("[uploads.parseUploadedInvoice] created billId:", String(billId));
+
+    await ctx.scheduler.runAfter(0, internal.billParsing.parseBillPdf, { billId });
+    console.log("[uploads.parseUploadedInvoice] scheduled parse for billId:", String(billId));
+
+    const providerSlug = provider ? slugify(provider.name) : customProviderName ? slugify(customProviderName) : "other";
+    const catSlug = category?.slug ?? "invoices";
+    let redirectPath = `/${catSlug}/${providerSlug}/${billId}`;
+    let listPath = `/${catSlug}`;
+
+    if (catSlug === "admin") {
+      const subSlug = args.adminSubcategory || "payroll";
+      redirectPath = `/admin/${subSlug}/${providerSlug}/${billId}`;
+      listPath = `/admin/${subSlug}/${providerSlug}`;
+    } else if (catSlug === "dues-registrations") {
+      const subSlug = args.duesSubcategory || "memberships";
+      redirectPath = `/dues-registrations/${subSlug}/${providerSlug}/${billId}`;
+      listPath = `/dues-registrations/${subSlug}/${providerSlug}`;
+    } else if (providerId) {
+      listPath = `/${catSlug}/${providerSlug}`;
+    }
+
+    return { billId, fileName, redirectPath, listPath };
+  },
+});
+
+export const reassignAndReparse: any = action({
+  args: {
+    billId: v.id("bills"),
+    categoryId: v.id("categories"),
+    providerId: v.optional(v.id("providers")),
+    customProviderName: v.optional(v.string()),
+    adminSubcategory: v.optional(v.string()),
+    duesSubcategory: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.runMutation(internal.bills.reassignBillProvider, {
+      billId: args.billId,
+      categoryId: args.categoryId,
+      providerId: args.providerId,
+      customProviderName: args.customProviderName,
+      adminSubcategory: args.adminSubcategory,
+      duesSubcategory: args.duesSubcategory,
+    });
+    await ctx.scheduler.runAfter(0, internal.billParsing.parseBillPdf, { billId: args.billId });
   }
 });
 

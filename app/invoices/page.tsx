@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
+import { formatInvoiceFileName, formatInvoiceName } from "@/lib/formatInvoiceName";
 import styles from "./invoices.module.css";
 
 type SortColumn = "invoice" | "category" | "date" | "amount" | null;
@@ -31,6 +32,7 @@ export default function InvoicesPage() {
   const router = useRouter();
   const rows = useQuery(api.bills.listAll) ?? [];
   const deleteBill = useMutation(api.bills.deleteBill);
+  const updateBillNotes = useMutation(api.bills.updateBillNotes);
 
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [fromDate, setFromDate] = useState("");
@@ -39,6 +41,9 @@ export default function InvoicesPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editingNotesFor, setEditingNotesFor] = useState<string | null>(null);
+  const [editingNotes, setEditingNotes] = useState("");
 
   const categories = useMemo(() => ["all", ...new Set(rows.map((row) => row.categoryName))], [rows]);
 
@@ -55,8 +60,8 @@ export default function InvoicesPage() {
     if (!sortColumn) return sorted;
     sorted.sort((a, b) => {
       if (sortColumn === "invoice") {
-        const aVal = invoiceLabel(a).toLowerCase();
-        const bVal = invoiceLabel(b).toLowerCase();
+        const aVal = formatInvoiceName({ providerName: getProvider(a), date: getInvoiceDate(a) }).toLowerCase();
+        const bVal = formatInvoiceName({ providerName: getProvider(b), date: getInvoiceDate(b) }).toLowerCase();
         return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
       }
       if (sortColumn === "category") {
@@ -95,7 +100,7 @@ export default function InvoicesPage() {
     if (!url) return;
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${invoiceLabel(row)}.pdf`;
+    a.download = formatInvoiceFileName({ providerName: getProvider(row), date: getInvoiceDate(row) });
     a.click();
   }
 
@@ -103,6 +108,11 @@ export default function InvoicesPage() {
     if (!deleteTarget) return;
     await deleteBill({ billId: deleteTarget._id });
     setDeleteTarget(null);
+  }
+
+  async function saveNotes(billId: string) {
+    await updateBillNotes({ billId: billId as any, notes: editingNotes });
+    setEditingNotesFor(null);
   }
 
   return (
@@ -113,7 +123,7 @@ export default function InvoicesPage() {
           { label: "invoices", current: true },
         ]}
         actions={[
-          { label: "upload invoices", href: "/upload", variant: "outlined" },
+          { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
           { label: "biz overview", href: "/biz-overview", variant: "filled" },
         ]}
       />
@@ -175,41 +185,154 @@ export default function InvoicesPage() {
               label: prettyCategory(categoryKey),
             };
             const url = getInvoiceUrl(row);
+            const rowId = String(row._id);
+            const isExpanded = expandedId === rowId;
+            const assignedHorses = Array.isArray(row.assignedHorses) ? row.assignedHorses.map((entry: any) => entry.horseName).filter(Boolean) : [];
+            const invoiceNumber = String(row?.extractedData?.invoice_number ?? row?.extractedData?.invoiceNumber ?? "—");
             return (
-              <div key={String(row._id)} className={styles.invoiceRow} onClick={() => router.push(url)}>
-                <div className={styles.invoiceCol}>
-                  <div className={styles.invoiceTitle}>{invoiceLabel(row)}</div>
+              <div key={rowId}>
+                <div
+                  className={`${styles.invoiceRow} ${isExpanded ? styles.invoiceRowExpanded : ""}`}
+                  onClick={() => {
+                    setExpandedId((prev) => (prev === rowId ? null : rowId));
+                    setEditingNotesFor(null);
+                    setOpenMenuId(null);
+                  }}
+                >
+                  <div className={styles.invoiceCol}>
+                    <span className={styles.expandChevron}>{isExpanded ? "▾" : "▸"}</span>
+                    <a
+                      className={styles.invoiceNameLink}
+                      href={url}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        router.push(url);
+                      }}
+                    >
+                      {formatInvoiceName({ providerName: getProvider(row), date })}
+                    </a>
+                  </div>
+                  <div>
+                    <span className={styles.categoryBadge} style={{ background: categoryColor.bg, color: categoryColor.color }}>
+                      {categoryColor.label}
+                    </span>
+                  </div>
+                  <div className={styles.dateCol}>{date}</div>
+                  <div className={styles.amountCol}>{formatUsd(total)}</div>
+                  <div className={styles.menuWrap} onClick={(e) => e.stopPropagation()}>
+                    <button type="button" className={styles.invoiceMenuBtn} onClick={(e) => { e.stopPropagation(); setOpenMenuId((prev) => (prev === rowId ? null : rowId)); }}>
+                      ⋮
+                    </button>
+                    {openMenuId === rowId ? (
+                      <div className={styles.menuDropdown}>
+                        <button type="button" className={styles.menuItem} onClick={() => { setOpenMenuId(null); router.push(`/invoices/preview/${row._id}`); }}>
+                          Edit Invoice
+                        </button>
+                        <button type="button" className={styles.menuItem} onClick={() => handleDownloadPdf(row)}>
+                          Download PDF
+                        </button>
+                        <div className={styles.menuDivider} />
+                        <button
+                          type="button"
+                          className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                          onClick={() => {
+                            setOpenMenuId(null);
+                            setDeleteTarget(row);
+                          }}
+                        >
+                          Delete Invoice
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
-                <div>
-                  <span className={styles.categoryBadge} style={{ background: categoryColor.bg, color: categoryColor.color }}>
-                    {categoryColor.label}
-                  </span>
-                </div>
-                <div className={styles.dateCol}>{date}</div>
-                <div className={styles.amountCol}>{formatUsd(total)}</div>
-                <div className={styles.menuWrap} onClick={(e) => e.stopPropagation()}>
-                  <button type="button" className={styles.invoiceMenuBtn} onClick={(e) => { e.stopPropagation(); setOpenMenuId((prev) => (prev === String(row._id) ? null : String(row._id))); }}>
-                    ⋮
-                  </button>
-                  {openMenuId === String(row._id) ? (
-                    <div className={styles.menuDropdown}>
-                      <button type="button" className={styles.menuItem} onClick={() => handleDownloadPdf(row)}>
-                        Download PDF
-                      </button>
-                      <div className={styles.menuDivider} />
+
+                {isExpanded ? (
+                  <div className={styles.invoiceExpanded}>
+                    {editingNotesFor === rowId ? (
+                      <div className={styles.notesEditor}>
+                        <textarea
+                          value={editingNotes}
+                          onChange={(e) => setEditingNotes(e.target.value)}
+                          placeholder="add notes..."
+                          className={styles.notesTextarea}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div className={styles.notesButtons}>
+                          <button
+                            type="button"
+                            className={styles.secondaryAction}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingNotesFor(null);
+                            }}
+                          >
+                            cancel
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.primaryAction}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void saveNotes(rowId);
+                            }}
+                          >
+                            save notes
+                          </button>
+                        </div>
+                      </div>
+                    ) : row.notes ? (
+                      <div className={styles.notesBlock}>
+                        <div className={styles.detailLabel}>NOTES</div>
+                        <div className={styles.notesText}>{row.notes}</div>
+                      </div>
+                    ) : (
+                      <div className={styles.noNotes}>no notes</div>
+                    )}
+
+                    <div className={styles.quickInfo}>
+                      <div>
+                        <div className={styles.detailLabel}>INVOICE #</div>
+                        <div className={styles.detailValue}>{invoiceNumber}</div>
+                      </div>
+                      <div>
+                        <div className={styles.detailLabel}>CATEGORY</div>
+                        <div className={styles.detailValue}>{prettyCategory(categoryKey)}</div>
+                      </div>
+                      {assignedHorses.length > 0 ? (
+                        <div>
+                          <div className={styles.detailLabel}>HORSES</div>
+                          <div className={styles.detailValue}>{assignedHorses.join(", ")}</div>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className={styles.expandedActions}>
                       <button
                         type="button"
-                        className={`${styles.menuItem} ${styles.menuItemDanger}`}
-                        onClick={() => {
-                          setOpenMenuId(null);
-                          setDeleteTarget(row);
+                        className={styles.viewInvoiceBtn}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(url);
                         }}
                       >
-                        Delete Invoice
+                        view invoice →
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.secondaryAction}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingNotesFor(rowId);
+                          setEditingNotes(row.notes ?? "");
+                        }}
+                      >
+                        {row.notes ? "edit notes" : "+ add notes"}
                       </button>
                     </div>
-                  ) : null}
-                </div>
+                  </div>
+                ) : null}
               </div>
             );
           })}
@@ -223,7 +346,7 @@ export default function InvoicesPage() {
             <div className={styles.modalIcon}>⚠</div>
             <div className={styles.modalTitle}>delete invoice?</div>
             <div className={styles.modalText}>
-              Are you sure you want to delete "{invoiceLabel(deleteTarget)}"?
+              Are you sure you want to delete "{formatInvoiceName({ providerName: getProvider(deleteTarget), date: getInvoiceDate(deleteTarget) })}"?
               <br />
               This cannot be undone.
             </div>
@@ -267,10 +390,8 @@ function getTotal(row: any) {
   return typeof value === "number" ? value : Number(value) || 0;
 }
 
-function invoiceLabel(row: any) {
-  const categoryLabel = prettyCategory(row.categorySlug ?? slugify(row.categoryName ?? "unknown"));
-  const provider = row.providerName ?? row.customProviderName ?? "Unknown";
-  return `${categoryLabel} - ${provider}`;
+function getProvider(row: any) {
+  return row?.providerName ?? row?.customProviderName ?? "Unassigned Invoice";
 }
 
 function getInvoiceUrl(bill: any) {

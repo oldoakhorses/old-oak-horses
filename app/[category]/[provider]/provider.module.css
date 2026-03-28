@@ -38,7 +38,7 @@
 .infoLabel {
   font-size: 10px;
   color: var(--color-text-muted);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   margin-bottom: 3px;
 }
@@ -70,7 +70,7 @@
 .statLabel {
   font-size: 10px;
   color: var(--color-text-muted);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
@@ -99,7 +99,7 @@
 .fieldLabel {
   font-size: 10px;
   color: var(--color-text-muted);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 

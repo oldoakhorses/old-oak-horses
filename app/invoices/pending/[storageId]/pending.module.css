@@ -1,0 +1,84 @@
+.providerBannerUnknown {
+  background: rgba(245, 158, 11, 0.04);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 12px;
+  padding: 18px 26px;
+  max-width: 760px;
+}
+
+.bannerTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 8px;
+}
+
+.bannerSub {
+  font-size: 10px;
+  color: #9ea2b0;
+  margin-bottom: 16px;
+}
+
+.fieldRow {
+  margin-bottom: 14px;
+}
+
+.label {
+  display: block;
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.input {
+  width: 100%;
+  max-width: 420px;
+  background: #ffffff;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #1a1a2e;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.cancelBtn {
+  font-size: 10px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #6b7084;
+  cursor: pointer;
+}
+
+.saveBtn {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: none;
+  background: #1a1a2e;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.saveBtn:disabled {
+  background: #e8eaf0;
+  color: #9ea2b0;
+  cursor: default;
+}
+
+.error {
+  color: #e5484d;
+  font-size: 10px;
+  margin-top: 6px;
+}

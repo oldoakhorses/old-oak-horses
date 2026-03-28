@@ -1,0 +1,198 @@
+"use client";
+
+import { useParams } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import Link from "next/link";
+import styles from "./contact.module.css";
+
+const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
+  veterinary: { bg: "rgba(74,91,219,0.08)", color: "#4A5BDB" },
+  farrier: { bg: "rgba(20,184,166,0.08)", color: "#14B8A6" },
+  stabling: { bg: "rgba(245,158,11,0.08)", color: "#F59E0B" },
+  "feed-bedding": { bg: "rgba(107,112,132,0.12)", color: "#6B7084" },
+  "horse-transport": { bg: "rgba(239,68,68,0.08)", color: "#E5484D" },
+  bodywork: { bg: "rgba(167,139,250,0.08)", color: "#A78BFA" },
+  supplies: { bg: "rgba(34,197,131,0.08)", color: "#22C583" },
+  travel: { bg: "rgba(236,72,153,0.08)", color: "#EC4899" },
+  housing: { bg: "rgba(6,182,212,0.08)", color: "#06B6D4" },
+  admin: { bg: "rgba(100,116,139,0.12)", color: "#64748B" },
+  "dues-registrations": { bg: "rgba(168,85,247,0.12)", color: "#A855F7" },
+  marketing: { bg: "rgba(99,102,241,0.08)", color: "#6366F1" },
+  "show-expenses": { bg: "rgba(249,115,22,0.08)", color: "#F97316" },
+  salaries: { bg: "rgba(14,165,233,0.08)", color: "#0EA5E9" },
+};
+
+function formatUsd(amount: number) {
+  return `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatCategoryLabel(slug: string) {
+  return slug
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ")
+    .replace("Feed Bedding", "Feed & Bedding")
+    .replace("Dues Registrations", "Dues & Registrations");
+}
+
+export default function ContactDetailPage() {
+  const params = useParams<{ slug: string }>();
+  const slug = params.slug;
+
+  const contact = useQuery(api.contacts.getContactBySlug, { slug });
+  const bills = useQuery(
+    api.bills.getBillsByContact,
+    contact?._id ? { contactId: contact._id } : "skip"
+  );
+  const costSummary = useQuery(
+    api.bills.getContactCostSummary,
+    contact?._id ? { contactId: contact._id } : "skip"
+  );
+
+  if (contact === undefined) return <div className="page-loading">Loading...</div>;
+  if (contact === null) return <div className="page-loading">Contact not found</div>;
+
+  const approvedBills = (bills ?? []).filter(
+    (b) => b.status === "done" || b.isApproved
+  );
+
+  return (
+    <main className="page-main">
+      <Link href="/contacts" className={styles.backLink}>
+        &larr; cd /contacts
+      </Link>
+
+      <div className={styles.header}>
+        <div>
+          <h1 className={styles.contactName}>{contact.name}</h1>
+          <div className={styles.contactType}>
+            {contact.type ?? "vendor"} {contact.category ? `/ ${contact.category}` : ""}
+          </div>
+        </div>
+      </div>
+
+      {/* Contact details */}
+      <div className={styles.detailsCard}>
+        <div className={styles.detailsGrid}>
+          {contact.fullName ? (
+            <div><span className={styles.label}>FULL NAME</span><span className={styles.value}>{contact.fullName}</span></div>
+          ) : null}
+          {contact.contactName || contact.primaryContactName ? (
+            <div><span className={styles.label}>CONTACT PERSON</span><span className={styles.value}>{contact.contactName ?? contact.primaryContactName}</span></div>
+          ) : null}
+          {contact.phone || contact.primaryContactPhone ? (
+            <div><span className={styles.label}>PHONE</span><span className={styles.value}>{contact.phone ?? contact.primaryContactPhone}</span></div>
+          ) : null}
+          {contact.email ? (
+            <div><span className={styles.label}>EMAIL</span><span className={styles.value}>{contact.email}</span></div>
+          ) : null}
+          {contact.address ? (
+            <div><span className={styles.label}>ADDRESS</span><span className={styles.value}>{contact.address}</span></div>
+          ) : null}
+          {contact.website ? (
+            <div><span className={styles.label}>WEBSITE</span><span className={styles.value}>{contact.website}</span></div>
+          ) : null}
+          {contact.accountNumber ? (
+            <div><span className={styles.label}>ACCOUNT #</span><span className={styles.value}>{contact.accountNumber}</span></div>
+          ) : null}
+          {contact.location ? (
+            <div><span className={styles.label}>LOCATION</span><span className={styles.value}>{contact.location}</span></div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className={styles.statsRow}>
+        <div className={styles.statCard}>
+          <div className={styles.statLabel}>TOTAL SPEND</div>
+          <div className={styles.statValue}>{costSummary ? formatUsd(costSummary.totalSpend) : "..."}</div>
+        </div>
+        <div className={styles.statCard}>
+          <div className={styles.statLabel}>INVOICES</div>
+          <div className={styles.statValue}>{costSummary?.invoiceCount ?? "..."}</div>
+        </div>
+        <div className={styles.statCard}>
+          <div className={styles.statLabel}>CATEGORIES</div>
+          <div className={styles.statValue}>{costSummary?.categoryBreakdown.length ?? "..."}</div>
+        </div>
+      </div>
+
+      {/* Category breakdown */}
+      {costSummary && costSummary.categoryBreakdown.length > 0 ? (
+        <>
+          <div className={styles.sectionTitle}>SPEND BY CATEGORY</div>
+          <div className={styles.breakdownCard}>
+            {costSummary.categoryBreakdown.map((row) => {
+              const colors = CATEGORY_COLORS[row.category] ?? { bg: "rgba(0,0,0,0.04)", color: "#666" };
+              return (
+                <div key={row.category} className={styles.breakdownRow}>
+                  <span
+                    className={styles.categoryPill}
+                    style={{ background: colors.bg, color: colors.color }}
+                  >
+                    {formatCategoryLabel(row.category)}
+                  </span>
+                  <span className={styles.breakdownAmount}>{formatUsd(row.amount)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : null}
+
+      {/* Invoices list */}
+      <div className={styles.sectionTitle}>INVOICES</div>
+      {approvedBills.length === 0 ? (
+        <div className={styles.empty}>No approved invoices yet</div>
+      ) : (
+        <table className={styles.invoiceTable}>
+          <thead>
+            <tr>
+              <th>INVOICE</th>
+              <th>DATE</th>
+              <th>CATEGORIES</th>
+              <th style={{ textAlign: "right" }}>TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {approvedBills.map((bill) => {
+              const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+              const invoiceDate = typeof extracted.invoice_date === "string" ? extracted.invoice_date : null;
+              const invoiceTotal = typeof extracted.invoice_total_usd === "number" ? extracted.invoice_total_usd : 0;
+              const lineItemCats = (bill.lineItemCategories ?? []) as string[];
+
+              return (
+                <tr key={bill._id}>
+                  <td>
+                    <Link href={`/invoices/preview/${bill._id}`} className={styles.invoiceLink}>
+                      {bill.fileName}
+                    </Link>
+                  </td>
+                  <td>{invoiceDate ?? "—"}</td>
+                  <td>
+                    {lineItemCats.length > 0
+                      ? lineItemCats.map((cat) => {
+                          const colors = CATEGORY_COLORS[cat] ?? { bg: "rgba(0,0,0,0.04)", color: "#666" };
+                          return (
+                            <span
+                              key={cat}
+                              className={styles.categoryPill}
+                              style={{ background: colors.bg, color: colors.color, marginRight: 4 }}
+                            >
+                              {formatCategoryLabel(cat)}
+                            </span>
+                          );
+                        })
+                      : "—"}
+                  </td>
+                  <td className={styles.amountCell}>{formatUsd(invoiceTotal)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </main>
+  );
+}

@@ -1,0 +1,427 @@
+.loading {
+
+  font-size: 12px;
+  color: #9ea2b0;
+  text-align: center;
+  padding: 60px 20px;
+}
+
+/* Info card */
+.infoCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 24px 26px;
+  margin-bottom: 20px;
+}
+
+.infoHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.ownerName {
+
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0;
+}
+
+.ownerMeta {
+
+  font-size: 11px;
+  color: #6b7084;
+  margin-top: 4px;
+}
+
+.ownerAddress {
+
+  font-size: 11px;
+  color: #6b7084;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f1f5;
+}
+
+.ownerNotes {
+
+  font-size: 11px;
+  color: #9ea2b0;
+  margin-top: 8px;
+  font-style: italic;
+}
+
+.btnEdit {
+
+  font-size: 10px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #e8eaf0;
+  background: #fff;
+  color: #4a5bdb;
+  cursor: pointer;
+}
+
+.btnEdit:hover {
+  border-color: #4a5bdb;
+}
+
+/* Stats row */
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.statCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+
+.statLabel {
+
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.statValue {
+
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+/* Section cards */
+.sectionCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sectionTitle {
+
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 16px;
+}
+
+.sectionHeader .sectionTitle {
+  margin-bottom: 0;
+}
+
+/* Category rows */
+.catRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.catInfo {
+  width: 140px;
+  flex-shrink: 0;
+}
+
+.catPill {
+
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+.catBarWrap {
+  flex: 1;
+  height: 6px;
+  background: #f0f1f5;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.catBar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.catAmount {
+
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a2e;
+  width: 100px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Horse spend rows */
+.horseSpendRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid #f0f1f5;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.horseSpendRow:last-child {
+  border-bottom: none;
+}
+
+.horseSpendRow:hover {
+  opacity: 0.8;
+}
+
+.horseSpendLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.horseIcon {
+  font-size: 20px;
+}
+
+.horseSpendName {
+
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.horseSpendMeta {
+
+  font-size: 10px;
+  color: #9ea2b0;
+  margin-top: 2px;
+}
+
+.horseSpendAmount {
+
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+/* Horse list rows */
+.horseRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid #f0f1f5;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.horseRow:last-child {
+  border-bottom: none;
+}
+
+.horseRow:hover {
+  opacity: 0.8;
+}
+
+.horseRowLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.horseName {
+
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.horseSub {
+
+  font-size: 10px;
+  color: #9ea2b0;
+  margin-top: 2px;
+}
+
+.horseStatus {
+
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.horseStatus[data-status="active"] {
+  background: rgba(34, 197, 131, 0.1);
+  color: #22C583;
+}
+
+.horseStatus[data-status="inactive"] {
+  background: rgba(158, 162, 176, 0.1);
+  color: #9ea2b0;
+}
+
+.horseStatus[data-status="past"] {
+  background: rgba(107, 112, 132, 0.1);
+  color: #6b7084;
+}
+
+.emptyHorses {
+
+  font-size: 12px;
+  color: #9ea2b0;
+  text-align: center;
+  padding: 24px;
+}
+
+/* Assign modal */
+.assignList {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.assignOption {
+
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border: none;
+  border-bottom: 1px solid #f0f1f5;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: #1a1a2e;
+}
+
+.assignOption:last-child {
+  border-bottom: none;
+}
+
+.assignOption:hover {
+  background: #fafafc;
+}
+
+.assignPlus {
+  font-size: 16px;
+  color: #22C583;
+  font-weight: 700;
+}
+
+/* Buttons */
+.btnAdd {
+
+  font-size: 10px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #e8eaf0;
+  background: #fff;
+  color: #6b7084;
+  cursor: pointer;
+}
+
+.btnAdd:hover {
+  border-color: #4a5bdb;
+  color: #4a5bdb;
+}
+
+.btnSave {
+
+  font-size: 11px;
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* Form */
+.formGroup {
+  margin-bottom: 14px;
+}
+
+.formLabel {
+
+  font-size: 10px;
+  font-weight: 700;
+  color: #6b7084;
+  display: block;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.formInput {
+
+  width: 100%;
+  font-size: 13px;
+  padding: 10px 12px;
+  background: #f5f5f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  color: #1a1a2e;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.formInput:focus {
+  border-color: #4a5bdb;
+}
+
+.formTextarea {
+
+  width: 100%;
+  font-size: 13px;
+  padding: 10px 12px;
+  background: #f5f5f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  color: #1a1a2e;
+  box-sizing: border-box;
+  outline: none;
+  min-height: 60px;
+  resize: vertical;
+}
+
+.formTextarea:focus {
+  border-color: #4a5bdb;
+}
+
+@media (max-width: 640px) {
+  .statsRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .ownerName {
+    font-size: 22px;
+  }
+  .catInfo {
+    width: 100px;
+  }
+  .catAmount {
+    width: 80px;
+  }
+}

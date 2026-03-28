@@ -6,7 +6,9 @@ import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import InvoiceNotesCard from "@/components/InvoiceNotesCard";
 import NavBar from "@/components/NavBar";
+import { formatInvoiceName } from "@/lib/formatInvoiceName";
 import Modal from "@/components/Modal";
 import UnmatchedHorseBanner from "@/components/UnmatchedHorseBanner";
 import styles from "./feedBeddingInvoice.module.css";
@@ -223,7 +225,7 @@ export default function FeedBeddingInvoicePage() {
   async function onDelete() {
     if (!bill) return;
     await deleteBill({ billId: bill._id });
-    router.push(`/feed-bedding/${providerSlug}`);
+    router.push("/invoices");
   }
 
   async function onToggleSubcategory(index: number, current: FeedBeddingType) {
@@ -248,7 +250,7 @@ export default function FeedBeddingInvoicePage() {
           { label: "old-oak-horses", href: "/dashboard", brand: true },
           { label: "feed_bedding", href: "/feed-bedding" },
           { label: providerSlug, href: `/feed-bedding/${providerSlug}` },
-          { label: String(extracted.invoice_number ?? "invoice"), current: true }
+          { label: formatInvoiceName({ providerName: String((extracted as any).provider_name ?? bill?.provider?.name ?? bill?.customProviderName ?? "Unassigned Invoice"), date: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "") }), current: true }
         ]}
         actions={bill.originalPdfUrl ? [{ label: "view original PDF", href: bill.originalPdfUrl, variant: "link", newTab: true }] : []}
       />
@@ -346,16 +348,18 @@ export default function FeedBeddingInvoicePage() {
                   ))}
                 </div>
               </div>
-              <button
-                type="button"
-                className="ui-button-outlined"
-                onClick={() => {
-                  setEditing(true);
-                  setAssignmentSavedLocal(false);
-                }}
-              >
-                edit
-              </button>
+              {!bill.isApproved ? (
+                <button
+                  type="button"
+                  className="ui-button-outlined"
+                  onClick={() => {
+                    setEditing(true);
+                    setAssignmentSavedLocal(false);
+                  }}
+                >
+                  edit
+                </button>
+              ) : null}
             </div>
           ) : (
             <>
@@ -462,6 +466,8 @@ export default function FeedBeddingInvoicePage() {
           )}
         </section>
 
+        {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
+
         <section className={styles.approvalRow}>
           {bill.isApproved ? (
             <div className={styles.approvedBox}>✓ invoice approved</div>
@@ -510,7 +516,7 @@ export default function FeedBeddingInvoicePage() {
 
         <Modal open={showDeleteConfirm} title="delete invoice?" onClose={() => setShowDeleteConfirm(false)}>
           <p className={styles.modalBody}>
-            this will permanently delete invoice <strong>{String(extracted.invoice_number ?? billId)}</strong>.
+            this will permanently delete invoice <strong>{formatInvoiceName({ providerName: String((extracted as any).provider_name ?? bill?.provider?.name ?? bill?.customProviderName ?? "Unassigned Invoice"), date: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "") })}</strong>.
           </p>
           <p className={styles.modalSub}>this action cannot be undone.</p>
           <div className={styles.modalActions}>

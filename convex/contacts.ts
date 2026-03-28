@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 
 const locationValue = v.union(
   v.literal("wellington"),
@@ -62,6 +62,27 @@ export const getContactById = query({
   }
 });
 
+export const getContactBySlug = query({
+  args: { slug: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("contacts")
+      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .first();
+  }
+});
+
+export const getVendorContacts = query({
+  args: {},
+  handler: async (ctx) => {
+    const contacts = await ctx.db
+      .query("contacts")
+      .withIndex("by_type", (q) => q.eq("type", "vendor"))
+      .collect();
+    return contacts.sort((a, b) => a.name.localeCompare(b.name));
+  }
+});
+
 export const listContacts = query({
   args: {
     category: v.optional(v.string()),
@@ -121,7 +142,7 @@ export const updateContact = mutation({
     providerId: v.optional(v.id("providers")),
     providerName: v.optional(v.string()),
     category: v.optional(v.string()),
-    location: v.optional(locationValue),
+    location: v.optional(v.string()),
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
     notes: v.optional(v.string()),
@@ -134,18 +155,26 @@ export const updateContact = mutation({
     if (!contact) throw new Error("Contact not found");
 
     const providerName = args.providerName ?? args.company;
-    await ctx.db.patch(contactId, {
-      name: args.name ? args.name.trim() : undefined,
+    const fields = {
+      name: args.name !== undefined ? args.name.trim() : undefined,
       role: args.role !== undefined ? trimOrUndefined(args.role) : undefined,
       providerId: args.providerId,
       providerName: providerName !== undefined ? trimOrUndefined(providerName) : undefined,
-      category: args.category ? normalizeCategory(args.category) : undefined,
-      location: args.location,
+      category: args.category !== undefined ? normalizeCategory(args.category) : undefined,
+      location: args.location !== undefined ? normalizeLocation(args.location) : undefined,
       phone: args.phone !== undefined ? trimOrUndefined(args.phone) : undefined,
       email: args.email !== undefined ? normalizeEmail(args.email) : undefined,
       notes: args.notes !== undefined ? trimOrUndefined(args.notes) : undefined,
       company: providerName !== undefined ? trimOrUndefined(providerName) : undefined
-    });
+    } as const;
+    const updates = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
+    if (args.location !== undefined && !normalizeLocation(args.location)) {
+      updates.location = undefined;
+    }
+    if (args.category !== undefined && !args.category.trim()) {
+      updates.category = "other";
+    }
+    await ctx.db.patch(contactId, updates as any);
 
     return contactId;
   }
@@ -177,46 +206,31 @@ export const upsertContactFromInvoice = internalMutation({
   },
   handler: async (ctx, args) => {
     const normalizedName = args.name.trim();
-    if (!normalizedName) return null;
+    const normalizedProviderName = trimOrUndefined(args.providerName);
+    if (!normalizedName && !normalizedProviderName) return null;
 
     const normalizedCategory = normalizeCategory(args.category);
     const normalizedLocation = normalizeLocation(args.location);
     const normalizedEmail = normalizeEmail(args.email);
-    const normalizedProviderName = trimOrUndefined(args.providerName);
+    const providerKey = (normalizedProviderName ?? normalizedName).toLowerCase();
+    const existingContacts = await ctx.db.query("contacts").collect();
+    const alreadyExists = existingContacts.some((contact) => {
+      const contactProviderName = contact.providerName?.toLowerCase();
+      const contactName = contact.name?.toLowerCase();
+      const contactEmail = contact.email?.toLowerCase();
 
-    let existing =
-      normalizedEmail
-        ? (await ctx.db
-            .query("contacts")
-            .withIndex("by_name", (q) => q.eq("name", normalizedName))
-            .collect())
-            .find((entry) => entry.email === normalizedEmail && entry.category === normalizedCategory)
-        : undefined;
-
-    if (!existing) {
-      existing = (await ctx.db.query("contacts").withIndex("by_name", (q) => q.eq("name", normalizedName)).collect()).find((entry) => {
-        if (entry.category !== normalizedCategory) return false;
-        if (args.providerId && entry.providerId && String(entry.providerId) !== String(args.providerId)) return false;
-        if (normalizedProviderName && entry.providerName && entry.providerName !== normalizedProviderName) return false;
+      if (providerKey && (contactProviderName === providerKey || contactName === providerKey)) {
         return true;
-      });
-    }
-
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        role: existing.role ?? trimOrUndefined(args.role),
-        providerId: existing.providerId ?? args.providerId,
-        providerName: existing.providerName ?? normalizedProviderName,
-        company: existing.company ?? normalizedProviderName,
-        location: existing.location ?? normalizedLocation,
-        phone: existing.phone ?? trimOrUndefined(args.phone),
-        email: existing.email ?? normalizedEmail
-      });
-      return existing._id;
-    }
+      }
+      if (normalizedEmail && contactEmail === normalizedEmail) {
+        return true;
+      }
+      return false;
+    });
+    if (alreadyExists) return null;
 
     return await ctx.db.insert("contacts", {
-      name: normalizedName,
+      name: normalizedName || normalizedProviderName || "Unknown",
       role: trimOrUndefined(args.role),
       providerId: args.providerId,
       providerName: normalizedProviderName,
@@ -228,4 +242,68 @@ export const upsertContactFromInvoice = internalMutation({
       createdAt: Date.now()
     });
   }
+});
+
+export const listVendorsForMatching = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const contacts = await ctx.db.query("contacts").collect();
+    return contacts
+      .filter((c) => c.type === "vendor" || c.providerId)
+      .map((contact) => ({
+        _id: contact._id,
+        name: contact.name,
+        slug: contact.slug ?? undefined,
+        email: contact.email ?? undefined,
+        phone: contact.phone ?? undefined,
+        website: contact.website ?? undefined,
+        address: contact.address ?? undefined,
+        category: contact.category ?? "other",
+        providerId: contact.providerId ?? undefined,
+      }));
+  },
+});
+
+export const getContactByNameInternal = internalQuery({
+  args: { name: v.string() },
+  handler: async (ctx, args) => {
+    const normalized = args.name.trim().toLowerCase();
+    const contacts = await ctx.db.query("contacts").withIndex("by_name").collect();
+    return contacts.find((c) => c.name.toLowerCase().trim() === normalized) ?? null;
+  },
+});
+
+export const updateContactFromInvoice = internalMutation({
+  args: {
+    contactId: v.id("contacts"),
+    fullName: v.optional(v.string()),
+    contactName: v.optional(v.string()),
+    primaryContactName: v.optional(v.string()),
+    primaryContactPhone: v.optional(v.string()),
+    address: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    email: v.optional(v.string()),
+    website: v.optional(v.string()),
+    accountNumber: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const contact = await ctx.db.get(args.contactId);
+    if (!contact) return;
+
+    const updates: Record<string, unknown> = {};
+    if (args.fullName && !contact.fullName) updates.fullName = args.fullName;
+    if (args.contactName && !contact.contactName) updates.contactName = args.contactName;
+    if (args.primaryContactName && !contact.primaryContactName) updates.primaryContactName = args.primaryContactName;
+    if (args.primaryContactPhone && !contact.primaryContactPhone) updates.primaryContactPhone = args.primaryContactPhone;
+    if (args.address && !contact.address) updates.address = args.address;
+    if (args.phone && !contact.phone) updates.phone = args.phone;
+    if (args.email && !contact.email) updates.email = args.email;
+    if (args.website && !contact.website) updates.website = args.website;
+    if (args.accountNumber && !contact.accountNumber) updates.accountNumber = args.accountNumber;
+
+    if (Object.keys(updates).length > 0) {
+      updates.updatedAt = Date.now();
+      await ctx.db.patch(args.contactId, updates as any);
+    }
+  },
 });

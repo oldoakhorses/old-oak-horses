@@ -14,7 +14,6 @@
 }
 
 .addButton {
-  font-family: "Space Mono", monospace;
   font-size: 11px;
   font-weight: 700;
   padding: 10px 16px;
@@ -53,7 +52,6 @@
 }
 
 .searchInput {
-  font-family: "Space Mono", monospace;
   font-size: 12px;
   padding: 10px 14px 10px 36px;
   background: #fff;
@@ -75,7 +73,6 @@
 }
 
 .locationFilter {
-  font-family: "Space Mono", monospace;
   font-size: 10px;
   padding: 8px 10px;
   min-width: 130px;
@@ -92,7 +89,6 @@
   background: #fff;
   border: 1px solid #e8eaf0;
   border-radius: 12px;
-  overflow: hidden;
 }
 
 .newContactCard {
@@ -119,16 +115,27 @@
   flex-direction: column;
 }
 
+.fieldGroupFull {
+  grid-column: 1 / -1;
+}
+
 .fieldLabel {
   font-size: 10px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 6px;
 }
 
+.editLabel {
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
 .fieldInput {
-  font-family: "Space Mono", monospace;
   background: #f2f3f7;
   border: 1px solid #e8eaf0;
   border-radius: 6px;
@@ -156,7 +163,6 @@
 }
 
 .cancelButton {
-  font-family: "Space Mono", monospace;
   font-size: 11px;
   padding: 10px 16px;
   border-radius: 6px;
@@ -167,7 +173,6 @@
 }
 
 .saveButton {
-  font-family: "Space Mono", monospace;
   font-size: 11px;
   font-weight: 700;
   padding: 10px 16px;
@@ -192,10 +197,9 @@
 }
 
 .columnHeader {
-  font-family: "Space Mono", monospace;
   font-size: 9px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   cursor: pointer;
   display: flex;
@@ -323,7 +327,6 @@
 }
 
 .menuItem {
-  font-family: "Space Mono", monospace;
   font-size: 11px;
   padding: 8px 16px;
   border: none;
@@ -360,6 +363,13 @@
   margin-bottom: 16px;
 }
 
+.editFields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
 .detailField {
   min-width: 120px;
 }
@@ -369,17 +379,15 @@
 }
 
 .detailLabel {
-  font-family: "Space Mono", monospace;
   font-size: 9px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 4px;
 }
 
 .detailValue,
 .detailValueEmpty {
-  font-family: "Space Mono", monospace;
   font-size: 12px;
   color: #1a1a2e;
   line-height: 1.5;
@@ -391,7 +399,6 @@
 }
 
 .detailLink {
-  font-family: "Space Mono", monospace;
   font-size: 12px;
   color: #4a5bdb;
   text-decoration: none;
@@ -410,7 +417,6 @@
 }
 
 .btnEditContact {
-  font-family: "Space Mono", monospace;
   font-size: 10px;
   font-weight: 700;
   padding: 7px 14px;
@@ -427,7 +433,6 @@
 }
 
 .btnCloseDetail {
-  font-family: "Space Mono", monospace;
   font-size: 10px;
   padding: 7px 14px;
   border-radius: 6px;
@@ -443,7 +448,6 @@
 
 .detailInput,
 .detailTextarea {
-  font-family: "Space Mono", monospace;
   font-size: 12px;
   padding: 8px 12px;
   background: #fff;
@@ -452,6 +456,28 @@
   width: 100%;
   box-sizing: border-box;
   color: #1a1a2e;
+}
+
+.editInput {
+  font-size: 12px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  color: #1a1a2e;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.editInput:focus {
+  border-color: #4a5bdb;
+}
+
+.editFields textarea.editInput {
+  min-height: 60px;
+  resize: vertical;
+  line-height: 1.5;
 }
 
 .detailInput:focus,
@@ -467,7 +493,6 @@
 }
 
 .btnSaveDetail {
-  font-family: "Space Mono", monospace;
   font-size: 10px;
   font-weight: 700;
   padding: 7px 14px;
@@ -479,7 +504,6 @@
 }
 
 .btnCancelDetail {
-  font-family: "Space Mono", monospace;
   font-size: 10px;
   padding: 7px 14px;
   border-radius: 6px;
@@ -487,6 +511,11 @@
   background: transparent;
   color: #6b7084;
   cursor: pointer;
+}
+
+.btnSaveDetail:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .emptyState {

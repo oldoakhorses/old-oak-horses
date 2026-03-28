@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
-import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
+import { formatInvoiceName, toIsoDateString } from "@/lib/formatInvoiceName";
 
 const SUBCATEGORIES = new Set(["vip-tickets", "photography", "social-media"]);
 const LABELS: Record<string, string> = {
@@ -40,7 +40,7 @@ export default function MarketingSegmentPage() {
           { label: segment, current: true }
         ]}
         actions={[
-          { label: "upload invoices", href: "/upload", variant: "outlined" },
+          { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
           { label: "biz overview", href: "/biz-overview", variant: "filled" }
         ]}
       />
@@ -59,7 +59,7 @@ export default function MarketingSegmentPage() {
               {(bills ?? []).map((bill) => (
                 <li key={bill._id} style={{ marginBottom: 8 }}>
                   <Link href={`/marketing/${segment}/${bill._id}`}>
-                    {formatInvoiceTitle({
+                    {formatInvoiceName({
                       category: "marketing",
                       providerName: bill.providerName,
                       subcategory: segment,
@@ -87,7 +87,7 @@ export default function MarketingSegmentPage() {
                 {providerBills.map((bill) => (
                   <li key={bill._id} style={{ marginBottom: 8 }}>
                     <Link href={`/marketing/${bill.marketingSubcategory ?? "other"}/${bill._id}`}>
-                      {formatInvoiceTitle({
+                      {formatInvoiceName({
                         category: "marketing",
                         providerName: provider?.name ?? segment,
                         subcategory: bill.marketingSubcategory ?? "other",

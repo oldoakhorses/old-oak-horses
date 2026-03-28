@@ -6,7 +6,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
 import SpendBar from "@/components/SpendBar";
-import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
+import { formatInvoiceName, toIsoDateString } from "@/lib/formatInvoiceName";
 import styles from "./travel.module.css";
 
 const SUBCATEGORY_ORDER = ["flights", "trains", "rental-car", "gas", "meals", "hotels"] as const;
@@ -49,7 +49,7 @@ export default function TravelOverviewPage() {
           { label: "travel", current: true }
         ]}
         actions={[
-          { label: "upload invoices", href: "/upload", variant: "outlined" },
+          { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
           { label: "biz overview", href: "/biz-overview", variant: "filled" }
         ]}
       />
@@ -101,7 +101,7 @@ export default function TravelOverviewPage() {
                 <div>
                   <div className={styles.invoiceTop}>
                     <span className={styles.provider}>
-                      {formatInvoiceTitle({
+                      {formatInvoiceName({
                         category: "travel",
                         providerName: bill.providerName,
                         subcategory: bill.travelSubcategory || "travel",

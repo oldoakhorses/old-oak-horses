@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import ConvexClientProvider from "@/components/ConvexClientProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import AppAuthGate from "@/components/AppAuthGate";
+import GlobalFab from "@/components/GlobalFab";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,7 +17,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <ConvexClientProvider>
           <AuthProvider>
-            <AppAuthGate>{children}</AppAuthGate>
+            <AppAuthGate>
+              {children}
+              <Suspense fallback={null}>
+                <GlobalFab />
+              </Suspense>
+            </AppAuthGate>
           </AuthProvider>
         </ConvexClientProvider>
       </body>

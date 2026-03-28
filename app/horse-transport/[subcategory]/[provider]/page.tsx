@@ -7,7 +7,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import NavBar from "@/components/NavBar";
-import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
+import { formatInvoiceName, toIsoDateString } from "@/lib/formatInvoiceName";
 
 type ProviderInvoiceRow = {
   _id: Id<"bills">;
@@ -39,7 +39,7 @@ export default function HorseTransportProviderPage() {
           { label: providerSlug, current: true }
         ]}
         actions={[
-          { label: "upload invoices", href: "/upload", variant: "outlined" },
+          { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
           { label: "biz overview", href: "/biz-overview", variant: "filled" }
         ]}
       />
@@ -58,7 +58,7 @@ export default function HorseTransportProviderPage() {
               {rows.map((row) => (
                 <li key={row._id}>
                   <Link href={`/horse-transport/${subcategory}/${providerSlug}/${row._id}`}>
-                    {formatInvoiceTitle({
+                    {formatInvoiceName({
                       category: "horse-transport",
                       providerName: provider?.name ?? providerSlug,
                       subcategory,

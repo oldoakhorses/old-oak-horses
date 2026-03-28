@@ -1,12 +1,15 @@
 export const HORSE_ALIASES: Record<string, string> = {
   ben: "Ben",
   "ben 431": "Ben",
+  "ben 431 davis": "Ben",
+  "ben davis": "Ben",
   ben431: "Ben",
   benny: "Ben",
   gaby: "Gaby de Courcel",
   "gaby de courcel": "Gaby de Courcel",
   "gaby courcel": "Gaby de Courcel",
   gabby: "Gaby de Courcel",
+  "gabby de courcel": "Gaby de Courcel",
   valentina: "Numero Valentina Z",
   "numero valentina": "Numero Valentina Z",
   "numero valentina z": "Numero Valentina Z",
@@ -15,8 +18,12 @@ export const HORSE_ALIASES: Record<string, string> = {
   "lingo van de watermoelen": "Lingo Van De Watermoelen",
   "lingo watermoelen": "Lingo Van De Watermoelen",
   gigi: "Gigi",
+  "gigi davis": "Gigi",
   carlin: "Carlin",
+  "carlin davis": "Carlin",
   carl: "Carlin",
+  "valentina davis": "Numero Valentina Z",
+  "barn group davis": "__split_all__",
+  "barn group": "__split_all__",
   "chino 29": "Chino 29"
 };
-

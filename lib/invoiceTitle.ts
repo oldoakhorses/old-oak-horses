@@ -4,6 +4,7 @@ type InvoiceTitleInput = {
   subcategory?: string | null;
   date: string;
 };
+import { formatInvoiceName as _formatInvoiceName } from "./formatInvoiceName";
 
 const CATEGORY_LABELS: Record<string, string> = {
   veterinary: "Veterinary",
@@ -61,10 +62,10 @@ export function toIsoDateString(value: string) {
 }
 
 export function formatInvoiceTitle(input: InvoiceTitleInput) {
-  const categoryLabel = formatCategoryName(input.category);
-  const middle = input.providerName?.trim() || formatSubcategoryName(input.subcategory) || "Unknown";
-  const dateStr = toIsoDateString(input.date);
-  return `${categoryLabel} - ${middle} - ${dateStr}`;
+  return _formatInvoiceName({
+    providerName: input.providerName ?? (formatSubcategoryName(input.subcategory) || undefined),
+    date: input.date
+  });
 }
 
 function normalize(value: string) {

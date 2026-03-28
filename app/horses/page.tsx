@@ -93,7 +93,7 @@ export default function HorsesPage() {
           { label: "horses", current: true },
         ]}
         actions={[
-          { label: "upload invoices", href: "/upload", variant: "outlined" },
+          { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
           { label: "biz overview", href: "/biz-overview", variant: "filled" },
         ]}
       />
@@ -162,13 +162,9 @@ export default function HorsesPage() {
                   </button>
                   {menuOpen ? (
                     <div className={styles.menuDropdown}>
-                      <Link href={`/horses/${horse._id}`} className={styles.menuItem}>
-                        View Profile
-                      </Link>
                       <Link href={`/horses/${horse._id}?edit=1`} className={styles.menuItem}>
-                        Edit Profile
+                        Edit
                       </Link>
-                      <div className={styles.menuDivider} />
                       {horse.status === "active" ? (
                         <button type="button" className={styles.menuItem} onClick={() => updateStatus(horse._id, "inactive")}>
                           Deactivate

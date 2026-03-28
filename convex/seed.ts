@@ -20,6 +20,18 @@ const CATEGORY_SEED = [
   { name: "Show Expenses", slug: "show-expenses" }
 ] as const;
 
+const VET_SUBCATEGORY_DEFAULTS = [
+  { slug: "medication", label: "Medication", isDefault: true },
+  { slug: "joint_injections", label: "Joint Injections", isDefault: true },
+  { slug: "exams_diagnostics", label: "Exams & Diagnostics", isDefault: true },
+  { slug: "vaccinations", label: "Vaccinations", isDefault: true },
+  { slug: "shockwave", label: "Shockwave", isDefault: true },
+  { slug: "sedation", label: "Sedation", isDefault: true },
+  { slug: "fees", label: "Fees", isDefault: true },
+  { slug: "lab_work", label: "Lab Work", isDefault: true },
+  { slug: "other", label: "Other", isDefault: true },
+] as const;
+
 const BUTHE_EXTRACTION_PROMPT = `You are parsing a veterinary invoice from Dr André Buthe Equine Clinic Ltd. These invoices are in GBP — you must convert all monetary values to USD using the current GBP/USD exchange rate (fetch it at time of parsing).
 
 IMPORTANT: The PDF has two pages. Page 1 is a remittance/summary page — ignore it entirely. Extract data only from page 2 onwards.
@@ -110,7 +122,9 @@ Return the result as a single JSON object in this shape:
   ]
 }`;
 
-export const seedCategories = mutation(async (ctx) => {
+export const seedCategories = mutation({
+  args: {},
+  handler: async (ctx) => {
   let createdCategories = 0;
   for (const category of CATEGORY_SEED) {
     const existingCategory = await ctx.db
@@ -151,7 +165,7 @@ export const seedCategories = mutation(async (ctx) => {
       expectedFields: ["date", "horse_name", "services", "total_due"]
     },
     {
-      name: "EqSports",
+      name: "EQ Sports Medicine Group",
       extractionPrompt: "PLACEHOLDER — to be updated",
       expectedFields: ["date", "horse_name", "services", "total_due"]
     },
@@ -174,6 +188,7 @@ export const seedCategories = mutation(async (ctx) => {
 
   let createdProviders = 0;
   let updatedProviders = 0;
+  let seededVetSubcategories = 0;
   for (const provider of vetProviders) {
     const existingProvider = await ctx.db
       .query("providers")
@@ -200,6 +215,57 @@ export const seedCategories = mutation(async (ctx) => {
       updatedAt: Date.now()
     });
     updatedProviders += 1;
+  }
+
+  const legacyEqSports = await ctx.db
+    .query("providers")
+    .withIndex("by_category_name", (q) => q.eq("categoryId", vetCategory._id).eq("name", "EqSports"))
+    .first();
+  if (legacyEqSports) {
+    await ctx.db.patch(legacyEqSports._id, {
+      name: "EQ Sports Medicine Group",
+      slug: "eq-sports",
+      category: "veterinary",
+      email: legacyEqSports.email ?? "eqsportsmedicinegroup@gmail.com",
+      phone: legacyEqSports.phone ?? "310-944-0570",
+      address: legacyEqSports.address ?? "PO Box 1573, Rancho Santa Fe, CA 92067",
+      updatedAt: Date.now()
+    });
+    updatedProviders += 1;
+  }
+
+  const eqSportsProvider = await ctx.db
+    .query("providers")
+    .withIndex("by_category_name", (q) => q.eq("categoryId", vetCategory._id).eq("name", "EQ Sports Medicine Group"))
+    .first();
+  if (eqSportsProvider) {
+    const patch: Record<string, unknown> = {};
+    if (!eqSportsProvider.slug) patch.slug = "eq-sports";
+    if (!eqSportsProvider.category) patch.category = "veterinary";
+    if (!eqSportsProvider.email) patch.email = "eqsportsmedicinegroup@gmail.com";
+    if (!eqSportsProvider.phone) patch.phone = "310-944-0570";
+    if (!eqSportsProvider.address) patch.address = "PO Box 1573, Rancho Santa Fe, CA 92067";
+    if (Object.keys(patch).length > 0) {
+      patch.updatedAt = Date.now();
+      await ctx.db.patch(eqSportsProvider._id, patch);
+      updatedProviders += 1;
+    }
+  }
+
+  for (const row of VET_SUBCATEGORY_DEFAULTS) {
+    const existing = await ctx.db
+      .query("vetSubcategories")
+      .withIndex("by_slug", (q) => q.eq("slug", row.slug))
+      .first();
+    if (existing) {
+      continue;
+    }
+    await ctx.db.insert("vetSubcategories", {
+      slug: row.slug,
+      label: row.label,
+      isDefault: row.isDefault,
+    });
+    seededVetSubcategories += 1;
   }
 
   const travelCategory = await ctx.db
@@ -315,10 +381,34 @@ export const seedCategories = mutation(async (ctx) => {
     throw new Error("Horse Transport category not found after category seed");
   }
 
-  const horseTransportProviders = [
-    { name: "Brook Ledge", slug: "brook-ledge", subcategorySlug: "ground-transport" },
+  const horseTransportProviders: Array<{
+    name: string;
+    slug: string;
+    subcategorySlug: string;
+    email?: string;
+    phone?: string;
+    website?: string;
+    address?: string;
+  }> = [
+    {
+      name: "Brook Ledge",
+      slug: "brook-ledge",
+      subcategorySlug: "ground-transport",
+      email: "billing@brookledge.com",
+      phone: "610-987-6284",
+      website: "www.BrookLedge.com",
+      address: "PO Box 56, Oley, PA 19547-0056",
+    },
     { name: "Johnson", slug: "johnson", subcategorySlug: "ground-transport" },
-    { name: "Stateside", slug: "stateside", subcategorySlug: "ground-transport" },
+    {
+      name: "Stateside Horse Transportation",
+      slug: "stateside",
+      subcategorySlug: "ground-transport",
+      email: "bills.statesidefarms@gmail.com",
+      phone: "+1 (858) 864-8550",
+      website: "www.statesidefarms.com",
+      address: "P.O. Box 1898, Rancho Santa Fe, CA 92067",
+    },
     { name: "Somnium Farm", slug: "somnium", subcategorySlug: "ground-transport" },
     { name: "Gelissen", slug: "gelissen", subcategorySlug: "ground-transport" },
     { name: "Dutta Corp", slug: "dutta-corp", subcategorySlug: "air-transport" },
@@ -334,9 +424,14 @@ export const seedCategories = mutation(async (ctx) => {
     if (!existingProvider) {
       await ctx.db.insert("providers", {
         categoryId: horseTransportCategory._id,
+        category: "horse-transport",
         subcategorySlug: provider.subcategorySlug,
         name: provider.name,
         slug: provider.slug,
+        email: provider.email,
+        phone: provider.phone,
+        website: provider.website,
+        address: provider.address,
         extractionPrompt:
           "Extract from this horse transport invoice: invoice_number, invoice_date, due_date, provider_name, original_currency, original_total, exchange_rate, invoice_total_usd, origin, destination, and line_items[] with description, horse_name (or null), quantity, unit_price, total_usd.",
         expectedFields: ["invoice_number", "invoice_date", "provider_name", "invoice_total_usd", "line_items"],
@@ -345,14 +440,37 @@ export const seedCategories = mutation(async (ctx) => {
       createdProviders += 1;
       continue;
     }
-    if (!existingProvider.slug || !existingProvider.subcategorySlug) {
+    if (!existingProvider.slug || !existingProvider.subcategorySlug || !existingProvider.category || !existingProvider.email || !existingProvider.phone || !existingProvider.website || !existingProvider.address) {
       await ctx.db.patch(existingProvider._id, {
         slug: existingProvider.slug ?? provider.slug,
         subcategorySlug: existingProvider.subcategorySlug ?? provider.subcategorySlug,
+        category: existingProvider.category ?? "horse-transport",
+        email: existingProvider.email ?? provider.email,
+        phone: existingProvider.phone ?? provider.phone,
+        website: existingProvider.website ?? provider.website,
+        address: existingProvider.address ?? provider.address,
         updatedAt: Date.now()
       });
       updatedProviders += 1;
     }
+  }
+
+  const legacyStateside = await ctx.db
+    .query("providers")
+    .withIndex("by_category_name", (q) => q.eq("categoryId", horseTransportCategory._id).eq("name", "Stateside"))
+    .first();
+  if (legacyStateside) {
+    await ctx.db.patch(legacyStateside._id, {
+      name: "Stateside Horse Transportation",
+      slug: "stateside",
+      category: legacyStateside.category ?? "horse-transport",
+      email: legacyStateside.email ?? "bills.statesidefarms@gmail.com",
+      phone: legacyStateside.phone ?? "+1 (858) 864-8550",
+      website: legacyStateside.website ?? "www.statesidefarms.com",
+      address: legacyStateside.address ?? "P.O. Box 1898, Rancho Santa Fe, CA 92067",
+      updatedAt: Date.now(),
+    });
+    updatedProviders += 1;
   }
 
   const legacySominium = await ctx.db
@@ -457,19 +575,30 @@ export const seedCategories = mutation(async (ctx) => {
 
   const bodyworkProviders = [
     { name: "Steve Engle", slug: "steve-engle" },
-    { name: "Fred Michelon", slug: "fred-michelon" },
+    {
+      name: "Fred Michelon",
+      slug: "fred-michelon",
+      fullName: "1000870757 Ontario Limited",
+      category: "bodywork"
+    },
     { name: "Janice", slug: "janice" },
     { name: "Inga Pavling", slug: "inga-pavling" }
   ] as const;
 
-  const legacyFred = await ctx.db
+  const legacyFred = (await ctx.db
     .query("providers")
-    .withIndex("by_category_name", (q) => q.eq("categoryId", bodyworkCategory._id).eq("name", "Fred Michaelson"))
-    .first();
+    .withIndex("by_category", (q) => q.eq("categoryId", bodyworkCategory._id))
+    .collect())
+    .find((provider) => {
+      const normalized = String(provider.name ?? "").trim().toLowerCase();
+      return normalized.startsWith("fred mich") && normalized !== "fred michelon";
+    });
   if (legacyFred) {
     await ctx.db.patch(legacyFred._id, {
       name: "Fred Michelon",
       slug: "fred-michelon",
+      fullName: "1000870757 Ontario Limited",
+      category: "bodywork",
       updatedAt: Date.now()
     });
     updatedProviders += 1;
@@ -485,6 +614,8 @@ export const seedCategories = mutation(async (ctx) => {
         categoryId: bodyworkCategory._id,
         name: provider.name,
         slug: provider.slug,
+        fullName: "fullName" in provider ? provider.fullName : undefined,
+        category: "category" in provider ? provider.category : undefined,
         extractionPrompt:
           "Extract from this bodywork/chiropractic/massage invoice: invoice_number, invoice_date, due_date, provider_name, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, horse_name (if identifiable), quantity, unit_price, total_usd.",
         expectedFields: ["invoice_number", "invoice_date", "provider_name", "invoice_total_usd", "line_items"],
@@ -493,8 +624,13 @@ export const seedCategories = mutation(async (ctx) => {
       createdProviders += 1;
       continue;
     }
-    if (!existingProvider.slug) {
-      await ctx.db.patch(existingProvider._id, { slug: provider.slug, updatedAt: Date.now() });
+    const patch: Record<string, unknown> = {};
+    if (!existingProvider.slug) patch.slug = provider.slug;
+    if ("fullName" in provider && !existingProvider.fullName) patch.fullName = provider.fullName;
+    if ("category" in provider && !existingProvider.category) patch.category = provider.category;
+    if (Object.keys(patch).length > 0) {
+      patch.updatedAt = Date.now();
+      await ctx.db.patch(existingProvider._id, patch);
       updatedProviders += 1;
     }
   }
@@ -539,6 +675,7 @@ export const seedCategories = mutation(async (ctx) => {
     }
     const patch: Record<string, unknown> = {};
     if (!existingProvider.slug) patch.slug = provider.slug;
+    if (!existingProvider.category) patch.category = "supplies";
     if (!existingProvider.subcategorySlug) patch.subcategorySlug = provider.subcategorySlug;
     if (Object.keys(patch).length > 0) {
       patch.updatedAt = Date.now();
@@ -555,12 +692,36 @@ export const seedCategories = mutation(async (ctx) => {
     throw new Error("Dues & Registrations category not found after category seed");
   }
 
-  const duesProviders: Array<{ name: string; slug: string; subcategorySlug: string }> = [
-    { name: "USEF", slug: "usef", subcategorySlug: "horse-registrations" },
+  const duesProviders: Array<{
+    name: string;
+    slug: string;
+    subcategorySlug: string;
+    email?: string;
+    address?: string;
+  }> = [
+    {
+      name: "USEF",
+      slug: "usef",
+      subcategorySlug: "horse-registrations",
+      email: "customercare@usef.org",
+      address: "Lexington, KY 40511",
+    },
     { name: "USHJA", slug: "ushja", subcategorySlug: "horse-registrations" },
-    { name: "USEF", slug: "usef", subcategorySlug: "rider-registrations" },
+    {
+      name: "USEF",
+      slug: "usef",
+      subcategorySlug: "rider-registrations",
+      email: "customercare@usef.org",
+      address: "Lexington, KY 40511",
+    },
     { name: "USHJA", slug: "ushja", subcategorySlug: "rider-registrations" },
-    { name: "USEF", slug: "usef", subcategorySlug: "memberships" },
+    {
+      name: "USEF",
+      slug: "usef",
+      subcategorySlug: "memberships",
+      email: "customercare@usef.org",
+      address: "Lexington, KY 40511",
+    },
     { name: "USHJA", slug: "ushja", subcategorySlug: "memberships" }
   ];
 
@@ -574,9 +735,12 @@ export const seedCategories = mutation(async (ctx) => {
     if (!existingProvider) {
       await ctx.db.insert("providers", {
         categoryId: duesCategory._id,
+        category: "dues-registrations",
         subcategorySlug: provider.subcategorySlug,
         name: provider.name,
         slug: provider.slug,
+        email: provider.email,
+        address: provider.address,
         extractionPrompt:
           "Extract dues/registration invoice JSON: provider_name, invoice_number, invoice_date, due_date, invoice_total_usd, original_currency, dues_subcategory, line_items[] with description,total_usd,entity_name,entity_type.",
         expectedFields: ["invoice_number", "invoice_date", "provider_name", "invoice_total_usd", "line_items"],
@@ -587,7 +751,10 @@ export const seedCategories = mutation(async (ctx) => {
     }
     const patch: Record<string, unknown> = {};
     if (!existingProvider.slug) patch.slug = provider.slug;
+    if (!existingProvider.category) patch.category = "dues-registrations";
     if (!existingProvider.subcategorySlug) patch.subcategorySlug = provider.subcategorySlug;
+    if (!existingProvider.email && provider.email) patch.email = provider.email;
+    if (!existingProvider.address && provider.address) patch.address = provider.address;
     if (Object.keys(patch).length > 0) {
       patch.updatedAt = Date.now();
       await ctx.db.patch(existingProvider._id, patch);
@@ -701,10 +868,87 @@ export const seedCategories = mutation(async (ctx) => {
     }
   }
 
-  return { createdCategories, createdProviders, updatedProviders, skipped: false };
+  const statesideProvider = await ctx.db
+    .query("providers")
+    .withIndex("by_category_name", (q) => q.eq("categoryId", horseTransportCategory._id).eq("name", "Stateside Horse Transportation"))
+    .first();
+  if (statesideProvider) {
+    await upsertProviderAliases(ctx, {
+      providerId: statesideProvider._id,
+      providerName: statesideProvider.name,
+      category: "horse-transport",
+      aliases: ["Stateside Horse Transportation", "Stateside Farms", "Stateside", "statesidefarms"],
+    });
+  }
+
+  const brookLedgeProvider = await ctx.db
+    .query("providers")
+    .withIndex("by_category_name", (q) => q.eq("categoryId", horseTransportCategory._id).eq("name", "Brook Ledge"))
+    .first();
+  if (brookLedgeProvider) {
+    await upsertProviderAliases(ctx, {
+      providerId: brookLedgeProvider._id,
+      providerName: brookLedgeProvider.name,
+      category: "horse-transport",
+      aliases: ["Brook Ledge", "BrookLedge", "Brook Ledge, Inc.", "BROOK LEDGE"],
+    });
+  }
+
+  const farmVetProvider = await ctx.db
+    .query("providers")
+    .withIndex("by_category_name", (q) => q.eq("categoryId", suppliesCategory._id).eq("name", "FarmVet"))
+    .first();
+  if (farmVetProvider) {
+    await upsertProviderAliases(ctx, {
+      providerId: farmVetProvider._id,
+      providerName: farmVetProvider.name,
+      category: "supplies",
+      aliases: ["FarmVet", "FARMVET", "FarmVet Order", "farmvet.com"],
+    });
+  }
+
+  const usefProvider = await ctx.db
+    .query("providers")
+    .withIndex("by_category_subcategory_name", (q) =>
+      q.eq("categoryId", duesCategory._id).eq("subcategorySlug", "horse-registrations").eq("name", "USEF")
+    )
+    .first();
+  if (usefProvider) {
+    await upsertProviderAliases(ctx, {
+      providerId: usefProvider._id,
+      providerName: usefProvider.name,
+      category: "dues-registrations",
+      aliases: ["USEF", "United States Equestrian Federation", "United States Equestrian Federation Inc", "USEF Payment Services"],
+    });
+  }
+
+  const eqSportsAliasProvider = await ctx.db
+    .query("providers")
+    .withIndex("by_category_name", (q) => q.eq("categoryId", vetCategory._id).eq("name", "EQ Sports Medicine Group"))
+    .first();
+  if (eqSportsAliasProvider) {
+    await upsertProviderAliases(ctx, {
+      providerId: eqSportsAliasProvider._id,
+      providerName: eqSportsAliasProvider.name,
+      category: "veterinary",
+      aliases: [
+        "EQ Sports Medicine Group",
+        "EQ SPORTS MEDICINE GROUP",
+        "EQ Sports",
+        "eqsportsmedicinegroup",
+        "Sports Medicine Group",
+        "IDEXX Neo"
+      ]
+    });
+  }
+
+    return { createdCategories, createdProviders, updatedProviders, seededVetSubcategories, skipped: false };
+  },
 });
 
-export const seedDashboardData = mutation(async (ctx) => {
+export const seedDashboardData = mutation({
+  args: {},
+  handler: async (ctx) => {
   const horses = [
     { name: "Ben", yearOfBirth: 2015 },
     { name: "Gigi", yearOfBirth: 2017 },
@@ -764,10 +1008,13 @@ export const seedDashboardData = mutation(async (ctx) => {
     }
   }
 
-  return { createdHorses, createdContacts };
+    return { createdHorses, createdContacts };
+  },
 });
 
-export const seedPeople = mutation(async (ctx) => {
+export const seedPeople = mutation({
+  args: {},
+  handler: async (ctx) => {
   const seedRows: Array<{ name: string; role: "rider" | "groom" | "freelance" | "trainer" }> = [
     { name: "Lucy Davis Kennedy", role: "rider" },
     { name: "Charlotte Oakes", role: "groom" },
@@ -789,7 +1036,8 @@ export const seedPeople = mutation(async (ctx) => {
     created += 1;
   }
 
-  return { created };
+    return { created };
+  },
 });
 
 function slugify(value: string) {
@@ -799,4 +1047,34 @@ function slugify(value: string) {
     .replace(/[^\w\s-]/g, "")
     .trim()
     .replace(/\s+/g, "-");
+}
+
+async function upsertProviderAliases(
+  ctx: any,
+  args: { providerId: string; providerName: string; category: string; aliases: string[] }
+) {
+  for (const alias of args.aliases) {
+    const normalized = alias.toLowerCase().trim();
+    if (!normalized) continue;
+    const existing = await ctx.db
+      .query("providerAliases")
+      .withIndex("by_alias", (q: any) => q.eq("alias", normalized))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        providerName: args.providerName,
+        providerId: args.providerId,
+        category: args.category,
+        updatedAt: Date.now(),
+      });
+      continue;
+    }
+    await ctx.db.insert("providerAliases", {
+      alias: normalized,
+      providerName: args.providerName,
+      providerId: args.providerId,
+      category: args.category,
+      createdAt: Date.now(),
+    });
+  }
 }

@@ -129,6 +129,9 @@ export const getHorseSpendSummary = query({
     const horse = await ctx.db.get(args.horseId);
     if (!horse) return null;
 
+    const allHorses = await ctx.db.query("horses").withIndex("by_status_name", (q) => q.eq("status", "active")).collect();
+    const activeHorseCount = allHorses.filter((h) => !h.isSold).length;
+
     const bills = await ctx.db.query("bills").collect();
     const categories = await ctx.db.query("categories").collect();
     const categoryById = new Map(categories.map((row) => [String(row._id), row]));
@@ -148,9 +151,10 @@ export const getHorseSpendSummary = query({
 
     for (const bill of bills) {
       if (bill.status === "error" || !bill.extractedData) continue;
+      if (!(bill.status === "done" && bill.isApproved === true)) continue;
       const category = categoryById.get(String(bill.categoryId));
       if (!category) continue;
-      const matchedAmount = amountForHorseInBill(horseNamesToMatch, bill);
+      const matchedAmount = amountForHorseInBill(horseNamesToMatch, bill, activeHorseCount);
       if (matchedAmount <= 0) continue;
 
       const current = byCategory.get(category.slug) ?? { slug: category.slug, name: category.name, spend: 0, invoiceCount: 0 };
@@ -300,14 +304,21 @@ export const getTotalPrizeMoney = query({
   },
 });
 
-function amountForHorseInBill(horseNamesToMatch: Set<string>, bill: any) {
+function isSplitAll(name: string) {
+  return name === "__split_all__" || name === "barn group" || name === "barn group davis";
+}
+
+function amountForHorseInBill(horseNamesToMatch: Set<string>, bill: any, activeHorseCount: number) {
   let total = 0;
 
   const assignedHorses = Array.isArray(bill.assignedHorses) ? bill.assignedHorses : [];
   if (assignedHorses.length > 0) {
     for (const row of assignedHorses) {
       const name = String(row.horseName ?? "").toLowerCase();
-      if (horseNamesToMatch.has(name) || includesAlias(horseNamesToMatch, name)) {
+      if (isSplitAll(name)) {
+        const share = activeHorseCount > 0 ? (typeof row.amount === "number" ? row.amount : 0) / activeHorseCount : 0;
+        total += share;
+      } else if (horseNamesToMatch.has(name) || includesAlias(horseNamesToMatch, name)) {
         total += typeof row.amount === "number" ? row.amount : 0;
       }
     }
@@ -318,7 +329,11 @@ function amountForHorseInBill(horseNamesToMatch: Set<string>, bill: any) {
   for (const splitRow of Array.isArray(bill.splitLineItems) ? bill.splitLineItems : []) {
     for (const split of splitRow.splits ?? []) {
       const name = String(split.horseName ?? "").toLowerCase();
-      if (horseNamesToMatch.has(name) || includesAlias(horseNamesToMatch, name)) {
+      if (isSplitAll(name)) {
+        const lineAmt = lineItemAmount(bill.extractedData, splitRow.lineItemIndex);
+        const share = activeHorseCount > 0 ? lineAmt / activeHorseCount : 0;
+        splitLineItems.set(splitRow.lineItemIndex, (splitLineItems.get(splitRow.lineItemIndex) ?? 0) + share);
+      } else if (horseNamesToMatch.has(name) || includesAlias(horseNamesToMatch, name)) {
         splitLineItems.set(splitRow.lineItemIndex, (splitLineItems.get(splitRow.lineItemIndex) ?? 0) + (typeof split.amount === "number" ? split.amount : 0));
       }
     }
@@ -326,8 +341,15 @@ function amountForHorseInBill(horseNamesToMatch: Set<string>, bill: any) {
 
   for (const row of Array.isArray(bill.horseAssignments) ? bill.horseAssignments : []) {
     const name = String(row.horseName ?? "").toLowerCase();
-    if (!(horseNamesToMatch.has(name) || includesAlias(horseNamesToMatch, name))) continue;
-    total += lineItemAmount(bill.extractedData, row.lineItemIndex);
+    if (isSplitAll(name)) {
+      const lineAmt = lineItemAmount(bill.extractedData, row.lineItemIndex);
+      const share = activeHorseCount > 0 ? lineAmt / activeHorseCount : 0;
+      total += share;
+    } else if (!(horseNamesToMatch.has(name) || includesAlias(horseNamesToMatch, name))) {
+      continue;
+    } else {
+      total += lineItemAmount(bill.extractedData, row.lineItemIndex);
+    }
   }
   total += [...splitLineItems.values()].reduce((sum, value) => sum + value, 0);
   if (total > 0) return round2(total);
@@ -336,8 +358,12 @@ function amountForHorseInBill(horseNamesToMatch: Set<string>, bill: any) {
   const lineItems = Array.isArray(extracted.line_items) ? extracted.line_items : [];
   for (const item of lineItems as Array<Record<string, unknown>>) {
     const name = String(item.horse_name ?? item.horseName ?? "").toLowerCase();
-    if (!(horseNamesToMatch.has(name) || includesAlias(horseNamesToMatch, name))) continue;
-    total += numeric(item.total_usd ?? item.amount_usd ?? item.total);
+    if (isSplitAll(name)) {
+      const share = activeHorseCount > 0 ? numeric(item.total_usd ?? item.amount_usd ?? item.total) / activeHorseCount : 0;
+      total += share;
+    } else if (horseNamesToMatch.has(name) || includesAlias(horseNamesToMatch, name)) {
+      total += numeric(item.total_usd ?? item.amount_usd ?? item.total);
+    }
   }
   return round2(total);
 }
@@ -392,6 +418,9 @@ async function collectHorseInvoices(ctx: any, horseId: any) {
   const horse = await ctx.db.get(horseId);
   if (!horse) return [];
 
+  const allHorses = await ctx.db.query("horses").withIndex("by_status_name", (q: any) => q.eq("status", "active")).collect();
+  const activeHorseCount = allHorses.filter((h: any) => !h.isSold).length;
+
   const bills = await ctx.db.query("bills").collect();
   const categories = await ctx.db.query("categories").collect();
   const categoryById = new Map(categories.map((row: any) => [String(row._id), row]));
@@ -413,9 +442,14 @@ async function collectHorseInvoices(ctx: any, horseId: any) {
 
   for (const bill of bills) {
     if (bill.status === "error" || !bill.extractedData) continue;
-    const category = categoryById.get(String(bill.categoryId)) as { slug: string; name: string } | undefined;
-    if (!category) continue;
-    const amount = amountForHorseInBill(horseNamesToMatch, bill);
+    if (!(bill.status === "done" && bill.isApproved === true)) continue;
+    const category = bill.categoryId ? categoryById.get(String(bill.categoryId)) as { slug: string; name: string } | undefined : null;
+    // Derive category from line item categories if no bill-level category
+    const lineItemCats = Array.isArray(bill.lineItemCategories) ? bill.lineItemCategories as string[] : [];
+    const categorySlug = category?.slug ?? (lineItemCats.length > 0 ? lineItemCats[0] : null);
+    if (!categorySlug) continue;
+    const categoryName = category?.name ?? categorySlug.replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+    const amount = amountForHorseInBill(horseNamesToMatch, bill, activeHorseCount);
     if (amount <= 0) continue;
 
     const provider = bill.providerId ? await ctx.db.get(bill.providerId) : null;
@@ -426,8 +460,8 @@ async function collectHorseInvoices(ctx: any, horseId: any) {
 
     rows.push({
       _id: String(bill._id),
-      category: category.slug,
-      categoryName: category.name,
+      category: categorySlug,
+      categoryName: categoryName,
       providerName,
       providerSlug,
       invoiceNumber: String(extracted.invoice_number ?? bill.fileName ?? ""),
@@ -435,7 +469,7 @@ async function collectHorseInvoices(ctx: any, horseId: any) {
       uploadedAt: bill.uploadedAt,
       amount: round2(amount),
       status: bill.status === "done" && bill.isApproved ? "approved" : "pending",
-      href: buildInvoiceHref(category.slug, providerSlug, String(bill._id), bill),
+      href: buildInvoiceHref(categorySlug, providerSlug, String(bill._id), bill),
     });
   }
 

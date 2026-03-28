@@ -32,7 +32,7 @@
 .invoiceLabel {
   font-size: 10px;
   color: #9ea2b0;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 8px;
 }
@@ -53,7 +53,7 @@
 .detailLabel {
   font-size: 9px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
@@ -70,7 +70,7 @@
 .totalLabel {
   font-size: 9px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
@@ -169,7 +169,7 @@
 .tableHeader span {
   font-size: 9px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
@@ -203,7 +203,6 @@
 .feedBadge,
 .beddingBadge,
 .adminBadge {
-  font-family: "Space Mono", "SF Mono", Menlo, monospace;
   font-size: 9px;
   font-weight: 700;
   padding: 3px 8px;
@@ -296,7 +295,7 @@
 .fieldLabel {
   font-size: 10px;
   color: #9ea2b0;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   display: block;
   margin-bottom: 6px;
@@ -533,7 +532,7 @@
 .summaryLabel {
   font-size: 8px;
   color: #6b7084;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 4px;
 }
@@ -581,7 +580,6 @@
 }
 
 .confirmDelete {
-  font-family: "Space Mono", "SF Mono", Menlo, monospace;
   font-size: 11px;
   font-weight: 700;
   padding: 10px 20px;

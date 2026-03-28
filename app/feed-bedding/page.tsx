@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
-import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
+import { formatInvoiceName, toIsoDateString } from "@/lib/formatInvoiceName";
 
 export default function FeedBeddingOverviewPage() {
   const categories = useQuery(api.categories.getAllCategories) ?? [];
@@ -32,7 +32,7 @@ export default function FeedBeddingOverviewPage() {
           { label: "feed-bedding", current: true }
         ]}
         actions={[
-          { label: "upload invoices", href: "/upload", variant: "outlined" },
+          { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
           { label: "biz overview", href: "/biz-overview", variant: "filled" }
         ]}
       />
@@ -66,7 +66,7 @@ export default function FeedBeddingOverviewPage() {
             {bills.map((bill) => (
                 <li key={bill._id} style={{ marginBottom: 8 }}>
                   <Link href={`/feed-bedding/${bill.providerSlug}/${bill._id}`}>
-                    {formatInvoiceTitle({
+                    {formatInvoiceName({
                       category: "feed-bedding",
                       providerName: bill.providerName,
                       date: bill.invoiceDate || "",

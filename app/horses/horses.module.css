@@ -7,14 +7,12 @@
 
 .title {
   margin: 8px 0 0;
-  font-family: "Space Mono", monospace;
   font-size: 36px;
   font-weight: 700;
   color: #1a1a2e;
 }
 
 .addButton {
-  font-family: "Space Mono", monospace;
   font-size: 11px;
   font-weight: 700;
   padding: 10px 16px;
@@ -44,7 +42,6 @@
 
 .tab,
 .tabActive {
-  font-family: "Space Mono", monospace;
   font-size: 10px;
   padding: 8px 16px;
   border: none;
@@ -66,17 +63,15 @@
   background: #fff;
   border: 1px solid #e8eaf0;
   border-radius: 12px;
-  overflow: hidden;
 }
 
 .horsesHeader {
   display: grid;
   grid-template-columns: 1fr 140px 80px 80px 100px 40px;
   padding: 12px 26px;
-  font-family: "Space Mono", monospace;
   font-size: 9px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   border-bottom: 1px solid #e8eaf0;
 }
@@ -99,7 +94,6 @@
 }
 
 .horseName {
-  font-family: "Space Mono", monospace;
   font-size: 13px;
   font-weight: 700;
   color: #1a1a2e;
@@ -189,7 +183,6 @@
 }
 
 .menuItem {
-  font-family: "Space Mono", monospace;
   font-size: 11px;
   padding: 8px 16px;
   border: none;
@@ -256,13 +249,12 @@
 .fieldLabel {
   font-size: 10px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 6px;
 }
 
 .input {
-  font-family: "Space Mono", monospace;
   font-size: 12px;
   padding: 10px 14px;
   background: #f2f3f7;

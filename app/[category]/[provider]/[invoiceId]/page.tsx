@@ -6,8 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import LineItemReclassBadge from "@/components/LineItemReclassBadge";
+import InvoiceNotesCard from "@/components/InvoiceNotesCard";
 import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
+import { formatInvoiceName } from "@/lib/formatInvoiceName";
 import ReclassificationSummary from "@/components/ReclassificationSummary";
 import SpendBar from "@/components/SpendBar";
 import UnmatchedHorseBanner from "@/components/UnmatchedHorseBanner";
@@ -20,7 +22,13 @@ type LineItem = {
   match_confidence?: string;
   matchConfidence?: string;
   vet_subcategory?: string;
+  category?: string;
+  subcategory?: string;
+  assigneeId?: string;
+  assigneeType?: string;
+  horses?: string[];
   total_usd?: number;
+  amount?: number;
 };
 
 type Extracted = {
@@ -65,6 +73,13 @@ export default function InvoiceReportPage() {
   const [lineCategoryDecisions, setLineCategoryDecisions] = useState<Record<number, string | null>>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Redirect to invoices page when bill is deleted (becomes null)
+  useEffect(() => {
+    if (bill === null && invoiceId) {
+      router.replace("/invoices");
+    }
+  }, [bill, invoiceId, router]);
+
   const extracted = ((bill?.extractedData ?? {}) as Extracted) || {};
   const lineItems = Array.isArray(extracted.line_items) ? extracted.line_items : [];
   const isReclassCategory = categorySlug === "show-expenses";
@@ -77,29 +92,103 @@ export default function InvoiceReportPage() {
     );
   }, [bill?._id, lineItems]);
 
+  const horses = useQuery(api.horses.getAllHorses) ?? [];
+  const people = useQuery(api.people.list) ?? [];
+
   const horseGroups = useMemo(() => {
+    // Map lineItemIndex -> array of horse names (supports multiple horses per line)
+    const haMap = new Map<number, string[]>();
+    if (bill?.horseAssignments) {
+      for (const ha of bill.horseAssignments) {
+        const existing = haMap.get(ha.lineItemIndex) ?? [];
+        existing.push(ha.horseName ?? "Unknown");
+        haMap.set(ha.lineItemIndex, existing);
+      }
+    }
+    const splitMap = new Map<number, string[]>();
+    if (bill?.splitLineItems) {
+      for (const s of bill.splitLineItems) {
+        splitMap.set(s.lineItemIndex, s.splits?.map((sp: any) => sp.horseName ?? "Unknown") ?? []);
+      }
+    }
+
+    // Build a per-horse split amount lookup: splitAmountMap[lineItemIndex][horseName] = amount
+    const splitAmountMap = new Map<number, Map<string, number>>();
+    if (bill?.splitLineItems) {
+      for (const s of bill.splitLineItems) {
+        const perHorse = new Map<string, number>();
+        for (const sp of s.splits ?? []) {
+          perHorse.set(sp.horseName ?? "Unknown", sp.amount ?? 0);
+        }
+        splitAmountMap.set(s.lineItemIndex, perHorse);
+      }
+    }
+
     const map = new Map<string, LineItem[]>();
-    for (const item of lineItems) {
-      const horse = item.horse_name?.trim() || "Unassigned";
-      map.set(horse, [...(map.get(horse) ?? []), item]);
+    for (let i = 0; i < lineItems.length; i++) {
+      const item = lineItems[i];
+      if (splitMap.has(i)) {
+        const names = splitMap.get(i)!;
+        const perHorseAmounts = splitAmountMap.get(i);
+        for (const name of names) {
+          // Clone the line item but override amount with the per-horse split amount
+          const splitAmount = perHorseAmounts?.get(name) ?? safeAmount(item.total_usd ?? item.amount) / names.length;
+          const splitItem = { ...item, total_usd: splitAmount, amount: splitAmount, _isSplit: true };
+          map.set(name, [...(map.get(name) ?? []), splitItem as LineItem]);
+        }
+        continue;
+      }
+      if (haMap.has(i)) {
+        const names = haMap.get(i)!;
+        if (names.length > 1) {
+          // Multiple horses assigned to this line item — split the amount evenly
+          const fullAmount = safeAmount(item.total_usd ?? item.amount);
+          const perHorse = fullAmount / names.length;
+          for (const name of names) {
+            const splitItem = { ...item, total_usd: perHorse, amount: perHorse, _isSplit: true };
+            map.set(name, [...(map.get(name) ?? []), splitItem as LineItem]);
+          }
+        } else {
+          const name = names[0];
+          map.set(name, [...(map.get(name) ?? []), item]);
+        }
+        continue;
+      }
+      const assigneeId = (item as any).assigneeId;
+      const assigneeType = (item as any).assigneeType;
+      if (assigneeType === "business_general") {
+        map.set("Business / General", [...(map.get("Business / General") ?? []), item]);
+      } else if (assigneeId && assigneeType === "horse") {
+        const horse = horses.find((h) => String(h._id) === assigneeId);
+        const name = horse?.name ?? item.horse_name?.trim() ?? "Unknown";
+        map.set(name, [...(map.get(name) ?? []), item]);
+      } else if (assigneeId && assigneeType === "person") {
+        const person = people.find((p) => String(p._id) === assigneeId);
+        const name = person?.name ?? "Unknown";
+        map.set(name, [...(map.get(name) ?? []), item]);
+      } else {
+        const horse = item.horse_name?.trim() || "Unassigned";
+        map.set(horse, [...(map.get(horse) ?? []), item]);
+      }
     }
     return [...map.entries()].map(([horseName, items]) => ({
       horseName,
       items,
-      subtotal: items.reduce((sum, item) => sum + safeAmount(item.total_usd), 0),
+      subtotal: items.reduce((sum, item) => sum + safeAmount(item.total_usd ?? item.amount), 0),
     }));
-  }, [lineItems]);
+  }, [lineItems, bill?.horseAssignments, bill?.splitLineItems, horses, people]);
 
   const total = useMemo(() => {
     if (typeof extracted.invoice_total_usd === "number") return extracted.invoice_total_usd;
-    return lineItems.reduce((sum, item) => sum + safeAmount(item.total_usd), 0);
+    return lineItems.reduce((sum, item) => sum + safeAmount(item.total_usd ?? item.amount), 0);
   }, [extracted.invoice_total_usd, lineItems]);
 
   const subcategoryRows = useMemo(() => {
     const map = new Map<string, number>();
     for (const item of lineItems) {
-      const key = item.vet_subcategory?.trim() || "Other";
-      map.set(key, (map.get(key) ?? 0) + safeAmount(item.total_usd));
+      const key = item.subcategory?.trim() || item.vet_subcategory?.trim() || item.category?.trim() || "Other";
+      const label = prettyCategoryLabel(key);
+      map.set(label, (map.get(label) ?? 0) + safeAmount(item.total_usd ?? item.amount));
     }
     return [...map.entries()]
       .map(([name, amount]) => ({ name, amount, pct: total > 0 ? (amount / total) * 100 : 0 }))
@@ -172,7 +261,7 @@ export default function InvoiceReportPage() {
   async function onDelete() {
     if (!bill) return;
     await deleteBill({ billId: bill._id });
-    router.push(`/${categorySlug}/${providerSlug}`);
+    router.push("/invoices");
   }
 
   return (
@@ -182,7 +271,7 @@ export default function InvoiceReportPage() {
           { label: "old-oak-horses", href: "/dashboard", brand: true },
           { label: categorySlug, href: `/${categorySlug}` },
           { label: providerSlug, href: `/${categorySlug}/${providerSlug}` },
-          { label: extracted.invoice_number || "invoice", current: true },
+          { label: formatInvoiceName({ providerName: String((extracted as any).provider_name ?? bill?.provider?.name ?? bill?.customProviderName ?? "Unassigned Invoice"), date: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "") }), current: true },
         ]}
         actions={bill?.originalPdfUrl ? [{ label: "view original PDF", href: bill.originalPdfUrl, variant: "link", newTab: true }] : []}
       />
@@ -263,9 +352,15 @@ export default function InvoiceReportPage() {
                 <div key={`${group.horseName}-${idx}`} className={styles.itemRow}>
                   <div>
                     <div className={styles.itemDesc}>{item.description || "—"}</div>
-                    <span className={styles.badge} style={{ background: subcategoryColors[item.vet_subcategory || ""] ?? "#6B7084" }}>
-                      {item.vet_subcategory || "Other"}
-                    </span>
+                    {(() => {
+                      const cat = item.subcategory?.trim() || item.vet_subcategory?.trim() || item.category?.trim() || "";
+                      const label = cat ? prettyCategoryLabel(cat) : "Other";
+                      return (
+                        <span className={styles.badge} style={{ background: subcategoryColors[label] ?? categoryBadgeColors[cat] ?? "#6B7084" }}>
+                          {label}
+                        </span>
+                      );
+                    })()}
                     {(() => {
                       const confidence = String((item as any).matchConfidence ?? (item as any).match_confidence ?? "").toLowerCase();
                       const raw = String((item as any).horse_name_raw ?? "").trim();
@@ -291,7 +386,10 @@ export default function InvoiceReportPage() {
                       />
                     ) : null}
                   </div>
-                  <div className={styles.itemAmount}>{fmtUSD(safeAmount(item.total_usd))}</div>
+                  <div className={styles.itemAmount}>
+                    {fmtUSD(safeAmount(item.total_usd ?? item.amount))}
+                    {(item as any)._isSplit ? <span className={styles.sharedBadge}>shared</span> : null}
+                  </div>
                 </div>
               ))}
             </div>
@@ -307,7 +405,9 @@ export default function InvoiceReportPage() {
           />
         ) : null}
 
-        <div className={styles.approvalRow}>
+        {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
+
+        <div style={{ marginTop: 16, marginBottom: 20, display: "flex", gap: 10, alignItems: "flex-start" }}>
           {bill?.status === "done" ? (
             <div className={styles.approvedBox}>
               ✓ invoice approved
@@ -368,7 +468,7 @@ export default function InvoiceReportPage() {
 
         <Modal open={showDeleteConfirm} title="delete invoice?" onClose={() => setShowDeleteConfirm(false)}>
           <p style={{ marginTop: 0, color: "var(--ui-text-secondary)" }}>
-            this will permanently delete invoice <strong>{String(extracted.invoice_number ?? invoiceId)}</strong> from {provider?.name ?? providerSlug}.
+            this will permanently delete invoice <strong>{formatInvoiceName({ providerName: String((extracted as any).provider_name ?? bill?.provider?.name ?? bill?.customProviderName ?? "Unassigned Invoice"), date: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "") })}</strong> from {provider?.name ?? providerSlug}.
           </p>
           <p style={{ color: "var(--ui-text-muted)" }}>this action cannot be undone.</p>
           {bill?.linkedBills?.length ? (
@@ -444,4 +544,28 @@ function round2(value: number) {
 
 function normalize(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+const categoryBadgeColors: Record<string, string> = {
+  veterinary: "rgba(74,91,219,0.15)",
+  farrier: "rgba(20,184,166,0.15)",
+  stabling: "rgba(245,158,11,0.15)",
+  "feed-bedding": "rgba(107,112,132,0.18)",
+  "horse-transport": "rgba(239,68,68,0.15)",
+  bodywork: "rgba(167,139,250,0.15)",
+  supplies: "rgba(56,189,248,0.15)",
+  "show-expenses": "rgba(249,115,22,0.15)",
+  travel: "rgba(168,85,247,0.15)",
+  housing: "rgba(234,179,8,0.15)",
+  admin: "rgba(107,114,128,0.15)",
+  salaries: "rgba(16,185,129,0.15)",
+  marketing: "rgba(236,72,153,0.15)",
+  "dues-registrations": "rgba(99,102,241,0.15)",
+};
+
+function prettyCategoryLabel(slug: string): string {
+  if (!slug) return "Other";
+  return slug
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (ch) => ch.toUpperCase());
 }

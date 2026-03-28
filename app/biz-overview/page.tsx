@@ -6,7 +6,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavBar from "@/components/NavBar";
 import FilterTabs from "@/components/FilterTabs";
-import { formatInvoiceTitle, toIsoDateString } from "@/lib/invoiceTitle";
+import { formatInvoiceName, toIsoDateString } from "@/lib/formatInvoiceName";
 import styles from "./bizOverview.module.css";
 
 type Period = "thisMonth" | "ytd" | "2024" | "all";
@@ -60,7 +60,7 @@ export default function BizOverviewPage() {
             { label: "old-oak-horses", href: "/dashboard", brand: true },
             { label: "biz_overview", current: true }
           ]}
-          actions={[{ label: "upload invoices", href: "/upload", variant: "outlined" }]}
+          actions={[{ label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" }]}
         />
         <main className="page-main">
           <Link href="/dashboard" className="ui-back-link">← cd /dashboard</Link>
@@ -68,7 +68,7 @@ export default function BizOverviewPage() {
             <div className="ui-label">// no data</div>
             <h1 className={styles.title}>biz_overview</h1>
             <p className={styles.emptyText}>No invoices found for this period.</p>
-            <Link href="/upload" className="ui-button-outlined">upload invoices</Link>
+            <Link href="/dashboard" className="ui-button-outlined">go to dashboard</Link>
           </section>
           <div className="ui-footer">OLD_OAK_HORSES // BIZ_OVERVIEW</div>
         </main>
@@ -83,7 +83,7 @@ export default function BizOverviewPage() {
           { label: "old-oak-horses", href: "/dashboard", brand: true },
           { label: "biz_overview", current: true }
         ]}
-        actions={[{ label: "upload invoices", href: "/upload", variant: "outlined" }]}
+        actions={[{ label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" }]}
       />
 
       <main className="page-main">
@@ -253,7 +253,7 @@ export default function BizOverviewPage() {
             return (
               <Link key={String(row._id)} href={href} className={styles.invoiceRow}>
                 <div className={styles.invoiceNumber}>
-                  {formatInvoiceTitle({
+                  {formatInvoiceName({
                     category: row.categorySlug,
                     providerName: row.provider,
                     date: row.date,

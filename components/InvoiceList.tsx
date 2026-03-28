@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { formatInvoiceTitle } from "@/lib/invoiceTitle";
+import { formatInvoiceName } from "@/lib/formatInvoiceName";
 import styles from "./InvoiceList.module.css";
 
 const ITEMS_PER_PAGE = 5;
@@ -41,7 +41,7 @@ export default function InvoiceList({
     if (!query) return items;
 
     return items.filter((item) => {
-      const invoiceTitle = formatInvoiceTitle({
+      const invoiceTitle = formatInvoiceName({
         category: item.category,
         providerName: item.providerName,
         subcategory: item.subcategory,
@@ -95,7 +95,7 @@ export default function InvoiceList({
             <div className={styles.left}>
               <div className={styles.line1}>
                 <span className={styles.invoice}>
-                  {formatInvoiceTitle({
+                  {formatInvoiceName({
                     category: item.category,
                     providerName: item.providerName,
                     subcategory: item.subcategory,

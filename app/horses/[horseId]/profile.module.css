@@ -16,14 +16,12 @@
   font-size: 36px;
   font-weight: 700;
   color: #1a1a2e;
-  font-family: "Space Mono", monospace;
 }
 
 .subtitle {
   margin-top: 4px;
   font-size: 12px;
   color: #6b7084;
-  font-family: "Space Mono", monospace;
 }
 
 .statusActive,
@@ -52,7 +50,6 @@
 }
 
 .btnEdit {
-  font-family: "Space Mono", monospace;
   font-size: 10px;
   padding: 8px 14px;
   border-radius: 6px;
@@ -84,7 +81,7 @@
 .fieldLabel {
   font-size: 9px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 4px;
 }
@@ -107,7 +104,6 @@
   border-radius: 6px;
   padding: 10px 14px;
   font-size: 12px;
-  font-family: "Space Mono", monospace;
   color: #1a1a2e;
   min-width: 160px;
 }
@@ -121,6 +117,23 @@
   border-top: 1px solid #f0f1f5;
 }
 
+.btnDelete {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid #fecaca;
+  background: transparent;
+  color: #dc2626;
+  cursor: pointer;
+}
+
+.btnDelete:hover {
+  background: #fef2f2;
+  border-color: #dc2626;
+}
+
 .btnCancel {
   font-size: 10px;
   padding: 8px 14px;
@@ -128,7 +141,6 @@
   border: 1px solid #e8eaf0;
   background: transparent;
   color: #6b7084;
-  font-family: "Space Mono", monospace;
   cursor: pointer;
 }
 
@@ -140,7 +152,6 @@
   border: none;
   background: #1a1a2e;
   color: #fff;
-  font-family: "Space Mono", monospace;
   cursor: pointer;
 }
 
@@ -162,7 +173,7 @@
 .spendLabel {
   font-size: 9px;
   color: #9ea2b0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
@@ -294,7 +305,6 @@
 
 .invoiceTab,
 .invoiceTabActive {
-  font-family: "Space Mono", monospace;
   font-size: 9px;
   padding: 5px 10px;
   border: none;
@@ -377,21 +387,20 @@
   border-right: none;
   border-bottom: none;
   width: 100%;
-  font-family: "Space Mono", monospace;
 }
 
 .recordsCard {
   background: #fff;
   border: 1px solid #e8eaf0;
   border-radius: 12px;
-  padding: 22px 26px;
+  overflow: hidden;
   margin-bottom: 20px;
 }
 
 .recordsTitle {
   font-size: 14px;
   font-weight: 700;
-  margin-bottom: 12px;
+  margin: 0;
 }
 
 .recordRow {
@@ -544,6 +553,260 @@
   color: #ef4444;
 }
 
+/* Feed plan link block */
+.feedPlanBlock {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin-bottom: 20px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.feedPlanBlock:hover {
+  border-color: #4a5bdb;
+  box-shadow: 0 2px 8px rgba(74, 91, 219, 0.08);
+}
+
+.feedPlanBlockLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.feedPlanBlockIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(34, 197, 131, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.feedPlanBlockTitle {
+  font-family: 'Space Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.feedPlanBlockSub {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: #9ea2b0;
+  margin-top: 2px;
+}
+
+.feedPlanBlockArrow {
+  font-family: 'Space Mono', monospace;
+  font-size: 18px;
+  color: #9ea2b0;
+  transition: color 0.15s;
+}
+
+.feedPlanBlock:hover .feedPlanBlockArrow {
+  color: #4a5bdb;
+}
+
+.documentsCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.documentsHeader {
+  padding: 18px 26px;
+  border-bottom: 1px solid #e8eaf0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.documentsTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.documentsCount {
+  font-size: 10px;
+  color: #9ea2b0;
+  margin-top: 2px;
+}
+
+.btnAddDoc {
+  font-size: 10px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #6b7084;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btnAddDoc:hover {
+  border-color: #4a5bdb;
+  color: #4a5bdb;
+}
+
+.docHeader {
+  display: grid;
+  grid-template-columns: 1fr 140px 120px 40px;
+  padding: 10px 26px;
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e8eaf0;
+}
+
+.docRow {
+  display: grid;
+  grid-template-columns: 1fr 140px 120px 40px;
+  padding: 12px 26px;
+  align-items: center;
+  border-bottom: 1px solid #f0f1f5;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.docRow:hover {
+  background: #fafafc;
+}
+
+.docRow:last-child {
+  border-bottom: none;
+}
+
+.docName {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a2e;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tagBadge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: capitalize;
+  display: inline-block;
+  width: fit-content;
+}
+
+.docDate {
+  font-size: 11px;
+  color: #6b7084;
+}
+
+.docMenuWrap {
+  position: relative;
+}
+
+.docMenuButton {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #9ea2b0;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.docMenuButton:hover {
+  background: #f2f3f7;
+}
+
+.docMenuDropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  padding: 6px 0;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 20;
+}
+
+.docMenuItem {
+  font-size: 11px;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: #6b7084;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.docMenuItem:hover {
+  background: #fafafc;
+}
+
+.docMenuDivider {
+  border-top: 1px solid #e8eaf0;
+  margin: 4px 0;
+}
+
+.docMenuItemDanger {
+  color: #e5484d;
+}
+
+.documentsEmpty {
+  text-align: center;
+  font-size: 12px;
+  color: #9ea2b0;
+  padding: 40px 26px;
+}
+
+.documentsEmptyTitle {
+  font-weight: 700;
+}
+
+.documentsEmptySub {
+  margin-top: 6px;
+}
+
+.deleteBody {
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: #6b7084;
+  line-height: 1.5;
+}
+
+.deleteActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.deleteButton {
+  font-size: 11px;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  background: #e5484d;
+  color: #fff;
+  cursor: pointer;
+}
+
 @media (max-width: 920px) {
   .headerRow {
     flex-direction: column;
@@ -603,4 +866,270 @@
   .breakdownAmount {
     width: 60px;
   }
+}
+
+.recordsHeaderNew {
+  padding: 18px 26px;
+  border-bottom: 1px solid #e8eaf0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.recordsSubhead {
+  font-size: 10px;
+  color: #9ea2b0;
+  margin-top: 2px;
+}
+
+.seeAllLink {
+  font-size: 10px;
+  color: #4a5bdb;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+}
+
+.seeAllLink:hover {
+  text-decoration: underline;
+}
+
+.recordsSearchRow {
+  padding: 12px 26px;
+  border-bottom: 1px solid #f0f1f5;
+}
+
+.recordsSearchWrapper {
+  position: relative;
+}
+
+.recordsSearch {
+  font-size: 11px;
+  padding: 8px 12px 8px 32px;
+  background: #f2f3f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  color: #1a1a2e;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.recordsSearch:focus {
+  border-color: #4a5bdb;
+}
+
+.recordsSearch::placeholder {
+  color: #c4c7d0;
+}
+
+.recordsSearchIcon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: #9ea2b0;
+  pointer-events: none;
+}
+
+.recordsSearchNote {
+  font-size: 10px;
+  color: #9ea2b0;
+  padding: 8px 26px;
+  border-bottom: 1px solid #f0f1f5;
+}
+
+.recordsSearchNoteLink {
+  color: #4a5bdb;
+  text-decoration: none;
+}
+
+.recordRowNew {
+  padding: 14px 26px;
+  border-bottom: 1px solid #f0f1f5;
+  cursor: pointer;
+  transition: background 0.1s;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.recordRowNew:hover {
+  background: #fafafc;
+}
+
+.recordRowNew:last-child {
+  border-bottom: none;
+}
+
+.recordTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a2e;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recordDetail {
+  font-size: 10px;
+  color: #9ea2b0;
+  margin-top: 3px;
+  padding-left: 26px;
+}
+
+.recordDate {
+  font-size: 11px;
+  color: #6b7084;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.recordExpanded {
+  background: #f8f9fb;
+  padding: 16px 26px;
+  border-bottom: 1px solid #f0f1f5;
+}
+
+.recordExpandedFields {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.expandedField {
+  min-width: 120px;
+}
+
+.expandedFieldLabel {
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.expandedFieldValue,
+.expandedFieldEmpty {
+  font-size: 12px;
+  color: #1a1a2e;
+  max-width: 250px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.expandedFieldEmpty {
+  color: #c4c7d0;
+}
+
+.expandedInput,
+.expandedTextarea {
+  font-size: 12px;
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  color: #1a1a2e;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.expandedInput:focus,
+.expandedTextarea:focus {
+  border-color: #4a5bdb;
+}
+
+.expandedTextarea {
+  min-height: 60px;
+  resize: vertical;
+}
+
+.attachmentRow {
+  margin-bottom: 12px;
+}
+
+.attachmentLabel {
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.attachmentValue {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: #1a1a2e;
+  flex-wrap: wrap;
+}
+
+.attachmentLink {
+  font-size: 10px;
+  color: #4a5bdb;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.expandedActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 12px;
+  border-top: 1px solid #e8eaf0;
+}
+
+.expandedEditBtn {
+  font-size: 10px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #6b7084;
+  cursor: pointer;
+}
+
+.expandedEditBtn:hover {
+  border-color: #4a5bdb;
+  color: #4a5bdb;
+}
+
+.expandedCloseBtn {
+  font-size: 10px;
+  padding: 7px 14px;
+  border: none;
+  background: transparent;
+  color: #9ea2b0;
+  cursor: pointer;
+}
+
+.recordsEmpty {
+  text-align: center;
+  font-size: 12px;
+  color: #9ea2b0;
+  padding: 40px 26px;
+}
+
+.recordsEmptyTitle {
+  font-weight: 700;
+}
+
+.recordsEmptySub {
+  margin-top: 6px;
+}
+
+.field {
+  min-width: 120px;
 }
