@@ -6,6 +6,8 @@ import AppAuthGate from "@/components/AppAuthGate";
 import GlobalFab from "@/components/GlobalFab";
 import "./globals.css";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "HorseBilz",
   description: "Convex bill ingestion dashboard"
