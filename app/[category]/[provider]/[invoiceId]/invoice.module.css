@@ -265,3 +265,50 @@
     flex-wrap: wrap;
   }
 }
+
+@media (max-width: 640px) {
+  .headerCard,
+  .card {
+    padding: 18px 18px;
+  }
+
+  .providerName {
+    font-size: 18px;
+  }
+
+  .total {
+    font-size: 24px;
+  }
+
+  .totalBox {
+    min-width: 0;
+  }
+
+  .detailRow {
+    gap: 12px;
+  }
+
+  .horseName {
+    font-size: 14px;
+  }
+
+  .subtotal {
+    font-size: 16px;
+  }
+
+  .summaryBar {
+    padding: 16px 18px;
+  }
+
+  .summaryLeft {
+    gap: 16px;
+  }
+
+  .summaryTotal {
+    font-size: 20px;
+  }
+
+  .itemList {
+    padding: 10px 14px;
+  }
+}

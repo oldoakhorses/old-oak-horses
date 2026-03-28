@@ -160,3 +160,18 @@ select {
   outline: none;
   appearance: auto;
 }
+
+@media (max-width: 640px) {
+  .page-main,
+  .page-content {
+    padding: 20px 16px 40px;
+  }
+
+  .ui-card {
+    padding: 16px 18px;
+  }
+
+  .ui-back-link {
+    margin-bottom: 20px;
+  }
+}

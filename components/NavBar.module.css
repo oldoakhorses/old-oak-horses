@@ -145,13 +145,28 @@
 
 @media (max-width: 640px) {
   .nav {
-    padding: 0 16px;
+    padding: 0 12px;
+  }
+
+  .breadcrumbs {
+    gap: 4px;
+  }
+
+  .brand,
+  .segment,
+  .current,
+  .sep {
+    font-size: 11px;
   }
 
   .actionOutlined,
   .actionFilled {
-    padding: 7px 10px;
-    font-size: 10px;
+    padding: 6px 8px;
+    font-size: 9px;
+  }
+
+  .actions {
+    gap: 4px;
   }
 }
 

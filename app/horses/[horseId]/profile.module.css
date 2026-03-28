@@ -416,3 +416,47 @@
     align-items: flex-start;
   }
 }
+
+@media (max-width: 640px) {
+  .title {
+    font-size: 24px;
+  }
+
+  .profileCard {
+    padding: 18px 18px;
+  }
+
+  .profileFields {
+    gap: 16px;
+  }
+
+  .spendTotalCard,
+  .spendBreakdownCard {
+    padding: 18px 18px;
+  }
+
+  .spendTotal {
+    font-size: 22px;
+  }
+
+  .invoicesHeader {
+    padding: 14px 18px;
+  }
+
+  .invoiceRow {
+    padding: 10px 18px;
+  }
+
+  .recordsCard {
+    padding: 18px 18px;
+  }
+
+  .breakdownName {
+    width: 60px;
+    font-size: 9px;
+  }
+
+  .breakdownAmount {
+    width: 60px;
+  }
+}

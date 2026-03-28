@@ -516,3 +516,30 @@
   color: #9ea2b0;
   margin-top: 3px;
 }
+
+@media (max-width: 480px) {
+  .timeTabLabel {
+    font-size: 10px;
+  }
+
+  .sectionHeader {
+    padding: 12px 14px;
+  }
+
+  .itemRow {
+    padding: 12px 14px;
+  }
+
+  .itemEditCard {
+    margin: 8px 10px;
+  }
+
+  .btnAddItem {
+    width: calc(100% - 20px);
+    margin: 8px 10px;
+  }
+
+  .summaryRow {
+    padding-left: 16px;
+  }
+}

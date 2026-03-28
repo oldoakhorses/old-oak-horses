@@ -131,3 +131,13 @@
   color: var(--color-text-muted);
   letter-spacing: 0.1em;
 }
+
+@media (max-width: 480px) {
+  .page {
+    padding: 16px;
+  }
+
+  .card {
+    padding: 24px 20px;
+  }
+}

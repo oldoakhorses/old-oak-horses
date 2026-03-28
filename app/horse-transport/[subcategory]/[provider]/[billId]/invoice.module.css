@@ -510,3 +510,38 @@
   }
 }
 
+@media (max-width: 640px) {
+  .headerCard {
+    padding: 18px 18px;
+  }
+
+  .providerName {
+    font-size: 18px;
+  }
+
+  .total {
+    font-size: 24px;
+  }
+
+  .totalBox {
+    min-width: 0;
+  }
+
+  .detailsRow {
+    gap: 12px;
+  }
+
+  .footerBar {
+    padding: 16px 18px;
+  }
+
+  .footerStats {
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+
+  .footerAmount {
+    font-size: 18px;
+  }
+}
+

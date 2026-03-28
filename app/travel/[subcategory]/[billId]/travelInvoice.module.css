@@ -498,3 +498,40 @@
     gap: 12px;
   }
 }
+
+@media (max-width: 640px) {
+  .headerCard,
+  .assignmentCard,
+  .assignmentSavedCard,
+  .lineItemsCard {
+    padding: 18px 18px;
+  }
+
+  .provider {
+    font-size: 18px;
+  }
+
+  .total {
+    font-size: 24px;
+  }
+
+  .summaryBar {
+    padding: 16px 18px;
+  }
+
+  .summaryLeft {
+    gap: 14px;
+  }
+
+  .summaryTotal {
+    font-size: 20px;
+  }
+
+  .lineLeft {
+    min-width: 0;
+  }
+
+  .select {
+    width: 100%;
+  }
+}

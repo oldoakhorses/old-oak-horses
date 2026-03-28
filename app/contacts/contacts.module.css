@@ -535,3 +535,42 @@
     gap: 8px;
   }
 }
+
+@media (max-width: 640px) {
+  .title {
+    font-size: 24px;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .newContactCard {
+    padding: 14px 18px;
+  }
+
+  .contactRow {
+    padding: 12px 18px;
+  }
+
+  .contactDetail {
+    padding: 16px 18px;
+  }
+
+  .detailFields {
+    gap: 16px;
+  }
+
+  .detailNotes {
+    max-width: none;
+  }
+
+  .searchInput {
+    max-width: none;
+  }
+
+  .locationFilter {
+    min-width: 0;
+    width: 100%;
+  }
+}

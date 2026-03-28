@@ -252,3 +252,42 @@
   gap: 8px;
   margin-top: 16px;
 }
+
+@media (max-width: 640px) {
+  .headerCard {
+    flex-direction: column;
+    padding: 18px 18px;
+  }
+
+  .providerName {
+    font-size: 18px;
+  }
+
+  .total {
+    font-size: 24px;
+  }
+
+  .totalBox {
+    min-width: 0;
+  }
+
+  .detailsRow {
+    gap: 12px;
+  }
+
+  .footerBar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 16px 18px;
+  }
+
+  .footerStats {
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+
+  .totalDueValue {
+    font-size: 18px;
+  }
+}
