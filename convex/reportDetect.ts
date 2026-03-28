@@ -50,7 +50,7 @@ export const detectReportFromPdf = action({
 
     const parseResponse = await client.messages.create({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 700,
+      max_tokens: 2500,
       temperature: 0,
       messages: [
         {
@@ -59,13 +59,22 @@ export const detectReportFromPdf = action({
             {
               type: "text",
               text:
-                "You will receive text extracted from a horse bodywork/treatment report. Return strict JSON only with keys: horseName, reportDate, providerName, treatmentNotes, sessionNumber.\n\n" +
-                "reportDate must be YYYY-MM-DD when possible.\n\n" +
-                "For treatmentNotes: Write a clean, readable summary of the treatment findings and work done. " +
-                "Remove any raw timestamps, file metadata, session IDs, disclaimers (like 'don't replace veterinarian care'), and formatting artifacts. " +
-                "Keep the clinical observations and treatment details in plain, readable sentences. " +
-                "Use natural language — not raw extracted text. Keep it concise but include all relevant findings.\n\n" +
-                "If missing, use null for values.\n\nTEXT:\n" +
+                "You will receive text extracted from a horse bodywork/treatment report. " +
+                "This report may contain treatment notes for MULTIPLE horses.\n\n" +
+                "Return strict JSON with these keys:\n" +
+                "- reportDate: string (YYYY-MM-DD)\n" +
+                "- providerName: string\n" +
+                "- horses: array of objects, each with { horseName: string, treatmentNotes: string, sessionNumber: number|null }\n\n" +
+                "IMPORTANT rules for treatmentNotes:\n" +
+                "- Write a clean, readable clinical summary for each horse individually.\n" +
+                "- Remove ALL raw timestamps, page numbers (1/3, 2/3), file metadata, session IDs, disclaimers, and formatting artifacts.\n" +
+                "- Remove duplicate text — the raw extraction often repeats the same notes multiple times. Only include each observation ONCE.\n" +
+                "- Remove boilerplate labels like 'Muscular', 'Bone/joint', 'Reactive points' that appear as section headers without content.\n" +
+                "- Keep clinical observations and treatment details in plain, readable sentences.\n" +
+                "- Use natural language. Be concise but include all relevant clinical findings.\n" +
+                "- Do NOT include the horse name or date within the notes text.\n\n" +
+                "If only one horse is in the report, still return it as a single-element array.\n" +
+                "If missing values, use null.\n\nTEXT:\n" +
                 extractedText
             }
           ]
@@ -76,29 +85,51 @@ export const detectReportFromPdf = action({
     const parseTextBlock = parseResponse.content.find((item) => item.type === "text");
     const rawJson = parseTextBlock && parseTextBlock.type === "text" ? parseTextBlock.text ?? "" : "";
     const parsed = parseJsonObject(rawJson) as {
-      horseName?: string | null;
       reportDate?: string | null;
       providerName?: string | null;
+      horses?: Array<{
+        horseName?: string | null;
+        treatmentNotes?: string | null;
+        sessionNumber?: number | string | null;
+      }> | null;
+      // Legacy single-horse fallback
+      horseName?: string | null;
       treatmentNotes?: string | null;
       sessionNumber?: number | string | null;
     };
 
-    const extractedHorseName = clean(parsed.horseName);
-    const matchedHorseName = matchHorseAlias(extractedHorseName);
     const reportDate = normalizeDate(clean(parsed.reportDate)) ?? normalizeDateFromText(extractedText);
     const providerFromText = clean(parsed.providerName);
-    const providerName = providerFromText && providerFromText.toLowerCase().includes("fred") ? "Fred Michelon" : "Fred Michelon";
-    const treatmentNotes = cleanNotes(clean(parsed.treatmentNotes) || extractedText);
-    const sessionNumber = parseSessionNumber(parsed.sessionNumber, extractedText);
+    const providerName = providerFromText && providerFromText.toLowerCase().includes("fred") ? "Fred Michelon" : providerFromText || "Fred Michelon";
+
+    // Handle multi-horse response
+    const rawHorses = Array.isArray(parsed.horses) && parsed.horses.length > 0
+      ? parsed.horses
+      : [{ horseName: parsed.horseName, treatmentNotes: parsed.treatmentNotes, sessionNumber: parsed.sessionNumber }];
+
+    const horses = rawHorses.map((h) => {
+      const extractedName = clean(h.horseName);
+      const matchedName = matchHorseAlias(extractedName);
+      return {
+        extractedHorseName: extractedName,
+        matchedHorseName: matchedName,
+        treatmentNotes: cleanNotes(clean(h.treatmentNotes)),
+        sessionNumber: parseSessionNumber(h.sessionNumber, extractedText),
+      };
+    }).filter((h) => h.extractedHorseName);
+
+    // For backwards compatibility, also return top-level fields from first horse
+    const firstHorse = horses[0];
 
     return {
       reportType,
-      extractedHorseName,
-      matchedHorseName,
+      extractedHorseName: firstHorse?.extractedHorseName ?? "",
+      matchedHorseName: firstHorse?.matchedHorseName ?? null,
       reportDate,
       providerName,
-      treatmentNotes,
-      sessionNumber,
+      treatmentNotes: firstHorse?.treatmentNotes ?? "",
+      sessionNumber: firstHorse?.sessionNumber ?? null,
+      horses,
       extractedTextLength: extractedText.length
     };
   }

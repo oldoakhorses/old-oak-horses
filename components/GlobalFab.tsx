@@ -46,10 +46,17 @@ type InvoiceDetectionState = {
   categoryId: Id<"categories"> | null;
 };
 
+type DetectedHorseNotes = {
+  horseId: Id<"horses">;
+  horseName: string;
+  notes: string;
+};
+
 type RecordReportDetectionState = {
   detected: boolean;
   reportType: "bodywork" | "invoice" | "unknown";
   message: string;
+  perHorseNotes?: DetectedHorseNotes[];
 };
 
 const farrierServiceTypes = ["Full Set", "Reset", "Trim", "Front Only", "Other"];
@@ -386,27 +393,68 @@ export default function GlobalFab() {
         reportDate?: string | null;
         providerName?: string | null;
         treatmentNotes?: string | null;
+        horses?: Array<{
+          extractedHorseName: string;
+          matchedHorseName: string | null;
+          treatmentNotes: string;
+          sessionNumber: number | null;
+        }>;
       };
 
       if (detection.reportType !== "bodywork") return;
 
-      const matchedHorseId = detection.matchedHorseName
-        ? activeHorses.find((horse) => horse.name.toLowerCase() === detection.matchedHorseName!.toLowerCase())?._id
-        : undefined;
+      // Match all detected horses to active horses
+      const detectedHorses = detection.horses ?? [];
+      const matchedHorseIds: Id<"horses">[] = [];
+      const perHorseNotes: DetectedHorseNotes[] = [];
+
+      for (const dh of detectedHorses) {
+        const matchName = dh.matchedHorseName ?? dh.extractedHorseName;
+        const horse = matchName
+          ? activeHorses.find((h) => h.name.toLowerCase() === matchName.toLowerCase())
+          : undefined;
+        if (horse) {
+          matchedHorseIds.push(horse._id);
+          perHorseNotes.push({
+            horseId: horse._id,
+            horseName: horse.name,
+            notes: dh.treatmentNotes || "",
+          });
+        }
+      }
+
+      // Fallback to single-horse matching if multi-horse didn't work
+      if (matchedHorseIds.length === 0 && detection.matchedHorseName) {
+        const horse = activeHorses.find((h) => h.name.toLowerCase() === detection.matchedHorseName!.toLowerCase());
+        if (horse) {
+          matchedHorseIds.push(horse._id);
+          perHorseNotes.push({
+            horseId: horse._id,
+            horseName: horse.name,
+            notes: detection.treatmentNotes?.trim() || "",
+          });
+        }
+      }
+
+      // Build combined notes for display — individual notes will be used per-horse on save
+      const combinedNotes = perHorseNotes.length === 1
+        ? perHorseNotes[0].notes
+        : perHorseNotes.map((p) => `${p.horseName}:\n${p.notes}`).join("\n\n");
 
       setSelectedRecordType("bodywork");
       setRecordForm((prev) => ({
         ...prev,
-        horseIds: matchedHorseId ? [matchedHorseId] : prev.horseIds,
+        horseIds: matchedHorseIds.length > 0 ? matchedHorseIds : prev.horseIds,
         date: detection.reportDate || prev.date,
         selectedProvider: "__other",
         providerName: detection.providerName || "Fred Michelon",
-        notes: detection.treatmentNotes?.trim() || prev.notes
+        notes: combinedNotes || detection.treatmentNotes?.trim() || prev.notes
       }));
       setRecordReportDetection({
         detected: true,
         reportType: "bodywork",
-        message: "✓ report detected — fields pre-filled from PDF"
+        message: `✓ report detected — ${matchedHorseIds.length > 1 ? `${matchedHorseIds.length} horses` : "fields"} pre-filled from PDF`,
+        perHorseNotes: perHorseNotes.length > 0 ? perHorseNotes : undefined,
       });
     } catch (error) {
       setRecordError(error instanceof Error ? error.message : "Failed to detect report type from attachment");
@@ -572,7 +620,11 @@ export default function GlobalFab() {
           : recordForm.providerName.trim() || undefined;
 
       const attachmentStorageId = await uploadAttachmentIfPresent();
+      const perHorseNotes = recordReportDetection.perHorseNotes;
       for (const horseId of recordForm.horseIds) {
+        // Use per-horse notes from detection if available, otherwise use the general notes field
+        const horseSpecificNotes = perHorseNotes?.find((p) => p.horseId === horseId)?.notes;
+        const notesForHorse = horseSpecificNotes ?? recordForm.notes.trim();
         const mainRecordId = await createHorseRecord({
           horseId,
           type: selectedRecordType,
@@ -590,7 +642,7 @@ export default function GlobalFab() {
               : undefined,
           serviceType: selectedRecordType === "farrier" ? recordForm.serviceType || undefined : undefined,
           isUpcoming: false,
-          notes: recordForm.notes.trim() || undefined,
+          notes: notesForHorse || undefined,
           attachmentStorageId,
         });
         if (recordForm.nextVisitDate) {

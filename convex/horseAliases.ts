@@ -25,5 +25,6 @@ export const HORSE_ALIASES: Record<string, string> = {
   "valentina davis": "Numero Valentina Z",
   "barn group davis": "__split_all__",
   "barn group": "__split_all__",
+  chino: "Chino 29",
   "chino 29": "Chino 29"
 };
