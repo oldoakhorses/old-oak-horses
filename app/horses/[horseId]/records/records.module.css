@@ -9,21 +9,158 @@
   color: #1a1a2e;
 }
 
+.typeCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 12px;
+}
+
+.typeHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.typeTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+  text-transform: lowercase;
+}
+
+.typeCount {
+  font-size: 11px;
+  color: #9ea2b0;
+}
+
+.viewAllLink {
+  font-size: 11px;
+  color: #4a5bdb;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.viewAllLink:hover {
+  text-decoration: underline;
+}
+
+.recordRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid #f0f1f5;
+  text-decoration: none;
+  color: inherit;
+}
+
+.recordRow:hover {
+  background: rgba(74, 91, 219, 0.03);
+  margin: 0 -24px;
+  padding: 10px 24px;
+}
+
+.recordLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.recordProvider {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a2e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recordMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: #9ea2b0;
+}
+
+.recordDateTime {
+  font-size: 10px;
+  color: #6b7084;
+}
+
+.recordRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.recordAmount {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a2e;
+  text-align: right;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.statusApproved {
+  background: #22c583;
+}
+
+.statusPending {
+  background: #f59e0b;
+}
+
+.arrow {
+  font-size: 11px;
+  color: #9ea2b0;
+}
+
+.emptyRow {
+  padding: 16px 0;
+  font-size: 11px;
+  color: #9ea2b0;
+  text-align: center;
+}
+
 .card {
   background: #fff;
   border: 1px solid #e8eaf0;
   border-radius: 12px;
-  padding: 40px;
-  text-align: center;
+  padding: 20px 24px;
+  margin-bottom: 12px;
 }
 
-.icon {
-  font-size: 28px;
-  margin-bottom: 8px;
-}
+@media (max-width: 640px) {
+  .title {
+    font-size: 22px;
+  }
 
-.line1,
-.line2 {
-  font-size: 12px;
-  color: #9ea2b0;
+  .typeCard,
+  .card {
+    padding: 16px 16px;
+  }
+
+  .recordRow:hover {
+    margin: 0 -16px;
+    padding: 10px 16px;
+  }
+
+  .recordProvider {
+    font-size: 11px;
+  }
 }

@@ -193,6 +193,7 @@ export default defineSchema({
     usefNumber: v.optional(v.string()),
     feiNumber: v.optional(v.string()),
     owner: v.optional(v.string()),
+    prizeMoney: v.optional(v.number()),
     status: v.union(v.literal("active"), v.literal("inactive"), v.literal("past")),
     isSold: v.optional(v.boolean()),
     soldDate: v.optional(v.number()),
@@ -314,4 +315,19 @@ export default defineSchema({
     previousSections: v.optional(v.any()),
     changedAt: v.number(),
   }).index("by_horse", ["horseId"]),
+
+  incomeEntries: defineTable({
+    horseId: v.id("horses"),
+    billId: v.optional(v.id("bills")),
+    type: v.union(v.literal("prize_money"), v.literal("other")),
+    amount: v.number(),
+    description: v.string(),
+    className: v.optional(v.string()),
+    placing: v.optional(v.string()),
+    showName: v.optional(v.string()),
+    date: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_horse", ["horseId"])
+    .index("by_bill", ["billId"]),
 });

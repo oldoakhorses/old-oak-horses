@@ -252,8 +252,12 @@ function sortArrow(active: boolean, direction: SortDirection, css: Record<string
 }
 
 function getInvoiceDate(row: any) {
-  const raw = row?.extractedData?.invoice_date;
-  if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const raw = row?.extractedData?.invoice_date ?? row?.extractedData?.invoiceDate;
+  if (typeof raw === "string" && raw.trim().length > 0) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+    const parsed = new Date(raw);
+    if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  }
   return new Date(row.uploadedAt).toISOString().slice(0, 10);
 }
 

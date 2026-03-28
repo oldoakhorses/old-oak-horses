@@ -65,7 +65,8 @@ export const updateHorseProfile = mutation({
     sex: v.optional(v.union(v.literal("gelding"), v.literal("mare"), v.literal("stallion"))),
     usefNumber: v.optional(v.string()),
     feiNumber: v.optional(v.string()),
-    owner: v.optional(v.string())
+    owner: v.optional(v.string()),
+    prizeMoney: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const horse = await ctx.db.get(args.horseId);
@@ -79,7 +80,8 @@ export const updateHorseProfile = mutation({
       sex: args.sex,
       usefNumber: args.usefNumber?.trim() || undefined,
       feiNumber: args.feiNumber?.trim() || undefined,
-      owner: args.owner?.trim() || undefined
+      owner: args.owner?.trim() || undefined,
+      prizeMoney: args.prizeMoney,
     });
 
     return args.horseId;
@@ -261,6 +263,43 @@ export const getHorseRecordCounts = query({
   },
 });
 
+const RECORD_TYPE_CATEGORIES: Record<string, string[]> = {
+  veterinary: ["veterinary"],
+  farrier: ["farrier", "bodywork"],
+  health: ["veterinary", "dues-registrations"],
+  registration: ["dues-registrations"],
+};
+
+export const getRecordsByType = query({
+  args: { horseId: v.id("horses"), type: v.string() },
+  handler: async (ctx, args) => {
+    const categorySlugs = RECORD_TYPE_CATEGORIES[args.type] ?? [args.type];
+    const invoices = await collectHorseInvoices(ctx, args.horseId);
+    return invoices
+      .filter((row) => categorySlugs.includes(row.category))
+      .map((row) => ({
+        ...row,
+        uploadedAt: row.uploadedAt,
+      }));
+  },
+});
+
+export const getTotalPrizeMoney = query({
+  args: {},
+  handler: async (ctx) => {
+    const horses = await ctx.db.query("horses").collect();
+    let total = 0;
+    const byHorse: Array<{ horseId: string; name: string; prizeMoney: number }> = [];
+    for (const horse of horses) {
+      if (horse.prizeMoney && horse.prizeMoney > 0) {
+        total += horse.prizeMoney;
+        byHorse.push({ horseId: String(horse._id), name: horse.name, prizeMoney: horse.prizeMoney });
+      }
+    }
+    return { total: round2(total), byHorse };
+  },
+});
+
 function amountForHorseInBill(horseNamesToMatch: Set<string>, bill: any) {
   let total = 0;
 
@@ -366,6 +405,7 @@ async function collectHorseInvoices(ctx: any, horseId: any) {
     providerSlug: string;
     invoiceNumber: string;
     date: string | null;
+    uploadedAt: number;
     amount: number;
     status: "pending" | "approved";
     href: string;
@@ -392,6 +432,7 @@ async function collectHorseInvoices(ctx: any, horseId: any) {
       providerSlug,
       invoiceNumber: String(extracted.invoice_number ?? bill.fileName ?? ""),
       date: invoiceDate,
+      uploadedAt: bill.uploadedAt,
       amount: round2(amount),
       status: bill.status === "done" && bill.isApproved ? "approved" : "pending",
       href: buildInvoiceHref(category.slug, providerSlug, String(bill._id), bill),

@@ -24,6 +24,7 @@ export default function BizOverviewPage() {
   const [page, setPage] = useState(1);
 
   const data = useQuery(api.bills.getBizOverview, { period });
+  const prizeData = useQuery(api.incomeEntries.getTotalPrizeMoney);
 
   const filteredInvoices = useMemo(() => {
     const rows = data?.recentInvoices ?? [];
@@ -106,6 +107,18 @@ export default function BizOverviewPage() {
           </div>
           <div className={styles.heroAmount}>{fmtUSD(data.totalSpend)}</div>
           <div className={styles.momRow}>{renderMom(data.totalSpend, data.previousPeriodSpend)}</div>
+          {prizeData && prizeData.total > 0 ? (
+            <div className={styles.prizeRow}>
+              <div className={styles.prizeStat}>
+                <span className={styles.prizeLabel}>PRIZE MONEY</span>
+                <span className={styles.prizeValue}>+{fmtUSD(prizeData.total)}</span>
+              </div>
+              <div className={styles.prizeStat}>
+                <span className={styles.prizeLabel}>NET COST</span>
+                <span className={styles.netValue}>{fmtUSD(data.totalSpend - prizeData.total)}</span>
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section className={styles.card}>
@@ -160,11 +173,16 @@ export default function BizOverviewPage() {
               <div className={styles.cardMeta}>all categories</div>
             </div>
             <div className={styles.list}>
-              {data.horses.map((row) => (
+              {data.horses.map((row) => {
+                const horsePrize = prizeData?.byHorse.find((h) => h.name === row.name);
+                return (
                 <div key={row.name} className={styles.listRow}>
                   <div className={styles.listTop}>
                     <div className={styles.listName}>🐴 {row.name}</div>
-                    <div className={styles.listMeta}>{row.pctOfTotal.toFixed(1)}% · {fmtUSD(row.totalSpend)}</div>
+                    <div className={styles.listMeta}>
+                      {row.pctOfTotal.toFixed(1)}% · {fmtUSD(row.totalSpend)}
+                      {horsePrize ? <span className={styles.horsePrizeBadge}>🏆 +{fmtUSD(horsePrize.prizeMoney)}</span> : null}
+                    </div>
                   </div>
                   <StackBar
                     segments={[
@@ -182,7 +200,8 @@ export default function BizOverviewPage() {
                     <span><i className={styles.breakDot} style={{ background: "#6B7084" }} />other {fmtUSD(row.breakdown.other)}</span>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           </section>
 
