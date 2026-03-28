@@ -263,6 +263,27 @@ export const getHorseRecordCounts = query({
   },
 });
 
+const RECORD_TYPE_CATEGORIES: Record<string, string[]> = {
+  veterinary: ["veterinary"],
+  farrier: ["farrier", "bodywork"],
+  health: ["veterinary", "dues-registrations"],
+  registration: ["dues-registrations"],
+};
+
+export const getRecordsByType = query({
+  args: { horseId: v.id("horses"), type: v.string() },
+  handler: async (ctx, args) => {
+    const categorySlugs = RECORD_TYPE_CATEGORIES[args.type] ?? [args.type];
+    const invoices = await collectHorseInvoices(ctx, args.horseId);
+    return invoices
+      .filter((row) => categorySlugs.includes(row.category))
+      .map((row) => ({
+        ...row,
+        uploadedAt: row.uploadedAt,
+      }));
+  },
+});
+
 export const getTotalPrizeMoney = query({
   args: {},
   handler: async (ctx) => {
@@ -384,6 +405,7 @@ async function collectHorseInvoices(ctx: any, horseId: any) {
     providerSlug: string;
     invoiceNumber: string;
     date: string | null;
+    uploadedAt: number;
     amount: number;
     status: "pending" | "approved";
     href: string;
@@ -410,6 +432,7 @@ async function collectHorseInvoices(ctx: any, horseId: any) {
       providerSlug,
       invoiceNumber: String(extracted.invoice_number ?? bill.fileName ?? ""),
       date: invoiceDate,
+      uploadedAt: bill.uploadedAt,
       amount: round2(amount),
       status: bill.status === "done" && bill.isApproved ? "approved" : "pending",
       href: buildInvoiceHref(category.slug, providerSlug, String(bill._id), bill),
