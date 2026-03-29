@@ -2315,6 +2315,23 @@ export const approveBill = mutation({
           line_items: mergedLineItems
         }
       });
+
+      // Update bill category based on line item categories if they differ from current
+      const lineCategories = new Map<string, number>();
+      for (const item of mergedLineItems) {
+        const cat = typeof item.category === "string" ? item.category.toLowerCase().replace(/\s+/g, "-") : null;
+        if (cat) lineCategories.set(cat, (lineCategories.get(cat) || 0) + 1);
+      }
+      if (lineCategories.size > 0) {
+        const dominant = [...lineCategories.entries()].sort((a, b) => b[1] - a[1])[0][0];
+        const currentCategory = bill.categoryId ? await ctx.db.get(bill.categoryId) : null;
+        if (!currentCategory || currentCategory.slug !== dominant) {
+          const newCategory = await ctx.db.query("categories").withIndex("by_slug", (q) => q.eq("slug", dominant)).first();
+          if (newCategory) {
+            await ctx.db.patch(args.billId, { categoryId: newCategory._id });
+          }
+        }
+      }
     }
 
     const result = await approveBillById(ctx, args.billId);

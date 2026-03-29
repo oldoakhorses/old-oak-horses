@@ -1118,7 +1118,19 @@ export default function InvoicePreviewPage() {
             : undefined,
         notes: notes.trim() || undefined
       });
-      router.push(isEditing ? "/invoices" : buildPermanentInvoicePath(bill));
+      // Determine redirect based on line item categories (which may have been changed by the user)
+      const lineCatFreq = new Map<string, number>();
+      for (const ls of Object.values(lineStates)) {
+        if (ls?.category) lineCatFreq.set(ls.category, (lineCatFreq.get(ls.category) || 0) + 1);
+      }
+      const dominantLineCat = lineCatFreq.size > 0
+        ? [...lineCatFreq.entries()].sort((a, b) => b[1] - a[1])[0][0]
+        : null;
+      // If line items were recategorized, build path using the new category
+      const effectiveBill = dominantLineCat && dominantLineCat !== categorySlug
+        ? { ...bill, category: { ...(bill?.category ?? {}), slug: dominantLineCat } }
+        : bill;
+      router.push(isEditing ? "/invoices" : buildPermanentInvoicePath(effectiveBill));
     } catch (err) {
       setError(err instanceof Error ? err.message : isEditing ? "Failed to save" : "Failed to approve");
     } finally {
