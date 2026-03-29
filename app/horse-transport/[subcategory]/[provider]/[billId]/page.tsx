@@ -260,33 +260,51 @@ export default function HorseTransportInvoicePage() {
           <Link className="ui-back-link" href={`/horse-transport/${subcategory}/${providerSlug}`}>
             ← cd /{providerSlug}
           </Link>
-          {bill.status === "done" ? (
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <LogRecordFromInvoice
-                billId={bill._id}
-                categorySlug="horse-transport"
-                providerName={providerName}
-                invoiceDate={String(extracted.invoice_date ?? "")}
-                assignedHorses={(bill.assignedHorses ?? []) as any}
-                lineItems={lineItems}
-              />
-              <Link
-                href={`/invoices/preview/${billId}`}
-                style={{
-                  fontFamily: "inherit",
-                  fontSize: 10,
-                  padding: "6px 14px",
-                  borderRadius: 6,
-                  border: "1px solid #E8EAF0",
-                  background: "transparent",
-                  color: "#4A5BDB",
-                  textDecoration: "none",
-                }}
-              >
-                edit
-              </Link>
-            </div>
-          ) : null}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {bill.status === "done" ? (
+              <>
+                <LogRecordFromInvoice
+                  billId={bill._id}
+                  categorySlug="horse-transport"
+                  providerName={providerName}
+                  invoiceDate={String(extracted.invoice_date ?? "")}
+                  assignedHorses={(bill.assignedHorses ?? []) as any}
+                  lineItems={lineItems}
+                />
+                <Link
+                  href={`/invoices/preview/${billId}`}
+                  style={{
+                    fontFamily: "inherit",
+                    fontSize: 10,
+                    padding: "6px 14px",
+                    borderRadius: 6,
+                    border: "1px solid #E8EAF0",
+                    background: "transparent",
+                    color: "#4A5BDB",
+                    textDecoration: "none",
+                  }}
+                >
+                  edit
+                </Link>
+              </>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              style={{
+                fontFamily: "inherit",
+                fontSize: 10,
+                padding: "6px 14px",
+                borderRadius: 6,
+                border: "1px solid #E8EAF0",
+                background: "transparent",
+                color: "#E5484D",
+                cursor: "pointer",
+              }}
+            >
+              delete
+            </button>
+          </div>
         </div>
 
         <section className={styles.headerCard}>
@@ -555,9 +573,6 @@ export default function HorseTransportInvoicePage() {
               ) : null}
             </>
           )}
-          <button type="button" className={styles.deleteBtn} onClick={() => setShowDeleteConfirm(true)}>
-            delete
-          </button>
         </div>
 
         <section className={styles.footerBar}>
