@@ -127,6 +127,8 @@ export default function HorseProfilePage() {
   const deleteHorse = useMutation(api.horses.deleteHorse);
   const router = useRouter();
   const updateRecordWithNextVisit = useMutation(api.horseRecords.updateRecordWithNextVisit);
+  const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
+  const [recordAttachment, setRecordAttachment] = useState<File | null>(null);
   const deleteDocument = useMutation(api.documents.deleteDocument);
 
   const [isEditing, setIsEditing] = useState(startsInEditMode);
@@ -265,6 +267,22 @@ export default function HorseProfilePage() {
   async function onSaveRecordEdit() {
     if (!editingRecordId || !recordEdit) return;
     const nextVisitTimestamp = recordEdit.nextVisitDate ? new Date(`${recordEdit.nextVisitDate}T00:00:00`).getTime() : undefined;
+
+    let attachmentStorageId: string | undefined;
+    let attachmentName: string | undefined;
+    if (recordAttachment) {
+      const uploadUrl = await generateUploadUrl();
+      const resp = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": recordAttachment.type || "application/octet-stream" },
+        body: recordAttachment,
+      });
+      if (!resp.ok) throw new Error("Upload failed");
+      const result = await resp.json();
+      attachmentStorageId = result.storageId;
+      attachmentName = recordAttachment.name;
+    }
+
     await updateRecordWithNextVisit({
       recordId: editingRecordId,
       updates: {
@@ -275,11 +293,13 @@ export default function HorseProfilePage() {
         customType: recordEdit.customType || undefined,
         vaccineName: recordEdit.vaccineName || undefined,
         treatmentDescription: recordEdit.treatmentDescription || undefined,
+        ...(attachmentStorageId ? { attachmentStorageId, attachmentName } : {}),
       },
       nextVisitDate: nextVisitTimestamp,
     });
     setEditingRecordId(null);
     setRecordEdit(null);
+    setRecordAttachment(null);
   }
 
   async function onDeleteDocument() {
@@ -668,6 +688,36 @@ export default function HorseProfilePage() {
                                 </>
                               </ExpandedInput>
                             ) : null}
+                            {!record.attachmentUrl ? (
+                              <ExpandedInput label="ATTACHMENT">
+                                {recordAttachment ? (
+                                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                    <span style={{ fontSize: 11, color: "#2D2F39" }}>📎 {recordAttachment.name}</span>
+                                    <button
+                                      type="button"
+                                      style={{ fontSize: 10, color: "#E5484D", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                                      onClick={(event) => { event.stopPropagation(); setRecordAttachment(null); }}
+                                    >
+                                      remove
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10, color: "#4A5BDB", cursor: "pointer" }}>
+                                    <input
+                                      type="file"
+                                      accept=".pdf,.jpg,.jpeg,.png"
+                                      style={{ display: "none" }}
+                                      onChange={(event) => {
+                                        event.stopPropagation();
+                                        const file = event.target.files?.[0];
+                                        if (file) setRecordAttachment(file);
+                                      }}
+                                    />
+                                    + add document
+                                  </label>
+                                )}
+                              </ExpandedInput>
+                            ) : null}
                           </>
                         ) : (
                           <>
@@ -730,6 +780,7 @@ export default function HorseProfilePage() {
                                 event.stopPropagation();
                                 setEditingRecordId(null);
                                 setRecordEdit(null);
+                                setRecordAttachment(null);
                               }}
                             >
                               cancel

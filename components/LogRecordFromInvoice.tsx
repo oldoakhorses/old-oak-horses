@@ -14,7 +14,7 @@ type RecordFormState = {
   date: string;
   recordType: RecordType;
   customType: string;
-  visitType: "" | "vaccination" | "treatment";
+  visitType: "" | "vaccination" | "treatment" | "other";
   vaccineName: string;
   treatmentDescription: string;
   serviceType: string;
@@ -171,7 +171,7 @@ export default function LogRecordFromInvoice({
           date: dateTs,
           providerName: form.providerName || undefined,
           visitType:
-            form.recordType === "veterinary" && form.visitType
+            form.recordType === "veterinary" && form.visitType && form.visitType !== "other"
               ? (form.visitType as "vaccination" | "treatment")
               : undefined,
           vaccineName:
@@ -182,7 +182,10 @@ export default function LogRecordFromInvoice({
             form.recordType === "veterinary" && form.visitType === "treatment"
               ? form.treatmentDescription || undefined
               : undefined,
-          serviceType: form.recordType === "farrier" ? form.serviceType || undefined : undefined,
+          serviceType:
+            form.recordType === "farrier" || (form.recordType === "veterinary" && form.visitType === "other")
+              ? form.serviceType || undefined
+              : undefined,
           isUpcoming: false,
           notes: combinedNotes,
           attachmentStorageId,
@@ -288,13 +291,14 @@ export default function LogRecordFromInvoice({
                 onChange={(e) =>
                   setForm((prev) => ({
                     ...prev,
-                    visitType: e.target.value as "" | "vaccination" | "treatment",
+                    visitType: e.target.value as "" | "vaccination" | "treatment" | "other",
                   }))
                 }
               >
-                <option value="">select</option>
+                <option value="">select...</option>
                 <option value="vaccination">vaccination</option>
                 <option value="treatment">treatment</option>
+                <option value="other">other</option>
               </select>
             </div>
           )}
@@ -321,6 +325,20 @@ export default function LogRecordFromInvoice({
                   setForm((prev) => ({ ...prev, treatmentDescription: e.target.value }))
                 }
                 placeholder="describe treatment..."
+              />
+            </div>
+          )}
+
+          {form.recordType === "veterinary" && form.visitType === "other" && (
+            <div className={styles.field}>
+              <div className={styles.label}>service description</div>
+              <input
+                className={styles.input}
+                value={form.serviceType}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, serviceType: e.target.value }))
+                }
+                placeholder="e.g. MRI, dental float, blood work..."
               />
             </div>
           )}
