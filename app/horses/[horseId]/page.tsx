@@ -9,7 +9,6 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { formatInvoiceName, toIsoDateString } from "@/lib/formatInvoiceName";
 import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
-import FeedPlan from "./FeedPlan";
 import styles from "./profile.module.css";
 
 type DocumentTag = "coggins" | "health_certificate" | "horse_agreement" | "insurance" | "registration" | "other";
@@ -887,8 +886,6 @@ export default function HorseProfilePage() {
             </>
           )}
         </section>
-
-        <FeedPlan horseId={horse._id} horseName={horse.name} />
 
         <div className="ui-footer">OLD_OAK_HORSES // HORSES // {horse.name.toUpperCase()}</div>
       </main>
