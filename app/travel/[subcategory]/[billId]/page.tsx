@@ -224,7 +224,15 @@ export default function TravelInvoicePage() {
               <span className="ui-label">TRAVEL · {subcategory.toUpperCase()}</span>
               <span className={styles.subBadge}>{titleCase(subcategory)}</span>
             </div>
-            <h1 className={styles.provider}>{extracted.provider_name || bill.provider?.fullName || bill.provider?.name || "Travel Provider"}</h1>
+            <h1 className={styles.provider}>
+              {bill.contactId ? (
+                <Link href={`/contacts/${bill.contactId}`} style={{ color: "inherit", textDecoration: "none" }}>
+                  {extracted.provider_name || bill.provider?.fullName || bill.provider?.name || "Travel Provider"}
+                </Link>
+              ) : (
+                extracted.provider_name || bill.provider?.fullName || bill.provider?.name || "Travel Provider"
+              )}
+            </h1>
             <div className={styles.details}>
               <Detail label="CONFIRMATION" value={extracted.invoice_number || bill.fileName} />
               <Detail label="DATE" value={extracted.invoice_date || "—"} />

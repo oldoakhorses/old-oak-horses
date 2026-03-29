@@ -175,7 +175,15 @@ export default function BodyworkInvoicePage() {
         <section className={styles.headerCard}>
           <div>
             <div className={styles.invoiceLabel}>BODYWORK INVOICE</div>
-            <h1 className={styles.providerName}>{providerName}</h1>
+            <h1 className={styles.providerName}>
+              {bill?.contactId ? (
+                <Link href={`/contacts/${bill.contactId}`} style={{ color: "inherit", textDecoration: "none" }}>
+                  {providerName}
+                </Link>
+              ) : (
+                providerName
+              )}
+            </h1>
             <div className={styles.detailsRow}>
               <Detail label="INVOICE #" value={invoiceNumber} />
               <Detail label="DATE" value={invoiceDate} />

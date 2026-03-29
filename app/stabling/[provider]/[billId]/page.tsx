@@ -412,7 +412,15 @@ export default function StablingInvoicePage() {
             <div className={styles.labelRow}>
               <span className="ui-label">STABLING INVOICE</span>
             </div>
-            <h1 className={styles.provider}>{extracted.provider_name || bill.provider?.fullName || bill.provider?.name || "Stabling Provider"}</h1>
+            <h1 className={styles.provider}>
+              {bill.contactId ? (
+                <Link href={`/contacts/${bill.contactId}`} style={{ color: "inherit", textDecoration: "none" }}>
+                  {extracted.provider_name || bill.provider?.fullName || bill.provider?.name || "Stabling Provider"}
+                </Link>
+              ) : (
+                extracted.provider_name || bill.provider?.fullName || bill.provider?.name || "Stabling Provider"
+              )}
+            </h1>
             <div className={styles.details}>
               <Detail label="INVOICE #" value={extracted.invoice_number || bill.fileName} />
               <Detail label="DATE" value={extracted.invoice_date || extracted.period || "—"} />

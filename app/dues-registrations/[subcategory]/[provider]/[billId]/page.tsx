@@ -239,7 +239,15 @@ export default function DuesInvoicePage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 24 }}>
             <div>
               <div className="ui-label">DUES & REGISTRATIONS INVOICE</div>
-              <h1 style={{ fontSize: 24, margin: "8px 0 16px" }}>{provider?.name ?? bill.providerName ?? bill.customProviderName ?? "Provider"}</h1>
+              <h1 style={{ fontSize: 24, margin: "8px 0 16px" }}>
+                {bill.contactId ? (
+                  <Link href={`/contacts/${bill.contactId}`} style={{ color: "inherit", textDecoration: "none" }}>
+                    {provider?.name ?? bill.providerName ?? bill.customProviderName ?? "Provider"}
+                  </Link>
+                ) : (
+                  provider?.name ?? bill.providerName ?? bill.customProviderName ?? "Provider"
+                )}
+              </h1>
               <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
                 <Detail label="INVOICE #" value={String(extracted.invoice_number ?? "—")} />
                 <Detail label="DATE" value={formatDate(extracted.invoice_date)} />

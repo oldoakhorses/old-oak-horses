@@ -332,7 +332,15 @@ export default function InvoiceReportPage() {
         <section className={styles.headerCard}>
           <div>
             <div className="ui-label">// {categorySlug} invoice</div>
-            <h1 className={styles.providerName}>{provider?.fullName || provider?.name || providerSlug}</h1>
+            <h1 className={styles.providerName}>
+              {bill?.contactId ? (
+                <Link href={`/contacts/${bill.contactId}`} style={{ color: "inherit", textDecoration: "none" }}>
+                  {provider?.fullName || provider?.name || providerSlug}
+                </Link>
+              ) : (
+                provider?.fullName || provider?.name || providerSlug
+              )}
+            </h1>
             <div className={styles.detailRow}>
               <Detail label="INVOICE #" value={extracted.invoice_number || "—"} />
               <Detail label="DATE" value={formatDate(extracted.invoice_date)} />

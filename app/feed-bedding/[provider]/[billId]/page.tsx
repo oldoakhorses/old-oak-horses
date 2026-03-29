@@ -311,7 +311,15 @@ export default function FeedBeddingInvoicePage() {
         <section className={styles.headerCard}>
           <div className={styles.headerLeft}>
             <div className={styles.invoiceLabel}>FEED & BEDDING INVOICE</div>
-            <h1 className={styles.providerName}>{bill.provider?.fullName || bill.provider?.name || bill.customProviderName || providerSlug}</h1>
+            <h1 className={styles.providerName}>
+              {bill.contactId ? (
+                <Link href={`/contacts/${bill.contactId}`} style={{ color: "inherit", textDecoration: "none" }}>
+                  {bill.provider?.fullName || bill.provider?.name || bill.customProviderName || providerSlug}
+                </Link>
+              ) : (
+                bill.provider?.fullName || bill.provider?.name || bill.customProviderName || providerSlug
+              )}
+            </h1>
             <div className={styles.detailsRow}>
               <Detail label="INVOICE #" value={String(extracted.invoice_number ?? bill.fileName)} />
               <Detail label="DATE" value={formatDate(extracted.invoice_date)} />

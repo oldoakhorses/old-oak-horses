@@ -310,7 +310,15 @@ export default function HorseTransportInvoicePage() {
         <section className={styles.headerCard}>
           <div className={styles.headerLeft}>
             <div className={styles.label}>HORSE TRANSPORT INVOICE</div>
-            <h1 className={styles.providerName}>{providerName}</h1>
+            <h1 className={styles.providerName}>
+              {bill.contactId ? (
+                <Link href={`/contacts/${bill.contactId}`} style={{ color: "inherit", textDecoration: "none" }}>
+                  {providerName}
+                </Link>
+              ) : (
+                providerName
+              )}
+            </h1>
             <div className={styles.detailsRow}>
               <Detail label="INVOICE #" value={String(extracted.invoice_number ?? bill.fileName)} />
               <Detail label="DATE" value={formatDate(extracted.invoice_date)} />

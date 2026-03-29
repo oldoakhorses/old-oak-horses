@@ -136,7 +136,15 @@ export default function MarketingInvoicePage() {
               {subcategory}
             </span>
           </div>
-          <h1 style={{ fontSize: 28, marginTop: 10 }}>{providerName}</h1>
+          <h1 style={{ fontSize: 28, marginTop: 10 }}>
+            {bill?.contactId ? (
+              <Link href={`/contacts/${bill.contactId}`} style={{ color: "inherit", textDecoration: "none" }}>
+                {providerName}
+              </Link>
+            ) : (
+              providerName
+            )}
+          </h1>
           <p style={{ color: "var(--ui-text-secondary)", marginTop: 8 }}>
             {String(extracted.invoice_number ?? "—")} · {formatDate(extracted.invoice_date)} · due {formatDate(extracted.due_date)}
           </p>
