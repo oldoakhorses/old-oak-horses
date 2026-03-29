@@ -137,23 +137,41 @@ export default function MarketingInvoicePage() {
 
         <div style={{ marginTop: 16, marginBottom: 20, display: "flex", gap: 10 }}>
           {bill?.status === "done" ? (
-            <div
-              style={{
-                flex: 1,
-                background: "rgba(34, 197, 131, 0.08)",
-                border: "1px solid #22C583",
-                borderRadius: 8,
-                padding: "14px 20px",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 12,
-                fontWeight: 700,
-                color: "#22C583"
-              }}
-            >
-              ✓ invoice approved
-            </div>
+            <>
+              <div
+                style={{
+                  flex: 1,
+                  background: "rgba(34, 197, 131, 0.08)",
+                  border: "1px solid #22C583",
+                  borderRadius: 8,
+                  padding: "14px 20px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: "#22C583"
+                }}
+              >
+                ✓ invoice approved
+              </div>
+              <Link
+                href={`/invoices/preview/${billId}`}
+                style={{
+                  fontFamily: "inherit",
+                  fontSize: 10,
+                  padding: "7px 14px",
+                  borderRadius: 6,
+                  border: "1px solid #E8EAF0",
+                  background: "transparent",
+                  color: "#4A5BDB",
+                  textDecoration: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                edit assignments
+              </Link>
+            </>
           ) : (
             <button type="button" className="ui-button-filled" onClick={onApprove} style={{ background: "#22C583", borderColor: "#22C583" }}>
               approve invoice

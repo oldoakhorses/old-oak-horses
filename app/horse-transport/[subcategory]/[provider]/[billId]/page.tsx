@@ -526,7 +526,25 @@ export default function HorseTransportInvoicePage() {
 
         <div className={styles.approvalRow}>
           {bill.status === "done" ? (
-            <div className={styles.approvedBar}>✓ invoice approved</div>
+            <>
+              <div className={styles.approvedBar}>✓ invoice approved</div>
+              <Link
+                href={`/invoices/preview/${billId}`}
+                style={{
+                  fontFamily: "inherit",
+                  fontSize: 10,
+                  padding: "7px 14px",
+                  borderRadius: 6,
+                  border: "1px solid #E8EAF0",
+                  background: "transparent",
+                  color: "#4A5BDB",
+                  textDecoration: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                edit assignments
+              </Link>
+            </>
           ) : (
             <>
               <button type="button" className={canApprove ? styles.approveBtn : styles.approveDisabled} disabled={!canApprove || isApproving} onClick={onApprove}>

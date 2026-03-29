@@ -316,7 +316,25 @@ export default function DuesInvoicePage() {
 
         <div style={{ display: "flex", gap: 10, marginTop: 16, marginBottom: 16 }}>
           {bill.isApproved ? (
-            <div style={{ flex: 1, padding: "14px 20px", borderRadius: 8, background: "rgba(34,197,131,0.08)", border: "1px solid #22C583", color: "#22C583", fontWeight: 700 }}>✓ invoice approved</div>
+            <>
+              <div style={{ flex: 1, padding: "14px 20px", borderRadius: 8, background: "rgba(34,197,131,0.08)", border: "1px solid #22C583", color: "#22C583", fontWeight: 700 }}>✓ invoice approved</div>
+              <Link
+                href={`/invoices/preview/${billId}`}
+                style={{
+                  fontFamily: "inherit",
+                  fontSize: 10,
+                  padding: "7px 14px",
+                  borderRadius: 6,
+                  border: "1px solid #E8EAF0",
+                  background: "transparent",
+                  color: "#4A5BDB",
+                  textDecoration: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                edit assignments
+              </Link>
+            </>
           ) : (
             <button type="button" onClick={onApprove} disabled={!completion || dirty} style={{ flex: 1, fontFamily: "inherit", fontSize: 12, fontWeight: 700, padding: "14px 20px", borderRadius: 8, border: "none", background: !completion || dirty ? "#E8EAF0" : "#22C583", color: !completion || dirty ? "#9EA2B0" : "#fff" }}>
               {!completion ? "assign all line items before approving" : dirty ? "save assignment before approving" : "approve invoice"}

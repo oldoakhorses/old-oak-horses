@@ -332,7 +332,25 @@ export default function TravelInvoicePage() {
 
         <section className={styles.approvalRow}>
           {bill.isApproved ? (
-            <div className={styles.approvedBox}>✓ invoice approved</div>
+            <>
+              <div className={styles.approvedBox}>✓ invoice approved</div>
+              <Link
+                href={`/invoices/preview/${billId}`}
+                style={{
+                  fontFamily: "inherit",
+                  fontSize: 10,
+                  padding: "7px 14px",
+                  borderRadius: 6,
+                  border: "1px solid #E8EAF0",
+                  background: "transparent",
+                  color: "#4A5BDB",
+                  textDecoration: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                edit assignments
+              </Link>
+            </>
           ) : (
             <button type="button" className={assignmentSaved ? styles.approveBtn : styles.approveDisabled} disabled={!assignmentSaved} onClick={onApprove}>
               {assignmentSaved ? "approve invoice" : "assign people before approving"}
