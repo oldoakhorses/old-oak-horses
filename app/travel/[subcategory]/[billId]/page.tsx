@@ -172,21 +172,31 @@ export default function TravelInvoicePage() {
             ← cd /travel/{subcategory}
           </Link>
           {bill.isApproved ? (
-            <Link
-              href={`/invoices/preview/${billId}`}
-              style={{
-                fontFamily: "inherit",
-                fontSize: 10,
-                padding: "6px 14px",
-                borderRadius: 6,
-                border: "1px solid #E8EAF0",
-                background: "transparent",
-                color: "#4A5BDB",
-                textDecoration: "none",
-              }}
-            >
-              edit
-            </Link>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <LogRecordFromInvoice
+                billId={bill._id}
+                categorySlug="travel"
+                providerName={String(extracted.provider_name || bill.provider?.fullName || bill.provider?.name || "Travel Provider")}
+                invoiceDate={String(extracted.invoice_date ?? "")}
+                assignedHorses={(bill.assignedHorses ?? []) as any}
+                lineItems={lineItems}
+              />
+              <Link
+                href={`/invoices/preview/${billId}`}
+                style={{
+                  fontFamily: "inherit",
+                  fontSize: 10,
+                  padding: "6px 14px",
+                  borderRadius: 6,
+                  border: "1px solid #E8EAF0",
+                  background: "transparent",
+                  color: "#4A5BDB",
+                  textDecoration: "none",
+                }}
+              >
+                edit
+              </Link>
+            </div>
           ) : null}
         </div>
 
@@ -337,17 +347,6 @@ export default function TravelInvoicePage() {
         <div style={{ marginTop: 24 }}>
           {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
         </div>
-
-        {bill?.isApproved ? (
-          <LogRecordFromInvoice
-            billId={bill._id}
-            categorySlug="travel"
-            providerName={String(extracted.provider_name || bill.provider?.fullName || bill.provider?.name || "Travel Provider")}
-            invoiceDate={String(extracted.invoice_date ?? "")}
-            assignedHorses={(bill.assignedHorses ?? []) as any}
-            lineItems={lineItems}
-          />
-        ) : null}
 
         <section className={styles.approvalRow}>
           {bill.isApproved ? (

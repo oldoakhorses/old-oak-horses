@@ -189,21 +189,31 @@ export default function DuesInvoicePage() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Link href={`/dues-registrations/${subcategory}/${providerSlug}`} className="ui-back-link">← cd /dues-registrations/{subcategory}/{providerSlug}</Link>
           {bill.isApproved ? (
-            <Link
-              href={`/invoices/preview/${billId}`}
-              style={{
-                fontFamily: "inherit",
-                fontSize: 10,
-                padding: "6px 14px",
-                borderRadius: 6,
-                border: "1px solid #E8EAF0",
-                background: "transparent",
-                color: "#4A5BDB",
-                textDecoration: "none",
-              }}
-            >
-              edit
-            </Link>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <LogRecordFromInvoice
+                billId={bill._id}
+                categorySlug="dues-registrations"
+                providerName={String(provider?.name ?? bill.providerName ?? bill.customProviderName ?? "Provider")}
+                invoiceDate={String(extracted.invoice_date ?? "")}
+                assignedHorses={(bill.assignedHorses ?? []) as any}
+                lineItems={lineItems}
+              />
+              <Link
+                href={`/invoices/preview/${billId}`}
+                style={{
+                  fontFamily: "inherit",
+                  fontSize: 10,
+                  padding: "6px 14px",
+                  borderRadius: 6,
+                  border: "1px solid #E8EAF0",
+                  background: "transparent",
+                  color: "#4A5BDB",
+                  textDecoration: "none",
+                }}
+              >
+                edit
+              </Link>
+            </div>
           ) : null}
         </div>
 
@@ -323,17 +333,6 @@ export default function DuesInvoicePage() {
         <div style={{ marginTop: 24 }}>
           {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
         </div>
-
-        {bill?.isApproved ? (
-          <LogRecordFromInvoice
-            billId={bill._id}
-            categorySlug="dues-registrations"
-            providerName={String(provider?.name ?? bill.providerName ?? bill.customProviderName ?? "Provider")}
-            invoiceDate={String(extracted.invoice_date ?? "")}
-            assignedHorses={(bill.assignedHorses ?? []) as any}
-            lineItems={lineItems}
-          />
-        ) : null}
 
         <div style={{ display: "flex", gap: 10, marginTop: 16, marginBottom: 16 }}>
           {bill.isApproved ? (

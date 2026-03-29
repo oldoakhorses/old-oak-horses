@@ -419,8 +419,15 @@ export const parseBillPdf = internalAction({
           providerName: resolvedProvider?.name ?? extractedCustomProviderName ?? providerContactPatch.fullName,
           category: categorySlug ?? (lineItemCategories.length > 0 ? lineItemCategories[0] : "other"),
           location: resolvedProvider?.location,
+          fullName: providerContactPatch.fullName,
+          contactName: providerContactPatch.contactName,
+          primaryContactName: providerContactPatch.primaryContactName,
+          primaryContactPhone: providerContactPatch.primaryContactPhone,
+          address: providerContactPatch.address,
           phone: providerContactPatch.phone ?? providerContactPatch.primaryContactPhone,
-          email: providerContactPatch.email
+          email: providerContactPatch.email,
+          website: providerContactPatch.website,
+          accountNumber: providerContactPatch.accountNumber,
         });
       }
 

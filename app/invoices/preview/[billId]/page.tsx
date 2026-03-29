@@ -1974,6 +1974,11 @@ function buildPermanentInvoicePath(bill: any) {
   if (categorySlug === "stabling") return `/stabling/${providerSlug}/${id}`;
   if (categorySlug === "bodywork") return `/bodywork/${providerSlug}/${id}`;
   if (categorySlug === "feed-bedding") return `/feed-bedding/${providerSlug}/${id}`;
+  if (categorySlug === "veterinary") return `/veterinary/${providerSlug}/${id}`;
+  if (categorySlug === "farrier") return `/farrier/${providerSlug}/${id}`;
+  if (categorySlug === "supplies") return `/supplies/${providerSlug}/${id}`;
+  // Fallback — guard against empty categorySlug producing a broken path
+  if (!categorySlug) return `/invoices`;
   return `/${categorySlug}/${providerSlug}/${id}`;
 }
 

@@ -202,7 +202,14 @@ export const upsertContactFromInvoice = internalMutation({
     category: v.string(),
     location: v.optional(v.string()),
     phone: v.optional(v.string()),
-    email: v.optional(v.string())
+    email: v.optional(v.string()),
+    fullName: v.optional(v.string()),
+    contactName: v.optional(v.string()),
+    primaryContactName: v.optional(v.string()),
+    primaryContactPhone: v.optional(v.string()),
+    address: v.optional(v.string()),
+    website: v.optional(v.string()),
+    accountNumber: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const normalizedName = args.name.trim();
@@ -231,14 +238,22 @@ export const upsertContactFromInvoice = internalMutation({
 
     return await ctx.db.insert("contacts", {
       name: normalizedName || normalizedProviderName || "Unknown",
+      fullName: trimOrUndefined(args.fullName),
       role: trimOrUndefined(args.role),
       providerId: args.providerId,
       providerName: normalizedProviderName,
       company: normalizedProviderName,
+      contactName: trimOrUndefined(args.contactName),
+      primaryContactName: trimOrUndefined(args.primaryContactName),
+      primaryContactPhone: trimOrUndefined(args.primaryContactPhone),
       category: normalizedCategory,
       location: normalizedLocation,
+      address: trimOrUndefined(args.address),
       phone: trimOrUndefined(args.phone),
       email: normalizedEmail,
+      website: trimOrUndefined(args.website),
+      accountNumber: trimOrUndefined(args.accountNumber),
+      type: "vendor",
       createdAt: Date.now()
     });
   }
