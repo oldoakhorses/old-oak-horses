@@ -559,7 +559,7 @@ export default function GlobalFab() {
 
       if (!detection.matched || !detection.providerId || !detection.categoryId) {
         // Don't default to "admin" — let AI auto-detect category from line items
-        setInvoiceStatusMessage("parsing invoice...");
+        setInvoiceStatusMessage("doing things...");
         setInvoiceStage("parsing");
         const fallback = await parseUploadedInvoice({
           fileStorageId: storageId,
@@ -575,7 +575,7 @@ export default function GlobalFab() {
         return;
       }
 
-      setInvoiceStatusMessage("parsing invoice...");
+      setInvoiceStatusMessage("doing things...");
       setInvoiceStage("parsing");
       const result = await parseUploadedInvoice({
         fileStorageId: storageId,

@@ -1272,7 +1272,7 @@ export default function InvoicePreviewPage() {
       >
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 11, letterSpacing: "0.05em", marginBottom: 8 }}>⏳</div>
-          <div>parsing invoice...</div>
+          <div>doing things...</div>
         </div>
       </div>
     );
@@ -1331,7 +1331,7 @@ export default function InvoicePreviewPage() {
             {reparsing && isParsing ? (
               <div className={styles.card} style={{ background: "rgba(74,91,219,0.06)", borderColor: "#4A5BDB", textAlign: "center", padding: "20px 16px" }}>
                 <div style={{ fontSize: 11, letterSpacing: "0.05em", marginBottom: 6, color: "#4A5BDB" }}>⏳</div>
-                <div style={{ fontSize: 12, color: "#4A5BDB", fontWeight: 600 }}>re-parsing invoice with new provider...</div>
+                <div style={{ fontSize: 12, color: "#4A5BDB", fontWeight: 600 }}>doing things...</div>
               </div>
             ) : null}
 

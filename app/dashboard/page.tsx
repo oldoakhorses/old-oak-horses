@@ -473,7 +473,7 @@ export default function DashboardPage() {
       if (!detection.matched || !detection.providerId || !detection.categoryId) {
         const fallbackCategory = categories.find((row) => row.slug === "admin");
         if (!fallbackCategory) throw new Error("Fallback category not found");
-        setInvoiceStatusMessage("parsing invoice...");
+        setInvoiceStatusMessage("doing things...");
         setInvoiceStage("parsing");
         const fallback = await parseUploadedInvoice({
           fileStorageId: storageId,
@@ -490,7 +490,7 @@ export default function DashboardPage() {
         return;
       }
 
-      setInvoiceStatusMessage("parsing invoice...");
+      setInvoiceStatusMessage("doing things...");
       setInvoiceStage("parsing");
       const result = await parseUploadedInvoice({
         fileStorageId: storageId,
