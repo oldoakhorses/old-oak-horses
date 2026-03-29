@@ -30,6 +30,7 @@ export default function BodyworkInvoicePage() {
     api.providers.getProviderBySlug,
     providerSlugParam ? { categorySlug: "bodywork", providerSlug: providerSlugParam } : "skip"
   );
+  const horses = useQuery(api.horses.getActiveHorses) ?? [];
   const approveBill = useMutation(api.bills.approveBill);
   const deleteBill = useMutation(api.bills.deleteBill);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -47,19 +48,54 @@ export default function BodyworkInvoicePage() {
       ? extracted.invoice_total_usd
       : lineItems.reduce((sum, row) => sum + safeAmount(row.total_usd), 0);
 
+  const assignedHorses = (bill?.assignedHorses ?? []) as Array<{ horseId: string; horseName: string; amount: number }>;
+  const assignedHorseNames = new Set(assignedHorses.map((h) => h.horseName.toLowerCase().trim()));
+
   const grouped = useMemo(() => {
     const map = new Map<string, LineItem[]>();
+    const unassignedItems: LineItem[] = [];
+
     for (const row of lineItems) {
-      const key = row.horse_name?.trim() || "Unassigned / General";
-      map.set(key, [...(map.get(key) ?? []), row]);
+      const name = row.horse_name?.trim();
+      if (name) {
+        map.set(name, [...(map.get(name) ?? []), row]);
+      } else {
+        unassignedItems.push(row);
+      }
     }
-    return [...map.entries()].map(([horseName, items]) => ({
-      horseName,
-      items,
-      subtotal: items.reduce((sum, item) => sum + safeAmount(item.total_usd), 0),
-      autoDetected: items.some((item) => item.auto_detected === true)
-    }));
-  }, [lineItems]);
+
+    // Get list of horse groups (named horses only)
+    const horseNames = [...map.keys()];
+
+    // Split unassigned items across all named horses (or assigned horses)
+    const splitTargets = horseNames.length > 0 ? horseNames : assignedHorses.map((h) => h.horseName);
+    if (unassignedItems.length > 0 && splitTargets.length > 0) {
+      for (const item of unassignedItems) {
+        const splitAmount = safeAmount(item.total_usd) / splitTargets.length;
+        for (const target of splitTargets) {
+          const existing = map.get(target) ?? [];
+          map.set(target, [
+            ...existing,
+            { ...item, total_usd: splitAmount, description: `${item.description || "General"} (split)` }
+          ]);
+        }
+      }
+    } else if (unassignedItems.length > 0) {
+      // No horses to split across — keep as unassigned
+      map.set("Unassigned / General", unassignedItems);
+    }
+
+    return [...map.entries()].map(([horseName, items]) => {
+      const horse = horses.find((h) => h.name.toLowerCase() === horseName.toLowerCase());
+      return {
+        horseName,
+        horseId: horse ? String(horse._id) : assignedHorses.find((h) => h.horseName.toLowerCase() === horseName.toLowerCase())?.horseId ?? null,
+        items,
+        subtotal: items.reduce((sum, item) => sum + safeAmount(item.total_usd), 0),
+        autoDetected: items.some((item) => item.auto_detected === true)
+      };
+    });
+  }, [lineItems, horses, assignedHorses]);
 
   async function onApprove() {
     if (!bill) return;
@@ -119,7 +155,13 @@ export default function BodyworkInvoicePage() {
             <div className={styles.horseCardHeader}>
               <div className={styles.horseLeft}>
                 <span className={styles.horseEmoji}>🐴</span>
-                <span className={styles.horseName}>{group.horseName}</span>
+                {group.horseId ? (
+                  <Link href={`/horses/${group.horseId}`} className={styles.horseName} style={{ textDecoration: "none", color: "inherit" }}>
+                    {group.horseName}
+                  </Link>
+                ) : (
+                  <span className={styles.horseName}>{group.horseName}</span>
+                )}
                 {group.autoDetected ? <span className={styles.autoBadge}>auto</span> : null}
               </div>
               <div className={styles.horseRight}>

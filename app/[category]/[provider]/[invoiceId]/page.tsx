@@ -336,7 +336,16 @@ export default function InvoiceReportPage() {
               <div className={styles.horseLeft}>
                 <div className={styles.horseAvatar}>🐴</div>
                 <div>
-                  <div className={styles.horseName}>{group.horseName}</div>
+                  {(() => {
+                    const horse = horses.find((h) => h.name.toLowerCase() === group.horseName.toLowerCase());
+                    return horse ? (
+                      <Link href={`/horses/${horse._id}`} className={styles.horseName} style={{ textDecoration: "none", color: "inherit" }}>
+                        {group.horseName}
+                      </Link>
+                    ) : (
+                      <div className={styles.horseName}>{group.horseName}</div>
+                    );
+                  })()}
                   <div className={styles.horseMeta}>
                     {group.items.length} line items{horseGroups.length > 1 ? ` · ${((group.subtotal / total) * 100).toFixed(1)}% of invoice` : ""}
                   </div>
