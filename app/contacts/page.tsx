@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -21,17 +22,6 @@ type ContactFormState = {
   email: string;
   phone: string;
   role: string;
-};
-
-type DetailFormState = {
-  name: string;
-  providerName: string;
-  location: LocationValue;
-  category: string;
-  email: string;
-  phone: string;
-  role: string;
-  notes: string;
 };
 
 const CATEGORY_OPTIONS = [
@@ -100,20 +90,8 @@ export default function ContactsPage() {
   const [sortColumn, setSortColumn] = useState<SortColumn>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [isAdding, setIsAdding] = useState(false);
+  const router = useRouter();
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [detailEditId, setDetailEditId] = useState<string | null>(null);
-  const [detailSaving, setDetailSaving] = useState(false);
-  const [detailForm, setDetailForm] = useState<DetailFormState>({
-    name: "",
-    providerName: "",
-    location: "all",
-    category: "",
-    email: "",
-    phone: "",
-    role: "",
-    notes: "",
-  });
   const [form, setForm] = useState<ContactFormState>(EMPTY_FORM);
   const [error, setError] = useState<string>("");
   const [saving, setSaving] = useState(false);
@@ -125,7 +103,6 @@ export default function ContactsPage() {
   const providers = useQuery(api.providers.getAllProvidersWithCategory) ?? [];
 
   const createContact = useMutation(api.contacts.createContact);
-  const updateContact = useMutation(api.contacts.updateContact);
   const deleteContact = useMutation(api.contacts.deleteContact);
 
   const providerLookup = useMemo(() => new Map(providers.map((provider) => [String(provider._id), provider])), [providers]);
@@ -222,53 +199,9 @@ export default function ContactsPage() {
     await deleteContact({ contactId: contactId as Id<"contacts"> });
   }
 
-  function handleRowClick(contactId: string) {
-    setExpandedId((prev) => (prev === contactId ? null : contactId));
-    setDetailEditId(null);
-  }
-
-  function startDetailEdit(contact: (typeof contacts)[number]) {
-    const provider = contact.providerId ? providerLookup.get(String(contact.providerId)) : null;
-    setDetailEditId(String(contact._id));
-    setDetailForm({
-      name: contact.name ?? "",
-      providerName: contact.providerName ?? contact.company ?? provider?.name ?? "",
-      location: (contact.location as Exclude<LocationValue, "all"> | undefined) ?? "all",
-      category: contact.category ?? "",
-      email: contact.email ?? "",
-      phone: contact.phone ?? "",
-      role: contact.role ?? "",
-      notes: contact.notes ?? "",
-    });
-  }
-
-  function closeDetail(contactId?: string) {
-    if (!contactId) {
-      setExpandedId(null);
-    } else {
-      setExpandedId((prev) => (prev === contactId ? null : prev));
-    }
-    setDetailEditId(null);
-  }
-
-  async function saveDetail(contact: (typeof contacts)[number]) {
-    setDetailSaving(true);
-    try {
-      await updateContact({
-        contactId: contact._id,
-        name: detailForm.name || undefined,
-        providerName: detailForm.providerName || undefined,
-        location: detailForm.location === "all" ? "" : detailForm.location,
-        category: detailForm.category || undefined,
-        email: detailForm.email || undefined,
-        phone: detailForm.phone || undefined,
-        role: detailForm.role || undefined,
-        notes: detailForm.notes || undefined,
-      });
-      setDetailEditId(null);
-    } finally {
-      setDetailSaving(false);
-    }
+  function handleRowClick(contact: (typeof contacts)[number]) {
+    const slug = contact.slug || String(contact._id);
+    router.push(`/contacts/${slug}`);
   }
 
   return (
@@ -419,8 +352,9 @@ export default function ContactsPage() {
               return (
                 <div key={contactId}>
                   <div
-                    className={`${styles.contactRow} ${expandedId === contactId ? styles.contactRowExpanded : ""}`}
-                    onClick={() => handleRowClick(contactId)}
+                    className={styles.contactRow}
+                    onClick={() => handleRowClick(contact)}
+                    style={{ cursor: "pointer" }}
                   >
                     <div>
                       <div className={styles.contactName}>{contact.name}</div>
@@ -452,21 +386,10 @@ export default function ContactsPage() {
                             className={styles.menuItem}
                             onClick={() => {
                               setOpenMenuId(null);
-                              setExpandedId(contactId);
+                              handleRowClick(contact);
                             }}
                           >
                             View Contact
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.menuItem}
-                            onClick={() => {
-                              setOpenMenuId(null);
-                              setExpandedId(contactId);
-                              startDetailEdit(contact);
-                            }}
-                          >
-                            Edit Contact
                           </button>
                           <div className={styles.menuDivider} />
                           <button type="button" className={`${styles.menuItem} ${styles.menuItemDanger}`} onClick={() => handleDeleteContact(contactId)}>
@@ -476,156 +399,6 @@ export default function ContactsPage() {
                       ) : null}
                     </div>
                   </div>
-                  {expandedId === contactId ? (
-                    <div className={styles.contactDetail} onClick={(event) => event.stopPropagation()}>
-                      {detailEditId === contactId ? (
-                        <div className={styles.editFields}>
-                          <EditField label="NAME">
-                            <input
-                              className={styles.editInput}
-                              value={detailForm.name}
-                              onChange={(event) => setDetailForm((prev) => ({ ...prev, name: event.target.value }))}
-                              placeholder="contact name"
-                            />
-                          </EditField>
-                          <EditField label="PROVIDER">
-                            <input
-                              className={styles.editInput}
-                              value={detailForm.providerName}
-                              onChange={(event) => setDetailForm((prev) => ({ ...prev, providerName: event.target.value }))}
-                              placeholder="company or business name"
-                            />
-                          </EditField>
-                          <EditField label="LOCATION">
-                            <select
-                              className={styles.editInput}
-                              value={detailForm.location}
-                              onChange={(event) => setDetailForm((prev) => ({ ...prev, location: event.target.value as LocationValue }))}
-                            >
-                              <option value="all">select...</option>
-                              <option value="wellington">Wellington</option>
-                              <option value="thermal">Thermal</option>
-                              <option value="ocala">Ocala</option>
-                              <option value="la">LA</option>
-                              <option value="eu">EU</option>
-                              <option value="can">CAN</option>
-                            </select>
-                          </EditField>
-                          <EditField label="CATEGORY">
-                            <select
-                              className={styles.editInput}
-                              value={detailForm.category}
-                              onChange={(event) => setDetailForm((prev) => ({ ...prev, category: event.target.value }))}
-                            >
-                              <option value="">select...</option>
-                              {CATEGORY_OPTIONS.map((row) => (
-                                <option key={row.key} value={row.key}>
-                                  {row.label}
-                                </option>
-                              ))}
-                            </select>
-                          </EditField>
-                          <EditField label="EMAIL">
-                            <input
-                              className={styles.editInput}
-                              value={detailForm.email}
-                              onChange={(event) => setDetailForm((prev) => ({ ...prev, email: event.target.value }))}
-                              placeholder="email address"
-                              type="email"
-                            />
-                          </EditField>
-                          <EditField label="PHONE">
-                            <input
-                              className={styles.editInput}
-                              value={detailForm.phone}
-                              onChange={(event) => setDetailForm((prev) => ({ ...prev, phone: event.target.value }))}
-                              placeholder="phone number"
-                              type="tel"
-                            />
-                          </EditField>
-                          <EditField label="ROLE">
-                            <input
-                              className={styles.editInput}
-                              value={detailForm.role}
-                              onChange={(event) => setDetailForm((prev) => ({ ...prev, role: event.target.value }))}
-                              placeholder="e.g., Veterinarian, Farrier, Sales Rep"
-                            />
-                          </EditField>
-                          <EditField label="NOTES" fullWidth>
-                            <textarea
-                              className={styles.editInput}
-                              value={detailForm.notes}
-                              onChange={(event) => setDetailForm((prev) => ({ ...prev, notes: event.target.value }))}
-                              placeholder="any additional details..."
-                            />
-                          </EditField>
-                        </div>
-                      ) : (
-                        <div className={styles.detailFields}>
-                          <div className={styles.detailField}>
-                            <div className={styles.detailLabel}>EMAIL</div>
-                            {contact.email ? (
-                              <a className={styles.detailLink} href={`mailto:${contact.email}`}>
-                                {contact.email}
-                              </a>
-                            ) : (
-                              <div className={styles.detailValueEmpty}>—</div>
-                            )}
-                          </div>
-                          <div className={styles.detailField}>
-                            <div className={styles.detailLabel}>PHONE</div>
-                            {contact.phone ? (
-                              <a className={styles.detailLink} href={`tel:${contact.phone}`}>
-                                {contact.phone}
-                              </a>
-                            ) : (
-                              <div className={styles.detailValueEmpty}>—</div>
-                            )}
-                          </div>
-                          <div className={styles.detailField}>
-                            <div className={styles.detailLabel}>ROLE</div>
-                            <div className={contact.role ? styles.detailValue : styles.detailValueEmpty}>{contact.role || "—"}</div>
-                          </div>
-                          <div className={`${styles.detailField} ${styles.detailNotes}`}>
-                            <div className={styles.detailLabel}>NOTES</div>
-                            <div className={contact.notes ? styles.detailValue : styles.detailValueEmpty}>{contact.notes || "—"}</div>
-                          </div>
-                        </div>
-                      )}
-                      <div className={styles.detailActions}>
-                        {detailEditId === contactId ? (
-                          <>
-                            <button
-                              type="button"
-                              className={styles.btnCancelDetail}
-                              onClick={() => {
-                                setDetailEditId(null);
-                              }}
-                            >
-                              cancel
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.btnSaveDetail}
-                              disabled={detailSaving || !detailForm.name.trim()}
-                              onClick={() => saveDetail(contact)}
-                            >
-                              {detailSaving ? "saving..." : "save changes"}
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button type="button" className={styles.btnEditContact} onClick={() => startDetailEdit(contact)}>
-                              edit contact
-                            </button>
-                            <button type="button" className={styles.btnCloseDetail} onClick={() => closeDetail(contactId)}>
-                              close
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
               );
             })
@@ -681,11 +454,3 @@ function Field({ label, children, fullWidth = false }: { label: string; children
   );
 }
 
-function EditField({ label, children, fullWidth = false }: { label: string; children: React.ReactNode; fullWidth?: boolean }) {
-  return (
-    <label className={`${styles.fieldGroup} ${fullWidth ? styles.fieldGroupFull : ""}`}>
-      <span className={styles.editLabel}>{label}</span>
-      {children}
-    </label>
-  );
-}

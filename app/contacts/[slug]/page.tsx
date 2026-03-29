@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
+import NavBar from "@/components/NavBar";
 import styles from "./contact.module.css";
 
 const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
@@ -40,7 +41,13 @@ export default function ContactDetailPage() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug;
 
-  const contact = useQuery(api.contacts.getContactBySlug, { slug });
+  // Try slug lookup first, fall back to ID lookup
+  const contactBySlug = useQuery(api.contacts.getContactBySlug, { slug });
+  const contactById = useQuery(
+    api.contacts.getContactById,
+    contactBySlug === null ? { id: slug as any } : "skip"
+  );
+  const contact = contactBySlug ?? contactById;
   const bills = useQuery(
     api.bills.getBillsByContact,
     contact?._id ? { contactId: contact._id } : "skip"
@@ -58,8 +65,16 @@ export default function ContactDetailPage() {
   );
 
   return (
-    <main className="page-main">
-      <Link href="/contacts" className={styles.backLink}>
+    <div className="page-shell">
+      <NavBar
+        items={[
+          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "contacts", href: "/contacts" },
+          { label: contact.name, current: true },
+        ]}
+      />
+      <main className="page-main">
+      <Link href="/contacts" className="ui-back-link">
         &larr; cd /contacts
       </Link>
 
@@ -67,7 +82,7 @@ export default function ContactDetailPage() {
         <div>
           <h1 className={styles.contactName}>{contact.name}</h1>
           <div className={styles.contactType}>
-            {contact.type ?? "vendor"} {contact.category ? `/ ${contact.category}` : ""}
+            {contact.type ?? "vendor"} {contact.category ? `/ ${formatCategoryLabel(contact.category)}` : ""}
           </div>
         </div>
       </div>
@@ -194,5 +209,6 @@ export default function ContactDetailPage() {
         </table>
       )}
     </main>
+    </div>
   );
 }

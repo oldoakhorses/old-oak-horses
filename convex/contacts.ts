@@ -37,6 +37,28 @@ function normalizeEmail(value?: string) {
   return trimmed ? trimmed.toLowerCase() : undefined;
 }
 
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
+async function generateUniqueSlug(ctx: any, name: string) {
+  const base = slugify(name);
+  if (!base) return undefined;
+  const existing = await ctx.db.query("contacts").withIndex("by_slug", (q: any) => q.eq("slug", base)).first();
+  if (!existing) return base;
+  let suffix = 2;
+  while (true) {
+    const candidate = `${base}-${suffix}`;
+    const found = await ctx.db.query("contacts").withIndex("by_slug", (q: any) => q.eq("slug", candidate)).first();
+    if (!found) return candidate;
+    suffix++;
+  }
+}
+
 export const getAllContacts = query({
   args: {},
   handler: async (ctx) => {
@@ -117,8 +139,10 @@ export const createContact = mutation({
   },
   handler: async (ctx, args) => {
     const providerName = trimOrUndefined(args.providerName) ?? trimOrUndefined(args.company);
+    const slug = await generateUniqueSlug(ctx, args.name);
     return await ctx.db.insert("contacts", {
       name: args.name.trim(),
+      slug,
       role: trimOrUndefined(args.role),
       providerId: args.providerId,
       providerName,
@@ -236,8 +260,11 @@ export const upsertContactFromInvoice = internalMutation({
     });
     if (alreadyExists) return null;
 
+    const contactName = normalizedName || normalizedProviderName || "Unknown";
+    const slug = await generateUniqueSlug(ctx, contactName);
     return await ctx.db.insert("contacts", {
-      name: normalizedName || normalizedProviderName || "Unknown",
+      name: contactName,
+      slug,
       fullName: trimOrUndefined(args.fullName),
       role: trimOrUndefined(args.role),
       providerId: args.providerId,
