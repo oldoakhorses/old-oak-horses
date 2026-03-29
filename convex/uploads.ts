@@ -230,15 +230,16 @@ export const parseUploadedInvoice: any = action({
     console.log("[uploads.parseUploadedInvoice] scheduled parse for billId:", String(billId));
 
     const providerSlug = provider ? slugify(provider.name) : customProviderName ? slugify(customProviderName) : "other";
-    const catSlug = category?.slug ?? "invoices";
-    let redirectPath = `/${catSlug}/${providerSlug}/${billId}`;
-    let listPath = `/${catSlug}`;
+    const catSlug = category?.slug ?? null;
+    // When no category (auto-detect mode), redirect to preview page
+    let redirectPath = catSlug ? `/${catSlug}/${providerSlug}/${billId}` : `/invoices/preview/${billId}`;
+    let listPath = catSlug ? `/${catSlug}` : "/invoices";
 
-    if (catSlug === "admin") {
+    if (catSlug && catSlug === "admin") {
       const subSlug = args.adminSubcategory || "payroll";
       redirectPath = `/admin/${subSlug}/${providerSlug}/${billId}`;
       listPath = `/admin/${subSlug}/${providerSlug}`;
-    } else if (catSlug === "dues-registrations") {
+    } else if (catSlug && catSlug === "dues-registrations") {
       const subSlug = args.duesSubcategory || "memberships";
       redirectPath = `/dues-registrations/${subSlug}/${providerSlug}/${billId}`;
       listPath = `/dues-registrations/${subSlug}/${providerSlug}`;

@@ -558,13 +558,11 @@ export default function GlobalFab() {
       const detection = (await detectProvider({ fileStorageId: storageId })) as InvoiceDetectionState;
 
       if (!detection.matched || !detection.providerId || !detection.categoryId) {
-        const fallbackCategory = categories.find((row) => row.slug === "admin");
-        if (!fallbackCategory) throw new Error("Fallback category not found");
+        // Don't default to "admin" — let AI auto-detect category from line items
         setInvoiceStatusMessage("parsing invoice...");
         setInvoiceStage("parsing");
         const fallback = await parseUploadedInvoice({
           fileStorageId: storageId,
-          categoryId: fallbackCategory._id,
           customProviderName:
             detection.extractedName && detection.extractedName.toUpperCase() !== "UNKNOWN"
               ? detection.extractedName

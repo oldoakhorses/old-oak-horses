@@ -1455,6 +1455,13 @@ export const getCategory = internalQuery({
   }
 });
 
+export const getCategoryBySlug = internalQuery({
+  args: { slug: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db.query("categories").withIndex("by_slug", (q) => q.eq("slug", args.slug)).first();
+  }
+});
+
 export const getBillFileNamesByProvider = internalQuery({
   args: { providerId: v.id("providers") },
   handler: async (ctx, args) => {
@@ -1734,7 +1741,8 @@ export const markDone = internalMutation({
     isApproved: v.optional(v.boolean()),
     hasUnmatchedHorses: v.optional(v.boolean()),
     unmatchedHorseNames: v.optional(v.array(v.string())),
-    lineItemCategories: v.optional(v.array(v.string()))
+    lineItemCategories: v.optional(v.array(v.string())),
+    inferredCategoryId: v.optional(v.id("categories"))
   },
   handler: async (ctx, args) => {
     const patch: Record<string, unknown> = {
@@ -1766,6 +1774,9 @@ export const markDone = internalMutation({
     };
     if (args.lineItemCategories) {
       patch.lineItemCategories = args.lineItemCategories;
+    }
+    if (args.inferredCategoryId) {
+      patch.categoryId = args.inferredCategoryId;
     }
 
     // Update fileName to use parsed invoice date instead of upload date

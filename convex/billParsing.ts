@@ -344,6 +344,19 @@ export const parseBillPdf = internalAction({
         resolvedContactId = contact?._id ?? undefined;
       }
 
+      // When no bill-level category was set, infer from line item categories
+      let inferredCategoryId: string | undefined;
+      if (!categorySlug && lineItemCategories.length > 0) {
+        // Pick the most common line item category
+        const freq = new Map<string, number>();
+        for (const cat of lineItemCategories) freq.set(cat, (freq.get(cat) || 0) + 1);
+        const dominant = [...freq.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+        if (dominant) {
+          const matched = await ctx.runQuery(internal.bills.getCategoryBySlug, { slug: dominant });
+          if (matched) inferredCategoryId = matched._id;
+        }
+      }
+
       await ctx.runMutation(internal.bills.markDone, {
         billId: bill._id,
         extractedData: parsed,
@@ -355,6 +368,7 @@ export const parseBillPdf = internalAction({
         contactId: resolvedContactId as any,
         customProviderName: extractedCustomProviderName,
         extractedProviderContact,
+        inferredCategoryId: inferredCategoryId as any,
         ...currencyMeta,
         discount: typeof billDiscount === "number" ? round2(billDiscount) : undefined,
         ...categoryMeta
