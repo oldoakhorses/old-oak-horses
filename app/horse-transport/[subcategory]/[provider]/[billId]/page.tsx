@@ -256,10 +256,27 @@ export default function HorseTransportInvoicePage() {
       />
 
       <main className="page-main">
-        <div className={styles.topRow}>
+        <div className={styles.topRow} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Link className="ui-back-link" href={`/horse-transport/${subcategory}/${providerSlug}`}>
             ← cd /{providerSlug}
           </Link>
+          {bill.status === "done" ? (
+            <Link
+              href={`/invoices/preview/${billId}`}
+              style={{
+                fontFamily: "inherit",
+                fontSize: 10,
+                padding: "6px 14px",
+                borderRadius: 6,
+                border: "1px solid #E8EAF0",
+                background: "transparent",
+                color: "#4A5BDB",
+                textDecoration: "none",
+              }}
+            >
+              edit
+            </Link>
+          ) : null}
         </div>
 
         <section className={styles.headerCard}>
@@ -511,7 +528,9 @@ export default function HorseTransportInvoicePage() {
           </section>
         )}
 
-        {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
+        <div style={{ marginTop: 24 }}>
+          {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
+        </div>
 
         {bill?.status === "done" ? (
           <LogRecordFromInvoice
@@ -526,25 +545,7 @@ export default function HorseTransportInvoicePage() {
 
         <div className={styles.approvalRow}>
           {bill.status === "done" ? (
-            <>
               <div className={styles.approvedBar}>✓ invoice approved</div>
-              <Link
-                href={`/invoices/preview/${billId}`}
-                style={{
-                  fontFamily: "inherit",
-                  fontSize: 10,
-                  padding: "7px 14px",
-                  borderRadius: 6,
-                  border: "1px solid #E8EAF0",
-                  background: "transparent",
-                  color: "#4A5BDB",
-                  textDecoration: "none",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                edit assignments
-              </Link>
-            </>
           ) : (
             <>
               <button type="button" className={canApprove ? styles.approveBtn : styles.approveDisabled} disabled={!canApprove || isApproving} onClick={onApprove}>

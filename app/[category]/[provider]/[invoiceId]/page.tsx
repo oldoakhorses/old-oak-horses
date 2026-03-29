@@ -282,6 +282,23 @@ export default function InvoiceReportPage() {
           <Link href={`/${categorySlug}/${providerSlug}`} className="ui-back-link">
             ← cd /{providerSlug}
           </Link>
+          {bill?.status === "done" ? (
+            <Link
+              href={`/invoices/preview/${invoiceId}`}
+              style={{
+                fontFamily: "inherit",
+                fontSize: 10,
+                padding: "6px 14px",
+                borderRadius: 6,
+                border: "1px solid #E8EAF0",
+                background: "transparent",
+                color: "#4A5BDB",
+                textDecoration: "none",
+              }}
+            >
+              edit
+            </Link>
+          ) : null}
         </div>
 
         <section className={styles.headerCard}>
@@ -415,7 +432,9 @@ export default function InvoiceReportPage() {
           />
         ) : null}
 
-        {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
+        <div style={{ marginTop: 24 }}>
+          {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
+        </div>
 
         {bill?.status === "done" ? (
           <LogRecordFromInvoice
@@ -430,27 +449,9 @@ export default function InvoiceReportPage() {
 
         <div style={{ marginTop: 16, marginBottom: 20, display: "flex", gap: 10, alignItems: "flex-start" }}>
           {bill?.status === "done" ? (
-            <>
-              <div className={styles.approvedBox}>
-                ✓ invoice approved
-              </div>
-              <Link
-                href={`/invoices/preview/${invoiceId}`}
-                style={{
-                  fontFamily: "inherit",
-                  fontSize: 10,
-                  padding: "7px 14px",
-                  borderRadius: 6,
-                  border: "1px solid #E8EAF0",
-                  background: "transparent",
-                  color: "#4A5BDB",
-                  textDecoration: "none",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                edit assignments
-              </Link>
-            </>
+            <div className={styles.approvedBox}>
+              ✓ invoice approved
+            </div>
           ) : (
             <div style={{ flex: 1 }}>
               <button
@@ -477,14 +478,6 @@ export default function InvoiceReportPage() {
               ) : null}
             </div>
           )}
-          {bill?.assignedHorses?.length ? (
-            <Link
-              href={`/horses/${bill.assignedHorses[0].horseId}/records/${categorySlug}`}
-              className={styles.linkRecordBtn}
-            >
-              link to record →
-            </Link>
-          ) : null}
           <button type="button" className="ui-button-outlined" onClick={() => setShowDeleteConfirm(true)}>
             delete
           </button>

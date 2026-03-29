@@ -121,9 +121,28 @@ export default function BodyworkInvoicePage() {
       />
 
       <main className="page-main">
-        <Link className="ui-back-link" href={`/bodywork/${providerSlug}`}>
-          ← cd /{providerSlug}
-        </Link>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Link className="ui-back-link" href={`/bodywork/${providerSlug}`}>
+            ← cd /{providerSlug}
+          </Link>
+          {bill?.status === "done" ? (
+            <Link
+              href={`/invoices/preview/${billId}`}
+              style={{
+                fontFamily: "inherit",
+                fontSize: 10,
+                padding: "6px 14px",
+                borderRadius: 6,
+                border: "1px solid #E8EAF0",
+                background: "transparent",
+                color: "#4A5BDB",
+                textDecoration: "none",
+              }}
+            >
+              edit
+            </Link>
+          ) : null}
+        </div>
 
         <section className={styles.headerCard}>
           <div>
@@ -180,7 +199,9 @@ export default function BodyworkInvoicePage() {
           </section>
         ))}
 
-        {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
+        <div style={{ marginTop: 24 }}>
+          {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
+        </div>
 
         {bill?.status === "done" ? (
           <LogRecordFromInvoice
@@ -195,25 +216,7 @@ export default function BodyworkInvoicePage() {
 
         <div className={styles.approveDeleteRow}>
           {bill?.status === "done" ? (
-            <>
-              <div className={styles.approvedBar}>✓ invoice approved</div>
-              <Link
-                href={`/invoices/preview/${billId}`}
-                style={{
-                  fontFamily: "inherit",
-                  fontSize: 10,
-                  padding: "7px 14px",
-                  borderRadius: 6,
-                  border: "1px solid #E8EAF0",
-                  background: "transparent",
-                  color: "#4A5BDB",
-                  textDecoration: "none",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                edit assignments
-              </Link>
-            </>
+            <div className={styles.approvedBar}>✓ invoice approved</div>
           ) : (
             <div style={{ flex: 1 }}>
               <button

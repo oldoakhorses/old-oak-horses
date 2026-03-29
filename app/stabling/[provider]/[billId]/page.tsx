@@ -356,10 +356,27 @@ export default function StablingInvoicePage() {
       />
 
       <main className="page-main">
-        <div className={styles.topRow}>
+        <div className={styles.topRow} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Link href={`/stabling/${providerSlug}`} className="ui-back-link">
             ← cd /stabling/{providerSlug}
           </Link>
+          {bill.isApproved ? (
+            <Link
+              href={`/invoices/preview/${billId}`}
+              style={{
+                fontFamily: "inherit",
+                fontSize: 10,
+                padding: "6px 14px",
+                borderRadius: 6,
+                border: "1px solid #E8EAF0",
+                background: "transparent",
+                color: "#4A5BDB",
+                textDecoration: "none",
+              }}
+            >
+              edit
+            </Link>
+          ) : null}
         </div>
 
         <section className={styles.headerCard}>
@@ -611,7 +628,9 @@ export default function StablingInvoicePage() {
           remainingTotal={reclassification.remainingTotal}
         />
 
-        {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
+        <div style={{ marginTop: 24 }}>
+          {bill ? <InvoiceNotesCard billId={bill._id} initialNotes={String(bill.notes ?? "")} /> : null}
+        </div>
 
         {bill?.isApproved ? (
           <LogRecordFromInvoice
@@ -626,25 +645,7 @@ export default function StablingInvoicePage() {
 
         <section className={styles.approvalRow}>
           {bill.isApproved ? (
-            <>
               <div className={styles.approvedBox}>✓ invoice approved</div>
-              <Link
-                href={`/invoices/preview/${billId}`}
-                style={{
-                  fontFamily: "inherit",
-                  fontSize: 10,
-                  padding: "7px 14px",
-                  borderRadius: 6,
-                  border: "1px solid #E8EAF0",
-                  background: "transparent",
-                  color: "#4A5BDB",
-                  textDecoration: "none",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                edit assignments
-              </Link>
-            </>
           ) : (
             <div style={{ flex: 1 }}>
               <button
