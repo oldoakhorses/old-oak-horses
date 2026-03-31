@@ -10,6 +10,7 @@ import InvoiceNotesCard from "@/components/InvoiceNotesCard";
 import LogRecordFromInvoice from "@/components/LogRecordFromInvoice";
 import NavBar from "@/components/NavBar";
 import { formatInvoiceName } from "@/lib/formatInvoiceName";
+import ContactEditModal from "@/components/ContactEditModal";
 import Modal from "@/components/Modal";
 import UnmatchedHorseBanner from "@/components/UnmatchedHorseBanner";
 import styles from "./feedBeddingInvoice.module.css";
@@ -47,6 +48,7 @@ export default function FeedBeddingInvoicePage() {
   const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+  const [showContactEdit, setShowContactEdit] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [assignmentSavedLocal, setAssignmentSavedLocal] = useState(false);
   const [isUpdatingLineItem, setIsUpdatingLineItem] = useState<number | null>(null);
@@ -55,11 +57,16 @@ export default function FeedBeddingInvoicePage() {
   const lineItems = Array.isArray(extracted.line_items) ? (extracted.line_items as Array<Record<string, unknown>>) : [];
   const typedLineItems = useMemo(
     () =>
-      lineItems.map((row) => ({
-        row,
-        type: normalizeFeedBeddingType(row.subcategory),
-        amount: safeNumber(row.total_usd ?? row.amount_usd ?? row.total)
-      })),
+      lineItems.map((row) => {
+        const rowCategory = String(row.category ?? "").toLowerCase().replace(/\s+/g, "-");
+        const isFeedBedding = !rowCategory || rowCategory === "feed-bedding" || rowCategory === "feed_bedding" || rowCategory === "feed & bedding";
+        return {
+          row,
+          type: isFeedBedding ? normalizeFeedBeddingType(row.subcategory) : ("other_category" as const),
+          categoryLabel: isFeedBedding ? null : prettyCategoryLabel(String(row.category ?? "")),
+          amount: safeNumber(row.total_usd ?? row.amount_usd ?? row.total)
+        };
+      }),
     [lineItems]
   );
   const total =
@@ -102,6 +109,16 @@ export default function FeedBeddingInvoicePage() {
   const feedTotal = useMemo(() => round2(typedLineItems.reduce((sum, row) => (row.type === "feed" ? sum + row.amount : sum), 0)), [typedLineItems]);
   const beddingTotal = useMemo(() => round2(typedLineItems.reduce((sum, row) => (row.type === "bedding" ? sum + row.amount : sum), 0)), [typedLineItems]);
   const adminTotal = useMemo(() => round2(typedLineItems.reduce((sum, row) => (row.type === "admin" ? sum + row.amount : sum), 0)), [typedLineItems]);
+  const otherCategoryTotal = useMemo(() => round2(typedLineItems.reduce((sum, row) => (row.type === "other_category" ? sum + row.amount : sum), 0)), [typedLineItems]);
+  const otherCategoryBreakdown = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of typedLineItems) {
+      if (row.type === "other_category" && row.categoryLabel) {
+        map.set(row.categoryLabel, (map.get(row.categoryLabel) || 0) + row.amount);
+      }
+    }
+    return [...map.entries()].map(([label, amount]) => ({ label, amount: round2(amount) }));
+  }, [typedLineItems]);
   const assignableTotal = useMemo(() => round2(Math.max(0, total - adminTotal)), [adminTotal, total]);
 
   const assignedRows: AssignedHorse[] = useMemo(() => {
@@ -171,6 +188,7 @@ export default function FeedBeddingInvoicePage() {
   const feedPct = total > 0 ? (feedTotal / total) * 100 : 0;
   const beddingPct = total > 0 ? (beddingTotal / total) * 100 : 0;
   const adminPct = total > 0 ? (adminTotal / total) * 100 : 0;
+  const otherPct = total > 0 ? (otherCategoryTotal / total) * 100 : 0;
 
   const canSaveAssignment =
     splitType === "single"
@@ -272,6 +290,22 @@ export default function FeedBeddingInvoicePage() {
                   assignedHorses={(bill.assignedHorses ?? []) as any}
                   lineItems={lineItems}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowContactEdit(true)}
+                  style={{
+                    fontFamily: "inherit",
+                    fontSize: 10,
+                    padding: "6px 14px",
+                    borderRadius: 6,
+                    border: "1px solid #E8EAF0",
+                    background: "transparent",
+                    color: "#4A5BDB",
+                    cursor: "pointer",
+                  }}
+                >
+                  contact
+                </button>
                 <Link
                   href={`/invoices/preview/${billId}`}
                   style={{
@@ -348,10 +382,17 @@ export default function FeedBeddingInvoicePage() {
             <div className={styles.typeMeta}><span className={styles.adminDot} />Admin</div>
             <div className={styles.typeNumbers}>{fmtUSD(adminTotal)} · {adminPct.toFixed(1)}%</div>
           </div>
+          {otherCategoryBreakdown.map((row) => (
+            <div key={row.label} className={styles.typeRow}>
+              <div className={styles.typeMeta}><span className={styles.otherDot} />{row.label}</div>
+              <div className={styles.typeNumbers}>{fmtUSD(row.amount)} · {total > 0 ? ((row.amount / total) * 100).toFixed(1) : "0.0"}%</div>
+            </div>
+          ))}
           <div className={styles.splitTrack}>
             <div className={styles.feedFill} style={{ width: `${feedPct}%` }} />
             <div className={styles.beddingFill} style={{ width: `${beddingPct}%` }} />
             <div className={styles.adminFill} style={{ width: `${adminPct}%` }} />
+            {otherPct > 0 ? <div className={styles.otherFill} style={{ width: `${otherPct}%` }} /> : null}
           </div>
         </section>
 
@@ -364,8 +405,9 @@ export default function FeedBeddingInvoicePage() {
             <span>TYPE</span>
             <span>AMOUNT</span>
           </div>
-          {lineItems.map((row, index) => {
-            const sub = normalizeFeedBeddingType(row.subcategory);
+          {typedLineItems.map((typed, index) => {
+            const row = typed.row;
+            const sub = typed.type === "other_category" ? null : typed.type;
             const qty = safeNumber(row.quantity || row.qty);
             const unit = safeNumber(row.unit_price || row.rate);
             return (
@@ -374,14 +416,18 @@ export default function FeedBeddingInvoicePage() {
                 <span className={styles.centerText}>{qty > 0 ? qty.toFixed(2) : "—"}</span>
                 <span className={styles.centerText}>{unit > 0 ? fmtUSD(unit) : "—"}</span>
                 <span>
-                  <button
-                    type="button"
-                    disabled={isUpdatingLineItem === index}
-                    onClick={() => onToggleSubcategory(index, sub)}
-                    className={sub === "feed" ? styles.feedBadge : sub === "bedding" ? styles.beddingBadge : styles.adminBadge}
-                  >
-                    {isUpdatingLineItem === index ? "..." : sub}
-                  </button>
+                  {typed.type === "other_category" ? (
+                    <span className={styles.otherCategoryBadge}>{typed.categoryLabel}</span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isUpdatingLineItem === index}
+                      onClick={() => onToggleSubcategory(index, sub!)}
+                      className={sub === "feed" ? styles.feedBadge : sub === "bedding" ? styles.beddingBadge : styles.adminBadge}
+                    >
+                      {isUpdatingLineItem === index ? "..." : sub}
+                    </button>
+                  )}
                 </span>
                 <span className={styles.amount}>{fmtUSD(safeNumber(row.total_usd ?? row.amount_usd ?? row.total))}</span>
               </div>
@@ -556,6 +602,7 @@ export default function FeedBeddingInvoicePage() {
             <Summary label="FEED" value={fmtUSD(feedTotal)} />
             <Summary label="BEDDING" value={fmtUSD(beddingTotal)} />
             <Summary label="ADMIN" value={fmtUSD(adminTotal)} />
+            {otherCategoryTotal > 0 ? <Summary label="OTHER" value={fmtUSD(otherCategoryTotal)} /> : null}
             <Summary label="HORSES" value={String(assignedRows.length)} />
             <Summary label="STATUS" value={bill.isApproved ? "APPROVED" : "PENDING"} valueClassName={bill.isApproved ? styles.greenText : styles.amberText} />
           </div>
@@ -566,6 +613,15 @@ export default function FeedBeddingInvoicePage() {
         </section>
 
         <div className="ui-footer">OLD_OAK_HORSES // FEED_BEDDING // {providerSlug.toUpperCase()}</div>
+
+        <ContactEditModal
+          open={showContactEdit}
+          onClose={() => setShowContactEdit(false)}
+          billId={bill._id}
+          currentContactId={bill.contactId}
+          currentName={bill.provider?.fullName || bill.provider?.name || bill.customProviderName || providerSlug}
+          currentContact={bill.extractedProviderContact as any}
+        />
 
         <Modal open={showDeleteConfirm} title="delete invoice?" onClose={() => setShowDeleteConfirm(false)}>
           <p className={styles.modalBody}>
@@ -628,4 +684,14 @@ function normalizeFeedBeddingType(value: unknown): FeedBeddingType {
   if (source.includes("bedding")) return "bedding";
   if (source.includes("admin")) return "admin";
   return "feed";
+}
+
+function prettyCategoryLabel(value: string) {
+  return value
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .replace("Feed Bedding", "Feed & Bedding")
+    .replace("Dues Registrations", "Dues & Registrations")
+    .replace("Horse Transport", "Horse Transport")
+    .trim();
 }

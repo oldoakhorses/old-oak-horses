@@ -1,7 +1,8 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { useQuery } from "convex/react";
+import { useEffect, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
 import NavBar from "@/components/NavBar";
@@ -21,7 +22,8 @@ const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
   "dues-registrations": { bg: "rgba(168,85,247,0.12)", color: "#A855F7" },
   marketing: { bg: "rgba(99,102,241,0.08)", color: "#6366F1" },
   "show-expenses": { bg: "rgba(249,115,22,0.08)", color: "#F97316" },
-  salaries: { bg: "rgba(14,165,233,0.08)", color: "#0EA5E9" },
+  grooming: { bg: "rgba(14,165,233,0.08)", color: "#0EA5E9" },
+  "riding-training": { bg: "rgba(236,72,153,0.08)", color: "#EC4899" },
 };
 
 function formatUsd(amount: number) {
@@ -39,6 +41,7 @@ function formatCategoryLabel(slug: string) {
 
 export default function ContactDetailPage() {
   const params = useParams<{ slug: string }>();
+  const searchParams = useSearchParams();
   const slug = params.slug;
 
   // Try slug lookup first, fall back to ID lookup
@@ -56,6 +59,71 @@ export default function ContactDetailPage() {
     api.bills.getContactCostSummary,
     contact?._id ? { contactId: contact._id } : "skip"
   );
+
+  const updateContact = useMutation(api.contacts.updateContact);
+
+  const shouldEdit = searchParams.get("edit") === "true";
+  const [editing, setEditing] = useState(false);
+  const [didAutoEdit, setDidAutoEdit] = useState(false);
+
+  useEffect(() => {
+    if (shouldEdit && contact && !didAutoEdit) {
+      startEdit();
+      setDidAutoEdit(true);
+    }
+  }, [shouldEdit, contact, didAutoEdit]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [saving, setSaving] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    fullName: "",
+    contactName: "",
+    phone: "",
+    email: "",
+    address: "",
+    website: "",
+    accountNumber: "",
+    category: "",
+  });
+
+  function startEdit() {
+    if (!contact) return;
+    setEditForm({
+      name: contact.name ?? "",
+      fullName: contact.fullName ?? "",
+      contactName: contact.contactName ?? contact.primaryContactName ?? "",
+      phone: contact.phone ?? contact.primaryContactPhone ?? "",
+      email: contact.email ?? "",
+      address: contact.address ?? "",
+      website: contact.website ?? "",
+      accountNumber: contact.accountNumber ?? "",
+      category: contact.category ?? "",
+    });
+    setEditing(true);
+  }
+
+  async function handleSave() {
+    if (!contact) return;
+    setSaving(true);
+    try {
+      await updateContact({
+        contactId: contact._id,
+        name: editForm.name || undefined,
+        fullName: editForm.fullName || undefined,
+        contactName: editForm.contactName || undefined,
+        phone: editForm.phone || undefined,
+        email: editForm.email || undefined,
+        address: editForm.address || undefined,
+        website: editForm.website || undefined,
+        accountNumber: editForm.accountNumber || undefined,
+        category: editForm.category || undefined,
+      });
+      setEditing(false);
+    } catch {
+      // silently fail
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (contact === undefined) return <div className="page-loading">Loading...</div>;
   if (contact === null) return <div className="page-loading">Contact not found</div>;
@@ -85,36 +153,82 @@ export default function ContactDetailPage() {
             {contact.type ?? "vendor"} {contact.category ? `/ ${formatCategoryLabel(contact.category)}` : ""}
           </div>
         </div>
+        {!editing && (
+          <button type="button" className={styles.editBtn} onClick={startEdit}>edit</button>
+        )}
       </div>
 
       {/* Contact details */}
       <div className={styles.detailsCard}>
-        <div className={styles.detailsGrid}>
-          {contact.fullName ? (
-            <div><span className={styles.label}>FULL NAME</span><span className={styles.value}>{contact.fullName}</span></div>
-          ) : null}
-          {contact.contactName || contact.primaryContactName ? (
-            <div><span className={styles.label}>CONTACT PERSON</span><span className={styles.value}>{contact.contactName ?? contact.primaryContactName}</span></div>
-          ) : null}
-          {contact.phone || contact.primaryContactPhone ? (
-            <div><span className={styles.label}>PHONE</span><span className={styles.value}>{contact.phone ?? contact.primaryContactPhone}</span></div>
-          ) : null}
-          {contact.email ? (
-            <div><span className={styles.label}>EMAIL</span><span className={styles.value}>{contact.email}</span></div>
-          ) : null}
-          {contact.address ? (
-            <div><span className={styles.label}>ADDRESS</span><span className={styles.value}>{contact.address}</span></div>
-          ) : null}
-          {contact.website ? (
-            <div><span className={styles.label}>WEBSITE</span><span className={styles.value}>{contact.website}</span></div>
-          ) : null}
-          {contact.accountNumber ? (
-            <div><span className={styles.label}>ACCOUNT #</span><span className={styles.value}>{contact.accountNumber}</span></div>
-          ) : null}
-          {contact.location ? (
-            <div><span className={styles.label}>LOCATION</span><span className={styles.value}>{contact.location}</span></div>
-          ) : null}
-        </div>
+        {editing ? (
+          <div className={styles.editGrid}>
+            <div className={styles.editField}>
+              <span className={styles.label}>NAME</span>
+              <input className={styles.editInput} value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} />
+            </div>
+            <div className={styles.editField}>
+              <span className={styles.label}>FULL NAME</span>
+              <input className={styles.editInput} value={editForm.fullName} onChange={(e) => setEditForm((p) => ({ ...p, fullName: e.target.value }))} />
+            </div>
+            <div className={styles.editField}>
+              <span className={styles.label}>CONTACT PERSON</span>
+              <input className={styles.editInput} value={editForm.contactName} onChange={(e) => setEditForm((p) => ({ ...p, contactName: e.target.value }))} />
+            </div>
+            <div className={styles.editField}>
+              <span className={styles.label}>PHONE</span>
+              <input className={styles.editInput} value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} />
+            </div>
+            <div className={styles.editField}>
+              <span className={styles.label}>EMAIL</span>
+              <input className={styles.editInput} value={editForm.email} onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))} type="email" />
+            </div>
+            <div className={styles.editField}>
+              <span className={styles.label}>ADDRESS</span>
+              <input className={styles.editInput} value={editForm.address} onChange={(e) => setEditForm((p) => ({ ...p, address: e.target.value }))} />
+            </div>
+            <div className={styles.editField}>
+              <span className={styles.label}>WEBSITE</span>
+              <input className={styles.editInput} value={editForm.website} onChange={(e) => setEditForm((p) => ({ ...p, website: e.target.value }))} />
+            </div>
+            <div className={styles.editField}>
+              <span className={styles.label}>ACCOUNT #</span>
+              <input className={styles.editInput} value={editForm.accountNumber} onChange={(e) => setEditForm((p) => ({ ...p, accountNumber: e.target.value }))} />
+            </div>
+            <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, marginTop: 8 }}>
+              <button type="button" className={styles.cancelBtn} onClick={() => setEditing(false)}>cancel</button>
+              <button type="button" className={styles.saveBtn} disabled={saving} onClick={() => void handleSave()}>
+                {saving ? "saving..." : "save"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className={styles.detailsGrid}>
+            {contact.fullName ? (
+              <div><span className={styles.label}>FULL NAME</span><span className={styles.value}>{contact.fullName}</span></div>
+            ) : null}
+            {contact.contactName || contact.primaryContactName ? (
+              <div><span className={styles.label}>CONTACT PERSON</span><span className={styles.value}>{contact.contactName ?? contact.primaryContactName}</span></div>
+            ) : null}
+            {contact.phone || contact.primaryContactPhone ? (
+              <div><span className={styles.label}>PHONE</span><span className={styles.value}>{contact.phone ?? contact.primaryContactPhone}</span></div>
+            ) : null}
+            {contact.email ? (
+              <div><span className={styles.label}>EMAIL</span><span className={styles.value}>{contact.email}</span></div>
+            ) : null}
+            {contact.address ? (
+              <div><span className={styles.label}>ADDRESS</span><span className={styles.value}>{contact.address}</span></div>
+            ) : null}
+            {contact.website ? (
+              <div><span className={styles.label}>WEBSITE</span><span className={styles.value}>{contact.website}</span></div>
+            ) : null}
+            {contact.accountNumber ? (
+              <div><span className={styles.label}>ACCOUNT #</span><span className={styles.value}>{contact.accountNumber}</span></div>
+            ) : null}
+            {contact.location ? (
+              <div><span className={styles.label}>LOCATION</span><span className={styles.value}>{contact.location}</span></div>
+            ) : null}
+          </div>
+        )}
       </div>
 
       {/* Stats */}

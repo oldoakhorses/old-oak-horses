@@ -391,6 +391,17 @@ export default function ContactsPage() {
                           >
                             View Contact
                           </button>
+                          <button
+                            type="button"
+                            className={styles.menuItem}
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              const slug = contact.slug || String(contact._id);
+                              router.push(`/contacts/${slug}?edit=true`);
+                            }}
+                          >
+                            Edit Contact
+                          </button>
                           <div className={styles.menuDivider} />
                           <button type="button" className={`${styles.menuItem} ${styles.menuItemDanger}`} onClick={() => handleDeleteContact(contactId)}>
                             Delete

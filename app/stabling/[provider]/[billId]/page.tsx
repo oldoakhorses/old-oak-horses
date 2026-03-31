@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import ContactEditModal from "@/components/ContactEditModal";
 import InvoiceNotesCard from "@/components/InvoiceNotesCard";
 import LogRecordFromInvoice from "@/components/LogRecordFromInvoice";
 import NavBar from "@/components/NavBar";
@@ -43,6 +44,7 @@ export default function StablingInvoicePage() {
   const [lineAssignments, setLineAssignments] = useState<Record<number, string>>({});
   const [splitState, setSplitState] = useState<Record<number, SplitState>>({});
   const [lineCategoryDecisions, setLineCategoryDecisions] = useState<Record<number, string | null>>({});
+  const [showContactEdit, setShowContactEdit] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -371,6 +373,22 @@ export default function StablingInvoicePage() {
                   assignedHorses={(bill.assignedHorses ?? []) as any}
                   lineItems={lineItems}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowContactEdit(true)}
+                  style={{
+                    fontFamily: "inherit",
+                    fontSize: 10,
+                    padding: "6px 14px",
+                    borderRadius: 6,
+                    border: "1px solid #E8EAF0",
+                    background: "transparent",
+                    color: "#4A5BDB",
+                    cursor: "pointer",
+                  }}
+                >
+                  contact
+                </button>
                 <Link
                   href={`/invoices/preview/${billId}`}
                   style={{
@@ -710,6 +728,15 @@ export default function StablingInvoicePage() {
         </section>
 
         <div className="ui-footer">OLD_OAK_HORSES // STABLING // {providerSlug.toUpperCase()}</div>
+
+        <ContactEditModal
+          open={showContactEdit}
+          onClose={() => setShowContactEdit(false)}
+          billId={bill._id}
+          currentContactId={bill.contactId}
+          currentName={extracted.provider_name || bill.provider?.fullName || bill.provider?.name || "Stabling Provider"}
+          currentContact={bill.extractedProviderContact as any}
+        />
       </main>
 
       {showDeleteConfirm ? (

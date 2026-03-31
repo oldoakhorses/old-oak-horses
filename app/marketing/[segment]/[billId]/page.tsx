@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import ContactEditModal from "@/components/ContactEditModal";
 import NavBar from "@/components/NavBar";
 import InvoiceNotesCard from "@/components/InvoiceNotesCard";
 import LogRecordFromInvoice from "@/components/LogRecordFromInvoice";
@@ -26,6 +27,7 @@ export default function MarketingInvoicePage() {
   const bill = useQuery(api.bills.getBillById, billId ? { billId: billId as any } : "skip");
   const approveBill = useMutation(api.bills.approveBill);
   const deleteBill = useMutation(api.bills.deleteBill);
+  const [showContactEdit, setShowContactEdit] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const extracted = (bill?.extractedData ?? {}) as Record<string, unknown>;
@@ -84,6 +86,22 @@ export default function MarketingInvoicePage() {
                   assignedHorses={(bill.assignedHorses ?? []) as any}
                   lineItems={lineItems}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowContactEdit(true)}
+                  style={{
+                    fontFamily: "inherit",
+                    fontSize: 10,
+                    padding: "6px 14px",
+                    borderRadius: 6,
+                    border: "1px solid #E8EAF0",
+                    background: "transparent",
+                    color: "#4A5BDB",
+                    cursor: "pointer",
+                  }}
+                >
+                  contact
+                </button>
                 <Link
                   href={`/invoices/preview/${billId}`}
                   style={{
@@ -229,6 +247,17 @@ export default function MarketingInvoicePage() {
         </section>
 
         <div className="ui-footer">OLD_OAK_HORSES // MARKETING // {subcategory.toUpperCase()}</div>
+
+        {bill ? (
+          <ContactEditModal
+            open={showContactEdit}
+            onClose={() => setShowContactEdit(false)}
+            billId={bill._id}
+            currentContactId={bill.contactId}
+            currentName={providerName}
+            currentContact={bill.extractedProviderContact as any}
+          />
+        ) : null}
 
         <Modal open={showDeleteConfirm} title="delete invoice?" onClose={() => setShowDeleteConfirm(false)}>
           <p style={{ marginTop: 0, color: "var(--ui-text-secondary)" }}>

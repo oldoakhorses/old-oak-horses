@@ -620,7 +620,7 @@ export const getSalaryBills = query({
   },
   handler: async (ctx, args) => {
     const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
-    const filtered = bills.filter((bill) => (args.subcategory ? bill.salariesSubcategory === args.subcategory : true));
+    const filtered = bills.filter((bill) => (args.subcategory ? bill.groomingSubcategory === args.subcategory : true));
     const rows = await Promise.all(
       filtered.map(async (bill) => {
         const resolved = await resolveContactForBill(ctx, bill as any);
@@ -663,7 +663,7 @@ export const getSalarySpendBySubcategory = query({
     const bills = (await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect()).filter(isApprovedBill);
     const totals = new Map<string, { totalSpend: number; invoiceCount: number }>();
     for (const bill of bills) {
-      const key = bill.salariesSubcategory ?? "other";
+      const key = bill.groomingSubcategory ?? "other";
       const current = totals.get(key) ?? { totalSpend: 0, invoiceCount: 0 };
       current.totalSpend += getInvoiceTotalUsdFromAny(bill.extractedData);
       current.invoiceCount += 1;
@@ -1141,8 +1141,8 @@ export const getBizOverview = query({
               ? bill.housingSubcategory ?? slugify(providerName)
               : categorySlug === "marketing"
                 ? bill.marketingSubcategory ?? slugify(providerName)
-                : categorySlug === "salaries"
-                  ? bill.salariesSubcategory ?? "other"
+                : categorySlug === "grooming"
+                  ? bill.groomingSubcategory ?? "other"
               : resolved?.slug ?? slugify(providerName);
         const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
         const invoiceNumber =
@@ -1581,7 +1581,7 @@ export const createParsingBill = internalMutation({
     marketingSubcategory: v.optional(v.string()),
     adminSubcategory: v.optional(v.string()),
     duesSubcategory: v.optional(v.string()),
-    salariesSubcategory: v.optional(v.string())
+    groomingSubcategory: v.optional(v.string())
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("bills", {
@@ -1601,7 +1601,7 @@ export const createParsingBill = internalMutation({
       marketingSubcategory: args.marketingSubcategory,
       adminSubcategory: args.adminSubcategory,
       duesSubcategory: args.duesSubcategory,
-      salariesSubcategory: args.salariesSubcategory
+      groomingSubcategory: args.groomingSubcategory
     });
   }
 });
@@ -1671,7 +1671,7 @@ export const markDone = internalMutation({
     marketingSubcategory: v.optional(v.string()),
     adminSubcategory: v.optional(v.string()),
     duesSubcategory: v.optional(v.string()),
-    salariesSubcategory: v.optional(v.string()),
+    groomingSubcategory: v.optional(v.string()),
     providerId: v.optional(v.id("providers")),
     contactId: v.optional(v.id("contacts")),
     customProviderName: v.optional(v.string()),
@@ -1755,7 +1755,7 @@ export const markDone = internalMutation({
       marketingSubcategory: args.marketingSubcategory,
       adminSubcategory: args.adminSubcategory,
       duesSubcategory: args.duesSubcategory,
-      salariesSubcategory: args.salariesSubcategory,
+      groomingSubcategory: args.groomingSubcategory,
       providerId: args.providerId,
       contactId: args.contactId,
       customProviderName: args.customProviderName,
@@ -2150,10 +2150,26 @@ export const updatePreviewFields = mutation({
     totalUsd: v.optional(v.number()),
     origin: v.optional(v.string()),
     destination: v.optional(v.string()),
+    extractedProviderContact: v.optional(
+      v.object({
+        providerName: v.optional(v.string()),
+        contactName: v.optional(v.string()),
+        address: v.optional(v.string()),
+        phone: v.optional(v.string()),
+        email: v.optional(v.string()),
+        website: v.optional(v.string()),
+        accountNumber: v.optional(v.string()),
+      })
+    ),
   },
   handler: async (ctx, args) => {
     const bill = await ctx.db.get(args.billId);
     if (!bill) throw new Error("Bill not found");
+
+    if (args.extractedProviderContact !== undefined) {
+      await ctx.db.patch(args.billId, { extractedProviderContact: args.extractedProviderContact });
+    }
+
     const extracted = ((bill.extractedData ?? {}) as Record<string, unknown>) ?? {};
     const next = { ...extracted } as Record<string, unknown>;
     if (args.invoiceNumber !== undefined) {
@@ -2197,6 +2213,33 @@ export const updatePreviewFields = mutation({
     }
 
     await ctx.db.patch(args.billId, { extractedData: next });
+    return args.billId;
+  }
+});
+
+export const updateBillContact = mutation({
+  args: {
+    billId: v.id("bills"),
+    contactId: v.optional(v.id("contacts")),
+    extractedProviderContact: v.optional(
+      v.object({
+        providerName: v.optional(v.string()),
+        contactName: v.optional(v.string()),
+        address: v.optional(v.string()),
+        phone: v.optional(v.string()),
+        email: v.optional(v.string()),
+        website: v.optional(v.string()),
+        accountNumber: v.optional(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+    const patch: Record<string, unknown> = {};
+    if (args.contactId !== undefined) patch.contactId = args.contactId;
+    if (args.extractedProviderContact !== undefined) patch.extractedProviderContact = args.extractedProviderContact;
+    await ctx.db.patch(args.billId, patch);
     return args.billId;
   }
 });
@@ -2864,7 +2907,7 @@ function getInvoiceEntities(
     const names = [...new Set((bill.assignedPeople ?? []).map((row) => peopleById.get(String(row.personId))?.name).filter(Boolean) as string[])];
     return { type: "person" as const, names };
   }
-  if (categorySlug === "salaries" || categorySlug === "admin") {
+  if (categorySlug === "grooming" || categorySlug === "admin") {
     const names = new Set<string>();
     for (const row of bill.personAssignments ?? []) {
       if (row.personName?.trim()) names.add(row.personName.trim());
@@ -2916,7 +2959,7 @@ function getCategoryColor(slug: string) {
     "feed-bedding": "#22C583",
     admin: "#6B7084",
     "dues-registrations": "#22C583",
-    salaries: "#4A5BDB",
+    grooming: "#4A5BDB",
     stabling: "#F59E0B",
     travel: "#EC4899",
     housing: "#A78BFA",

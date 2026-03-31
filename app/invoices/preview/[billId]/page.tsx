@@ -73,9 +73,10 @@ const HORSE_CATEGORY_SLUGS = new Set([
   "feed-bedding",
   "bodywork",
   "supplies",
-  "show-expenses"
+  "show-expenses",
+  "riding-training"
 ]);
-const PERSON_CATEGORY_SLUGS = new Set(["travel", "housing", "admin", "salaries"]);
+const PERSON_CATEGORY_SLUGS = new Set(["travel", "admin", "grooming"]);
 const NO_ASSIGNMENT_CATEGORY_SLUGS = new Set(["marketing"]);
 const SPLIT_ALL = "__split_all__";
 const SPLIT_INVOICE = "__split_invoice__";
@@ -102,12 +103,12 @@ const ALL_CATEGORY_OPTIONS = [
   { value: "bodywork", label: "Bodywork" },
   { value: "supplies", label: "Supplies" },
   { value: "travel", label: "Travel" },
-  { value: "housing", label: "Housing" },
   { value: "admin", label: "Admin" },
   { value: "dues-registrations", label: "Dues & Registrations" },
   { value: "marketing", label: "Marketing" },
   { value: "show-expenses", label: "Show Expenses" },
-  { value: "salaries", label: "Salaries" },
+  { value: "grooming", label: "Grooming" },
+  { value: "riding-training", label: "Riding & Training" },
   { value: "commissions", label: "Commissions" },
 ] as const;
 
@@ -130,6 +131,7 @@ function normalizeCategory(raw: string, fallback: string): string {
     tack: "supplies",
     equipment: "supplies",
     grooming: "supplies",
+    housing: "admin",
   };
   return aliases[lower] ?? fallback;
 }
@@ -154,11 +156,6 @@ const SUBCATEGORY_OPTIONS: Record<string, Array<{ value: string; label: string }
     { value: "meals", label: "Meals" },
     { value: "other", label: "Other" },
   ],
-  housing: [
-    { value: "rent", label: "Rent" },
-    { value: "utilities", label: "Utilities" },
-    { value: "other", label: "Other" },
-  ],
   "feed-bedding": [
     { value: "hay", label: "Hay" },
     { value: "grain", label: "Grain" },
@@ -176,6 +173,8 @@ const SUBCATEGORY_OPTIONS: Record<string, Array<{ value: string; label: string }
     { value: "accounting", label: "Accounting" },
     { value: "legal", label: "Legal" },
     { value: "insurance", label: "Insurance" },
+    { value: "software-subscriptions", label: "Software & Subscriptions" },
+    { value: "housing", label: "Housing" },
     { value: "other", label: "Other" },
   ],
 };
@@ -194,7 +193,8 @@ const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
   "dues-registrations": { bg: "rgba(168,85,247,0.12)", color: "#A855F7" },
   marketing: { bg: "rgba(99,102,241,0.08)", color: "#6366F1" },
   "show-expenses": { bg: "rgba(249,115,22,0.08)", color: "#F97316" },
-  salaries: { bg: "rgba(14,165,233,0.08)", color: "#0EA5E9" }
+  grooming: { bg: "rgba(14,165,233,0.08)", color: "#0EA5E9" },
+  "riding-training": { bg: "rgba(236,72,153,0.08)", color: "#EC4899" }
 };
 
 export default function InvoicePreviewPage() {
@@ -248,9 +248,37 @@ export default function InvoicePreviewPage() {
   const [reparsing, setReparsing] = useState(false);
   const [error, setError] = useState("");
 
+  const [contactEdit, setContactEdit] = useState(false);
+  const [savingContact, setSavingContact] = useState(false);
+  const [contactSearch, setContactSearch] = useState("");
+  const [showContactSuggestions, setShowContactSuggestions] = useState(false);
+  const [selectedContactId, setSelectedContactId] = useState<Id<"contacts"> | null>(null);
+  const [contactForm, setContactForm] = useState({
+    providerName: "",
+    contactName: "",
+    phone: "",
+    email: "",
+    address: "",
+    website: "",
+    accountNumber: "",
+  });
+
+  const allContacts = useQuery(api.contacts.getAllContacts) ?? [];
+  const contactSuggestions = useMemo(() => {
+    const q = contactSearch.trim().toLowerCase();
+    if (!q) return allContacts.slice(0, 8);
+    return allContacts
+      .filter((c) => {
+        const haystack = [c.name, c.fullName, c.providerName, c.email, c.phone].filter(Boolean).join(" ").toLowerCase();
+        return haystack.includes(q);
+      })
+      .slice(0, 8);
+  }, [allContacts, contactSearch]);
+
   const parseUploadedInvoice = useAction((api as any).uploads.parseUploadedInvoice);
   const reassignAndReparse = useAction((api as any).uploads.reassignAndReparse);
   const updatePreviewFields = useMutation(api.bills.updatePreviewFields);
+  const updateBillContact = useMutation(api.bills.updateBillContact);
   const saveHorseAssignment = useMutation(api.bills.saveHorseAssignment);
   const savePersonAssignment = useMutation(api.bills.savePersonAssignment);
   const saveDuesAssignments = useMutation(api.bills.saveDuesAssignments);
@@ -802,6 +830,65 @@ export default function InvoicePreviewPage() {
     }
   }
 
+  function openContactEdit() {
+    const c = bill?.extractedProviderContact;
+    setContactForm({
+      providerName: c?.providerName ?? providerName ?? "",
+      contactName: c?.contactName ?? "",
+      phone: c?.phone ?? "",
+      email: c?.email ?? "",
+      address: c?.address ?? "",
+      website: c?.website ?? "",
+      accountNumber: c?.accountNumber ?? "",
+    });
+    setContactSearch(c?.providerName ?? providerName ?? "");
+    setSelectedContactId(bill?.contactId ?? null);
+    setShowContactSuggestions(false);
+    setContactEdit(true);
+  }
+
+  function selectExistingContact(contact: (typeof allContacts)[number]) {
+    setSelectedContactId(contact._id);
+    setContactSearch(contact.name);
+    setShowContactSuggestions(false);
+    setContactForm({
+      providerName: contact.name,
+      contactName: contact.contactName ?? contact.primaryContactName ?? "",
+      phone: contact.phone ?? contact.primaryContactPhone ?? "",
+      email: contact.email ?? "",
+      address: contact.address ?? "",
+      website: contact.website ?? "",
+      accountNumber: contact.accountNumber ?? "",
+    });
+  }
+
+  async function onSaveContact() {
+    if (!bill) return;
+    setSavingContact(true);
+    setError("");
+    try {
+      const contactData = {
+        providerName: contactForm.providerName || undefined,
+        contactName: contactForm.contactName || undefined,
+        phone: contactForm.phone || undefined,
+        email: contactForm.email || undefined,
+        address: contactForm.address || undefined,
+        website: contactForm.website || undefined,
+        accountNumber: contactForm.accountNumber || undefined,
+      };
+      await updateBillContact({
+        billId,
+        contactId: selectedContactId ?? undefined,
+        extractedProviderContact: contactData,
+      });
+      setContactEdit(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save contact");
+    } finally {
+      setSavingContact(false);
+    }
+  }
+
   async function onSaveDetails() {
     if (!bill) return;
     setSavingDetails(true);
@@ -1294,37 +1381,114 @@ export default function InvoicePreviewPage() {
         <section className={styles.previewLayout}>
           <div className={styles.previewDetails}>
             <div className={`${styles.card} ${providerDetected ? styles.providerDetected : styles.providerUnknown}`}>
-              <div className={styles.bannerTitle}>{providerDetected ? "✓ contact detected" : "⚠ contact unknown"}</div>
-
-              <div className={styles.providerGrid}>
-                <div>
-                  <div className={styles.label}>CONTACT</div>
-                  <div className={styles.value}>{providerName}</div>
-                </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div className={styles.bannerTitle}>{providerDetected ? "✓ contact detected" : "⚠ contact unknown"}</div>
+                {!contactEdit && (
+                  <button type="button" className={styles.changeLink} onClick={openContactEdit}>edit</button>
+                )}
               </div>
 
-              {bill?.extractedProviderContact ? (
-                <div className={styles.contactDetailsGrid}>
-                  {bill.extractedProviderContact.contactName ? (
-                    <div><span className={styles.label}>CONTACT NAME</span><span className={styles.value}>{bill.extractedProviderContact.contactName}</span></div>
-                  ) : null}
-                  {bill.extractedProviderContact.phone ? (
-                    <div><span className={styles.label}>PHONE</span><span className={styles.value}>{bill.extractedProviderContact.phone}</span></div>
-                  ) : null}
-                  {bill.extractedProviderContact.email ? (
-                    <div><span className={styles.label}>EMAIL</span><span className={styles.value}>{bill.extractedProviderContact.email}</span></div>
-                  ) : null}
-                  {bill.extractedProviderContact.address ? (
-                    <div><span className={styles.label}>ADDRESS</span><span className={styles.value}>{bill.extractedProviderContact.address}</span></div>
-                  ) : null}
-                  {bill.extractedProviderContact.website ? (
-                    <div><span className={styles.label}>WEBSITE</span><span className={styles.value}>{bill.extractedProviderContact.website}</span></div>
-                  ) : null}
-                  {bill.extractedProviderContact.accountNumber ? (
-                    <div><span className={styles.label}>ACCOUNT</span><span className={styles.value}>{bill.extractedProviderContact.accountNumber}</span></div>
-                  ) : null}
+              {contactEdit ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+                  <div style={{ position: "relative" }}>
+                    <div className={styles.label}>CONTACT</div>
+                    <input
+                      className={styles.inputCompact}
+                      value={contactSearch}
+                      onChange={(e) => {
+                        setContactSearch(e.target.value);
+                        setContactForm((p) => ({ ...p, providerName: e.target.value }));
+                        setSelectedContactId(null);
+                        setShowContactSuggestions(true);
+                      }}
+                      onFocus={() => setShowContactSuggestions(true)}
+                      placeholder="search or type contact name..."
+                      autoComplete="off"
+                    />
+                    {showContactSuggestions && contactSuggestions.length > 0 && (
+                      <div className={styles.contactSuggestions}>
+                        {contactSuggestions.map((c) => (
+                          <button
+                            key={String(c._id)}
+                            type="button"
+                            className={styles.contactSuggestionItem}
+                            onMouseDown={(e) => { e.preventDefault(); selectExistingContact(c); }}
+                          >
+                            <span className={styles.contactSuggestionName}>{c.name}</span>
+                            {c.email ? <span className={styles.contactSuggestionMeta}>{c.email}</span> : null}
+                            {c.category ? <span className={styles.contactSuggestionMeta}>{c.category}</span> : null}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {selectedContactId && (
+                      <div style={{ fontSize: 9, color: "#22C583", marginTop: 2 }}>✓ linked to existing contact</div>
+                    )}
+                  </div>
+                  <div>
+                    <div className={styles.label}>CONTACT NAME</div>
+                    <input className={styles.inputCompact} value={contactForm.contactName} onChange={(e) => setContactForm((p) => ({ ...p, contactName: e.target.value }))} />
+                  </div>
+                  <div>
+                    <div className={styles.label}>PHONE</div>
+                    <input className={styles.inputCompact} value={contactForm.phone} onChange={(e) => setContactForm((p) => ({ ...p, phone: e.target.value }))} />
+                  </div>
+                  <div>
+                    <div className={styles.label}>EMAIL</div>
+                    <input className={styles.inputCompact} value={contactForm.email} onChange={(e) => setContactForm((p) => ({ ...p, email: e.target.value }))} />
+                  </div>
+                  <div>
+                    <div className={styles.label}>ADDRESS</div>
+                    <input className={styles.inputCompact} value={contactForm.address} onChange={(e) => setContactForm((p) => ({ ...p, address: e.target.value }))} />
+                  </div>
+                  <div>
+                    <div className={styles.label}>WEBSITE</div>
+                    <input className={styles.inputCompact} value={contactForm.website} onChange={(e) => setContactForm((p) => ({ ...p, website: e.target.value }))} />
+                  </div>
+                  <div>
+                    <div className={styles.label}>ACCOUNT #</div>
+                    <input className={styles.inputCompact} value={contactForm.accountNumber} onChange={(e) => setContactForm((p) => ({ ...p, accountNumber: e.target.value }))} />
+                  </div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                    <button type="button" className={styles.changeLink} onClick={() => { setContactEdit(false); setShowContactSuggestions(false); }}>cancel</button>
+                    <button type="button" className={styles.changeLink} style={{ fontWeight: 600 }} disabled={savingContact} onClick={() => void onSaveContact()}>
+                      {savingContact ? "saving..." : "save"}
+                    </button>
+                  </div>
                 </div>
-              ) : null}
+              ) : (
+                <>
+                  <div className={styles.providerGrid}>
+                    <div>
+                      <div className={styles.label}>CONTACT</div>
+                      <div className={styles.value}>{providerName}</div>
+                    </div>
+                  </div>
+
+                  {bill?.extractedProviderContact ? (
+                    <div className={styles.contactDetailsGrid}>
+                      {bill.extractedProviderContact.contactName ? (
+                        <div><span className={styles.label}>CONTACT NAME</span><span className={styles.value}>{bill.extractedProviderContact.contactName}</span></div>
+                      ) : null}
+                      {bill.extractedProviderContact.phone ? (
+                        <div><span className={styles.label}>PHONE</span><span className={styles.value}>{bill.extractedProviderContact.phone}</span></div>
+                      ) : null}
+                      {bill.extractedProviderContact.email ? (
+                        <div><span className={styles.label}>EMAIL</span><span className={styles.value}>{bill.extractedProviderContact.email}</span></div>
+                      ) : null}
+                      {bill.extractedProviderContact.address ? (
+                        <div><span className={styles.label}>ADDRESS</span><span className={styles.value}>{bill.extractedProviderContact.address}</span></div>
+                      ) : null}
+                      {bill.extractedProviderContact.website ? (
+                        <div><span className={styles.label}>WEBSITE</span><span className={styles.value}>{bill.extractedProviderContact.website}</span></div>
+                      ) : null}
+                      {bill.extractedProviderContact.accountNumber ? (
+                        <div><span className={styles.label}>ACCOUNT</span><span className={styles.value}>{bill.extractedProviderContact.accountNumber}</span></div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </>
+              )}
 
             </div>
 
@@ -1970,7 +2134,7 @@ function buildPermanentInvoicePath(bill: any) {
   if (categorySlug === "marketing") return `/marketing/${bill.marketingSubcategory ?? "other"}/${id}`;
   if (categorySlug === "admin") return `/admin/${bill.adminSubcategory ?? "payroll"}/${providerSlug}/${id}`;
   if (categorySlug === "dues-registrations") return `/dues-registrations/${bill.duesSubcategory ?? "memberships"}/${providerSlug}/${id}`;
-  if (categorySlug === "salaries") return `/salaries/${bill.salariesSubcategory ?? "other"}/${id}`;
+  if (categorySlug === "grooming") return `/grooming/${bill.groomingSubcategory ?? "other"}/${id}`;
   if (categorySlug === "stabling") return `/stabling/${providerSlug}/${id}`;
   if (categorySlug === "bodywork") return `/bodywork/${providerSlug}/${id}`;
   if (categorySlug === "feed-bedding") return `/feed-bedding/${providerSlug}/${id}`;

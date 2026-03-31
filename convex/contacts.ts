@@ -170,7 +170,12 @@ export const updateContact = mutation({
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
     notes: v.optional(v.string()),
-    company: v.optional(v.string())
+    company: v.optional(v.string()),
+    address: v.optional(v.string()),
+    website: v.optional(v.string()),
+    accountNumber: v.optional(v.string()),
+    fullName: v.optional(v.string()),
+    contactName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const contactId = args.contactId ?? args.id;
@@ -189,7 +194,12 @@ export const updateContact = mutation({
       phone: args.phone !== undefined ? trimOrUndefined(args.phone) : undefined,
       email: args.email !== undefined ? normalizeEmail(args.email) : undefined,
       notes: args.notes !== undefined ? trimOrUndefined(args.notes) : undefined,
-      company: providerName !== undefined ? trimOrUndefined(providerName) : undefined
+      company: providerName !== undefined ? trimOrUndefined(providerName) : undefined,
+      address: args.address !== undefined ? trimOrUndefined(args.address) : undefined,
+      website: args.website !== undefined ? trimOrUndefined(args.website) : undefined,
+      accountNumber: args.accountNumber !== undefined ? trimOrUndefined(args.accountNumber) : undefined,
+      fullName: args.fullName !== undefined ? trimOrUndefined(args.fullName) : undefined,
+      contactName: args.contactName !== undefined ? trimOrUndefined(args.contactName) : undefined,
     } as const;
     const updates = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
     if (args.location !== undefined && !normalizeLocation(args.location)) {

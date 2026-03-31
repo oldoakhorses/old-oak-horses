@@ -128,6 +128,51 @@
   padding: 8px 10px;
 }
 
+.contactSuggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 20;
+  margin-top: 2px;
+}
+
+.contactSuggestionItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 11px;
+  color: #1a1a2e;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+.contactSuggestionItem:last-child { border-bottom: none; }
+.contactSuggestionItem:hover { background: rgba(74, 91, 219, 0.04); }
+
+.contactSuggestionName {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.contactSuggestionMeta {
+  font-size: 10px;
+  color: #9ea2b0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .rowActions {
   display: flex;
   justify-content: flex-end;

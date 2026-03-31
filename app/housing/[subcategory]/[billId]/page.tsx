@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import ContactEditModal from "@/components/ContactEditModal";
 import InvoiceNotesCard from "@/components/InvoiceNotesCard";
 import LogRecordFromInvoice from "@/components/LogRecordFromInvoice";
 import NavBar from "@/components/NavBar";
@@ -33,6 +34,7 @@ export default function HousingInvoicePage() {
   const [splitPeople, setSplitPeople] = useState<string[]>([]);
   const [splitMode, setSplitMode] = useState<"even" | "custom">("even");
   const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
+  const [showContactEdit, setShowContactEdit] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -170,6 +172,22 @@ export default function HousingInvoicePage() {
                   assignedHorses={(bill.assignedHorses ?? []) as any}
                   lineItems={lineItems}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowContactEdit(true)}
+                  style={{
+                    fontFamily: "inherit",
+                    fontSize: 10,
+                    padding: "6px 14px",
+                    borderRadius: 6,
+                    border: "1px solid #E8EAF0",
+                    background: "transparent",
+                    color: "#4A5BDB",
+                    cursor: "pointer",
+                  }}
+                >
+                  contact
+                </button>
                 <Link
                   href={`/invoices/preview/${billId}`}
                   style={{
@@ -406,6 +424,15 @@ export default function HousingInvoicePage() {
         </section>
 
         <div className="ui-footer">OLD_OAK_HORSES // HOUSING // {subcategory.toUpperCase()}</div>
+
+        <ContactEditModal
+          open={showContactEdit}
+          onClose={() => setShowContactEdit(false)}
+          billId={bill._id}
+          currentContactId={bill.contactId}
+          currentName={extracted.provider_name || bill.provider?.fullName || bill.provider?.name || "Housing Provider"}
+          currentContact={bill.extractedProviderContact as any}
+        />
       </main>
 
       {showDeleteConfirm ? (

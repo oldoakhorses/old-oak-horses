@@ -8,7 +8,6 @@ const CATEGORY_SEED = [
   { name: "Bodywork", slug: "bodywork" },
   { name: "Therapeutic Care", slug: "therapeutic-care" },
   { name: "Travel", slug: "travel" },
-  { name: "Housing", slug: "housing" },
   { name: "Riding & Training", slug: "riding-training" },
   { name: "Commissions", slug: "commissions" },
   { name: "Horse Purchases", slug: "horse-purchases" },
@@ -17,7 +16,8 @@ const CATEGORY_SEED = [
   { name: "Dues & Registrations", slug: "dues-registrations" },
   { name: "Admin", slug: "admin" },
   { name: "Horse Transport", slug: "horse-transport" },
-  { name: "Show Expenses", slug: "show-expenses" }
+  { name: "Show Expenses", slug: "show-expenses" },
+  { name: "Grooming", slug: "grooming" }
 ] as const;
 
 const VET_SUBCATEGORY_DEFAULTS = [

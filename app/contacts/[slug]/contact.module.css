@@ -184,7 +184,67 @@
   font-size: 14px;
 }
 
+.editBtn {
+  font-size: 11px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #fff;
+  color: #4A5BDB;
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+.editBtn:hover { background: rgba(74, 91, 219, 0.04); }
+
+.editGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px 24px;
+}
+
+.editField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.editInput {
+  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  color: #1a1a2e;
+  width: 100%;
+  box-sizing: border-box;
+}
+.editInput:focus {
+  outline: none;
+  border-color: #4A5BDB;
+}
+
+.cancelBtn {
+  font-size: 11px;
+  border: none;
+  background: none;
+  color: #8b8fa3;
+  cursor: pointer;
+  padding: 6px 12px;
+}
+
+.saveBtn {
+  font-size: 11px;
+  border: none;
+  background: #4A5BDB;
+  color: #fff;
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+.saveBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
 @media (max-width: 768px) {
   .detailsGrid { grid-template-columns: 1fr 1fr; }
+  .editGrid { grid-template-columns: 1fr 1fr; }
   .statsRow { grid-template-columns: 1fr 1fr; }
 }

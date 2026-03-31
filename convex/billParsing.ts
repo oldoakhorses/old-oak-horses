@@ -12,9 +12,9 @@ import { matchProvider } from "./providerMatching";
 const TRAVEL_SUBCATEGORY_SLUGS = new Set(["flights", "trains", "rental-car", "gas", "meals", "hotels"]);
 const HOUSING_SUBCATEGORY_SLUGS = new Set(["rider-housing", "groom-housing"]);
 const MARKETING_SUBCATEGORY_SLUGS = new Set(["vip-tickets", "photography", "social-media"]);
-const ADMIN_SUBCATEGORY_SLUGS = new Set(["legal", "visas", "accounting", "payroll", "contractors"]);
+const ADMIN_SUBCATEGORY_SLUGS = new Set(["legal", "visas", "accounting", "payroll", "contractors", "software-subscriptions", "housing"]);
 const DUES_SUBCATEGORY_SLUGS = new Set(["horse-registrations", "rider-registrations", "memberships"]);
-const SALARIES_SUBCATEGORY_SLUGS = new Set(["rider", "groom", "freelance"]);
+const GROOMING_SUBCATEGORY_SLUGS = new Set(["rider", "groom", "freelance"]);
 const RECLASSIFICATION_SOURCE_CATEGORIES = new Set(["stabling", "show-expenses", "feed-bedding"]);
 const HORSE_BASED_CATEGORIES = new Set([
   "veterinary",
@@ -25,8 +25,9 @@ const HORSE_BASED_CATEGORIES = new Set([
   "bodywork",
   "show-expenses",
   "dues-registrations",
+  "riding-training",
 ]);
-const PERSON_BASED_CATEGORIES = new Set(["travel", "housing", "admin", "salaries", "commissions"]);
+const PERSON_BASED_CATEGORIES = new Set(["travel", "housing", "admin", "grooming", "commissions", "riding-training"]);
 const USD_EXCHANGE_RATES: Record<string, number> = {
   CAD: 0.72,
   EUR: 1.08,
@@ -107,7 +108,7 @@ export const parseBillPdf = internalAction({
           bill.duesSubcategory ??
           bill.adminSubcategory ??
           bill.marketingSubcategory ??
-          bill.salariesSubcategory ??
+          bill.groomingSubcategory ??
           bill.travelSubcategory,
         providerName: provider?.name,
         providerPrompt: provider?.extractionPrompt,
@@ -230,7 +231,7 @@ export const parseBillPdf = internalAction({
           bill.marketingSubcategory ??
           bill.travelSubcategory ??
           bill.housingSubcategory ??
-          bill.salariesSubcategory;
+          bill.groomingSubcategory;
         const allProviders = await ctx.runQuery(internal.providers.listAllForMatching, {});
         const categoryProviders = allProviders.filter((candidate: any) => candidate.categorySlug === categorySlug);
         const subcategoryScopedProviders = targetSubcategory
@@ -321,8 +322,8 @@ export const parseBillPdf = internalAction({
                   ? extractAdminMeta(parsed, bill.adminSubcategory)
                   : categorySlug === "dues-registrations"
                     ? extractDuesMeta(parsed, bill.duesSubcategory)
-                : categorySlug === "salaries"
-                  ? extractSalariesMeta(parsed, bill.salariesSubcategory)
+                : categorySlug === "grooming"
+                  ? extractGroomingMeta(parsed, bill.groomingSubcategory)
                 : {};
       const currencyMeta = extractCurrencyMeta(parsed);
       const billDiscount = pickNumber(parsed, ["discount", "professional_discount", "professionalDiscount"]);
@@ -958,13 +959,13 @@ function extractDuesMeta(parsed: Record<string, unknown>, billSubcategory: strin
   };
 }
 
-function extractSalariesMeta(parsed: Record<string, unknown>, billSubcategory: string | undefined) {
+function extractGroomingMeta(parsed: Record<string, unknown>, billSubcategory: string | undefined) {
   const originalCurrency = pickString(parsed, ["original_currency", "currency"])?.toUpperCase();
   const originalTotal = pickNumber(parsed, ["original_total", "invoice_total_original"]);
   const exchangeRate = pickNumber(parsed, ["exchange_rate", "exchange_rate_used"]);
-  const parsedSubcategory = slugify(pickString(parsed, ["salary_subcategory", "salaries_subcategory", "subcategory"]) ?? "");
-  const salariesSubcategory = SALARIES_SUBCATEGORY_SLUGS.has(parsedSubcategory) ? parsedSubcategory : billSubcategory ?? "other";
-  const role = salariesSubcategory === "rider" || salariesSubcategory === "groom" || salariesSubcategory === "freelance" ? salariesSubcategory : undefined;
+  const parsedSubcategory = slugify(pickString(parsed, ["salary_subcategory", "salaries_subcategory", "grooming_subcategory", "subcategory"]) ?? "");
+  const groomingSubcategory = GROOMING_SUBCATEGORY_SLUGS.has(parsedSubcategory) ? parsedSubcategory : billSubcategory ?? "other";
+  const role = groomingSubcategory === "rider" || groomingSubcategory === "groom" || groomingSubcategory === "freelance" ? groomingSubcategory : undefined;
   const lineItems = getLineItems(parsed);
   const personAssignments = lineItems.map((item, index) => {
     const row = item as Record<string, unknown>;
@@ -978,7 +979,7 @@ function extractSalariesMeta(parsed: Record<string, unknown>, billSubcategory: s
     };
   });
   return {
-    salariesSubcategory,
+    groomingSubcategory,
     personAssignments,
     splitPersonLineItems: [] as any[],
     originalCurrency,
@@ -1038,9 +1039,10 @@ For each line item, extract into a "line_items" array:
 - rate: Per-unit price
 - total_usd: Total for this line item
 - horse_name: If the line item is for a specific horse, extract the horse name. Otherwise null.
-- person_name: If the line item is for a specific person (travel, housing, etc.), extract the person name. Otherwise null.
+- person_name: If the line item is for a specific person (travel, admin/housing, etc.), extract the person name. Otherwise null.
 - category: Classify this line item into ONE of these categories:
-  veterinary, farrier, stabling, travel, housing, horse-transport, feed-bedding, bodywork, marketing, admin, dues-registrations, show-expenses, salaries, supplies, commissions
+  veterinary, farrier, stabling, travel, horse-transport, feed-bedding, bodywork, marketing, admin, dues-registrations, show-expenses, grooming, riding-training, supplies, commissions
+  Note: housing is now a subcategory of admin — use "admin" for housing-related items.
   Choose the most specific match. If unclear, use "supplies".
 - subcategory: Optional more specific classification within the category (e.g., "medication", "joint_injections" for veterinary; "flights", "hotels" for travel; "hay", "grain" for feed-bedding; "grooming", "stable", "tack" for supplies)
 
@@ -1470,8 +1472,8 @@ For prize money / winnings / credits:
 ${PROVIDER_CONTACT_PROMPT}
 Return strict JSON only.`;
   }
-  if (categorySlug === "salaries") {
-    return `Extract from this salary/payroll invoice: invoice_number, invoice_date, due_date, provider_name, pay_period, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, person_name (if identifiable), quantity, unit_price, total_usd.
+  if (categorySlug === "grooming") {
+    return `Extract from this grooming invoice: invoice_number, invoice_date, due_date, provider_name, pay_period, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, person_name (if identifiable), quantity, unit_price, total_usd.
 
 ${PROVIDER_CONTACT_PROMPT}
 Return strict JSON.`;
@@ -1507,9 +1509,9 @@ function annotateSuggestedCategories(parsed: Record<string, unknown>, categorySl
  * Each line item may have a `category` field set by the AI or during normalization.
  */
 const VALID_LINE_ITEM_CATEGORIES = new Set([
-  "veterinary", "farrier", "stabling", "travel", "housing", "horse-transport",
+  "veterinary", "farrier", "stabling", "travel", "horse-transport",
   "feed-bedding", "bodywork", "marketing", "admin", "dues-registrations",
-  "show-expenses", "salaries", "supplies", "commissions",
+  "show-expenses", "grooming", "riding-training", "supplies", "commissions",
 ]);
 const LINE_ITEM_CATEGORY_ALIASES: Record<string, string> = {
   general: "supplies",
@@ -1522,6 +1524,7 @@ const LINE_ITEM_CATEGORY_ALIASES: Record<string, string> = {
   tack: "supplies",
   equipment: "supplies",
   grooming: "supplies",
+  housing: "admin",
 };
 
 function normalizeLineItemCategory(raw: string): string {

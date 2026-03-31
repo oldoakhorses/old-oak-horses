@@ -153,6 +153,18 @@
   background: rgba(107, 112, 132, 0.5);
 }
 
+.otherDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4A5BDB;
+}
+
+.otherFill {
+  height: 100%;
+  background: rgba(74, 91, 219, 0.5);
+}
+
 .tableHeader,
 .tableRow {
   display: grid;
@@ -225,6 +237,16 @@
 .adminBadge {
   background: rgba(107, 112, 132, 0.08);
   color: #6b7084;
+}
+
+.otherCategoryBadge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  background: rgba(74, 91, 219, 0.08);
+  color: #4A5BDB;
 }
 
 .assignmentCard,

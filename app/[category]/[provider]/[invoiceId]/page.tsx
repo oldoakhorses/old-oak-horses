@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import ContactEditModal from "@/components/ContactEditModal";
 import LineItemReclassBadge from "@/components/LineItemReclassBadge";
 import InvoiceNotesCard from "@/components/InvoiceNotesCard";
 import LogRecordFromInvoice from "@/components/LogRecordFromInvoice";
@@ -72,6 +73,7 @@ export default function InvoiceReportPage() {
   const approveInvoiceWithReclassification = useMutation(api.bills.approveInvoiceWithReclassification);
   const deleteBill = useMutation(api.bills.deleteBill);
   const [lineCategoryDecisions, setLineCategoryDecisions] = useState<Record<number, string | null>>({});
+  const [showContactEdit, setShowContactEdit] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Redirect to invoices page when bill is deleted (becomes null)
@@ -293,6 +295,22 @@ export default function InvoiceReportPage() {
                   assignedHorses={(bill.assignedHorses ?? []) as any}
                   lineItems={lineItems}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowContactEdit(true)}
+                  style={{
+                    fontFamily: "inherit",
+                    fontSize: 10,
+                    padding: "6px 14px",
+                    borderRadius: 6,
+                    border: "1px solid #E8EAF0",
+                    background: "transparent",
+                    color: "#4A5BDB",
+                    cursor: "pointer",
+                  }}
+                >
+                  contact
+                </button>
                 <Link
                   href={`/invoices/preview/${invoiceId}`}
                   style={{
@@ -520,6 +538,17 @@ export default function InvoiceReportPage() {
 
         <div className="ui-footer">OLD_OAK_HORSES // {categorySlug.toUpperCase()} // {providerSlug.toUpperCase()}</div>
 
+        {bill ? (
+          <ContactEditModal
+            open={showContactEdit}
+            onClose={() => setShowContactEdit(false)}
+            billId={bill._id}
+            currentContactId={bill.contactId}
+            currentName={provider?.fullName || provider?.name || providerSlug}
+            currentContact={bill.extractedProviderContact as any}
+          />
+        ) : null}
+
         <Modal open={showDeleteConfirm} title="delete invoice?" onClose={() => setShowDeleteConfirm(false)}>
           <p style={{ marginTop: 0, color: "var(--ui-text-secondary)" }}>
             this will permanently delete invoice <strong>{formatInvoiceName({ providerName: String((extracted as any).provider_name ?? bill?.provider?.name ?? bill?.customProviderName ?? "Unassigned Invoice"), date: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "") })}</strong> from {provider?.name ?? providerSlug}.
@@ -612,7 +641,8 @@ const categoryBadgeColors: Record<string, string> = {
   travel: "rgba(168,85,247,0.15)",
   housing: "rgba(234,179,8,0.15)",
   admin: "rgba(107,114,128,0.15)",
-  salaries: "rgba(16,185,129,0.15)",
+  grooming: "rgba(16,185,129,0.15)",
+  "riding-training": "rgba(236,72,153,0.15)",
   marketing: "rgba(236,72,153,0.15)",
   "dues-registrations": "rgba(99,102,241,0.15)",
 };

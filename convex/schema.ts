@@ -92,7 +92,7 @@ export default defineSchema({
     marketingSubcategory: v.optional(v.string()),
     adminSubcategory: v.optional(v.string()),
     duesSubcategory: v.optional(v.string()),
-    salariesSubcategory: v.optional(v.string()),
+    groomingSubcategory: v.optional(v.string()),
     originalCurrency: v.optional(v.string()),
     originalTotal: v.optional(v.number()),
     exchangeRate: v.optional(v.number()),

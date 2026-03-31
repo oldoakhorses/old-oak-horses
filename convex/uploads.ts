@@ -15,7 +15,7 @@ export const uploadAndParseBill: any = action({
     marketingSubcategory: v.optional(v.string()),
     adminSubcategory: v.optional(v.string()),
     duesSubcategory: v.optional(v.string()),
-    salariesSubcategory: v.optional(v.string()),
+    groomingSubcategory: v.optional(v.string()),
     base64Pdf: v.string(),
     uploadedAt: v.optional(v.number())
   },
@@ -31,7 +31,7 @@ export const uploadAndParseBill: any = action({
     const customProviderName = args.customProviderName?.trim() || undefined;
 
     const isSubcategoryCategory =
-      category.slug === "travel" || category.slug === "housing" || category.slug === "marketing" || category.slug === "salaries";
+      category.slug === "travel" || category.slug === "housing" || category.slug === "marketing" || category.slug === "grooming";
     const isAdminCategory = category.slug === "admin";
     const isDuesCategory = category.slug === "dues-registrations";
     const isHorseTransportCategory = category.slug === "horse-transport";
@@ -113,9 +113,9 @@ export const uploadAndParseBill: any = action({
         category.slug === "dues-registrations"
           ? args.duesSubcategory || undefined
           : undefined,
-      salariesSubcategory:
-        category.slug === "salaries"
-          ? args.salariesSubcategory || (!providerId && customProviderName ? slugify(customProviderName) : undefined)
+      groomingSubcategory:
+        category.slug === "grooming"
+          ? args.groomingSubcategory || (!providerId && customProviderName ? slugify(customProviderName) : undefined)
           : undefined
     })) as Id<"bills">;
 
@@ -152,10 +152,10 @@ export const uploadAndParseBill: any = action({
       const subSlug = args.duesSubcategory || "memberships";
       redirectPath = `/dues-registrations/${subSlug}/${providerSlug}/${billId}`;
       listPath = `/dues-registrations/${subSlug}/${providerSlug}`;
-    } else if (category.slug === "salaries") {
-      const subSlug = args.salariesSubcategory || "other";
-      redirectPath = `/salaries/${subSlug}/${billId}`;
-      listPath = `/salaries/${subSlug}`;
+    } else if (category.slug === "grooming") {
+      const subSlug = args.groomingSubcategory || "other";
+      redirectPath = `/grooming/${subSlug}/${billId}`;
+      listPath = `/grooming/${subSlug}`;
     } else if (providerId) {
       listPath = `/${category.slug}/${providerSlug}`;
     }

@@ -25,7 +25,8 @@ const CATEGORY_COLORS: Record<string, { bg: string; color: string; label: string
   admin: { bg: "rgba(107,112,132,0.08)", color: "#6B7084", label: "Admin" },
   dues_registrations: { bg: "rgba(74,91,219,0.08)", color: "#4A5BDB", label: "Dues & Registrations" },
   supplies: { bg: "rgba(107,112,132,0.08)", color: "#6B7084", label: "Supplies" },
-  salaries: { bg: "rgba(74,91,219,0.08)", color: "#4A5BDB", label: "Salaries" },
+  grooming: { bg: "rgba(14,165,233,0.08)", color: "#0EA5E9", label: "Grooming" },
+  "riding-training": { bg: "rgba(236,72,153,0.08)", color: "#EC4899", label: "Riding & Training" },
 };
 
 export default function InvoicesPage() {
@@ -403,7 +404,7 @@ function getInvoiceUrl(bill: any) {
   if (category === "admin") return `/admin/${bill.adminSubcategory ?? "legal"}/${providerSlug}/${bill._id}`;
   if (category === "dues-registrations") return `/dues-registrations/${bill.duesSubcategory ?? "memberships"}/${providerSlug}/${bill._id}`;
   if (category === "horse-transport") return `/horse-transport/${bill.horseTransportSubcategory ?? "ground-transport"}/${providerSlug}/${bill._id}`;
-  if (category === "salaries") return `/salaries/${bill.salariesSubcategory ?? "rider"}/${bill._id}`;
+  if (category === "grooming") return `/grooming/${bill.groomingSubcategory ?? "other"}/${bill._id}`;
   return `/${category}/${providerSlug}/${bill._id}`;
 }
 
