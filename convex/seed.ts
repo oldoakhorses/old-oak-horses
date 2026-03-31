@@ -788,8 +788,8 @@ export const seedCategories = mutation({
     for (const bill of salaryBills) {
       await ctx.db.patch(bill._id, {
         categoryId: adminCategory._id,
-        adminSubcategory: (bill as any).salariesSubcategory ?? "payroll",
-        salariesSubcategory: undefined
+        adminSubcategory: (bill as any).groomingSubcategory ?? "payroll",
+        groomingSubcategory: undefined
       });
     }
 
