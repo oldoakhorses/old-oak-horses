@@ -30,7 +30,11 @@ type LineItem = {
   assigneeType?: string;
   horses?: string[];
   total_usd?: number;
+  amount_usd?: number;
   amount?: number;
+  total?: number;
+  rate?: number;
+  quantity?: number;
 };
 
 type Extracted = {
@@ -86,7 +90,8 @@ export default function InvoiceReportPage() {
   const extracted = ((bill?.extractedData ?? {}) as Extracted) || {};
   const lineItems = Array.isArray(extracted.line_items) ? extracted.line_items : [];
   const isReclassCategory = categorySlug === "show-expenses";
-  const isHorseBasedCategory = ["veterinary", "farrier", "stabling", "feed-bedding", "horse-transport", "bodywork", "show-expenses"].includes(categorySlug);
+  const isHorseBasedCategory = ["veterinary", "farrier", "stabling", "feed-bedding", "horse-transport", "bodywork", "show-expenses", "riding-training"].includes(categorySlug);
+  const displayProviderName = provider?.fullName || provider?.name || (extracted as any).provider_name || bill?.customProviderName || providerSlug;
   const hasUnmatchedHorses = Boolean(isHorseBasedCategory && bill?.hasUnmatchedHorses);
 
   useEffect(() => {
@@ -135,7 +140,7 @@ export default function InvoiceReportPage() {
         const perHorseAmounts = splitAmountMap.get(i);
         for (const name of names) {
           // Clone the line item but override amount with the per-horse split amount
-          const splitAmount = perHorseAmounts?.get(name) ?? safeAmount(item.total_usd ?? item.amount) / names.length;
+          const splitAmount = perHorseAmounts?.get(name) ?? getLineAmount(item) / names.length;
           const splitItem = { ...item, total_usd: splitAmount, amount: splitAmount, _isSplit: true };
           map.set(name, [...(map.get(name) ?? []), splitItem as LineItem]);
         }
@@ -145,7 +150,7 @@ export default function InvoiceReportPage() {
         const names = haMap.get(i)!;
         if (names.length > 1) {
           // Multiple horses assigned to this line item — split the amount evenly
-          const fullAmount = safeAmount(item.total_usd ?? item.amount);
+          const fullAmount = getLineAmount(item);
           const perHorse = fullAmount / names.length;
           for (const name of names) {
             const splitItem = { ...item, total_usd: perHorse, amount: perHorse, _isSplit: true };
@@ -177,13 +182,13 @@ export default function InvoiceReportPage() {
     return [...map.entries()].map(([horseName, items]) => ({
       horseName,
       items,
-      subtotal: items.reduce((sum, item) => sum + safeAmount(item.total_usd ?? item.amount), 0),
+      subtotal: items.reduce((sum, item) => sum + getLineAmount(item), 0),
     }));
   }, [lineItems, bill?.horseAssignments, bill?.splitLineItems, horses, people]);
 
   const total = useMemo(() => {
     if (typeof extracted.invoice_total_usd === "number") return extracted.invoice_total_usd;
-    return lineItems.reduce((sum, item) => sum + safeAmount(item.total_usd ?? item.amount), 0);
+    return lineItems.reduce((sum, item) => sum + getLineAmount(item), 0);
   }, [extracted.invoice_total_usd, lineItems]);
 
   const subcategoryRows = useMemo(() => {
@@ -191,7 +196,7 @@ export default function InvoiceReportPage() {
     for (const item of lineItems) {
       const key = item.subcategory?.trim() || item.vet_subcategory?.trim() || item.category?.trim() || "Other";
       const label = prettyCategoryLabel(key);
-      map.set(label, (map.get(label) ?? 0) + safeAmount(item.total_usd ?? item.amount));
+      map.set(label, (map.get(label) ?? 0) + getLineAmount(item));
     }
     return [...map.entries()]
       .map(([name, amount]) => ({ name, amount, pct: total > 0 ? (amount / total) * 100 : 0 }))
@@ -210,7 +215,7 @@ export default function InvoiceReportPage() {
       const suggested = normalizeCategoryKey(item.suggestedCategory);
       const confirmed = normalizeCategoryKey(lineCategoryDecisions[idx]);
       const target = confirmed ?? suggested;
-      const amount = safeAmount(item.total_usd);
+      const amount = getLineAmount(item as LineItem);
       if (!target || target === current) {
         remainingItems += 1;
         remainingTotal += amount;
@@ -290,7 +295,7 @@ export default function InvoiceReportPage() {
                 <LogRecordFromInvoice
                   billId={bill._id}
                   categorySlug={categorySlug}
-                  providerName={provider?.fullName || provider?.name || providerSlug}
+                  providerName={displayProviderName}
                   invoiceDate={String(extracted.invoice_date ?? "")}
                   assignedHorses={(bill.assignedHorses ?? []) as any}
                   lineItems={lineItems}
@@ -353,10 +358,10 @@ export default function InvoiceReportPage() {
             <h1 className={styles.providerName}>
               {bill?.contactId ? (
                 <Link href={`/contacts/${bill.contactId}`} style={{ color: "inherit", textDecoration: "none" }}>
-                  {provider?.fullName || provider?.name || providerSlug}
+                  {displayProviderName}
                 </Link>
               ) : (
-                provider?.fullName || provider?.name || providerSlug
+                displayProviderName
               )}
             </h1>
             <div className={styles.detailRow}>
@@ -468,7 +473,7 @@ export default function InvoiceReportPage() {
                     ) : null}
                   </div>
                   <div className={styles.itemAmount}>
-                    {fmtUSD(safeAmount(item.total_usd ?? item.amount))}
+                    {fmtUSD(getLineAmount(item))}
                     {(item as any)._isSplit ? <span className={styles.sharedBadge}>shared</span> : null}
                   </div>
                 </div>
@@ -544,14 +549,14 @@ export default function InvoiceReportPage() {
             onClose={() => setShowContactEdit(false)}
             billId={bill._id}
             currentContactId={bill.contactId}
-            currentName={provider?.fullName || provider?.name || providerSlug}
+            currentName={displayProviderName}
             currentContact={bill.extractedProviderContact as any}
           />
         ) : null}
 
         <Modal open={showDeleteConfirm} title="delete invoice?" onClose={() => setShowDeleteConfirm(false)}>
           <p style={{ marginTop: 0, color: "var(--ui-text-secondary)" }}>
-            this will permanently delete invoice <strong>{formatInvoiceName({ providerName: String((extracted as any).provider_name ?? bill?.provider?.name ?? bill?.customProviderName ?? "Unassigned Invoice"), date: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "") })}</strong> from {provider?.name ?? providerSlug}.
+            this will permanently delete invoice <strong>{formatInvoiceName({ providerName: String((extracted as any).provider_name ?? bill?.provider?.name ?? bill?.customProviderName ?? "Unassigned Invoice"), date: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "") })}</strong> from {displayProviderName}.
           </p>
           <p style={{ color: "var(--ui-text-muted)" }}>this action cannot be undone.</p>
           {bill?.linkedBills?.length ? (
@@ -598,6 +603,10 @@ function Summary({ label, value }: { label: string; value: string }) {
 
 function safeAmount(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function getLineAmount(item: LineItem) {
+  return safeAmount(item.total_usd) || safeAmount(item.amount_usd) || safeAmount(item.amount) || safeAmount(item.total) || safeAmount((item.rate ?? 0) * (item.quantity ?? 0));
 }
 
 function fmtUSD(v: number) {
