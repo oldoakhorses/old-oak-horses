@@ -61,8 +61,8 @@ export default function InvoicesPage() {
     if (!sortColumn) return sorted;
     sorted.sort((a, b) => {
       if (sortColumn === "invoice") {
-        const aVal = formatInvoiceName({ providerName: getProvider(a), date: getInvoiceDate(a) }).toLowerCase();
-        const bVal = formatInvoiceName({ providerName: getProvider(b), date: getInvoiceDate(b) }).toLowerCase();
+        const aVal = (a.invoiceName || formatInvoiceName({ providerName: getProvider(a), date: getInvoiceDate(a) })).toLowerCase();
+        const bVal = (b.invoiceName || formatInvoiceName({ providerName: getProvider(b), date: getInvoiceDate(b) })).toLowerCase();
         return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
       }
       if (sortColumn === "category") {
@@ -211,7 +211,7 @@ export default function InvoicesPage() {
                         router.push(url);
                       }}
                     >
-                      {formatInvoiceName({ providerName: getProvider(row), date })}
+                      {row.invoiceName || formatInvoiceName({ providerName: getProvider(row), date })}
                     </a>
                   </div>
                   <div>

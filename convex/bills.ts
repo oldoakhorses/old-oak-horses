@@ -2147,6 +2147,7 @@ export const updatePreviewFields = mutation({
     terms: v.optional(v.string()),
     transactionId: v.optional(v.string()),
     customerId: v.optional(v.string()),
+    invoiceName: v.optional(v.string()),
     totalUsd: v.optional(v.number()),
     origin: v.optional(v.string()),
     destination: v.optional(v.string()),
@@ -2168,6 +2169,10 @@ export const updatePreviewFields = mutation({
 
     if (args.extractedProviderContact !== undefined) {
       await ctx.db.patch(args.billId, { extractedProviderContact: args.extractedProviderContact });
+    }
+    if (args.invoiceName !== undefined) {
+      const trimmed = args.invoiceName.trim() || undefined;
+      await ctx.db.patch(args.billId, { invoiceName: trimmed });
     }
 
     const extracted = ((bill.extractedData ?? {}) as Record<string, unknown>) ?? {};

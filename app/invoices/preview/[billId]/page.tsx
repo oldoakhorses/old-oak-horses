@@ -220,6 +220,7 @@ export default function InvoicePreviewPage() {
 
   const [detailsEdit, setDetailsEdit] = useState(false);
   const [details, setDetails] = useState({
+    invoiceName: "",
     invoiceNumber: "",
     invoiceDate: "",
     dueDate: "",
@@ -324,6 +325,7 @@ export default function InvoicePreviewPage() {
     setProviderEdit(false);
 
     setDetails({
+      invoiceName: String(bill.invoiceName ?? ""),
       invoiceNumber: String(extracted.invoice_number ?? extracted.invoiceNumber ?? ""),
       invoiceDate: String(extracted.invoice_date ?? extracted.invoiceDate ?? ""),
       dueDate: String(extracted.due_date ?? extracted.dueDate ?? ""),
@@ -896,6 +898,7 @@ export default function InvoicePreviewPage() {
     try {
       await updatePreviewFields({
         billId,
+        invoiceName: details.invoiceName || undefined,
         invoiceNumber: details.invoiceNumber || undefined,
         invoiceDate: details.invoiceDate || undefined,
         dueDate: details.dueDate || undefined,
@@ -1513,6 +1516,7 @@ export default function InvoicePreviewPage() {
               {detailsEdit ? (
                 <>
                   <div className={styles.detailsGrid}>
+                    <InputField label="INVOICE NAME" value={details.invoiceName || previewTitle} onChange={(value) => setDetails((prev) => ({ ...prev, invoiceName: value }))} />
                     <InputField label="INVOICE #" value={details.invoiceNumber} onChange={(value) => setDetails((prev) => ({ ...prev, invoiceNumber: value }))} />
                     <InputField label="DATE" value={details.invoiceDate} onChange={(value) => setDetails((prev) => ({ ...prev, invoiceDate: value }))} />
                     <InputField label="DUE DATE" value={details.dueDate} onChange={(value) => setDetails((prev) => ({ ...prev, dueDate: value }))} />
@@ -1538,6 +1542,7 @@ export default function InvoicePreviewPage() {
               ) : (
                 <>
                   <div className={styles.detailsRow}>
+                    {details.invoiceName ? <DisplayField label="INVOICE NAME" value={details.invoiceName} /> : null}
                     <DisplayField label="INVOICE #" value={details.invoiceNumber || "—"} />
                     <DisplayField label="DATE" value={formatDate(details.invoiceDate)} />
                     {details.dueDate ? <DisplayField label="DUE DATE" value={formatDate(details.dueDate)} /> : null}

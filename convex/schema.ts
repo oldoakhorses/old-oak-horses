@@ -85,6 +85,7 @@ export default defineSchema({
     extractedData: v.optional(v.any()),
     errorMessage: v.optional(v.string()),
     customProviderName: v.optional(v.string()),
+    invoiceName: v.optional(v.string()),
     originalPdfUrl: v.optional(v.string()),
     travelSubcategory: v.optional(v.string()),
     housingSubcategory: v.optional(v.string()),
