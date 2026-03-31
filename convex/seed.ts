@@ -762,37 +762,38 @@ export const seedCategories = mutation({
     }
   }
 
-  // Migrate legacy Salaries bills/providers to Admin -> Payroll.
+  // Rename legacy "Salaries" category to "Grooming".
   const salariesCategory = await ctx.db
     .query("categories")
     .withIndex("by_slug", (q) => q.eq("slug", "salaries"))
     .first();
-  if (salariesCategory) {
+  const groomingCategory = await ctx.db
+    .query("categories")
+    .withIndex("by_slug", (q) => q.eq("slug", "grooming"))
+    .first();
+  if (salariesCategory && !groomingCategory) {
+    // Simply rename the category in-place so all bills/providers keep their categoryId
+    await ctx.db.patch(salariesCategory._id, { name: "Grooming", slug: "grooming" });
+  } else if (salariesCategory && groomingCategory) {
+    // Both exist — move salaries bills & providers to grooming, then delete salaries
     const salaryProviders = await ctx.db
       .query("providers")
       .withIndex("by_category", (q) => q.eq("categoryId", salariesCategory._id))
       .collect();
     for (const provider of salaryProviders) {
       await ctx.db.patch(provider._id, {
-        categoryId: adminCategory._id,
-        subcategorySlug: provider.subcategorySlug ?? "payroll",
+        categoryId: groomingCategory._id,
         updatedAt: Date.now()
       });
       updatedProviders += 1;
     }
-
     const salaryBills = await ctx.db
       .query("bills")
       .withIndex("by_category", (q) => q.eq("categoryId", salariesCategory._id))
       .collect();
     for (const bill of salaryBills) {
-      await ctx.db.patch(bill._id, {
-        categoryId: adminCategory._id,
-        adminSubcategory: (bill as any).groomingSubcategory ?? "payroll",
-        groomingSubcategory: undefined
-      });
+      await ctx.db.patch(bill._id, { categoryId: groomingCategory._id });
     }
-
     await ctx.db.delete(salariesCategory._id);
   }
 
@@ -943,6 +944,47 @@ export const seedCategories = mutation({
   }
 
     return { createdCategories, createdProviders, updatedProviders, seededVetSubcategories, skipped: false };
+  },
+});
+
+/** One-off migration: rename Salaries → Grooming in DB */
+export const migrateSalariesToGrooming = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const salariesCategory = await ctx.db
+      .query("categories")
+      .withIndex("by_slug", (q) => q.eq("slug", "salaries"))
+      .first();
+    if (!salariesCategory) return { status: "no salaries category found — already migrated" };
+
+    const groomingCategory = await ctx.db
+      .query("categories")
+      .withIndex("by_slug", (q) => q.eq("slug", "grooming"))
+      .first();
+
+    if (!groomingCategory) {
+      // Rename in-place
+      await ctx.db.patch(salariesCategory._id, { name: "Grooming", slug: "grooming" });
+      return { status: "renamed salaries → grooming" };
+    }
+
+    // Both exist — merge salaries into grooming
+    const providers = await ctx.db
+      .query("providers")
+      .withIndex("by_category", (q) => q.eq("categoryId", salariesCategory._id))
+      .collect();
+    for (const p of providers) {
+      await ctx.db.patch(p._id, { categoryId: groomingCategory._id, updatedAt: Date.now() });
+    }
+    const bills = await ctx.db
+      .query("bills")
+      .withIndex("by_category", (q) => q.eq("categoryId", salariesCategory._id))
+      .collect();
+    for (const b of bills) {
+      await ctx.db.patch(b._id, { categoryId: groomingCategory._id });
+    }
+    await ctx.db.delete(salariesCategory._id);
+    return { status: `merged ${bills.length} bills and ${providers.length} providers into grooming, deleted salaries category` };
   },
 });
 
