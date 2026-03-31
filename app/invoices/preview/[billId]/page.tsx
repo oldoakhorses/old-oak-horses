@@ -245,6 +245,7 @@ export default function InvoicePreviewPage() {
   const [wholeAssignedIds, setWholeAssignedIds] = useState<string[]>([]);
   const [wholeAmounts, setWholeAmounts] = useState<Record<string, string>>({});
   const [wholeAssignMode, setWholeAssignMode] = useState<WholeAssignMode>("split");
+  const [wholeCategoryOverride, setWholeCategoryOverride] = useState("");
 
   const [savingProvider, setSavingProvider] = useState(false);
   const [savingDetails, setSavingDetails] = useState(false);
@@ -1178,7 +1179,7 @@ export default function InvoicePreviewPage() {
           ...line,
           description: line.description || `Line item ${index + 1}`,
           amount: getLineAmount(line),
-          category: state?.category || categorySlug,
+          category: (mode === "whole" && wholeCategoryOverride) ? wholeCategoryOverride : (state?.category || categorySlug),
           subcategory: state?.subcategory || line.subcategory || null,
           subcategoryAutoDetected: Boolean(state?.subcategoryAutoDetected),
           horses: assignType === "horse" ? selectedAssignees : undefined,
@@ -1212,13 +1213,15 @@ export default function InvoicePreviewPage() {
         notes: notes.trim() || undefined
       });
       // Determine redirect based on line item categories (which may have been changed by the user)
-      const lineCatFreq = new Map<string, number>();
-      for (const ls of Object.values(lineStates)) {
-        if (ls?.category) lineCatFreq.set(ls.category, (lineCatFreq.get(ls.category) || 0) + 1);
-      }
-      const dominantLineCat = lineCatFreq.size > 0
-        ? [...lineCatFreq.entries()].sort((a, b) => b[1] - a[1])[0][0]
-        : null;
+      const dominantLineCat = (mode === "whole" && wholeCategoryOverride) ? wholeCategoryOverride : (() => {
+        const lineCatFreq = new Map<string, number>();
+        for (const ls of Object.values(lineStates)) {
+          if (ls?.category) lineCatFreq.set(ls.category, (lineCatFreq.get(ls.category) || 0) + 1);
+        }
+        return lineCatFreq.size > 0
+          ? [...lineCatFreq.entries()].sort((a, b) => b[1] - a[1])[0][0]
+          : null;
+      })();
       // If line items were recategorized, build path using the new category
       const effectiveBill = dominantLineCat && dominantLineCat !== categorySlug
         ? { ...bill, category: { ...(bill?.category ?? {}), slug: dominantLineCat } }
@@ -1683,6 +1686,20 @@ export default function InvoicePreviewPage() {
                   {wholeAssignMode === "business_general" ? (
                     <div className={styles.wholeBusinessNote}>◼ This invoice will be recorded as a general business expense with no horse or person assignment.</div>
                   ) : null}
+
+                  <div className={styles.formField}>
+                    <div className={styles.label}>CATEGORY</div>
+                    <select
+                      className={styles.categorySelect}
+                      value={wholeCategoryOverride}
+                      onChange={(event) => setWholeCategoryOverride(event.target.value)}
+                    >
+                      <option value="">use invoice category</option>
+                      {ALL_CATEGORY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
 
                   <div className={styles.lineSummary}>
                     {lineItems.map((line, index) => (
