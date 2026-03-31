@@ -27,6 +27,7 @@ const CATEGORY_COLORS: Record<string, { bg: string; color: string; label: string
   supplies: { bg: "rgba(107,112,132,0.08)", color: "#6B7084", label: "Supplies" },
   grooming: { bg: "rgba(14,165,233,0.08)", color: "#0EA5E9", label: "Grooming" },
   "riding-training": { bg: "rgba(236,72,153,0.08)", color: "#EC4899", label: "Riding & Training" },
+  "prize-money": { bg: "rgba(34,197,94,0.08)", color: "#22C55E", label: "Prize Money" },
 };
 
 export default function InvoicesPage() {

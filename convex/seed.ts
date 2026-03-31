@@ -17,7 +17,8 @@ const CATEGORY_SEED = [
   { name: "Admin", slug: "admin" },
   { name: "Horse Transport", slug: "horse-transport" },
   { name: "Show Expenses", slug: "show-expenses" },
-  { name: "Grooming", slug: "grooming" }
+  { name: "Grooming", slug: "grooming" },
+  { name: "Prize Money", slug: "prize-money" }
 ] as const;
 
 const VET_SUBCATEGORY_DEFAULTS = [

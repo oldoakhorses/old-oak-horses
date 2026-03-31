@@ -2971,6 +2971,8 @@ function getCategoryColor(slug: string) {
     "entry-fees": "#EF4444",
     "tack-equipment": "#6B7084",
     insurance: "#22C583",
+    "prize-money": "#22C55E",
+    "riding-training": "#EC4899",
   };
   return map[slug] ?? "#6B7084";
 }

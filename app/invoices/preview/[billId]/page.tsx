@@ -74,7 +74,8 @@ const HORSE_CATEGORY_SLUGS = new Set([
   "bodywork",
   "supplies",
   "show-expenses",
-  "riding-training"
+  "riding-training",
+  "prize-money"
 ]);
 const PERSON_CATEGORY_SLUGS = new Set(["travel", "admin", "grooming"]);
 const NO_ASSIGNMENT_CATEGORY_SLUGS = new Set(["marketing"]);
@@ -110,6 +111,7 @@ const ALL_CATEGORY_OPTIONS = [
   { value: "grooming", label: "Grooming" },
   { value: "riding-training", label: "Riding & Training" },
   { value: "commissions", label: "Commissions" },
+  { value: "prize-money", label: "Prize Money" },
 ] as const;
 
 const VALID_CATEGORIES = new Set<string>(ALL_CATEGORY_OPTIONS.map((o) => o.value));
@@ -194,7 +196,8 @@ const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
   marketing: { bg: "rgba(99,102,241,0.08)", color: "#6366F1" },
   "show-expenses": { bg: "rgba(249,115,22,0.08)", color: "#F97316" },
   grooming: { bg: "rgba(14,165,233,0.08)", color: "#0EA5E9" },
-  "riding-training": { bg: "rgba(236,72,153,0.08)", color: "#EC4899" }
+  "riding-training": { bg: "rgba(236,72,153,0.08)", color: "#EC4899" },
+  "prize-money": { bg: "rgba(34,197,94,0.08)", color: "#22C55E" }
 };
 
 export default function InvoicePreviewPage() {

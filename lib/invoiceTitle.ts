@@ -25,6 +25,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   commissions: "Commissions",
   admin: "Admin",
   supplies: "Supplies",
+  "prize-money": "Prize Money",
 };
 
 const SUBCATEGORY_LABELS: Record<string, string> = {
