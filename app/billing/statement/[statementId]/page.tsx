@@ -97,15 +97,18 @@ export default function StatementReconcilePage() {
   }
 
   const txns = stmt.transactions;
-  const filtered = tab === "all" ? txns
-    : tab === "matched" ? txns.filter((t) => t.matchedBillId)
-    : tab === "unmatched" ? txns.filter((t) => !t.matchedBillId && t.amount < 0)
-    : tab === "assigned" ? txns.filter((t) => t.assignType)
-    : txns.filter((t) => t.isApproved);
+  const filtered = useMemo(() => {
+    if (tab === "all") return txns;
+    if (tab === "matched") return txns.filter((t) => t.matchedBillId);
+    if (tab === "unmatched") return txns.filter((t) => !t.matchedBillId && t.amount < 0);
+    if (tab === "assigned") return txns.filter((t) => t.assignType);
+    return txns.filter((t) => t.isApproved);
+  }, [txns, tab]);
 
   // Smart bill suggestions: score bills by relevance to the selected transaction
-  const matchTxn = matchModal ? txns.find((t) => String(t._id) === matchModal) : null;
+  const matchTxn = matchModal ? txns.find((t) => String(t._id) === matchModal) ?? null : null;
   const scoredBills = useMemo(() => {
+    const matchTxn = matchModal ? txns.find((t) => String(t._id) === matchModal) : null;
     if (!matchTxn) return matchableBills.map((b) => ({ ...b, score: 0 }));
     const absAmount = Math.round(Math.abs(matchTxn.amount) * 100) / 100;
     const txnKeywords = matchTxn.description.toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim().split(" ").filter((w) => w.length > 2);
@@ -113,18 +116,15 @@ export default function StatementReconcilePage() {
 
     return matchableBills.map((b) => {
       let score = 0;
-      // Amount match
       const amountDiff = Math.abs(b.amount - absAmount);
       if (amountDiff < 0.02) score += 100;
       else if (amountDiff / Math.max(absAmount, 1) < 0.05) score += 60;
       else if (amountDiff / Math.max(absAmount, 1) < 0.15) score += 20;
 
-      // Keyword match
       const billKw = (b.providerKeywords ?? []) as string[];
       const common = txnKeywords.filter((kw) => billKw.some((bk) => bk.includes(kw) || kw.includes(bk)));
       score += common.length * 30;
 
-      // Date proximity (within 30 days)
       if (b.invoiceDate && txnDateStr) {
         try {
           const txnDate = new Date(txnDateStr).getTime();
@@ -138,7 +138,7 @@ export default function StatementReconcilePage() {
 
       return { ...b, score };
     }).sort((a, b) => b.score - a.score);
-  }, [matchTxn, matchableBills]);
+  }, [matchModal, txns, matchableBills]);
 
   const filteredBills = billSearch
     ? scoredBills.filter((b) =>
