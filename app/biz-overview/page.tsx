@@ -237,6 +237,46 @@ export default function BizOverviewPage() {
           </section>
         </section>
 
+        {data.businessGeneral && data.businessGeneral.items.length > 0 ? (
+        <section className={styles.card}>
+          <div className={styles.cardHead}>
+            <h2 className={styles.cardTitle}>general_business</h2>
+            <div className={styles.cardMeta}>{data.businessGeneral.items.length} items · {fmtUSD(data.businessGeneral.total)}</div>
+          </div>
+
+          <div className={styles.tableWrap}>
+            <div className={styles.table}>
+              <div className={styles.tableHead}>
+                <div>INVOICE</div>
+                <div>DESCRIPTION</div>
+                <div>DATE</div>
+                <div className={styles.amount}>AMOUNT</div>
+              </div>
+
+              {data.businessGeneral.items.map((item: any, idx: number) => (
+                <Link
+                  key={`${item.billId}-${idx}`}
+                  href={buildInvoiceHref(item.categorySlug, slugify(item.providerName), item.billId)}
+                  className={styles.tableRow}
+                >
+                  <div className={styles.catName}>{item.invoiceName}</div>
+                  <div>{item.lineDescription}</div>
+                  <div>{item.invoiceDate}</div>
+                  <div className={styles.amount}>{fmtUSD(item.lineAmount)}</div>
+                </Link>
+              ))}
+
+              <div className={styles.tableTotal}>
+                <div className={styles.catName}>total</div>
+                <div />
+                <div />
+                <div className={styles.amount}>{fmtUSD(data.businessGeneral.total)}</div>
+              </div>
+            </div>
+          </div>
+        </section>
+        ) : null}
+
         <section className={styles.card}>
           <div className={styles.invoiceHead}>
             <h2 className={styles.cardTitle}>recent_invoices</h2>
@@ -299,6 +339,10 @@ function fmtUSD(v: number) {
 
 function snakeCase(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+}
+
+function slugify(value: string) {
+  return value.toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-");
 }
 
 function buildInvoiceHref(categorySlug: string, providerSlug: string, billId: string) {

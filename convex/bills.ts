@@ -1177,6 +1177,70 @@ export const getBizOverview = query({
         return 0;
       });
 
+    // Collect business_general line items
+    const businessGeneralItems: Array<{
+      billId: string;
+      invoiceName: string;
+      providerName: string;
+      invoiceDate: string;
+      categorySlug: string;
+      lineDescription: string;
+      lineAmount: number;
+    }> = [];
+    for (const bill of currentBills) {
+      const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+      const lineItems = getLineItems(extracted);
+      const category = categoryById.get(String(bill.categoryId));
+      const categorySlug = category?.slug ?? "unknown";
+      const resolved = contactResolved.get(String(bill._id));
+      const providerName = resolved?.name ?? bill.customProviderName ?? "Unknown";
+      const invoiceDate =
+        typeof extracted.invoice_date === "string" && extracted.invoice_date.trim().length > 0
+          ? extracted.invoice_date
+          : new Date(bill.uploadedAt).toISOString().slice(0, 10);
+
+      // Check whole-invoice business_general (assignMode === "whole" and all items tagged)
+      const isWholeBizGeneral = (bill as any).assignMode === "whole" &&
+        lineItems.length > 0 &&
+        lineItems.every((item: any) => String(item.assigneeType ?? "").toLowerCase() === "business_general");
+
+      if (isWholeBizGeneral) {
+        // Add as a single entry for the whole invoice
+        const total = lineItems.reduce((sum: number, item: any) => sum + getLineItemTotalUsd(item as Record<string, unknown>), 0);
+        businessGeneralItems.push({
+          billId: String(bill._id),
+          invoiceName: (bill as any).invoiceName || providerName,
+          providerName,
+          invoiceDate,
+          categorySlug,
+          lineDescription: `Whole invoice (${lineItems.length} items)`,
+          lineAmount: total,
+        });
+      } else {
+        // Check individual line items
+        for (const item of lineItems) {
+          const itemObj = item as Record<string, unknown>;
+          if (String(itemObj.assigneeType ?? "").toLowerCase() === "business_general") {
+            businessGeneralItems.push({
+              billId: String(bill._id),
+              invoiceName: (bill as any).invoiceName || providerName,
+              providerName,
+              invoiceDate,
+              categorySlug,
+              lineDescription: String(itemObj.description ?? "Line item"),
+              lineAmount: getLineItemTotalUsd(itemObj),
+            });
+          }
+        }
+      }
+    }
+    businessGeneralItems.sort((a, b) => {
+      const aTs = Date.parse(a.invoiceDate);
+      const bTs = Date.parse(b.invoiceDate);
+      return bTs - aTs;
+    });
+    const businessGeneralTotal = businessGeneralItems.reduce((sum, item) => sum + item.lineAmount, 0);
+
     return {
       totalSpend,
       previousPeriodSpend,
@@ -1185,7 +1249,11 @@ export const getBizOverview = query({
       categories: categoriesRows,
       horses,
       people: peopleRows,
-      recentInvoices
+      recentInvoices,
+      businessGeneral: {
+        items: businessGeneralItems,
+        total: businessGeneralTotal,
+      },
     };
   }
 });
@@ -2755,6 +2823,7 @@ function getLineItemTotalUsdByIndex(extractedData: unknown, index: number) {
 function getLineItemTotalUsd(record: Record<string, unknown>) {
   if (typeof record.total_usd === "number" && Number.isFinite(record.total_usd)) return record.total_usd;
   if (typeof record.amount_usd === "number" && Number.isFinite(record.amount_usd)) return record.amount_usd;
+  if (typeof record.amount === "number" && Number.isFinite(record.amount)) return record.amount;
   if (typeof record.total === "number" && Number.isFinite(record.total)) return record.total;
   return 0;
 }
