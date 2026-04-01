@@ -311,6 +311,29 @@
   cursor: pointer;
 }
 
+.inlineApproveBtn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(34, 197, 131, 0.4);
+  background: rgba(34, 197, 131, 0.06);
+  color: #22C583;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.inlineApproveBtn:hover {
+  background: #22C583;
+  color: #fff;
+  border-color: #22C583;
+}
+
 .btnUnapprove {
 
   font-size: 10px;

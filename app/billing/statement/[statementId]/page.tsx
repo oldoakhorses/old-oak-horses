@@ -276,7 +276,7 @@ export default function StatementReconcilePage() {
     setSelectedPeople(selectedPeople.map((p, i) => i === idx ? { ...p, amount } : p));
   }
 
-  const assignedCount = txns.filter((t) => t.assignType && !t.isApproved).length;
+  const assignedCount = txns.filter((t) => (t.assignType || t.matchedBillId) && !t.isApproved).length;
 
   return (
     <div className="page-shell">
@@ -389,6 +389,16 @@ export default function StatementReconcilePage() {
                   <div className={isDebit ? styles.txnDebit : styles.txnCredit}>
                     {fmtUSD(txn.amount)}
                   </div>
+                  {isDebit && (txn.assignType || txn.matchedBillId) && !txn.isApproved ? (
+                    <button
+                      type="button"
+                      className={styles.inlineApproveBtn}
+                      onClick={(e) => { e.stopPropagation(); approveTxn({ transactionId: txn._id, approved: true }); }}
+                      title="Approve this transaction"
+                    >
+                      ✓
+                    </button>
+                  ) : null}
                 </div>
 
                 {isExpanded ? (
@@ -411,7 +421,7 @@ export default function StatementReconcilePage() {
                           >
                             {txn.assignType ? "change assignment" : "assign"}
                           </button>
-                          {txn.assignType && !txn.isApproved ? (
+                          {(txn.assignType || txn.matchedBillId) && !txn.isApproved ? (
                             <button
                               type="button"
                               className={styles.btnApprove}

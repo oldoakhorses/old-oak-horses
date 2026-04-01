@@ -458,9 +458,9 @@ export const approveAllAssigned = mutation({
 
     let count = 0;
     for (const txn of txns) {
-      if (txn.assignType && !txn.isApproved) {
+      if ((txn.assignType || txn.matchedBillId) && !txn.isApproved) {
         // Create a bill for unmatched, non-ignored transactions
-        if (!txn.matchedBillId && txn.assignType !== "ignore" && !txn.generatedBillId) {
+        if (!txn.matchedBillId && txn.assignType && txn.assignType !== "ignore" && !txn.generatedBillId) {
           const billId = await createBillFromTransaction(ctx, txn as any);
           await ctx.db.patch(txn._id, { isApproved: true, approvedAt: Date.now(), generatedBillId: billId });
         } else {
