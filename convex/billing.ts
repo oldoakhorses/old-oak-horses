@@ -20,6 +20,33 @@ function lineItemAmount(item: Record<string, unknown>): number {
 
 function round2(n: number) { return Math.round(n * 100) / 100; }
 
+/** Check if a bill's billing period falls within a date range (YYYY-MM-DD strings) */
+function billInDateRange(bill: { billingPeriod?: string; extractedData?: unknown; uploadedAt: number }, startDate?: string, endDate?: string): boolean {
+  if (!startDate && !endDate) return true;
+  // Try to get invoice date from extracted data
+  const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+  const invoiceDateStr = String(extracted.invoice_date ?? extracted.invoiceDate ?? "").trim();
+  // Parse the invoice date or fall back to billingPeriod or uploadedAt
+  let dateStr = "";
+  if (invoiceDateStr) {
+    // Normalize common date formats to YYYY-MM-DD
+    const parsed = new Date(invoiceDateStr);
+    if (!isNaN(parsed.getTime())) {
+      dateStr = parsed.toISOString().slice(0, 10);
+    }
+  }
+  if (!dateStr && bill.billingPeriod) {
+    // billingPeriod is "YYYY-MM", treat as first of month
+    dateStr = `${bill.billingPeriod}-01`;
+  }
+  if (!dateStr) {
+    dateStr = new Date(bill.uploadedAt).toISOString().slice(0, 10);
+  }
+  if (startDate && dateStr < startDate) return false;
+  if (endDate && dateStr > endDate) return false;
+  return true;
+}
+
 // ── queries ──────────────────────────────────────────────────────────────
 export const listOwnerInvoices = query({
   args: { billingPeriod: v.optional(v.string()) },
@@ -151,7 +178,11 @@ export const getAvailablePeriods = query({
 
 /** Preview what line items would be generated for a period, without creating anything */
 export const previewBillingPeriod = query({
-  args: { billingPeriod: v.string() },
+  args: {
+    billingPeriod: v.optional(v.string()),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const owners = await ctx.db.query("owners").collect();
     const horses = await ctx.db.query("horses").collect();
@@ -163,9 +194,13 @@ export const previewBillingPeriod = query({
     }
 
     const bills = await ctx.db.query("bills").collect();
-    const approvedBills = bills.filter(
-      (b) => b.status === "done" && b.isApproved && b.billingPeriod === args.billingPeriod
-    );
+    const approvedBills = bills.filter((b) => {
+      if (b.status !== "done" || !b.isApproved) return false;
+      if (args.startDate || args.endDate) {
+        return billInDateRange(b, args.startDate, args.endDate);
+      }
+      return args.billingPeriod ? b.billingPeriod === args.billingPeriod : false;
+    });
 
     // Check which bills already have owner invoice line items
     const existingItems = await ctx.db.query("ownerInvoiceLineItems").collect();
@@ -236,7 +271,11 @@ export const previewBillingPeriod = query({
 // ── mutations ────────────────────────────────────────────────────────────
 /** Generate owner invoices for a billing period */
 export const generateOwnerInvoices = mutation({
-  args: { billingPeriod: v.string() },
+  args: {
+    billingPeriod: v.string(),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const owners = await ctx.db.query("owners").collect();
     const horses = await ctx.db.query("horses").collect();
@@ -248,9 +287,13 @@ export const generateOwnerInvoices = mutation({
     }
 
     const bills = await ctx.db.query("bills").collect();
-    const approvedBills = bills.filter(
-      (b) => b.status === "done" && b.isApproved && b.billingPeriod === args.billingPeriod
-    );
+    const approvedBills = bills.filter((b) => {
+      if (b.status !== "done" || !b.isApproved) return false;
+      if (args.startDate || args.endDate) {
+        return billInDateRange(b, args.startDate, args.endDate);
+      }
+      return b.billingPeriod === args.billingPeriod;
+    });
 
     // Check existing — skip bills already billed
     const existingItems = await ctx.db.query("ownerInvoiceLineItems").collect();

@@ -30,7 +30,6 @@
 }
 
 .periodSelect {
-
   font-size: 13px;
   padding: 10px 14px;
   background: #fff;
@@ -43,6 +42,46 @@
 
 .periodSelect:focus {
   border-color: #4a5bdb;
+}
+
+.dateRange {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dateField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dateLabel {
+  font-size: 9px;
+  font-weight: 700;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+}
+
+.dateInput {
+  font-size: 13px;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  color: #1a1a2e;
+  outline: none;
+  min-width: 150px;
+}
+
+.dateInput:focus {
+  border-color: #4a5bdb;
+}
+
+.dateSep {
+  color: #9ea2b0;
+  font-size: 16px;
+  margin-top: 18px;
 }
 
 .btnGenerate {

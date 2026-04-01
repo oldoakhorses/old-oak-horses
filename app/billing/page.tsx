@@ -81,13 +81,28 @@ function parseCSV(text: string): Array<{ details: string; postingDate: string; d
   return rows;
 }
 
+function defaultStartDate() {
+  const d = new Date();
+  d.setDate(1); // first of current month
+  return d.toISOString().slice(0, 10);
+}
+function defaultEndDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+function dateToPeriod(dateStr: string) {
+  return dateStr ? dateStr.slice(0, 7) : new Date().toISOString().slice(0, 7);
+}
+
 export default function BillingPage() {
-  const periods = useQuery(api.billing.getAvailablePeriods) ?? [];
-  const [selectedPeriod, setSelectedPeriod] = useState("");
-  const activePeriod = selectedPeriod || (periods.length > 0 ? periods[0] : "");
+  const [startDate, setStartDate] = useState(defaultStartDate);
+  const [endDate, setEndDate] = useState(defaultEndDate);
+  const activePeriod = dateToPeriod(startDate);
 
   const invoices = useQuery(api.billing.listOwnerInvoices, activePeriod ? { billingPeriod: activePeriod } : {}) ?? [];
-  const preview = useQuery(api.billing.previewBillingPeriod, activePeriod ? { billingPeriod: activePeriod } : "skip");
+  const preview = useQuery(
+    api.billing.previewBillingPeriod,
+    startDate && endDate ? { startDate, endDate } : "skip"
+  );
   const generateInvoices = useMutation(api.billing.generateOwnerInvoices);
   const [generating, setGenerating] = useState(false);
 
@@ -101,7 +116,7 @@ export default function BillingPage() {
     if (!activePeriod) return;
     setGenerating(true);
     try {
-      await generateInvoices({ billingPeriod: activePeriod });
+      await generateInvoices({ billingPeriod: activePeriod, startDate, endDate });
     } finally {
       setGenerating(false);
     }
@@ -205,15 +220,17 @@ export default function BillingPage() {
         {/* Period selector */}
         <div className={styles.periodRow}>
           <label className={styles.periodLabel}>BILLING PERIOD</label>
-          <select
-            className={styles.periodSelect}
-            value={activePeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-          >
-            {periods.map((p) => (
-              <option key={p} value={p}>{fmtPeriod(p)}</option>
-            ))}
-          </select>
+          <div className={styles.dateRange}>
+            <label className={styles.dateField}>
+              <span className={styles.dateLabel}>FROM</span>
+              <input type="date" className={styles.dateInput} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </label>
+            <span className={styles.dateSep}>→</span>
+            <label className={styles.dateField}>
+              <span className={styles.dateLabel}>TO</span>
+              <input type="date" className={styles.dateInput} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </label>
+          </div>
           {hasUnbilledItems ? (
             <button
               type="button"
@@ -229,7 +246,7 @@ export default function BillingPage() {
         {/* Preview of what would be generated */}
         {preview && preview.length > 0 && invoices.length === 0 ? (
           <div className={styles.previewCard}>
-            <div className={styles.previewTitle}>preview for {fmtPeriod(activePeriod)}</div>
+            <div className={styles.previewTitle}>preview for {startDate} → {endDate}</div>
             <div className={styles.previewSub}>
               These are the approved invoices ready to be batched into owner invoices.
             </div>
@@ -278,7 +295,7 @@ export default function BillingPage() {
           </div>
         ) : activePeriod && (!preview || preview.length === 0) ? (
           <div className={styles.emptyState}>
-            <div className={styles.emptyTitle}>no billing data for {fmtPeriod(activePeriod)}</div>
+            <div className={styles.emptyTitle}>no billing data for {startDate} → {endDate}</div>
             <div className={styles.emptySub}>
               approve invoices for this period first, then generate owner invoices
             </div>
