@@ -397,6 +397,6 @@ export const getMatchableBills = query({
           hasPersonAssignments: (b.assignedPeople?.length ?? 0) > 0,
         };
       })
-      .sort((a, b) => b.billingPeriod.localeCompare(a.billingPeriod) || a.fileName.localeCompare(b.fileName));
+      .sort((a, b) => (b.billingPeriod ?? "").localeCompare(a.billingPeriod ?? "") || a.fileName.localeCompare(b.fileName));
   },
 });

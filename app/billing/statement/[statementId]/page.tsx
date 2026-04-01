@@ -51,9 +51,10 @@ function truncDesc(desc: string, len = 60) {
 export default function StatementReconcilePage() {
   const params = useParams();
   const router = useRouter();
-  const statementId = params.statementId as Id<"ccStatements">;
+  const rawId = typeof params?.statementId === "string" ? params.statementId : "";
+  const statementId = rawId as Id<"ccStatements">;
 
-  const stmt = useQuery(api.ccReconcile.getStatement, { statementId });
+  const stmt = useQuery(api.ccReconcile.getStatement, rawId ? { statementId } : "skip");
   const matchableBills = useQuery(api.ccReconcile.getMatchableBills) ?? [];
   const horses = useQuery(api.horses.getAllHorses) ?? [];
   const people = useQuery(api.people.getAllPeople) ?? [];
