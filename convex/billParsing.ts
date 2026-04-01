@@ -12,9 +12,10 @@ import { matchProvider } from "./providerMatching";
 const TRAVEL_SUBCATEGORY_SLUGS = new Set(["flights", "trains", "rental-car", "gas", "meals", "hotels"]);
 const HOUSING_SUBCATEGORY_SLUGS = new Set(["rider-housing", "groom-housing"]);
 const MARKETING_SUBCATEGORY_SLUGS = new Set(["vip-tickets", "photography", "social-media"]);
-const ADMIN_SUBCATEGORY_SLUGS = new Set(["legal", "visas", "accounting", "payroll", "contractors", "software-subscriptions", "housing"]);
+const ADMIN_SUBCATEGORY_SLUGS = new Set(["legal", "visas", "accounting", "payroll", "contractors", "software-subscriptions", "housing", "bank-fees"]);
 const DUES_SUBCATEGORY_SLUGS = new Set(["horse-registrations", "rider-registrations", "memberships"]);
 const GROOMING_SUBCATEGORY_SLUGS = new Set(["rider", "groom", "freelance"]);
+const INCOME_SUBCATEGORY_SLUGS = new Set(["reimbursements", "other"]);
 const RECLASSIFICATION_SOURCE_CATEGORIES = new Set(["stabling", "show-expenses", "feed-bedding"]);
 const HORSE_BASED_CATEGORIES = new Set([
   "veterinary",
@@ -1043,9 +1044,10 @@ For each line item, extract into a "line_items" array:
 - horse_name: If the line item is for a specific horse, extract the horse name. Otherwise null.
 - person_name: If the line item is for a specific person (travel, admin/housing, etc.), extract the person name. Otherwise null.
 - category: Classify this line item into ONE of these categories:
-  veterinary, farrier, stabling, travel, horse-transport, feed-bedding, bodywork, marketing, admin, dues-registrations, show-expenses, grooming, riding-training, supplies, commissions, prize-money
+  veterinary, farrier, stabling, travel, horse-transport, feed-bedding, bodywork, marketing, admin, dues-registrations, show-expenses, grooming, riding-training, supplies, commissions, prize-money, income
   Note: housing is now a subcategory of admin — use "admin" for housing-related items.
   Use "prize-money" for any prize money, winnings, awards, or credits earned from competitions/shows.
+  Use "income" for reimbursements, refunds, or other non-prize income items. Subcategories: "reimbursements", "other".
   Choose the most specific match. If unclear, use "supplies".
 - subcategory: Optional more specific classification within the category (e.g., "medication", "joint_injections" for veterinary; "flights", "hotels" for travel; "hay", "grain" for feed-bedding; "grooming", "stable", "tack" for supplies)
 
@@ -1515,7 +1517,7 @@ const VALID_LINE_ITEM_CATEGORIES = new Set([
   "veterinary", "farrier", "stabling", "travel", "horse-transport",
   "feed-bedding", "bodywork", "marketing", "admin", "dues-registrations",
   "show-expenses", "grooming", "riding-training", "supplies", "commissions",
-  "prize-money",
+  "prize-money", "income",
 ]);
 const LINE_ITEM_CATEGORY_ALIASES: Record<string, string> = {
   general: "supplies",

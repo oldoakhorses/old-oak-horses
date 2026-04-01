@@ -560,12 +560,30 @@ export default function StatementReconcilePage() {
 
           <div style={{ marginTop: 12 }}>
             <div className={styles.assignLabel}>CATEGORY (OPTIONAL)</div>
-            <input
+            <select
               className={styles.searchInput}
-              placeholder="e.g. feed-bedding, veterinary..."
               value={assignCategory}
               onChange={(e) => setAssignCategory(e.target.value)}
-            />
+            >
+              <option value="">— select category —</option>
+              <option value="veterinary">Veterinary</option>
+              <option value="farrier">Farrier</option>
+              <option value="stabling">Stabling</option>
+              <option value="feed-bedding">Feed & Bedding</option>
+              <option value="horse-transport">Horse Transport</option>
+              <option value="bodywork">Bodywork</option>
+              <option value="supplies">Supplies</option>
+              <option value="travel">Travel</option>
+              <option value="admin">Admin</option>
+              <option value="dues-registrations">Dues & Registrations</option>
+              <option value="marketing">Marketing</option>
+              <option value="show-expenses">Show Expenses</option>
+              <option value="grooming">Grooming</option>
+              <option value="riding-training">Riding & Training</option>
+              <option value="commissions">Commissions</option>
+              <option value="prize-money">Prize Money</option>
+              <option value="income">Income</option>
+            </select>
           </div>
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>

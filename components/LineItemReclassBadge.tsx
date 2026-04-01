@@ -9,7 +9,18 @@ export const CATEGORY_COLORS: Record<string, { color: string; label: string }> =
   farrier: { color: "#14B8A6", label: "Farrier" },
   veterinary: { color: "#4A5BDB", label: "Veterinary" },
   supplies: { color: "#6B7084", label: "Supplies" },
-  show_expenses: { color: "#EC4899", label: "Show Expenses" }
+  show_expenses: { color: "#EC4899", label: "Show Expenses" },
+  bodywork: { color: "#A78BFA", label: "Bodywork" },
+  grooming: { color: "#0EA5E9", label: "Grooming" },
+  travel: { color: "#EC4899", label: "Travel" },
+  housing: { color: "#06B6D4", label: "Housing" },
+  admin: { color: "#64748B", label: "Admin" },
+  horse_transport: { color: "#E5484D", label: "Horse Transport" },
+  dues_registrations: { color: "#A855F7", label: "Dues & Registrations" },
+  riding_training: { color: "#EC4899", label: "Riding & Training" },
+  marketing: { color: "#6366F1", label: "Marketing" },
+  prize_money: { color: "#22C55E", label: "Prize Money" },
+  income: { color: "#16A34A", label: "Income" },
 };
 
 const TARGET_OPTIONS = Object.keys(CATEGORY_COLORS);

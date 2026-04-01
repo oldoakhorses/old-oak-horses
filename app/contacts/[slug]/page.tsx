@@ -25,6 +25,7 @@ const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
   grooming: { bg: "rgba(14,165,233,0.08)", color: "#0EA5E9" },
   "riding-training": { bg: "rgba(236,72,153,0.08)", color: "#EC4899" },
   "prize-money": { bg: "rgba(34,197,94,0.08)", color: "#22C55E" },
+  income: { bg: "rgba(34,197,94,0.08)", color: "#16A34A" },
 };
 
 function formatUsd(amount: number) {
