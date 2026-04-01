@@ -10,7 +10,7 @@
 
 .filters {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 180px));
+  grid-template-columns: repeat(3, minmax(0, 180px)) minmax(0, 220px);
   gap: 10px;
   margin-bottom: 16px;
 }

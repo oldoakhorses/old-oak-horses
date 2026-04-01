@@ -46,16 +46,22 @@ export default function InvoicesPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingNotesFor, setEditingNotesFor] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const categories = useMemo(() => ["all", ...new Set(rows.map((row) => row.categoryName))], [rows]);
 
   const filtered = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
     const base = rows.filter((row) => {
       const date = getInvoiceDate(row);
       const categoryPass = categoryFilter === "all" || row.categoryName === categoryFilter;
       const fromPass = !fromDate || date >= fromDate;
       const toPass = !toDate || date <= toDate;
-      return categoryPass && fromPass && toPass;
+      const searchPass = !q || (row.invoiceName || formatInvoiceName({ providerName: getProvider(row), date })).toLowerCase().includes(q)
+        || (row.categoryName ?? "").toLowerCase().includes(q)
+        || (getProvider(row)).toLowerCase().includes(q)
+        || date.includes(q);
+      return categoryPass && fromPass && toPass && searchPass;
     });
 
     const sorted = [...base];
@@ -81,7 +87,7 @@ export default function InvoicesPage() {
       return sortDirection === "asc" ? aAmount - bAmount : bAmount - aAmount;
     });
     return sorted;
-  }, [rows, categoryFilter, fromDate, toDate, sortColumn, sortDirection]);
+  }, [rows, categoryFilter, fromDate, toDate, searchQuery, sortColumn, sortDirection]);
 
   function handleSort(column: Exclude<SortColumn, null>) {
     if (sortColumn === column) {
@@ -157,6 +163,10 @@ export default function InvoicesPage() {
           <label>
             <span>TO</span>
             <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          </label>
+          <label>
+            <span>SEARCH</span>
+            <input type="text" placeholder="search invoices..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
           </label>
         </section>
 
@@ -428,5 +438,7 @@ function slugify(value: string) {
 }
 
 function formatUsd(value: number) {
-  return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const abs = Math.abs(value);
+  const formatted = `$${abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return value < 0 ? `(${formatted})` : formatted;
 }

@@ -247,6 +247,7 @@ export default function InvoicePreviewPage() {
   const [wholeAmounts, setWholeAmounts] = useState<Record<string, string>>({});
   const [wholeAssignMode, setWholeAssignMode] = useState<WholeAssignMode>("split");
   const [wholeCategoryOverride, setWholeCategoryOverride] = useState("");
+  const [wholeSubcategoryOverride, setWholeSubcategoryOverride] = useState("");
 
   const [savingProvider, setSavingProvider] = useState(false);
   const [savingDetails, setSavingDetails] = useState(false);
@@ -1197,7 +1198,7 @@ export default function InvoicePreviewPage() {
           description: line.description || `Line item ${index + 1}`,
           amount: getLineAmount(line),
           category: (mode === "whole" && wholeCategoryOverride) ? wholeCategoryOverride : (state?.category || categorySlug),
-          subcategory: state?.subcategory || line.subcategory || null,
+          subcategory: (mode === "whole" && wholeSubcategoryOverride) ? wholeSubcategoryOverride : (state?.subcategory || line.subcategory || null),
           subcategoryAutoDetected: Boolean(state?.subcategoryAutoDetected),
           horses: assignType === "horse" ? selectedAssignees : undefined,
           people: assignType === "person" ? selectedAssignees : undefined,
@@ -1709,7 +1710,7 @@ export default function InvoicePreviewPage() {
                     <select
                       className={styles.categorySelect}
                       value={wholeCategoryOverride}
-                      onChange={(event) => setWholeCategoryOverride(event.target.value)}
+                      onChange={(event) => { setWholeCategoryOverride(event.target.value); setWholeSubcategoryOverride(""); }}
                     >
                       <option value="">use invoice category</option>
                       {ALL_CATEGORY_OPTIONS.map((option) => (
@@ -1717,6 +1718,22 @@ export default function InvoicePreviewPage() {
                       ))}
                     </select>
                   </div>
+
+                  {SUBCATEGORY_OPTIONS[wholeCategoryOverride || categorySlug || ""] ? (
+                  <div className={styles.formField}>
+                    <div className={styles.label}>SUBCATEGORY</div>
+                    <select
+                      className={styles.categorySelect}
+                      value={wholeSubcategoryOverride}
+                      onChange={(event) => setWholeSubcategoryOverride(event.target.value)}
+                    >
+                      <option value="">—</option>
+                      {(SUBCATEGORY_OPTIONS[wholeCategoryOverride || categorySlug || ""] ?? []).map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  ) : null}
 
                   <div className={styles.lineSummary}>
                     {lineItems.map((line, index) => (
@@ -2157,7 +2174,10 @@ function formatDate(value: string) {
 }
 
 function formatUsd(value: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number.isFinite(value) ? value : 0);
+  const v = Number.isFinite(value) ? value : 0;
+  const abs = Math.abs(v);
+  const formatted = `$${abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return v < 0 ? `(${formatted})` : formatted;
 }
 
 function round2(value: number) {
