@@ -285,6 +285,7 @@ export default function InvoicePreviewPage() {
   const reassignAndReparse = useAction((api as any).uploads.reassignAndReparse);
   const updatePreviewFields = useMutation(api.bills.updatePreviewFields);
   const updateBillContact = useMutation(api.bills.updateBillContact);
+  const createContact = useMutation(api.contacts.createContact);
   const saveHorseAssignment = useMutation(api.bills.saveHorseAssignment);
   const savePersonAssignment = useMutation(api.bills.savePersonAssignment);
   const saveDuesAssignments = useMutation(api.bills.saveDuesAssignments);
@@ -422,7 +423,7 @@ export default function InvoicePreviewPage() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [openDropdownId]);
 
-  const providerName = bill?.provider?.name ?? bill?.customProviderName ?? "Unknown";
+  const providerName = bill?.extractedProviderContact?.providerName || bill?.provider?.name ?? bill?.customProviderName ?? "Unknown";
   const previewTitle = formatInvoiceName({ providerName: bill?.providerName ?? providerName, date: bill?.date });
   const providerDetected = Boolean(bill?.providerDetected ?? bill?.providerId);
   const providerConfirmed = Boolean((bill?.providerConfirmed ?? bill?.providerId) && !providerEdit);
@@ -883,9 +884,24 @@ export default function InvoicePreviewPage() {
         website: contactForm.website || undefined,
         accountNumber: contactForm.accountNumber || undefined,
       };
+
+      let contactId = selectedContactId ?? undefined;
+
+      // If no existing contact selected but we have a name, create a new contact
+      if (!contactId && contactForm.providerName?.trim()) {
+        const newContactId = await createContact({
+          name: contactForm.providerName.trim(),
+          category: categorySlug || "other",
+          phone: contactForm.phone || undefined,
+          email: contactForm.email || undefined,
+        });
+        contactId = newContactId;
+        setSelectedContactId(newContactId);
+      }
+
       await updateBillContact({
         billId,
-        contactId: selectedContactId ?? undefined,
+        contactId,
         extractedProviderContact: contactData,
       });
       setContactEdit(false);
