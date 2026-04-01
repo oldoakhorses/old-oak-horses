@@ -22,7 +22,9 @@ const STMT_STATUS: Record<string, { label: string; color: string; bg: string }> 
 };
 
 function fmtUSD(amount: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
+  const abs = Math.abs(amount);
+  const formatted = `$${abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return amount < 0 ? `(${formatted})` : formatted;
 }
 
 function fmtPeriod(period: string) {

@@ -75,7 +75,9 @@ function getTotal(bill: any) {
 }
 
 function fmtUSD(value: number) {
-  return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const abs = Math.abs(value);
+  const formatted = `$${abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return value < 0 ? `(${formatted})` : formatted;
 }
 
 function titleCase(value: string) {

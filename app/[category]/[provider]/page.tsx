@@ -274,7 +274,9 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function fmtUSD(v: number) {
-  return `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const abs = Math.abs(v);
+  const formatted = `$${abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return v < 0 ? `(${formatted})` : formatted;
 }
 
 function emptyToUndefined(value: string) {

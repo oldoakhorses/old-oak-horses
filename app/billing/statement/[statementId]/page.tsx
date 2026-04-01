@@ -29,7 +29,9 @@ const ASSIGN_COLORS: Record<string, string> = {
 type Tab = "all" | "matched" | "unmatched" | "assigned" | "approved";
 
 function fmtUSD(amount: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
+  const abs = Math.abs(amount);
+  const formatted = `$${abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return amount < 0 ? `(${formatted})` : formatted;
 }
 
 function fmtDate(dateStr: string) {

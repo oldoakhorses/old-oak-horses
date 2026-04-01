@@ -28,7 +28,9 @@ const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
 };
 
 function formatUsd(amount: number) {
-  return `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const abs = Math.abs(amount);
+  const formatted = `$${abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return amount < 0 ? `(${formatted})` : formatted;
 }
 
 function formatCategoryLabel(slug: string) {
