@@ -257,6 +257,17 @@
   display: inline-block;
 }
 
+.ccBadge {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: rgba(100, 116, 139, 0.1);
+  color: #64748b;
+  margin-left: 6px;
+  letter-spacing: 0.5px;
+}
+
 .dateCol {
   font-size: 12px;
   color: #6b7084;

@@ -363,9 +363,9 @@ export default function StatementReconcilePage() {
                               unapprove
                             </button>
                           ) : null}
-                          {txn.matchedBillId ? (
+                          {txn.matchedBillId || txn.generatedBillId ? (
                             <Link
-                              href={`/invoices/preview/${txn.matchedBillId}`}
+                              href={`/invoices/preview/${txn.matchedBillId ?? txn.generatedBillId}`}
                               className={styles.btnViewInvoice}
                               onClick={(e) => e.stopPropagation()}
                             >

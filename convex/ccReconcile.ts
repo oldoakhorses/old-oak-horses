@@ -307,6 +307,89 @@ export const assignTransaction = mutation({
   },
 });
 
+/** Create a bill from a CC transaction that has no matched invoice */
+async function createBillFromTransaction(
+  ctx: any,
+  txn: {
+    _id: Id<"ccTransactions">;
+    description: string;
+    amount: number;
+    postingDate: string;
+    assignType?: string;
+    assignedHorses?: { horseId: Id<"horses">; horseName: string; amount: number }[];
+    assignedPeople?: { personId: Id<"people">; personName: string; role?: string; amount: number }[];
+    category?: string;
+    subcategory?: string;
+  }
+): Promise<Id<"bills">> {
+  // Look up categoryId from slug
+  let categoryId: Id<"categories"> | undefined;
+  if (txn.category) {
+    const cats = await ctx.db.query("categories").collect();
+    const match = cats.find((c: any) => c.slug === txn.category);
+    if (match) categoryId = match._id;
+  }
+
+  const absAmount = Math.abs(txn.amount);
+  const billingPeriod = txn.postingDate.slice(0, 7); // "2026-03" from "2026-03-18"
+
+  const billId = await ctx.db.insert("bills", {
+    fileName: txn.description,
+    invoiceName: txn.description,
+    customProviderName: txn.description,
+    status: "done" as const,
+    billingPeriod,
+    uploadedAt: Date.now(),
+    isApproved: true,
+    approvedAt: Date.now(),
+    source: "cc_transaction" as const,
+    ccTransactionId: txn._id,
+    categoryId,
+    extractedData: {
+      invoice_total_usd: absAmount,
+      invoice_date: txn.postingDate,
+      provider_name: txn.description,
+    },
+    ...(txn.assignType === "horse" || txn.assignType === "person"
+      ? { assignType: txn.assignType as "horse" | "person" }
+      : {}),
+    ...(txn.assignType === "horse" && txn.assignedHorses
+      ? {
+          assignedHorses: txn.assignedHorses.map((h) => ({
+            horseId: h.horseId,
+            horseName: h.horseName,
+            amount: h.amount,
+            direct: h.amount,
+            shared: 0,
+          })),
+        }
+      : {}),
+    ...(txn.assignType === "person" && txn.assignedPeople
+      ? {
+          assignedPeople: txn.assignedPeople.map((p) => ({
+            personId: p.personId,
+            amount: p.amount,
+          })),
+        }
+      : {}),
+    ...(txn.category ? { lineItemCategories: [txn.category] } : {}),
+    ...(txn.subcategory
+      ? (() => {
+          const slug = txn.category;
+          if (slug === "travel") return { travelSubcategory: txn.subcategory };
+          if (slug === "housing") return { housingSubcategory: txn.subcategory };
+          if (slug === "admin") return { adminSubcategory: txn.subcategory };
+          if (slug === "marketing") return { marketingSubcategory: txn.subcategory };
+          if (slug === "grooming") return { groomingSubcategory: txn.subcategory };
+          if (slug === "dues-registrations") return { duesSubcategory: txn.subcategory };
+          return {};
+        })()
+      : {}),
+  });
+
+  return billId;
+}
+
 /** Approve a transaction — this is the gate before it hits horse profiles */
 export const approveTransaction = mutation({
   args: {
@@ -314,10 +397,53 @@ export const approveTransaction = mutation({
     approved: v.boolean(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.transactionId, {
-      isApproved: args.approved,
-      approvedAt: args.approved ? Date.now() : undefined,
-    });
+    const txn = await ctx.db.get(args.transactionId);
+    if (!txn) return;
+
+    if (args.approved) {
+      // Create a bill if there's no matched invoice and this isn't ignored
+      if (!txn.matchedBillId && txn.assignType && txn.assignType !== "ignore") {
+        // Check if bill already generated (re-approval case)
+        if (txn.generatedBillId) {
+          const existing = await ctx.db.get(txn.generatedBillId);
+          if (existing) {
+            // Bill already exists — skip creation
+            await ctx.db.patch(args.transactionId, {
+              isApproved: true,
+              approvedAt: Date.now(),
+            });
+            return;
+          }
+        }
+        const billId = await createBillFromTransaction(ctx, txn as any);
+        await ctx.db.patch(args.transactionId, {
+          isApproved: true,
+          approvedAt: Date.now(),
+          generatedBillId: billId,
+        });
+      } else {
+        await ctx.db.patch(args.transactionId, {
+          isApproved: true,
+          approvedAt: Date.now(),
+        });
+      }
+    } else {
+      // Unapproving — delete generated bill if it exists
+      if (txn.generatedBillId) {
+        const bill = await ctx.db.get(txn.generatedBillId);
+        if (bill) await ctx.db.delete(txn.generatedBillId);
+        await ctx.db.patch(args.transactionId, {
+          isApproved: false,
+          approvedAt: undefined,
+          generatedBillId: undefined,
+        });
+      } else {
+        await ctx.db.patch(args.transactionId, {
+          isApproved: false,
+          approvedAt: undefined,
+        });
+      }
+    }
   },
 });
 
@@ -333,7 +459,13 @@ export const approveAllAssigned = mutation({
     let count = 0;
     for (const txn of txns) {
       if (txn.assignType && !txn.isApproved) {
-        await ctx.db.patch(txn._id, { isApproved: true, approvedAt: Date.now() });
+        // Create a bill for unmatched, non-ignored transactions
+        if (!txn.matchedBillId && txn.assignType !== "ignore" && !txn.generatedBillId) {
+          const billId = await createBillFromTransaction(ctx, txn as any);
+          await ctx.db.patch(txn._id, { isApproved: true, approvedAt: Date.now(), generatedBillId: billId });
+        } else {
+          await ctx.db.patch(txn._id, { isApproved: true, approvedAt: Date.now() });
+        }
         count++;
       }
     }

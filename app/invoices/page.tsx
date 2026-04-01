@@ -232,6 +232,9 @@ export default function InvoicesPage() {
                     >
                       {row.invoiceName || formatInvoiceName({ providerName: getProvider(row), date })}
                     </a>
+                    {row.source === "cc_transaction" && (
+                      <span className={styles.ccBadge}>CC</span>
+                    )}
                   </div>
                   <div>
                     <span className={styles.categoryBadge} style={{ background: categoryColor.bg, color: categoryColor.color }}>
@@ -249,9 +252,11 @@ export default function InvoicesPage() {
                         <button type="button" className={styles.menuItem} onClick={() => { setOpenMenuId(null); router.push(`/invoices/preview/${row._id}`); }}>
                           Edit Invoice
                         </button>
-                        <button type="button" className={styles.menuItem} onClick={() => handleDownloadPdf(row)}>
-                          Download PDF
-                        </button>
+                        {row.source !== "cc_transaction" && (
+                          <button type="button" className={styles.menuItem} onClick={() => handleDownloadPdf(row)}>
+                            Download PDF
+                          </button>
+                        )}
                         <div className={styles.menuDivider} />
                         <button
                           type="button"

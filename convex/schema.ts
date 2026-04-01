@@ -66,7 +66,7 @@ export default defineSchema({
     categoryId: v.optional(v.id("categories")),
     /** Denormalized list of category slugs found across line items */
     lineItemCategories: v.optional(v.array(v.string())),
-    fileId: v.id("_storage"),
+    fileId: v.optional(v.id("_storage")),
     fileName: v.string(),
     notes: v.optional(v.string()),
     assignType: v.optional(v.union(v.literal("horse"), v.literal("person"))),
@@ -194,12 +194,17 @@ export default defineSchema({
         accountNumber: v.optional(v.string())
       })
     ),
-    dropboxPath: v.optional(v.string())
+    dropboxPath: v.optional(v.string()),
+    /** CC transaction that generated this bill (for non-invoice charges) */
+    ccTransactionId: v.optional(v.id("ccTransactions")),
+    /** How this bill was created */
+    source: v.optional(v.union(v.literal("upload"), v.literal("cc_transaction"))),
   })
     .index("by_uploadedAt", ["uploadedAt"])
     .index("by_provider", ["providerId"])
     .index("by_contact", ["contactId"])
-    .index("by_category", ["categoryId"]),
+    .index("by_category", ["categoryId"])
+    .index("by_ccTransaction", ["ccTransactionId"]),
 
   horses: defineTable({
     name: v.string(),
@@ -511,6 +516,8 @@ export default defineSchema({
     // Approval
     isApproved: v.boolean(),
     approvedAt: v.optional(v.number()),
+    /** Bill auto-created when this txn was approved without a matched invoice */
+    generatedBillId: v.optional(v.id("bills")),
   })
     .index("by_statement", ["statementId"])
     .index("by_matched_bill", ["matchedBillId"]),
