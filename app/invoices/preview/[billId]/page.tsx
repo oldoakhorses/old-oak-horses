@@ -114,6 +114,7 @@ const ALL_CATEGORY_OPTIONS = [
   { value: "commissions", label: "Commissions" },
   { value: "prize-money", label: "Prize Money" },
   { value: "income", label: "Income" },
+  { value: "equity", label: "Equity" },
 ] as const;
 
 const VALID_CATEGORIES = new Set<string>(ALL_CATEGORY_OPTIONS.map((o) => o.value));
@@ -186,6 +187,10 @@ const SUBCATEGORY_OPTIONS: Record<string, Array<{ value: string; label: string }
     { value: "reimbursements", label: "Reimbursements" },
     { value: "other", label: "Other" },
   ],
+  equity: [
+    { value: "investor-dues", label: "Investor Dues" },
+    { value: "horse-purchases", label: "Horse Purchases" },
+  ],
 };
 
 const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
@@ -205,7 +210,8 @@ const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
   grooming: { bg: "rgba(14,165,233,0.08)", color: "#0EA5E9" },
   "riding-training": { bg: "rgba(236,72,153,0.08)", color: "#EC4899" },
   "prize-money": { bg: "rgba(34,197,94,0.08)", color: "#22C55E" },
-  income: { bg: "rgba(34,197,94,0.08)", color: "#16A34A" }
+  income: { bg: "rgba(34,197,94,0.08)", color: "#16A34A" },
+  equity: { bg: "rgba(139,92,246,0.08)", color: "#8B5CF6" }
 };
 
 export default function InvoicePreviewPage() {

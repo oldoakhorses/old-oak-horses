@@ -3043,6 +3043,7 @@ function getCategoryColor(slug: string) {
     "prize-money": "#22C55E",
     "riding-training": "#EC4899",
     income: "#16A34A",
+    equity: "#8B5CF6",
   };
   return map[slug] ?? "#6B7084";
 }

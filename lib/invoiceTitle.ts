@@ -27,6 +27,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   supplies: "Supplies",
   "prize-money": "Prize Money",
   income: "Income",
+  equity: "Equity",
 };
 
 const SUBCATEGORY_LABELS: Record<string, string> = {
@@ -48,6 +49,8 @@ const SUBCATEGORY_LABELS: Record<string, string> = {
   housing: "Housing",
   "bank-fees": "Bank & Other Fees",
   reimbursements: "Reimbursements",
+  "investor-dues": "Investor Dues",
+  "horse-purchases": "Horse Purchases",
 };
 
 export function formatCategoryName(category: string) {

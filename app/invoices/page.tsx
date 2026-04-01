@@ -32,6 +32,7 @@ const CATEGORY_COLORS: Record<string, { bg: string; color: string; label: string
   "riding-training": { bg: "rgba(236,72,153,0.08)", color: "#EC4899", label: "Riding & Training" },
   "prize-money": { bg: "rgba(34,197,94,0.08)", color: "#22C55E", label: "Prize Money" },
   income: { bg: "rgba(34,197,94,0.08)", color: "#16A34A", label: "Income" },
+  equity: { bg: "rgba(139,92,246,0.08)", color: "#8B5CF6", label: "Equity" },
 };
 
 export default function InvoicesPage() {

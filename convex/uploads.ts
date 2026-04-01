@@ -17,6 +17,7 @@ export const uploadAndParseBill: any = action({
     duesSubcategory: v.optional(v.string()),
     groomingSubcategory: v.optional(v.string()),
     incomeSubcategory: v.optional(v.string()),
+    equitySubcategory: v.optional(v.string()),
     base64Pdf: v.string(),
     uploadedAt: v.optional(v.number())
   },

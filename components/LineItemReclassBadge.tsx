@@ -21,6 +21,7 @@ export const CATEGORY_COLORS: Record<string, { color: string; label: string }> =
   marketing: { color: "#6366F1", label: "Marketing" },
   prize_money: { color: "#22C55E", label: "Prize Money" },
   income: { color: "#16A34A", label: "Income" },
+  equity: { color: "#8B5CF6", label: "Equity" },
 };
 
 const TARGET_OPTIONS = Object.keys(CATEGORY_COLORS);

@@ -71,6 +71,10 @@ const SUBCATEGORY_OPTIONS: Record<string, Array<{ value: string; label: string }
     { value: "reimbursements", label: "Reimbursements" },
     { value: "other", label: "Other" },
   ],
+  equity: [
+    { value: "investor-dues", label: "Investor Dues" },
+    { value: "horse-purchases", label: "Horse Purchases" },
+  ],
   "dues-registrations": [
     { value: "horse-registrations", label: "Horse Registrations" },
     { value: "rider-registrations", label: "Rider Registrations" },
@@ -659,6 +663,7 @@ export default function StatementReconcilePage() {
               <option value="commissions">Commissions</option>
               <option value="prize-money">Prize Money</option>
               <option value="income">Income</option>
+              <option value="equity">Equity</option>
             </select>
           </div>
 
