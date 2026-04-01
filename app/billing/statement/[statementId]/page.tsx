@@ -26,6 +26,68 @@ const ASSIGN_COLORS: Record<string, string> = {
   ignore: "#9EA2B0",
 };
 
+const SUBCATEGORY_OPTIONS: Record<string, Array<{ value: string; label: string }>> = {
+  veterinary: [
+    { value: "medication", label: "Medication" },
+    { value: "joint_injections", label: "Joint Injections" },
+    { value: "exams_diagnostics", label: "Exams & Diagnostics" },
+    { value: "vaccinations", label: "Vaccinations" },
+    { value: "shockwave", label: "Shockwave" },
+    { value: "sedation", label: "Sedation" },
+    { value: "fees", label: "Fees" },
+    { value: "lab_work", label: "Lab Work" },
+    { value: "other", label: "Other" },
+  ],
+  travel: [
+    { value: "flights", label: "Flights" },
+    { value: "hotels", label: "Hotels" },
+    { value: "rental-car", label: "Rental Car" },
+    { value: "meals", label: "Meals" },
+    { value: "other", label: "Other" },
+  ],
+  "feed-bedding": [
+    { value: "hay", label: "Hay" },
+    { value: "grain", label: "Grain" },
+    { value: "supplements", label: "Supplements" },
+    { value: "bedding", label: "Bedding" },
+    { value: "other", label: "Other" },
+  ],
+  supplies: [
+    { value: "grooming", label: "Grooming Supplies" },
+    { value: "stable", label: "Stable Supplies" },
+    { value: "tack", label: "Tack" },
+    { value: "other", label: "Other" },
+  ],
+  admin: [
+    { value: "accounting", label: "Accounting" },
+    { value: "legal", label: "Legal" },
+    { value: "insurance", label: "Insurance" },
+    { value: "software-subscriptions", label: "Software & Subscriptions" },
+    { value: "housing", label: "Housing" },
+    { value: "bank-fees", label: "Bank & Other Fees" },
+    { value: "other", label: "Other" },
+  ],
+  income: [
+    { value: "reimbursements", label: "Reimbursements" },
+    { value: "other", label: "Other" },
+  ],
+  "dues-registrations": [
+    { value: "horse-registrations", label: "Horse Registrations" },
+    { value: "rider-registrations", label: "Rider Registrations" },
+    { value: "memberships", label: "Memberships" },
+  ],
+  grooming: [
+    { value: "rider", label: "Rider" },
+    { value: "groom", label: "Groom" },
+    { value: "freelance", label: "Freelance" },
+  ],
+  marketing: [
+    { value: "vip-tickets", label: "VIP Tickets" },
+    { value: "photography", label: "Photography" },
+    { value: "social-media", label: "Social Media" },
+  ],
+};
+
 type Tab = "all" | "matched" | "unmatched" | "assigned" | "approved";
 
 function fmtUSD(amount: number) {
@@ -76,6 +138,7 @@ export default function StatementReconcilePage() {
   const [selectedHorses, setSelectedHorses] = useState<Array<{ horseId: Id<"horses">; horseName: string; amount: number }>>([]);
   const [selectedPeople, setSelectedPeople] = useState<Array<{ personId: Id<"people">; personName: string; role?: string; amount: number }>>([]);
   const [assignCategory, setAssignCategory] = useState("");
+  const [assignSubcategory, setAssignSubcategory] = useState("");
 
   const activeHorses = useMemo(() => horses.filter((h) => h.status === "active" && !h.isSold), [horses]);
 
@@ -160,11 +223,13 @@ export default function StatementReconcilePage() {
       setSelectedHorses((txn.assignedHorses ?? []).map((h) => ({ horseId: h.horseId as Id<"horses">, horseName: h.horseName, amount: h.amount })));
       setSelectedPeople((txn.assignedPeople ?? []).map((p) => ({ personId: p.personId as Id<"people">, personName: p.personName, role: p.role, amount: p.amount })));
       setAssignCategory(txn.category ?? "");
+      setAssignSubcategory(txn.subcategory ?? "");
     } else {
       setAssignType("business");
       setSelectedHorses([]);
       setSelectedPeople([]);
       setAssignCategory("");
+      setAssignSubcategory("");
     }
   }
 
@@ -176,6 +241,7 @@ export default function StatementReconcilePage() {
       assignedHorses: assignType === "horse" ? selectedHorses : undefined,
       assignedPeople: assignType === "person" ? selectedPeople : undefined,
       category: assignCategory || undefined,
+      subcategory: assignSubcategory || undefined,
     });
     setAssignModal(null);
   }
@@ -474,14 +540,14 @@ export default function StatementReconcilePage() {
         {/* Assign Modal */}
         <Modal open={!!assignModal} title="assign transaction" onClose={() => setAssignModal(null)}>
           <div className={styles.assignTypeRow}>
-            {(["horse", "person", "business", "personal", "ignore"] as const).map((t) => (
+            {(["horse", "person", "business", "ignore"] as const).map((t) => (
               <button
                 key={t}
                 type="button"
                 className={assignType === t ? styles.assignTypeActive : styles.assignTypeBtn}
                 onClick={() => setAssignType(t)}
               >
-                {t === "horse" ? "🐴 Horse" : t === "person" ? "👤 Person" : t === "business" ? "💼 Business" : t === "personal" ? "🏠 Personal" : "⊘ Ignore"}
+                {t === "horse" ? "🐴 Horse" : t === "person" ? "👤 Person" : t === "business" ? "💼 Business" : "⊘ Ignore"}
               </button>
             ))}
           </div>
@@ -563,7 +629,7 @@ export default function StatementReconcilePage() {
             <select
               className={styles.searchInput}
               value={assignCategory}
-              onChange={(e) => setAssignCategory(e.target.value)}
+              onChange={(e) => { setAssignCategory(e.target.value); setAssignSubcategory(""); }}
             >
               <option value="">— select category —</option>
               <option value="veterinary">Veterinary</option>
@@ -585,6 +651,22 @@ export default function StatementReconcilePage() {
               <option value="income">Income</option>
             </select>
           </div>
+
+          {SUBCATEGORY_OPTIONS[assignCategory] ? (
+            <div style={{ marginTop: 8 }}>
+              <div className={styles.assignLabel}>SUBCATEGORY</div>
+              <select
+                className={styles.searchInput}
+                value={assignSubcategory}
+                onChange={(e) => setAssignSubcategory(e.target.value)}
+              >
+                <option value="">— select subcategory —</option>
+                {(SUBCATEGORY_OPTIONS[assignCategory] ?? []).map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          ) : null}
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
             <button type="button" className={styles.btnCancel} onClick={() => setAssignModal(null)}>cancel</button>
