@@ -75,7 +75,8 @@ const HORSE_CATEGORY_SLUGS = new Set([
   "supplies",
   "show-expenses",
   "riding-training",
-  "prize-money"
+  "prize-money",
+  "grooming"
 ]);
 const PERSON_CATEGORY_SLUGS = new Set(["travel", "admin", "grooming"]);
 const NO_ASSIGNMENT_CATEGORY_SLUGS = new Set(["marketing"]);

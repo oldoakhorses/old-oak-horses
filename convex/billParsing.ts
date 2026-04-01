@@ -27,6 +27,7 @@ const HORSE_BASED_CATEGORIES = new Set([
   "dues-registrations",
   "riding-training",
   "prize-money",
+  "grooming",
 ]);
 const PERSON_BASED_CATEGORIES = new Set(["travel", "housing", "admin", "grooming", "commissions", "riding-training"]);
 const USD_EXCHANGE_RATES: Record<string, number> = {
