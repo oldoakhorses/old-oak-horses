@@ -424,7 +424,7 @@ export default function InvoicePreviewPage() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [openDropdownId]);
 
-  const providerName = bill?.extractedProviderContact?.providerName || bill?.provider?.name ?? bill?.customProviderName ?? "Unknown";
+  const providerName = bill?.extractedProviderContact?.providerName || (bill?.provider?.name ?? bill?.customProviderName ?? "Unknown");
   const previewTitle = formatInvoiceName({ providerName: bill?.providerName ?? providerName, date: bill?.date });
   const providerDetected = Boolean(bill?.providerDetected ?? bill?.providerId);
   const providerConfirmed = Boolean((bill?.providerConfirmed ?? bill?.providerId) && !providerEdit);

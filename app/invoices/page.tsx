@@ -12,6 +12,9 @@ import styles from "./invoices.module.css";
 type SortColumn = "invoice" | "category" | "date" | "amount" | null;
 type SortDirection = "asc" | "desc";
 
+/** Categories where money comes IN (income) — amounts shown as positive */
+const INCOME_CATEGORIES = new Set(["prize-money", "prize_money"]);
+
 const CATEGORY_COLORS: Record<string, { bg: string; color: string; label: string }> = {
   veterinary: { bg: "rgba(74,91,219,0.08)", color: "#4A5BDB", label: "Veterinary" },
   farrier: { bg: "rgba(20,184,166,0.08)", color: "#14B8A6", label: "Farrier" },
@@ -82,8 +85,10 @@ export default function InvoicesPage() {
         const bTime = Date.parse(getInvoiceDate(b));
         return sortDirection === "asc" ? aTime - bTime : bTime - aTime;
       }
-      const aAmount = getTotal(a);
-      const bAmount = getTotal(b);
+      const aKey = normalizeKey(a.categorySlug ?? slugify(a.categoryName ?? ""));
+      const bKey = normalizeKey(b.categorySlug ?? slugify(b.categoryName ?? ""));
+      const aAmount = INCOME_CATEGORIES.has(aKey) ? getTotal(a) : -getTotal(a);
+      const bAmount = INCOME_CATEGORIES.has(bKey) ? getTotal(b) : -getTotal(b);
       return sortDirection === "asc" ? aAmount - bAmount : bAmount - aAmount;
     });
     return sorted;
@@ -189,7 +194,9 @@ export default function InvoicesPage() {
 
           {filtered.map((row) => {
             const date = getInvoiceDate(row);
-            const total = getTotal(row);
+            const rawTotal = getTotal(row);
+            const isIncome = INCOME_CATEGORIES.has(normalizeKey(row.categorySlug ?? slugify(row.categoryName ?? "")));
+            const total = isIncome ? rawTotal : -rawTotal;
             const categoryKey = normalizeKey(row.categorySlug ?? slugify(row.categoryName ?? ""));
             const categoryColor = CATEGORY_COLORS[categoryKey] ?? {
               bg: "rgba(107,112,132,0.08)",
@@ -231,7 +238,7 @@ export default function InvoicesPage() {
                     </span>
                   </div>
                   <div className={styles.dateCol}>{date}</div>
-                  <div className={styles.amountCol}>{formatUsd(total)}</div>
+                  <div className={styles.amountCol} style={total >= 0 ? { color: "#16A34A" } : undefined}>{formatUsd(total)}</div>
                   <div className={styles.menuWrap} onClick={(e) => e.stopPropagation()}>
                     <button type="button" className={styles.invoiceMenuBtn} onClick={(e) => { e.stopPropagation(); setOpenMenuId((prev) => (prev === rowId ? null : rowId)); }}>
                       ⋮
