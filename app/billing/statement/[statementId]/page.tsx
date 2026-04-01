@@ -79,24 +79,7 @@ export default function StatementReconcilePage() {
 
   const activeHorses = useMemo(() => horses.filter((h) => h.status === "active" && !h.isSold), [horses]);
 
-  if (stmt === undefined) {
-    return (
-      <div className="page-shell">
-        <NavBar items={[{ label: "billing", href: "/billing" }, { label: "loading..." }]} />
-        <main className="page-content"><div className={styles.loading}>loading...</div></main>
-      </div>
-    );
-  }
-  if (stmt === null) {
-    return (
-      <div className="page-shell">
-        <NavBar items={[{ label: "billing", href: "/billing" }, { label: "not found" }]} />
-        <main className="page-content"><div className={styles.loading}>statement not found</div></main>
-      </div>
-    );
-  }
-
-  const txns = stmt.transactions;
+  const txns = stmt?.transactions ?? [];
   const filtered = useMemo(() => {
     if (tab === "all") return txns;
     if (tab === "matched") return txns.filter((t) => t.matchedBillId);
@@ -108,11 +91,11 @@ export default function StatementReconcilePage() {
   // Smart bill suggestions: score bills by relevance to the selected transaction
   const matchTxn = matchModal ? txns.find((t) => String(t._id) === matchModal) ?? null : null;
   const scoredBills = useMemo(() => {
-    const matchTxn = matchModal ? txns.find((t) => String(t._id) === matchModal) : null;
-    if (!matchTxn) return matchableBills.map((b) => ({ ...b, score: 0 }));
-    const absAmount = Math.round(Math.abs(matchTxn.amount) * 100) / 100;
-    const txnKeywords = matchTxn.description.toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim().split(" ").filter((w) => w.length > 2);
-    const txnDateStr = matchTxn.postingDate;
+    const mt = matchModal ? txns.find((t) => String(t._id) === matchModal) : null;
+    if (!mt) return matchableBills.map((b) => ({ ...b, score: 0 }));
+    const absAmount = Math.round(Math.abs(mt.amount) * 100) / 100;
+    const txnKeywords = mt.description.toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim().split(" ").filter((w) => w.length > 2);
+    const txnDateStr = mt.postingDate;
 
     return matchableBills.map((b) => {
       let score = 0;
@@ -139,6 +122,23 @@ export default function StatementReconcilePage() {
       return { ...b, score };
     }).sort((a, b) => b.score - a.score);
   }, [matchModal, txns, matchableBills]);
+
+  if (stmt === undefined) {
+    return (
+      <div className="page-shell">
+        <NavBar items={[{ label: "billing", href: "/billing" }, { label: "loading..." }]} />
+        <main className="page-content"><div className={styles.loading}>loading...</div></main>
+      </div>
+    );
+  }
+  if (stmt === null) {
+    return (
+      <div className="page-shell">
+        <NavBar items={[{ label: "billing", href: "/billing" }, { label: "not found" }]} />
+        <main className="page-content"><div className={styles.loading}>statement not found</div></main>
+      </div>
+    );
+  }
 
   const filteredBills = billSearch
     ? scoredBills.filter((b) =>
