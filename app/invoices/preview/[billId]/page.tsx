@@ -307,6 +307,8 @@ export default function InvoicePreviewPage() {
   const approveBill = useMutation(api.bills.approveBill);
   const deleteBill = useMutation(api.bills.deleteBill);
   const updateBillNotes = useMutation(api.bills.updateBillNotes);
+  const reParseBill = useAction(api.billParsing.parseBillNow);
+  const [reparsing, setReparsing] = useState(false);
 
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
@@ -2125,6 +2127,20 @@ export default function InvoicePreviewPage() {
 
             <div className={styles.approveCard}>
               <button type="button" className={styles.btnDelete} onClick={() => void onDelete()}>delete invoice</button>
+              {bill?.fileId && lineItems.length === 0 ? (
+                <button
+                  type="button"
+                  className={styles.btnReparse}
+                  disabled={reparsing}
+                  onClick={async () => {
+                    setReparsing(true);
+                    try { await reParseBill({ billId }); } catch { /* bill will reload via query */ }
+                    setReparsing(false);
+                  }}
+                >
+                  {reparsing ? "re-parsing..." : "re-parse PDF"}
+                </button>
+              ) : null}
               <div className={styles.approveRight}>
                 {approveDisabled ? <div className={styles.helper}>{isEditing ? "confirm assignments to save" : "confirm assignments to approve"}</div> : null}
                 <button type="button" className={styles.btnApprove} disabled={approveDisabled || approving} onClick={() => void onApprove()}>
