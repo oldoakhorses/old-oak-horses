@@ -564,9 +564,13 @@ export default function InvoicePreviewPage() {
   const allLineAssigned = useMemo(() => {
     if (!requiresAssignment || mode !== "line") return true;
 
+    // Only confirmed (checked) items need assignment — unchecked items are excluded
+    const confirmedItems = lineItems.filter((_, index) => lineStates[index]?.confirmed);
+    if (confirmedItems.length === 0) return false; // must have at least one confirmed item
     return lineItems.every((_, index) => {
       const row = lineStates[index];
-      return Boolean(row?.confirmed && row.assignees?.length);
+      if (!row?.confirmed) return true; // unchecked items are excluded, skip them
+      return Boolean(row.assignees?.length);
     });
   }, [requiresAssignment, mode, lineItems, lineStates]);
 
@@ -679,6 +683,7 @@ export default function InvoicePreviewPage() {
       <div
         key={index}
         className={`${styles.lineRow} ${styles.lineRowVet} ${hasAnySplit ? styles.lineRowShared : hasBusinessGeneral ? styles.lineRowBusinessGeneral : row.confirmed ? (assignType === "horse" ? styles.lineRowHorse : styles.lineRowPerson) : ""}`}
+        style={!row.confirmed ? { opacity: 0.4 } : undefined}
       >
         <div className={styles.lineDescription}>{line.description || `Line item ${index + 1}`}</div>
 
@@ -1201,27 +1206,29 @@ export default function InvoicePreviewPage() {
     try {
       await saveNotesIfNeeded();
       await persistAssignments();
-      const payloadLineItems = lineItems.map((line, index) => {
-        const state = lineStates[index];
-        const selectedAssignees = state?.assignees ?? [];
-        const isBusinessGeneral = mode === "line" && selectedAssignees[0] === BUSINESS_GENERAL;
-        const isWholeBusinessGeneral = mode === "whole" && wholeAssignMode === "business_general";
-        return {
-          ...line,
-          description: line.description || `Line item ${index + 1}`,
-          amount: getLineAmount(line),
-          category: (mode === "whole" && wholeCategoryOverride) ? wholeCategoryOverride : (state?.category || categorySlug),
-          subcategory: (mode === "whole" && wholeSubcategoryOverride) ? wholeSubcategoryOverride : (state?.subcategory || line.subcategory || null),
-          subcategoryAutoDetected: Boolean(state?.subcategoryAutoDetected),
-          horses: assignType === "horse" ? selectedAssignees : undefined,
-          people: assignType === "person" ? selectedAssignees : undefined,
-          assignee: isBusinessGeneral || isWholeBusinessGeneral ? null : (selectedAssignees[0] || ""),
-          assigneeType: isBusinessGeneral || isWholeBusinessGeneral ? "business_general" : assignType,
-          assigneeId: isBusinessGeneral || isWholeBusinessGeneral ? null : (selectedAssignees[0] || ""),
-          confidence: state?.autoDetected ? "auto" : "manual",
-          confirmed: isWholeBusinessGeneral ? true : Boolean(state?.confirmed)
-        };
-      });
+      const payloadLineItems = lineItems
+        .map((line, index) => {
+          const state = lineStates[index];
+          const selectedAssignees = state?.assignees ?? [];
+          const isBusinessGeneral = mode === "line" && selectedAssignees[0] === BUSINESS_GENERAL;
+          const isWholeBusinessGeneral = mode === "whole" && wholeAssignMode === "business_general";
+          return {
+            ...line,
+            description: line.description || `Line item ${index + 1}`,
+            amount: getLineAmount(line),
+            category: (mode === "whole" && wholeCategoryOverride) ? wholeCategoryOverride : (state?.category || categorySlug),
+            subcategory: (mode === "whole" && wholeSubcategoryOverride) ? wholeSubcategoryOverride : (state?.subcategory || line.subcategory || null),
+            subcategoryAutoDetected: Boolean(state?.subcategoryAutoDetected),
+            horses: assignType === "horse" ? selectedAssignees : undefined,
+            people: assignType === "person" ? selectedAssignees : undefined,
+            assignee: isBusinessGeneral || isWholeBusinessGeneral ? null : (selectedAssignees[0] || ""),
+            assigneeType: isBusinessGeneral || isWholeBusinessGeneral ? "business_general" : assignType,
+            assigneeId: isBusinessGeneral || isWholeBusinessGeneral ? null : (selectedAssignees[0] || ""),
+            confidence: state?.autoDetected ? "auto" : "manual",
+            confirmed: isWholeBusinessGeneral ? true : Boolean(state?.confirmed)
+          };
+        })
+        .filter((item) => mode === "whole" || item.confirmed);
       await approveBill({
         billId,
         lineItems: payloadLineItems,
@@ -1697,7 +1704,13 @@ export default function InvoicePreviewPage() {
                   ) : null}
 
                   <div className={`${styles.assignmentStatus} ${allLineAssigned ? styles.assignmentStatusComplete : styles.assignmentStatusIncomplete}`}>
-                    {allLineAssigned ? "✓ all items assigned" : (isEditing ? "⚠ assign all items to save" : "⚠ assign all items to approve")}
+                    {allLineAssigned ? (() => {
+                      const confirmedCount = lineItems.filter((_, i) => lineStates[i]?.confirmed).length;
+                      const excludedCount = lineItems.length - confirmedCount;
+                      return excludedCount > 0
+                        ? `✓ ${confirmedCount} of ${lineItems.length} items assigned (${excludedCount} excluded)`
+                        : "✓ all items assigned";
+                    })() : (isEditing ? "⚠ assign checked items to save" : "⚠ assign checked items to approve")}
                   </div>
                 </>
               ) : (
