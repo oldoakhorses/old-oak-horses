@@ -60,6 +60,7 @@ export const parseBillPdf = internalAction({
     const categorySlug = category?.slug ?? null;
 
     try {
+      if (!bill.fileId) throw new Error("Bill has no PDF file");
       const blob = await ctx.storage.get(bill.fileId);
       if (!blob) throw new Error("PDF file not found in storage");
 

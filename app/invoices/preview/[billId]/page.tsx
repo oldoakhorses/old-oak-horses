@@ -308,7 +308,6 @@ export default function InvoicePreviewPage() {
   const deleteBill = useMutation(api.bills.deleteBill);
   const updateBillNotes = useMutation(api.bills.updateBillNotes);
   const reParseBill = useAction(api.billParsing.parseBillNow);
-  const [reparsing, setReparsing] = useState(false);
 
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
