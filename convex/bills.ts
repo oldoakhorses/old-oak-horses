@@ -2425,10 +2425,22 @@ export const approveBill = mutation({
           entityName: item.entityName ?? existing?.entityName ?? undefined
         };
       });
+      // Recalculate total from confirmed line items only
+      const confirmedTotal = mergedLineItems
+        .filter((item: any) => item.confirmed !== false)
+        .reduce((sum: number, item: any) => {
+          const amt = typeof item.amount === "number" ? item.amount
+            : typeof item.total_usd === "number" ? item.total_usd
+            : typeof item.total === "number" ? item.total
+            : 0;
+          return sum + amt;
+        }, 0);
+
       await ctx.db.patch(args.billId, {
         extractedData: {
           ...extracted,
-          line_items: mergedLineItems
+          line_items: mergedLineItems,
+          invoice_total_usd: Math.round(confirmedTotal * 100) / 100,
         }
       });
 
