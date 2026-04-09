@@ -2462,6 +2462,36 @@ export const approveBill = mutation({
       }
     }
 
+    // Auto-resolve contactId from extractedProviderContact if missing
+    const latestBill = await ctx.db.get(args.billId);
+    if (latestBill && !latestBill.contactId && latestBill.extractedProviderContact) {
+      const provName = (latestBill.extractedProviderContact as any).providerName;
+      if (provName) {
+        const allContacts = await ctx.db.query("contacts").collect();
+        const match = allContacts.find((c) => c.name?.toLowerCase() === provName.toLowerCase());
+        if (match) {
+          await ctx.db.patch(args.billId, { contactId: match._id });
+        } else {
+          // Create a new contact from the extracted info
+          const epc = latestBill.extractedProviderContact as any;
+          const category = latestBill.categoryId ? await ctx.db.get(latestBill.categoryId) : null;
+          const newContactId = await ctx.db.insert("contacts", {
+            name: provName,
+            slug: slugify(provName),
+            type: "vendor",
+            category: (category as any)?.slug ?? "other",
+            phone: epc.phone ?? undefined,
+            email: epc.email ?? undefined,
+            address: epc.address ?? undefined,
+            website: epc.website ?? undefined,
+            accountNumber: epc.accountNumber ?? undefined,
+            createdAt: Date.now(),
+          });
+          await ctx.db.patch(args.billId, { contactId: newContactId });
+        }
+      }
+    }
+
     const result = await approveBillById(ctx, args.billId);
     return result;
   }
