@@ -419,6 +419,93 @@ export const generateOwnerInvoices = mutation({
       }
     }
 
+    // ── Business General charges: split evenly across each owner's active horses ──
+    // Find bills that are business_general (no horse assignment, assignType not horse/person)
+    const businessGeneralBills = approvedBills.filter((b) => {
+      if (existingBillIds.has(String(b._id))) return false;
+      // Already processed above as horse-assigned
+      if (Array.isArray(b.assignedHorses) && b.assignedHorses.length > 0) return false;
+      if (Array.isArray(b.horseAssignments) && (b.horseAssignments as any[]).length > 0) return false;
+      // Check if it's a business or business_general bill
+      const extracted = (b.extractedData ?? {}) as Record<string, unknown>;
+      const lineItems = Array.isArray(extracted.line_items) ? extracted.line_items as any[] : [];
+      const isBusiness = (b as any).assignType === "business"
+        || (!b.assignedPeople || b.assignedPeople.length === 0)
+          && lineItems.some((li: any) => li.assigneeType === "business_general");
+      // Also include bills with no assignment at all (unassigned approved bills count as business)
+      const hasNoAssignment = !(b as any).assignType
+        && (!b.assignedPeople || b.assignedPeople.length === 0);
+      return isBusiness || hasNoAssignment;
+    });
+
+    if (businessGeneralBills.length > 0) {
+      // Build map: ownerId -> active horse list
+      const ownerHorses = new Map<string, Array<{ id: Id<"horses">; name: string }>>();
+      for (const h of horses) {
+        if (!h.ownerId || h.status !== "active" || h.isSold) continue;
+        const key = String(h.ownerId);
+        const list = ownerHorses.get(key) ?? [];
+        list.push({ id: h._id, name: h.name });
+        ownerHorses.set(key, list);
+      }
+
+      for (const bill of businessGeneralBills) {
+        const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+        const lineItems = getLineItems(extracted);
+        const providerName = String(extracted.provider_name ?? extracted.providerName ?? bill.fileName ?? "");
+        let categorySlug: string | undefined;
+        if (bill.categoryId) {
+          const cat = await ctx.db.get(bill.categoryId);
+          if (cat) categorySlug = (cat as any).slug;
+        }
+
+        // For each owner that has active horses, split this bill's total
+        for (const [ownerIdStr, ownerHorseList] of ownerHorses.entries()) {
+          if (ownerHorseList.length === 0) continue;
+          const items = ownerItems.get(ownerIdStr) ?? [];
+
+          if (lineItems.length > 0) {
+            // Split each line item across all owner's horses
+            for (let idx = 0; idx < lineItems.length; idx++) {
+              const li = lineItems[idx] as Record<string, unknown>;
+              const liAmount = lineItemAmount(li);
+              if (liAmount === 0) continue;
+              const perHorse = round2(liAmount / ownerHorseList.length);
+              for (const horse of ownerHorseList) {
+                items.push({
+                  sourceBillId: bill._id,
+                  horseId: horse.id,
+                  horseName: horse.name,
+                  description: `${String(li.description ?? providerName)} (shared)`,
+                  category: categorySlug ?? (typeof li.category === "string" ? li.category : undefined),
+                  subcategory: typeof li.subcategory === "string" ? li.subcategory : undefined,
+                  amount: perHorse,
+                  sourceLineItemIndex: idx,
+                });
+              }
+            }
+          } else {
+            // Bill has no line items — split total as single charge
+            const total = typeof extracted.invoice_total_usd === "number"
+              ? extracted.invoice_total_usd : 0;
+            if (total === 0) continue;
+            const perHorse = round2(total / ownerHorseList.length);
+            for (const horse of ownerHorseList) {
+              items.push({
+                sourceBillId: bill._id,
+                horseId: horse.id,
+                horseName: horse.name,
+                description: `${providerName || bill.fileName} (shared)`,
+                category: categorySlug,
+                amount: perHorse,
+              });
+            }
+          }
+          ownerItems.set(ownerIdStr, items);
+        }
+      }
+    }
+
     // Create owner invoices
     let invoicesCreated = 0;
     let lineItemsCreated = 0;
