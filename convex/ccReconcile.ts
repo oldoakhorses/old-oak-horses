@@ -639,6 +639,29 @@ export const approveAllAssigned = mutation({
   },
 });
 
+/** Finalize a statement — mark it as fully approved once all transactions are handled */
+export const approveStatement = mutation({
+  args: { statementId: v.id("ccStatements") },
+  handler: async (ctx, args) => {
+    const txns = await ctx.db
+      .query("ccTransactions")
+      .withIndex("by_statement", (q) => q.eq("statementId", args.statementId))
+      .collect();
+
+    // Check all transactions are approved
+    const unapproved = txns.filter((t) => !t.isApproved);
+    if (unapproved.length > 0) {
+      throw new Error(`${unapproved.length} transactions still need approval`);
+    }
+
+    await ctx.db.patch(args.statementId, {
+      status: "approved" as const,
+    });
+
+    return { transactionCount: txns.length };
+  },
+});
+
 /** Delete a statement and all its transactions */
 export const deleteStatement = mutation({
   args: { statementId: v.id("ccStatements") },

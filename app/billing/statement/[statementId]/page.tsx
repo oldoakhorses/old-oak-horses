@@ -130,6 +130,7 @@ export default function StatementReconcilePage() {
   const assignTxn = useMutation(api.ccReconcile.assignTransaction);
   const approveTxn = useMutation(api.ccReconcile.approveTransaction);
   const approveAllAssigned = useMutation(api.ccReconcile.approveAllAssigned);
+  const approveStatement = useMutation(api.ccReconcile.approveStatement);
   const deleteStatement = useMutation(api.ccReconcile.deleteStatement);
 
   const [tab, setTab] = useState<Tab>("all");
@@ -293,6 +294,8 @@ export default function StatementReconcilePage() {
   }
 
   const assignedCount = txns.filter((t) => (t.assignType || t.matchedBillId) && !t.isApproved).length;
+  const allApproved = txns.length > 0 && txns.every((t) => t.isApproved);
+  const isStatementApproved = stmt?.status === "approved";
 
   return (
     <div className="page-shell">
@@ -319,6 +322,13 @@ export default function StatementReconcilePage() {
           </div>
         </div>
 
+        {/* Statement Approved Banner */}
+        {isStatementApproved ? (
+          <div className={styles.statementApprovedBanner}>
+            ✓ Statement approved — all transactions have been categorized and pushed to profiles
+          </div>
+        ) : null}
+
         {/* Actions */}
         <div className={styles.actionsRow}>
           {assignedCount > 0 ? (
@@ -328,6 +338,15 @@ export default function StatementReconcilePage() {
               onClick={() => approveAllAssigned({ statementId })}
             >
               approve all assigned ({assignedCount})
+            </button>
+          ) : null}
+          {allApproved && !isStatementApproved ? (
+            <button
+              type="button"
+              className={styles.btnApproveStatement}
+              onClick={() => approveStatement({ statementId })}
+            >
+              ✓ Approve Statement
             </button>
           ) : null}
           <div style={{ flex: 1 }} />

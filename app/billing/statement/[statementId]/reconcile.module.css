@@ -96,6 +96,32 @@
   cursor: pointer;
 }
 
+.btnApproveStatement {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+}
+.btnApproveStatement:hover {
+  background: #2d2d4e;
+}
+
+.statementApprovedBanner {
+  background: rgba(34, 197, 131, 0.08);
+  border: 1px solid rgba(34, 197, 131, 0.2);
+  border-radius: 10px;
+  padding: 14px 20px;
+  color: #16A34A;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
 .btnDelete {
 
   font-size: 10px;
