@@ -564,7 +564,7 @@ export default function OwnerInvoiceDetailPage() {
         ))}
 
         {/* Notes section */}
-        <div className={styles.notesCard}>
+        <div className={`${styles.notesCard} ${!invoice.notes ? styles.notesCardEmpty : ""}`}>
           <div className={styles.notesHeader}>
             <span className={styles.notesLabel}>Notes</span>
             {!editingNotes ? (

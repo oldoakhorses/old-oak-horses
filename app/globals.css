@@ -202,3 +202,43 @@ select {
     margin-bottom: 20px;
   }
 }
+
+/* ── Global print styles ── */
+@media print {
+  /* Remove browser chrome, headers, footers */
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide nav bar */
+  nav,
+  [class*="nav"],
+  [class*="Nav"] {
+    display: none !important;
+  }
+
+  /* Hide global FAB */
+  [class*="fab"],
+  [class*="Fab"],
+  [class*="FAB"] {
+    display: none !important;
+  }
+
+  /* Hide back links */
+  .ui-back-link {
+    display: none !important;
+  }
+
+  /* Remove page shell padding/margin */
+  .page-shell {
+    min-height: auto !important;
+  }
+
+  .page-main,
+  .page-content {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+}

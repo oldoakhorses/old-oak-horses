@@ -813,12 +813,12 @@
 
 /* Print styles for PDF export */
 @media print {
-  /* Expand all bill groups for print */
-  .lineItemsContainer {
-    display: block !important;
+  @page {
+    margin: 0.6in 0.5in;
+    size: letter;
   }
 
-  /* Hide interactive elements */
+  /* Hide ALL interactive / UI-only elements */
   .actionsRow,
   .addChargeRow,
   .btnNotesEdit,
@@ -827,41 +827,184 @@
   .invoiceLink,
   .expandArrow,
   .btnDeleteItem,
-  .modalOverlay {
+  .modalOverlay,
+  .statusBadge,
+  .headerLabel,
+  .approvedLabel,
+  .allApprovedBadge,
+  .pendingBadge,
+  .billMeta,
+  .horseSub,
+  .titleInput {
     display: none !important;
   }
 
-  /* Clean up page layout */
+  /* Hide notes card entirely when empty */
+  .notesCardEmpty {
+    display: none !important;
+  }
+
+  /* ── Header ── */
   .headerCard {
-    border: none;
-    padding: 0;
-    margin-bottom: 24px;
+    border: none !important;
+    border-radius: 0 !important;
+    border-bottom: 2px solid #1a1a2e !important;
+    padding: 0 0 16px !important;
+    margin-bottom: 20px !important;
   }
 
+  .ownerName,
+  .ownerNameEditable {
+    font-size: 24px !important;
+    margin-bottom: 2px !important;
+    border-bottom: none !important;
+  }
+
+  .headerMeta {
+    font-size: 12px !important;
+    color: #6B7084 !important;
+  }
+
+  .totalLabel {
+    font-size: 9px !important;
+  }
+
+  .totalAmount {
+    font-size: 24px !important;
+  }
+
+  /* ── Horse cards ── */
   .horseCard {
-    break-inside: avoid;
-    border: none;
-    margin-bottom: 12px;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin-bottom: 4px !important;
+    box-shadow: none !important;
   }
 
+  .horseHeader {
+    padding: 10px 0 6px !important;
+    border-bottom: 1px solid #e8eaf0 !important;
+  }
+
+  .horseEmoji {
+    display: none !important;
+  }
+
+  .horseName {
+    font-size: 15px !important;
+  }
+
+  .horseLink {
+    color: #1a1a2e !important;
+    text-decoration: none !important;
+  }
+
+  .horseTotal {
+    font-size: 15px !important;
+  }
+
+  /* ── Bill groups ── */
   .billGroup {
     break-inside: avoid;
+    border: none !important;
   }
 
-  .summaryCard {
-    break-inside: avoid;
-    border: none;
-    padding: 16px 0;
-    border-top: 2px solid #1a1a2e;
+  .billRow {
+    padding: 6px 0 4px 12px !important;
+    border-bottom: none !important;
   }
 
-  .notesCard {
-    break-inside: avoid;
-    border: none;
-    padding: 12px 0;
+  .billNameRow {
+    gap: 6px !important;
+  }
+
+  .billName {
+    font-size: 11px !important;
+    font-weight: 600 !important;
+  }
+
+  .billCatPill {
+    font-size: 7px !important;
+    padding: 1px 5px !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .billNotes {
+    font-size: 9px !important;
+  }
+
+  .billTotal {
+    font-size: 11px !important;
+  }
+
+  /* ── Line items ── */
+  .lineItemsContainer {
+    display: block !important;
   }
 
   .lineItemRow {
-    padding: 4px 0 4px 16px;
+    padding: 3px 0 3px 24px !important;
+    border-bottom: 1px dotted #e8eaf0 !important;
+  }
+
+  .lineItemDesc {
+    font-size: 10px !important;
+    color: #3a3a4e !important;
+  }
+
+  .catPill {
+    font-size: 7px !important;
+    padding: 1px 5px !important;
+    margin-top: 1px !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .lineItemAmount {
+    font-size: 10px !important;
+    font-weight: 600 !important;
+  }
+
+  /* ── Notes card ── */
+  .notesCard {
+    break-inside: avoid;
+    border: none !important;
+    border-radius: 0 !important;
+    border-top: 1px solid #e8eaf0 !important;
+    padding: 10px 0 !important;
+    margin-bottom: 8px !important;
+  }
+
+  .notesLabel {
+    font-size: 10px !important;
+  }
+
+  .notesText {
+    font-size: 11px !important;
+  }
+
+  /* ── Summary card ── */
+  .summaryCard {
+    break-inside: avoid;
+    border: none !important;
+    border-radius: 0 !important;
+    border-top: 2px solid #1a1a2e !important;
+    padding: 12px 0 0 !important;
+    box-shadow: none !important;
+  }
+
+  .summaryRow {
+    font-size: 11px !important;
+    padding: 3px 0 !important;
+  }
+
+  .summaryTotal {
+    font-size: 13px !important;
+  }
+
+  .summaryBold {
+    font-size: 13px !important;
   }
 }
