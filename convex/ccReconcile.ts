@@ -149,6 +149,9 @@ export const uploadStatement = mutation({
       };
     });
 
+    // Load learned rules for auto-suggesting assignments
+    const learnedRules = await ctx.db.query("ccTransactionRules").collect();
+
     let matchedCount = 0;
 
     for (const row of args.csvRows) {
@@ -187,7 +190,25 @@ export const uploadStatement = mutation({
         }
       }
 
-      await ctx.db.insert("ccTransactions", {
+      // If no bill match, try learned rules
+      let ruleMatch: typeof learnedRules[0] | null = null;
+      if (!bestMatch && txnKeywords.length > 0) {
+        let bestScore = 0;
+        for (const rule of learnedRules) {
+          const ruleKeySet = new Set(rule.descriptionKeywords);
+          const overlap = txnKeywords.filter((kw) =>
+            [...ruleKeySet].some((rk) => rk.includes(kw) || kw.includes(rk))
+          ).length;
+          // Require at least half the rule keywords to match, and at least 2 overlapping
+          const matchRatio = overlap / rule.descriptionKeywords.length;
+          if (overlap >= 2 && matchRatio >= 0.5 && overlap > bestScore) {
+            bestScore = overlap;
+            ruleMatch = rule;
+          }
+        }
+      }
+
+      const txnId = await ctx.db.insert("ccTransactions", {
         statementId: stmtId,
         postingDate: row.postingDate,
         description: row.description,
@@ -198,7 +219,33 @@ export const uploadStatement = mutation({
         matchedBillName: bestMatch ? bestMatch.billRef.fileName : undefined,
         matchConfidence: bestMatch ? bestMatch.confidence : "none",
         isApproved: false,
+        // Apply learned rule as pre-populated suggestion
+        ...(ruleMatch && !bestMatch ? {
+          assignType: ruleMatch.assignType as any,
+          assignedHorses: ruleMatch.assignType === "horse" && ruleMatch.assignedHorses
+            ? ruleMatch.assignedHorses.map((h: any) => ({
+                horseId: h.horseId,
+                horseName: h.horseName,
+                amount: round2(absAmount / ruleMatch!.assignedHorses!.length),
+              }))
+            : undefined,
+          assignedPeople: ruleMatch.assignType === "person" && ruleMatch.assignedPeople
+            ? ruleMatch.assignedPeople.map((p: any) => ({
+                personId: p.personId,
+                personName: p.personName,
+                role: p.role,
+                amount: round2(absAmount / ruleMatch!.assignedPeople!.length),
+              }))
+            : undefined,
+          category: ruleMatch.category,
+          subcategory: ruleMatch.subcategory,
+        } : {}),
       });
+
+      // Increment rule usage count
+      if (ruleMatch && !bestMatch) {
+        await ctx.db.patch(ruleMatch._id, { timesApplied: ruleMatch.timesApplied + 1 });
+      }
 
       if (bestMatch) matchedCount++;
     }
@@ -297,6 +344,9 @@ export const assignTransaction = mutation({
     subcategory: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const txn = await ctx.db.get(args.transactionId);
+    if (!txn) throw new Error("Transaction not found");
+
     await ctx.db.patch(args.transactionId, {
       assignType: args.assignType,
       assignedHorses: args.assignedHorses,
@@ -304,8 +354,62 @@ export const assignTransaction = mutation({
       category: args.category,
       subcategory: args.subcategory,
     });
+
+    // Save/update a learned rule from this manual assignment
+    if (args.assignType !== "ignore") {
+      await saveTransactionRule(ctx, txn.description, args);
+    }
   },
 });
+
+/** Save or update a learned rule from a manual transaction assignment */
+async function saveTransactionRule(
+  ctx: any,
+  description: string,
+  assignment: {
+    assignType: "horse" | "person" | "business" | "personal" | "ignore";
+    assignedHorses?: { horseId: Id<"horses">; horseName: string; amount: number }[];
+    assignedPeople?: { personId: Id<"people">; personName: string; role?: string; amount: number }[];
+    category?: string;
+    subcategory?: string;
+  }
+) {
+  const keywords = extractKeywords(description);
+  if (keywords.length === 0) return;
+
+  // Check for existing rule with same keywords (exact set match)
+  const allRules = await ctx.db.query("ccTransactionRules").collect();
+  const keySet = new Set(keywords);
+  const existing = allRules.find((r: any) => {
+    if (r.descriptionKeywords.length !== keywords.length) return false;
+    return r.descriptionKeywords.every((k: string) => keySet.has(k));
+  });
+
+  const ruleData = {
+    descriptionKeywords: keywords,
+    originalDescription: description,
+    assignType: assignment.assignType,
+    assignedHorses: assignment.assignType === "horse" && assignment.assignedHorses
+      ? assignment.assignedHorses.map((h) => ({ horseId: h.horseId, horseName: h.horseName }))
+      : undefined,
+    assignedPeople: assignment.assignType === "person" && assignment.assignedPeople
+      ? assignment.assignedPeople.map((p) => ({ personId: p.personId, personName: p.personName, role: p.role }))
+      : undefined,
+    category: assignment.category,
+    subcategory: assignment.subcategory,
+    updatedAt: Date.now(),
+  };
+
+  if (existing) {
+    await ctx.db.patch(existing._id, ruleData);
+  } else {
+    await ctx.db.insert("ccTransactionRules", {
+      ...ruleData,
+      timesApplied: 0,
+      createdAt: Date.now(),
+    });
+  }
+}
 
 /** Create a bill from a CC transaction that has no matched invoice */
 async function createBillFromTransaction(

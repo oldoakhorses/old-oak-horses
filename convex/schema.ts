@@ -523,6 +523,30 @@ export default defineSchema({
     .index("by_statement", ["statementId"])
     .index("by_matched_bill", ["matchedBillId"]),
 
+  ccTransactionRules: defineTable({
+    /** Normalized keywords extracted from the transaction description */
+    descriptionKeywords: v.array(v.string()),
+    /** Original description that created the rule (for display) */
+    originalDescription: v.string(),
+    /** Assignment details to auto-suggest */
+    assignType: v.union(v.literal("horse"), v.literal("person"), v.literal("business"), v.literal("personal"), v.literal("ignore")),
+    assignedHorses: v.optional(v.array(v.object({
+      horseId: v.id("horses"),
+      horseName: v.string(),
+    }))),
+    assignedPeople: v.optional(v.array(v.object({
+      personId: v.id("people"),
+      personName: v.string(),
+      role: v.optional(v.string()),
+    }))),
+    category: v.optional(v.string()),
+    subcategory: v.optional(v.string()),
+    /** How many times this rule has been applied */
+    timesApplied: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }),
+
   feedPlanHistory: defineTable({
     horseId: v.id("horses"),
     feedPlanId: v.id("feedPlans"),

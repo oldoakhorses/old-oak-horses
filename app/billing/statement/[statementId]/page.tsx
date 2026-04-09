@@ -383,11 +383,11 @@ export default function StatementReconcilePage() {
                         <span className={styles.matchBadge} style={{ color: conf.color, background: conf.bg }}>
                           {conf.label}: {txn.matchedBillName}
                         </span>
-                      ) : isDebit ? (
+                      ) : (
                         <span className={styles.matchBadge} style={{ color: conf.color, background: conf.bg }}>
                           NO MATCH
                         </span>
-                      ) : null}
+                      )}
                       {txn.assignType ? (
                         <span className={styles.assignBadge} style={{ color: ASSIGN_COLORS[txn.assignType] }}>
                           {txn.assignType === "horse"
@@ -405,7 +405,7 @@ export default function StatementReconcilePage() {
                   <div className={isDebit ? styles.txnDebit : styles.txnCredit}>
                     {fmtUSD(txn.amount)}
                   </div>
-                  {isDebit && (txn.assignType || txn.matchedBillId) && !txn.isApproved ? (
+                  {(txn.assignType || txn.matchedBillId) && !txn.isApproved ? (
                     <button
                       type="button"
                       className={styles.inlineApproveBtn}
@@ -422,52 +422,48 @@ export default function StatementReconcilePage() {
                     <div className={styles.txnFullDesc}>{txn.description}</div>
                     <div className={styles.txnActions}>
                       {isDebit ? (
-                        <>
-                          <button
-                            type="button"
-                            className={styles.btnAction}
-                            onClick={(e) => { e.stopPropagation(); setMatchModal(String(txn._id)); setBillSearch(""); }}
-                          >
-                            {txn.matchedBillId ? "change match" : "match to invoice"}
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.btnAction}
-                            onClick={(e) => { e.stopPropagation(); openAssignModal(String(txn._id), txn.amount); }}
-                          >
-                            {txn.assignType ? "change assignment" : "assign"}
-                          </button>
-                          {(txn.assignType || txn.matchedBillId) && !txn.isApproved ? (
-                            <button
-                              type="button"
-                              className={styles.btnApprove}
-                              onClick={(e) => { e.stopPropagation(); approveTxn({ transactionId: txn._id, approved: true }); }}
-                            >
-                              approve
-                            </button>
-                          ) : null}
-                          {txn.isApproved ? (
-                            <button
-                              type="button"
-                              className={styles.btnUnapprove}
-                              onClick={(e) => { e.stopPropagation(); approveTxn({ transactionId: txn._id, approved: false }); }}
-                            >
-                              unapprove
-                            </button>
-                          ) : null}
-                          {txn.matchedBillId || txn.generatedBillId ? (
-                            <Link
-                              href={`/invoices/preview/${txn.matchedBillId ?? txn.generatedBillId}`}
-                              className={styles.btnViewInvoice}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              view invoice
-                            </Link>
-                          ) : null}
-                        </>
-                      ) : (
-                        <span className={styles.creditLabel}>credit / refund</span>
-                      )}
+                        <button
+                          type="button"
+                          className={styles.btnAction}
+                          onClick={(e) => { e.stopPropagation(); setMatchModal(String(txn._id)); setBillSearch(""); }}
+                        >
+                          {txn.matchedBillId ? "change match" : "match to invoice"}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className={styles.btnAction}
+                        onClick={(e) => { e.stopPropagation(); openAssignModal(String(txn._id), txn.amount); }}
+                      >
+                        {txn.assignType ? "change assignment" : "assign"}
+                      </button>
+                      {(txn.assignType || txn.matchedBillId) && !txn.isApproved ? (
+                        <button
+                          type="button"
+                          className={styles.btnApprove}
+                          onClick={(e) => { e.stopPropagation(); approveTxn({ transactionId: txn._id, approved: true }); }}
+                        >
+                          approve
+                        </button>
+                      ) : null}
+                      {txn.isApproved ? (
+                        <button
+                          type="button"
+                          className={styles.btnUnapprove}
+                          onClick={(e) => { e.stopPropagation(); approveTxn({ transactionId: txn._id, approved: false }); }}
+                        >
+                          unapprove
+                        </button>
+                      ) : null}
+                      {txn.matchedBillId || txn.generatedBillId ? (
+                        <Link
+                          href={`/invoices/preview/${txn.matchedBillId ?? txn.generatedBillId}`}
+                          className={styles.btnViewInvoice}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          view invoice
+                        </Link>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}
