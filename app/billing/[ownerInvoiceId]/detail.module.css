@@ -490,6 +490,26 @@
 }
 .btnDeleteItem:hover { background: rgba(239, 68, 68, 0.15); }
 
+.lineItemDescEditable {
+  cursor: text;
+  border-bottom: 1px dashed #d1d5db;
+  padding-bottom: 1px;
+}
+.lineItemDescEditable:hover {
+  border-bottom-color: #4A5BDB;
+}
+
+.lineItemDescInput {
+  font-size: 12px;
+  color: #1a1a2e;
+  border: 1px solid #4A5BDB;
+  border-radius: 4px;
+  padding: 2px 6px;
+  width: 100%;
+  outline: none;
+  background: #fff;
+}
+
 /* Add charge */
 .addChargeRow {
   display: flex;
@@ -510,6 +530,88 @@
 .btnAddCharge:hover {
   border-color: #4A5BDB;
   background: rgba(74, 91, 219, 0.04);
+}
+
+/* Export button */
+.btnExport {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #e8eaf0;
+  background: #fff;
+  color: #1a1a2e;
+  cursor: pointer;
+}
+.btnExport:hover { background: #f8f9fa; }
+
+/* Notes section */
+.notesCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+.notesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.notesLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.btnNotesEdit {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #e8eaf0;
+  background: #fff;
+  color: #6B7084;
+  cursor: pointer;
+}
+
+.notesText {
+  font-size: 13px;
+  color: #3a3a4e;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.notesEmpty {
+  font-size: 13px;
+  color: #9ea2b0;
+  font-style: italic;
+}
+
+.notesEditArea {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notesTextarea {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 13px;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  resize: vertical;
+  font-family: inherit;
+  color: #1a1a2e;
+  line-height: 1.5;
+}
+
+.notesEditActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 /* Modals */
@@ -684,5 +786,60 @@
   }
   .totalAmount {
     font-size: 22px;
+  }
+}
+
+/* Print styles for PDF export */
+@media print {
+  /* Expand all bill groups for print */
+  .lineItemsContainer {
+    display: block !important;
+  }
+
+  /* Hide interactive elements */
+  .actionsRow,
+  .addChargeRow,
+  .btnNotesEdit,
+  .notesEditArea,
+  .checkbox,
+  .invoiceLink,
+  .expandArrow,
+  .btnDeleteItem,
+  .modalOverlay {
+    display: none !important;
+  }
+
+  /* Clean up page layout */
+  .headerCard {
+    border: none;
+    padding: 0;
+    margin-bottom: 24px;
+  }
+
+  .horseCard {
+    break-inside: avoid;
+    border: none;
+    margin-bottom: 12px;
+  }
+
+  .billGroup {
+    break-inside: avoid;
+  }
+
+  .summaryCard {
+    break-inside: avoid;
+    border: none;
+    padding: 16px 0;
+    border-top: 2px solid #1a1a2e;
+  }
+
+  .notesCard {
+    break-inside: avoid;
+    border: none;
+    padding: 12px 0;
+  }
+
+  .lineItemRow {
+    padding: 4px 0 4px 16px;
   }
 }

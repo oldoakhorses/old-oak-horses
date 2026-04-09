@@ -548,6 +548,32 @@ export const deleteOwnerInvoice = mutation({
   },
 });
 
+/** Update a line item's description (does NOT affect the source bill) */
+export const updateLineItemDescription = mutation({
+  args: {
+    lineItemId: v.id("ownerInvoiceLineItems"),
+    description: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const item = await ctx.db.get(args.lineItemId);
+    if (!item) throw new Error("Line item not found");
+    const invoice = await ctx.db.get(item.ownerInvoiceId);
+    if (invoice && invoice.status !== "draft") throw new Error("Can only edit items on draft invoices");
+    await ctx.db.patch(args.lineItemId, { description: args.description.trim() });
+  },
+});
+
+/** Update notes on an owner invoice */
+export const updateOwnerInvoiceNotes = mutation({
+  args: {
+    ownerInvoiceId: v.id("ownerInvoices"),
+    notes: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.ownerInvoiceId, { notes: args.notes.trim() || undefined });
+  },
+});
+
 /** Add a manual line item to an owner invoice */
 export const addManualLineItem = mutation({
   args: {

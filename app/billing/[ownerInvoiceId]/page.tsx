@@ -87,6 +87,8 @@ export default function OwnerInvoiceDetailPage() {
   const addManualItem = useMutation(api.billing.addManualLineItem);
   const addBillCharges = useMutation(api.billing.addBillCharges);
   const deleteLineItem = useMutation(api.billing.deleteLineItem);
+  const updateNotes = useMutation(api.billing.updateOwnerInvoiceNotes);
+  const updateLineItemDesc = useMutation(api.billing.updateLineItemDescription);
 
   // Track which bill groups are expanded: key = "horseId:billId"
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -94,6 +96,10 @@ export default function OwnerInvoiceDetailPage() {
   const [showAddModal, setShowAddModal] = useState<"charges" | "manual" | null>(null);
   const [manualForm, setManualForm] = useState({ description: "", amount: "", category: "", horseId: "" });
   const [addingCharge, setAddingCharge] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesValue, setNotesValue] = useState("");
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingItemDesc, setEditingItemDesc] = useState("");
 
   function toggleExpand(key: string) {
     setExpanded((prev) => {
@@ -204,6 +210,23 @@ export default function OwnerInvoiceDetailPage() {
               {isEditing ? "done editing" : "edit invoice"}
             </button>
           ) : null}
+          <button
+            type="button"
+            className={styles.btnExport}
+            onClick={() => {
+              // Expand all bill groups before printing
+              const allKeys = new Set<string>();
+              for (const hg of invoice.byHorse) {
+                for (const bg of hg.bills) {
+                  allKeys.add(`${hg.horseId ?? "gen"}:${bg.billId}`);
+                }
+              }
+              setExpanded(allKeys);
+              setTimeout(() => window.print(), 100);
+            }}
+          >
+            export PDF
+          </button>
           <div style={{ flex: 1 }} />
           <button
             type="button"
@@ -446,7 +469,36 @@ export default function OwnerInvoiceDetailPage() {
                             {item.isApproved ? "✓" : ""}
                           </button>
                           <div className={styles.lineItemInfo}>
-                            <div className={styles.lineItemDesc}>{item.description}</div>
+                            {isEditing && editingItemId === String(item._id) ? (
+                              <input
+                                className={styles.lineItemDescInput}
+                                value={editingItemDesc}
+                                onChange={(e) => setEditingItemDesc(e.target.value)}
+                                onBlur={async () => {
+                                  if (editingItemDesc.trim() && editingItemDesc !== item.description) {
+                                    await updateLineItemDesc({ lineItemId: item._id, description: editingItemDesc });
+                                  }
+                                  setEditingItemId(null);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                                  if (e.key === "Escape") setEditingItemId(null);
+                                }}
+                                autoFocus
+                              />
+                            ) : (
+                              <div
+                                className={`${styles.lineItemDesc} ${isEditing ? styles.lineItemDescEditable : ""}`}
+                                onClick={() => {
+                                  if (isEditing) {
+                                    setEditingItemId(String(item._id));
+                                    setEditingItemDesc(item.description);
+                                  }
+                                }}
+                              >
+                                {item.description}
+                              </div>
+                            )}
                             {item.category ? (
                               <span
                                 className={styles.catPill}
@@ -478,6 +530,51 @@ export default function OwnerInvoiceDetailPage() {
             })}
           </div>
         ))}
+
+        {/* Notes section */}
+        <div className={styles.notesCard}>
+          <div className={styles.notesHeader}>
+            <span className={styles.notesLabel}>Notes</span>
+            {!editingNotes ? (
+              <button
+                type="button"
+                className={styles.btnNotesEdit}
+                onClick={() => { setEditingNotes(true); setNotesValue(invoice.notes ?? ""); }}
+              >
+                {invoice.notes ? "edit" : "+ add notes"}
+              </button>
+            ) : null}
+          </div>
+          {editingNotes ? (
+            <div className={styles.notesEditArea}>
+              <textarea
+                className={styles.notesTextarea}
+                value={notesValue}
+                onChange={(e) => setNotesValue(e.target.value)}
+                rows={4}
+                placeholder="Add notes to this invoice..."
+                autoFocus
+              />
+              <div className={styles.notesEditActions}>
+                <button type="button" className={styles.btnCancel} onClick={() => setEditingNotes(false)}>cancel</button>
+                <button
+                  type="button"
+                  className={styles.btnSave}
+                  onClick={async () => {
+                    await updateNotes({ ownerInvoiceId, notes: notesValue });
+                    setEditingNotes(false);
+                  }}
+                >
+                  save
+                </button>
+              </div>
+            </div>
+          ) : invoice.notes ? (
+            <div className={styles.notesText}>{invoice.notes}</div>
+          ) : (
+            <div className={styles.notesEmpty}>no notes</div>
+          )}
+        </div>
 
         {/* Summary footer */}
         <div className={styles.summaryCard}>
