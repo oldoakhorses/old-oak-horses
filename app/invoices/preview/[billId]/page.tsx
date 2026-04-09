@@ -399,7 +399,7 @@ export default function InvoicePreviewPage() {
 
     setLineStates(nextLineStates);
     setMode("line");
-    setWholeSplitType((bill as any).splitMode === "custom" ? "custom" : "even");
+    setWholeSplitType("even"); // will be overridden below if horses/people have custom amounts
     setWholeAssignMode("split");
     setNotes(String(bill.notes ?? ""));
 
@@ -409,8 +409,16 @@ export default function InvoicePreviewPage() {
       setWholeAmounts(
         Object.fromEntries(bill.assignedHorses.map((entry) => [String(entry.horseId), String(entry.amount)]))
       );
+      // Restore split type: explicit field, or infer from amounts
       if ((bill as any).splitMode === "custom") {
         setWholeSplitType("custom");
+      } else if ((bill as any).splitMode === "even") {
+        setWholeSplitType("even");
+      } else if (bill.assignedHorses.length > 1) {
+        // Infer: if all amounts are equal → even, otherwise custom
+        const amounts = bill.assignedHorses.map((h) => Math.round(h.amount * 100));
+        const allSame = amounts.every((a) => a === amounts[0]);
+        setWholeSplitType(allSame ? "even" : "custom");
       }
     } else if (requiresPerson && bill.assignedPeople?.length) {
       setMode("whole");
@@ -418,6 +426,16 @@ export default function InvoicePreviewPage() {
       setWholeAmounts(
         Object.fromEntries(bill.assignedPeople.map((entry) => [String(entry.personId), String(entry.amount)]))
       );
+      // Restore split type for people too
+      if ((bill as any).splitMode === "custom") {
+        setWholeSplitType("custom");
+      } else if ((bill as any).splitMode === "even") {
+        setWholeSplitType("even");
+      } else if (bill.assignedPeople.length > 1) {
+        const amounts = bill.assignedPeople.map((p) => Math.round(p.amount * 100));
+        const allSame = amounts.every((a) => a === amounts[0]);
+        setWholeSplitType(allSame ? "even" : "custom");
+      }
     } else {
       setWholeAssignedIds([]);
       setWholeAmounts({});
