@@ -28,11 +28,33 @@
 }
 
 .ownerName {
-
   font-size: 28px;
   font-weight: 700;
   color: #1a1a2e;
   margin: 0 0 8px;
+}
+
+.ownerNameEditable {
+  cursor: text;
+  border-bottom: 2px dashed transparent;
+  transition: border-color 0.15s;
+}
+.ownerNameEditable:hover {
+  border-bottom-color: #d1d5db;
+}
+
+.titleInput {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 8px;
+  border: none;
+  border-bottom: 2px solid #4A5BDB;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  padding: 0;
+  font-family: inherit;
 }
 
 .headerMeta {

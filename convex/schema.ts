@@ -437,6 +437,7 @@ export default defineSchema({
 
   ownerInvoices: defineTable({
     ownerId: v.id("owners"),
+    title: v.optional(v.string()),
     billingPeriod: v.string(), // "2026-03"
     status: v.union(v.literal("draft"), v.literal("finalized"), v.literal("sent"), v.literal("paid")),
     totalAmount: v.number(),

@@ -548,6 +548,17 @@ export const deleteOwnerInvoice = mutation({
   },
 });
 
+/** Update the title of an owner invoice */
+export const updateOwnerInvoiceTitle = mutation({
+  args: {
+    ownerInvoiceId: v.id("ownerInvoices"),
+    title: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.ownerInvoiceId, { title: args.title.trim() || undefined });
+  },
+});
+
 /** Update a line item's description (does NOT affect the source bill) */
 export const updateLineItemDescription = mutation({
   args: {

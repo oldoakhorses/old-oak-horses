@@ -88,6 +88,7 @@ export default function OwnerInvoiceDetailPage() {
   const addBillCharges = useMutation(api.billing.addBillCharges);
   const deleteLineItem = useMutation(api.billing.deleteLineItem);
   const updateNotes = useMutation(api.billing.updateOwnerInvoiceNotes);
+  const updateTitle = useMutation(api.billing.updateOwnerInvoiceTitle);
   const updateLineItemDesc = useMutation(api.billing.updateLineItemDescription);
 
   // Track which bill groups are expanded: key = "horseId:billId"
@@ -100,6 +101,8 @@ export default function OwnerInvoiceDetailPage() {
   const [notesValue, setNotesValue] = useState("");
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingItemDesc, setEditingItemDesc] = useState("");
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleValue, setTitleValue] = useState("");
 
   function toggleExpand(key: string) {
     setExpanded((prev) => {
@@ -143,7 +146,36 @@ export default function OwnerInvoiceDetailPage() {
         <div className={styles.headerCard}>
           <div className={styles.headerLeft}>
             <div className={styles.headerLabel}>// OWNER INVOICE</div>
-            <h1 className={styles.ownerName}>{invoice.ownerName}</h1>
+            {editingTitle ? (
+              <input
+                className={styles.titleInput}
+                value={titleValue}
+                onChange={(e) => setTitleValue(e.target.value)}
+                onBlur={async () => {
+                  if (titleValue.trim() !== (invoice.title ?? invoice.ownerName)) {
+                    await updateTitle({ ownerInvoiceId, title: titleValue });
+                  }
+                  setEditingTitle(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                  if (e.key === "Escape") setEditingTitle(false);
+                }}
+                autoFocus
+              />
+            ) : (
+              <h1
+                className={`${styles.ownerName} ${invoice.status === "draft" ? styles.ownerNameEditable : ""}`}
+                onClick={() => {
+                  if (invoice.status === "draft") {
+                    setEditingTitle(true);
+                    setTitleValue(invoice.title ?? invoice.ownerName);
+                  }
+                }}
+              >
+                {invoice.title || invoice.ownerName}
+              </h1>
+            )}
             <div className={styles.headerMeta}>
               <span>{fmtPeriod(invoice.billingPeriod)}</span>
               <span>&middot;</span>
