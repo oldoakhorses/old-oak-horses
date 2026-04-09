@@ -199,6 +199,30 @@ export default function ContactDetailPage() {
               <span className={styles.label}>ACCOUNT #</span>
               <input className={styles.editInput} value={editForm.accountNumber} onChange={(e) => setEditForm((p) => ({ ...p, accountNumber: e.target.value }))} />
             </div>
+            <div className={styles.editField}>
+              <span className={styles.label}>CATEGORY</span>
+              <select className={styles.editInput} value={editForm.category} onChange={(e) => setEditForm((p) => ({ ...p, category: e.target.value }))}>
+                <option value="">— select category —</option>
+                <option value="veterinary">Veterinary</option>
+                <option value="farrier">Farrier</option>
+                <option value="stabling">Stabling</option>
+                <option value="feed-bedding">Feed & Bedding</option>
+                <option value="horse-transport">Horse Transport</option>
+                <option value="bodywork">Bodywork</option>
+                <option value="supplies">Supplies</option>
+                <option value="travel">Travel</option>
+                <option value="admin">Admin</option>
+                <option value="dues-registrations">Dues & Registrations</option>
+                <option value="marketing">Marketing</option>
+                <option value="show-expenses">Show Expenses</option>
+                <option value="grooming">Grooming</option>
+                <option value="riding-training">Riding & Training</option>
+                <option value="commissions">Commissions</option>
+                <option value="prize-money">Prize Money</option>
+                <option value="income">Income</option>
+                <option value="equity">Equity</option>
+              </select>
+            </div>
             <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, marginTop: 8 }}>
               <button type="button" className={styles.cancelBtn} onClick={() => setEditing(false)}>cancel</button>
               <button type="button" className={styles.saveBtn} disabled={saving} onClick={() => void handleSave()}>
