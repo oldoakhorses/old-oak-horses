@@ -399,7 +399,7 @@ export default function InvoicePreviewPage() {
 
     setLineStates(nextLineStates);
     setMode("line");
-    setWholeSplitType("even");
+    setWholeSplitType((bill as any).splitMode === "custom" ? "custom" : "even");
     setWholeAssignMode("split");
     setNotes(String(bill.notes ?? ""));
 
@@ -409,6 +409,9 @@ export default function InvoicePreviewPage() {
       setWholeAmounts(
         Object.fromEntries(bill.assignedHorses.map((entry) => [String(entry.horseId), String(entry.amount)]))
       );
+      if ((bill as any).splitMode === "custom") {
+        setWholeSplitType("custom");
+      }
     } else if (requiresPerson && bill.assignedPeople?.length) {
       setMode("whole");
       setWholeAssignedIds(bill.assignedPeople.map((entry) => String(entry.personId)));

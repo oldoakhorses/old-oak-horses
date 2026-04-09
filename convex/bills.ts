@@ -2405,6 +2405,7 @@ export const approveBill = mutation({
     const patch: Record<string, unknown> = {
       assignMode: args.assignMode,
       assignType: args.assignType,
+      splitMode: args.splitMode,
       providerConfirmed: true
     };
     if (args.notes !== undefined) {

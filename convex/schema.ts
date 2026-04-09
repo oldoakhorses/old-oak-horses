@@ -71,6 +71,7 @@ export default defineSchema({
     notes: v.optional(v.string()),
     assignType: v.optional(v.union(v.literal("horse"), v.literal("person"))),
     assignMode: v.optional(v.union(v.literal("line"), v.literal("whole"))),
+    splitMode: v.optional(v.union(v.literal("even"), v.literal("custom"))),
     providerDetected: v.optional(v.boolean()),
     providerConfirmed: v.optional(v.boolean()),
     status: v.union(
