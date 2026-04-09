@@ -449,6 +449,47 @@
   color: #1a1a2e;
 }
 
+/* Edit button */
+.btnEdit {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #e8eaf0;
+  background: #fff;
+  color: #4A5BDB;
+  cursor: pointer;
+}
+.btnEdit:hover { background: rgba(74, 91, 219, 0.04); }
+
+.btnEditActive {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #4A5BDB;
+  background: #4A5BDB;
+  color: #fff;
+  cursor: pointer;
+}
+
+.btnDeleteItem {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(239, 68, 68, 0.08);
+  color: #EF4444;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btnDeleteItem:hover { background: rgba(239, 68, 68, 0.15); }
+
 /* Add charge */
 .addChargeRow {
   display: flex;

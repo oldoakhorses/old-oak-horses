@@ -90,6 +90,7 @@ export default function OwnerInvoiceDetailPage() {
 
   // Track which bill groups are expanded: key = "horseId:billId"
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [isEditing, setIsEditing] = useState(false);
   const [showAddModal, setShowAddModal] = useState<"charges" | "manual" | null>(null);
   const [manualForm, setManualForm] = useState({ description: "", amount: "", category: "", horseId: "" });
   const [addingCharge, setAddingCharge] = useState(false);
@@ -194,6 +195,15 @@ export default function OwnerInvoiceDetailPage() {
               mark as paid
             </button>
           ) : null}
+          {invoice.status === "draft" ? (
+            <button
+              type="button"
+              className={isEditing ? styles.btnEditActive : styles.btnEdit}
+              onClick={() => setIsEditing(!isEditing)}
+            >
+              {isEditing ? "done editing" : "edit invoice"}
+            </button>
+          ) : null}
           <div style={{ flex: 1 }} />
           <button
             type="button"
@@ -209,8 +219,8 @@ export default function OwnerInvoiceDetailPage() {
           </button>
         </div>
 
-        {/* Add charge buttons (only in draft) */}
-        {invoice.status === "draft" ? (
+        {/* Add charge buttons (only when editing) */}
+        {isEditing ? (
           <div className={styles.addChargeRow}>
             <button type="button" className={styles.btnAddCharge} onClick={() => setShowAddModal("charges")}>
               + add from horse profile
@@ -449,6 +459,16 @@ export default function OwnerInvoiceDetailPage() {
                             ) : null}
                           </div>
                           <div className={styles.lineItemAmount}>{fmtUSD(item.amount)}</div>
+                          {isEditing ? (
+                            <button
+                              type="button"
+                              className={styles.btnDeleteItem}
+                              onClick={() => deleteLineItem({ lineItemId: item._id })}
+                              title="Remove from invoice"
+                            >
+                              ×
+                            </button>
+                          ) : null}
                         </div>
                       ))}
                     </div>
