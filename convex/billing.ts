@@ -547,3 +547,232 @@ export const deleteOwnerInvoice = mutation({
     await ctx.db.delete(args.ownerInvoiceId);
   },
 });
+
+/** Add a manual line item to an owner invoice */
+export const addManualLineItem = mutation({
+  args: {
+    ownerInvoiceId: v.id("ownerInvoices"),
+    horseId: v.optional(v.id("horses")),
+    horseName: v.optional(v.string()),
+    description: v.string(),
+    amount: v.number(),
+    category: v.optional(v.string()),
+    subcategory: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.ownerInvoiceId);
+    if (!invoice) throw new Error("Invoice not found");
+    if (invoice.status !== "draft") throw new Error("Can only add items to draft invoices");
+
+    // Create a placeholder bill for the manual charge
+    const billId = await ctx.db.insert("bills", {
+      fileName: args.description,
+      invoiceName: args.description,
+      status: "done" as const,
+      isApproved: true,
+      approvedAt: Date.now(),
+      uploadedAt: Date.now(),
+      billingPeriod: invoice.billingPeriod,
+      source: "cc_transaction" as const,
+      extractedData: {
+        invoice_total_usd: args.amount,
+        provider_name: args.description,
+        line_items: [{ description: args.description, amount: args.amount, confirmed: true }],
+      },
+      ...(args.horseId ? {
+        assignType: "horse" as const,
+        assignedHorses: [{
+          horseId: args.horseId,
+          horseName: args.horseName ?? "",
+          amount: args.amount,
+          direct: args.amount,
+          shared: 0,
+        }],
+      } : {}),
+    });
+
+    const itemId = await ctx.db.insert("ownerInvoiceLineItems", {
+      ownerInvoiceId: args.ownerInvoiceId,
+      sourceBillId: billId,
+      horseId: args.horseId,
+      horseName: args.horseName,
+      description: args.description,
+      amount: args.amount,
+      category: args.category,
+      subcategory: args.subcategory,
+      isApproved: false,
+      createdAt: Date.now(),
+    });
+
+    // Update invoice totals
+    await recalcInvoiceTotals(ctx, args.ownerInvoiceId);
+    return itemId;
+  },
+});
+
+/** Get approved bills assigned to horses owned by this invoice's owner, not yet on the invoice */
+export const getAvailableCharges = query({
+  args: { ownerInvoiceId: v.id("ownerInvoices") },
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.ownerInvoiceId);
+    if (!invoice) return [];
+
+    const owner = await ctx.db.get(invoice.ownerId);
+    if (!owner) return [];
+
+    // Get horses owned by this owner
+    const horses = await ctx.db.query("horses").collect();
+    const ownerHorseIds = new Set(
+      horses.filter((h) => h.ownerId && String(h.ownerId) === String(invoice.ownerId)).map((h) => String(h._id))
+    );
+
+    // Get existing line items on this invoice to exclude
+    const existingItems = await ctx.db
+      .query("ownerInvoiceLineItems")
+      .withIndex("by_owner_invoice", (q) => q.eq("ownerInvoiceId", args.ownerInvoiceId))
+      .collect();
+    const existingBillIds = new Set(existingItems.map((i) => String(i.sourceBillId)));
+
+    // Find approved bills assigned to these horses, not already on the invoice
+    const bills = await ctx.db.query("bills").collect();
+    const available: Array<{
+      billId: string;
+      fileName: string;
+      providerName: string;
+      invoiceDate: string;
+      amount: number;
+      category: string;
+      horseName: string;
+      horseId: string;
+    }> = [];
+
+    for (const bill of bills) {
+      if (bill.status !== "done" || !bill.isApproved) continue;
+      if (existingBillIds.has(String(bill._id))) continue;
+
+      const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+      const providerName = String(extracted.provider_name ?? extracted.providerName ?? bill.fileName ?? "");
+      const invoiceDate = String(extracted.invoice_date ?? extracted.invoiceDate ?? "");
+      const total = typeof extracted.invoice_total_usd === "number" ? extracted.invoice_total_usd : 0;
+
+      // Check if bill has horses assigned that belong to this owner
+      if (bill.assignedHorses && bill.assignedHorses.length > 0) {
+        for (const h of bill.assignedHorses) {
+          if (ownerHorseIds.has(String(h.horseId))) {
+            let categorySlug = "";
+            if (bill.categoryId) {
+              const cat = await ctx.db.get(bill.categoryId);
+              if (cat) categorySlug = (cat as any).slug ?? "";
+            }
+            available.push({
+              billId: String(bill._id),
+              fileName: bill.fileName,
+              providerName,
+              invoiceDate,
+              amount: h.amount,
+              category: categorySlug,
+              horseName: h.horseName,
+              horseId: String(h.horseId),
+            });
+          }
+        }
+      }
+    }
+
+    return available.sort((a, b) => b.invoiceDate.localeCompare(a.invoiceDate));
+  },
+});
+
+/** Add charges from an existing bill to the owner invoice */
+export const addBillCharges = mutation({
+  args: {
+    ownerInvoiceId: v.id("ownerInvoices"),
+    billId: v.id("bills"),
+    horseId: v.id("horses"),
+    horseName: v.string(),
+    amount: v.number(),
+    category: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.ownerInvoiceId);
+    if (!invoice) throw new Error("Invoice not found");
+    if (invoice.status !== "draft") throw new Error("Can only add items to draft invoices");
+
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+
+    const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+    const lineItems = Array.isArray(extracted.line_items) ? extracted.line_items : [];
+    const providerName = String(extracted.provider_name ?? extracted.providerName ?? bill.fileName ?? "");
+
+    if (lineItems.length > 0) {
+      // Add each line item from the bill
+      const totalBillAmount = typeof extracted.invoice_total_usd === "number" ? extracted.invoice_total_usd : 0;
+      for (let i = 0; i < lineItems.length; i++) {
+        const li = lineItems[i] as Record<string, unknown>;
+        const liAmount = typeof li.amount === "number" ? li.amount
+          : typeof li.total_usd === "number" ? li.total_usd
+          : typeof li.total === "number" ? li.total : 0;
+        // Scale amount proportionally if horse gets partial
+        const scale = totalBillAmount > 0 ? args.amount / totalBillAmount : 1;
+        await ctx.db.insert("ownerInvoiceLineItems", {
+          ownerInvoiceId: args.ownerInvoiceId,
+          sourceBillId: args.billId,
+          horseId: args.horseId,
+          horseName: args.horseName,
+          description: String(li.description ?? providerName),
+          amount: round2(liAmount * scale),
+          category: args.category ?? String(li.category ?? ""),
+          sourceLineItemIndex: i,
+          isApproved: false,
+          createdAt: Date.now(),
+        });
+      }
+    } else {
+      // Bill has no parsed line items — add as single item
+      await ctx.db.insert("ownerInvoiceLineItems", {
+        ownerInvoiceId: args.ownerInvoiceId,
+        sourceBillId: args.billId,
+        horseId: args.horseId,
+        horseName: args.horseName,
+        description: providerName || bill.fileName,
+        amount: args.amount,
+        category: args.category,
+        isApproved: false,
+        createdAt: Date.now(),
+      });
+    }
+
+    await recalcInvoiceTotals(ctx, args.ownerInvoiceId);
+  },
+});
+
+/** Delete a single line item from an owner invoice */
+export const deleteLineItem = mutation({
+  args: { lineItemId: v.id("ownerInvoiceLineItems") },
+  handler: async (ctx, args) => {
+    const item = await ctx.db.get(args.lineItemId);
+    if (!item) throw new Error("Line item not found");
+    const invoice = await ctx.db.get(item.ownerInvoiceId);
+    if (invoice && invoice.status !== "draft") throw new Error("Can only delete items from draft invoices");
+    await ctx.db.delete(args.lineItemId);
+    if (item.ownerInvoiceId) await recalcInvoiceTotals(ctx, item.ownerInvoiceId);
+  },
+});
+
+/** Recalculate owner invoice totals from line items */
+async function recalcInvoiceTotals(ctx: any, ownerInvoiceId: Id<"ownerInvoices">) {
+  const items = await ctx.db
+    .query("ownerInvoiceLineItems")
+    .withIndex("by_owner_invoice", (q: any) => q.eq("ownerInvoiceId", ownerInvoiceId))
+    .collect();
+  const totalAmount = round2(items.reduce((s: number, i: any) => s + i.amount, 0));
+  const approvedItems = items.filter((i: any) => i.isApproved);
+  const approvedAmount = round2(approvedItems.reduce((s: number, i: any) => s + i.amount, 0));
+  await ctx.db.patch(ownerInvoiceId, {
+    totalAmount,
+    approvedAmount,
+    lineItemCount: items.length,
+    approvedLineItemCount: approvedItems.length,
+  });
+}

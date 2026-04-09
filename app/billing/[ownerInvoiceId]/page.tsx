@@ -78,13 +78,21 @@ export default function OwnerInvoiceDetailPage() {
   const ownerInvoiceId = params.ownerInvoiceId as Id<"ownerInvoices">;
 
   const invoice = useQuery(api.billing.getOwnerInvoice, { ownerInvoiceId });
+  const availableCharges = useQuery(api.billing.getAvailableCharges, { ownerInvoiceId });
+  const horses = useQuery(api.horses.getAllHorses) ?? [];
   const approveItem = useMutation(api.billing.approveLineItem);
   const approveAll = useMutation(api.billing.approveAllLineItems);
   const updateStatus = useMutation(api.billing.updateOwnerInvoiceStatus);
   const deleteInvoice = useMutation(api.billing.deleteOwnerInvoice);
+  const addManualItem = useMutation(api.billing.addManualLineItem);
+  const addBillCharges = useMutation(api.billing.addBillCharges);
+  const deleteLineItem = useMutation(api.billing.deleteLineItem);
 
   // Track which bill groups are expanded: key = "horseId:billId"
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [showAddModal, setShowAddModal] = useState<"charges" | "manual" | null>(null);
+  const [manualForm, setManualForm] = useState({ description: "", amount: "", category: "", horseId: "" });
+  const [addingCharge, setAddingCharge] = useState(false);
 
   function toggleExpand(key: string) {
     setExpanded((prev) => {
@@ -200,6 +208,149 @@ export default function OwnerInvoiceDetailPage() {
             delete
           </button>
         </div>
+
+        {/* Add charge buttons (only in draft) */}
+        {invoice.status === "draft" ? (
+          <div className={styles.addChargeRow}>
+            <button type="button" className={styles.btnAddCharge} onClick={() => setShowAddModal("charges")}>
+              + add from horse profile
+            </button>
+            <button type="button" className={styles.btnAddCharge} onClick={() => setShowAddModal("manual")}>
+              + new line item
+            </button>
+          </div>
+        ) : null}
+
+        {/* Add from horse profile modal */}
+        {showAddModal === "charges" ? (
+          <div className={styles.modalOverlay} onClick={() => setShowAddModal(null)}>
+            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+              <h3 className={styles.modalTitle}>Add charges from horse profile</h3>
+              {!availableCharges?.length ? (
+                <div className={styles.emptyState}>No available charges found</div>
+              ) : (
+                <div className={styles.chargesList}>
+                  {availableCharges.map((charge) => (
+                    <div key={`${charge.billId}-${charge.horseId}`} className={styles.chargeRow}>
+                      <div className={styles.chargeInfo}>
+                        <div className={styles.chargeName}>
+                          {charge.providerName || charge.fileName}
+                        </div>
+                        <div className={styles.chargeMeta}>
+                          🐴 {charge.horseName}
+                          {charge.invoiceDate ? ` · ${fmtDate(charge.invoiceDate)}` : ""}
+                          {charge.category ? (
+                            <span className={styles.chargeCatPill} style={{ background: CATEGORY_COLORS[charge.category] ?? "#9EA2B0" }}>
+                              {prettyCat(charge.category)}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className={styles.chargeAmount}>{fmtUSD(charge.amount)}</div>
+                      <button
+                        type="button"
+                        className={styles.btnAddSmall}
+                        disabled={addingCharge}
+                        onClick={async () => {
+                          setAddingCharge(true);
+                          await addBillCharges({
+                            ownerInvoiceId,
+                            billId: charge.billId as Id<"bills">,
+                            horseId: charge.horseId as Id<"horses">,
+                            horseName: charge.horseName,
+                            amount: charge.amount,
+                            category: charge.category || undefined,
+                          });
+                          setAddingCharge(false);
+                        }}
+                      >
+                        add
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className={styles.modalActions}>
+                <button type="button" className={styles.btnCancel} onClick={() => setShowAddModal(null)}>done</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* New manual line item modal */}
+        {showAddModal === "manual" ? (
+          <div className={styles.modalOverlay} onClick={() => setShowAddModal(null)}>
+            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+              <h3 className={styles.modalTitle}>New line item</h3>
+              <div className={styles.formField}>
+                <label>Description</label>
+                <input
+                  type="text"
+                  value={manualForm.description}
+                  onChange={(e) => setManualForm({ ...manualForm, description: e.target.value })}
+                  placeholder="e.g., Extra stall cleaning"
+                />
+              </div>
+              <div className={styles.formField}>
+                <label>Amount ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={manualForm.amount}
+                  onChange={(e) => setManualForm({ ...manualForm, amount: e.target.value })}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className={styles.formField}>
+                <label>Horse (optional)</label>
+                <select
+                  value={manualForm.horseId}
+                  onChange={(e) => setManualForm({ ...manualForm, horseId: e.target.value })}
+                >
+                  <option value="">— general / no horse —</option>
+                  {horses.filter((h) => h.status === "active").map((h) => (
+                    <option key={h._id} value={h._id}>{h.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className={styles.formField}>
+                <label>Category (optional)</label>
+                <select
+                  value={manualForm.category}
+                  onChange={(e) => setManualForm({ ...manualForm, category: e.target.value })}
+                >
+                  <option value="">— select category —</option>
+                  {Object.keys(CATEGORY_COLORS).filter((k) => !k.includes("_")).map((k) => (
+                    <option key={k} value={k}>{prettyCat(k)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className={styles.modalActions}>
+                <button type="button" className={styles.btnCancel} onClick={() => setShowAddModal(null)}>cancel</button>
+                <button
+                  type="button"
+                  className={styles.btnSave}
+                  disabled={!manualForm.description || !manualForm.amount}
+                  onClick={async () => {
+                    const horse = manualForm.horseId ? horses.find((h) => String(h._id) === manualForm.horseId) : null;
+                    await addManualItem({
+                      ownerInvoiceId,
+                      description: manualForm.description,
+                      amount: Number(manualForm.amount),
+                      horseId: horse ? (horse._id as Id<"horses">) : undefined,
+                      horseName: horse?.name,
+                      category: manualForm.category || undefined,
+                    });
+                    setManualForm({ description: "", amount: "", category: "", horseId: "" });
+                    setShowAddModal(null);
+                  }}
+                >
+                  add line item
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {/* Line items grouped by horse, then by source invoice */}
         {invoice.byHorse.map((horseGroup) => (
