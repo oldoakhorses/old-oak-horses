@@ -1228,7 +1228,7 @@ export default function InvoicePreviewPage() {
             assigneeType: isBusinessGeneral || isWholeBusinessGeneral ? "business_general" : assignType,
             assigneeId: isBusinessGeneral || isWholeBusinessGeneral ? null : (selectedAssignees[0] || ""),
             confidence: state?.autoDetected ? "auto" : "manual",
-            confirmed: isWholeBusinessGeneral ? true : Boolean(state?.confirmed)
+            confirmed: mode === "whole" ? true : Boolean(state?.confirmed)
           };
         })
         .filter((item) => mode === "whole" || item.confirmed);
