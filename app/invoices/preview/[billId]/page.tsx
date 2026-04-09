@@ -158,6 +158,7 @@ const SUBCATEGORY_OPTIONS: Record<string, Array<{ value: string; label: string }
     { value: "flights", label: "Flights" },
     { value: "hotels", label: "Hotels" },
     { value: "rental-car", label: "Rental Car" },
+    { value: "gas", label: "Gas" },
     { value: "meals", label: "Meals" },
     { value: "other", label: "Other" },
   ],
