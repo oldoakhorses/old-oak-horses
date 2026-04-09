@@ -12,6 +12,56 @@ import styles from "./invoices.module.css";
 type SortColumn = "invoice" | "category" | "date" | "amount" | null;
 type SortDirection = "asc" | "desc";
 
+/** Clean up raw CC descriptions and ALL-CAPS names into readable abbreviated titles */
+function abbreviateInvoiceName(name: string, maxLen = 50): string {
+  if (!name) return name;
+  // Remove common CC noise prefixes/suffixes
+  let cleaned = name
+    .replace(/\b(ORIG CO NAME:|ORIG ID:\S+|DESC DATE:\S+|CO ENTRY DESCR?:\S+|SEC:\S+|TRACE#?:\S+|EED:\S+|IND ID:\S+|IND NAME:\S+|TRN:\S+|CCD|PPD)\b/gi, "")
+    .replace(/\b(CHIPS CREDIT VIA:.*?B\/O:\s*)/gi, "")
+    .replace(/\b(C\/O\s+\w+\s+\w+\s+\w+)/gi, "")
+    .replace(/\b(REF:\s*NBNF=\S+)/gi, "")
+    .replace(/\b(US\/AC-\S+|ORG=\/\S+|OGB=\S+|OBI=\/\S+)/gi, "")
+    .replace(/\bSSN:\s*\S+/gi, "")
+    .replace(/\b(UNITED STATES OF AM\s*ERICA|UNITED STATES)\b/gi, "")
+    .replace(/\b(THE\)|THE)\b/gi, "")
+    .replace(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, "") // phone numbers
+    .replace(/\b\d{5,}\b/g, "") // long numeric codes
+    .replace(/\b[A-Z]{2}\s+\d{5}\b/g, "") // state + zip (e.g., "FL 33071")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  // Convert to title case if all caps
+  if (cleaned === cleaned.toUpperCase() && cleaned.length > 3) {
+    cleaned = cleaned
+      .toLowerCase()
+      .split(" ")
+      .filter(Boolean)
+      .map((word) => {
+        // Keep short words like "of", "and", "the" lowercase unless first
+        if (["of", "and", "the", "in", "at", "to", "for", "on", "by", "or"].includes(word)) return word;
+        // Keep common abbreviations uppercase
+        if (["llc", "inc", "usa", "ca", "fl", "ny", "tx"].includes(word)) return word.toUpperCase();
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      })
+      .join(" ");
+    // Capitalize first word always
+    if (cleaned.length > 0) {
+      cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    }
+  }
+
+  // Remove trailing location codes like "FL 03/25" or "CA 03/02"
+  cleaned = cleaned.replace(/\s+[A-Za-z]{2}\s+\d{2}\/\d{2}\s*$/, "");
+
+  // Truncate if still too long
+  if (cleaned.length > maxLen) {
+    cleaned = cleaned.slice(0, maxLen - 1).trim() + "…";
+  }
+
+  return cleaned || name;
+}
+
 /** Categories where money comes IN (income) — amounts shown as positive */
 const INCOME_CATEGORIES = new Set(["prize-money", "prize_money", "income"]);
 
@@ -62,7 +112,7 @@ export default function InvoicesPage() {
       const categoryPass = categoryFilter === "all" || row.categoryName === categoryFilter;
       const fromPass = !fromDate || date >= fromDate;
       const toPass = !toDate || date <= toDate;
-      const searchPass = !q || (row.invoiceName || formatInvoiceName({ providerName: getProvider(row), date })).toLowerCase().includes(q)
+      const searchPass = !q || abbreviateInvoiceName(row.invoiceName || formatInvoiceName({ providerName: getProvider(row), date })).toLowerCase().includes(q)
         || (row.categoryName ?? "").toLowerCase().includes(q)
         || (getProvider(row)).toLowerCase().includes(q)
         || date.includes(q);
@@ -73,8 +123,8 @@ export default function InvoicesPage() {
     if (!sortColumn) return sorted;
     sorted.sort((a, b) => {
       if (sortColumn === "invoice") {
-        const aVal = (a.invoiceName || formatInvoiceName({ providerName: getProvider(a), date: getInvoiceDate(a) })).toLowerCase();
-        const bVal = (b.invoiceName || formatInvoiceName({ providerName: getProvider(b), date: getInvoiceDate(b) })).toLowerCase();
+        const aVal = abbreviateInvoiceName(a.invoiceName || formatInvoiceName({ providerName: getProvider(a), date: getInvoiceDate(a) })).toLowerCase();
+        const bVal = abbreviateInvoiceName(b.invoiceName || formatInvoiceName({ providerName: getProvider(b), date: getInvoiceDate(b) })).toLowerCase();
         return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
       }
       if (sortColumn === "category") {
@@ -148,13 +198,13 @@ export default function InvoicesPage() {
           ← cd /dashboard
         </Link>
         <div className={styles.header}>
-          <div className="ui-label">// invoices</div>
-          <h1 className={styles.title}>invoices</h1>
+          <div className="ui-label">// Invoices</div>
+          <h1 className={styles.title}>Invoices</h1>
         </div>
 
         <section className={styles.filters}>
           <label>
-            <span>CATEGORY</span>
+            <span>Category</span>
             <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
               {categories.map((name) => (
                 <option key={name} value={name}>
@@ -164,15 +214,15 @@ export default function InvoicesPage() {
             </select>
           </label>
           <label>
-            <span>FROM</span>
+            <span>From</span>
             <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
           </label>
           <label>
-            <span>TO</span>
+            <span>To</span>
             <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
           </label>
           <label>
-            <span>SEARCH</span>
+            <span>Search</span>
             <input type="text" placeholder="search invoices..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
           </label>
         </section>
@@ -180,16 +230,16 @@ export default function InvoicesPage() {
         <section className={styles.listCard}>
           <div className={styles.invoicesHeader}>
             <button type="button" className={headerClass(sortColumn === "invoice", styles)} onClick={() => handleSort("invoice")}>
-              INVOICE {sortArrow(sortColumn === "invoice", sortDirection, styles)}
+              Invoice {sortArrow(sortColumn === "invoice", sortDirection, styles)}
             </button>
             <button type="button" className={headerClass(sortColumn === "category", styles)} onClick={() => handleSort("category")}>
-              CATEGORY {sortArrow(sortColumn === "category", sortDirection, styles)}
+              Category {sortArrow(sortColumn === "category", sortDirection, styles)}
             </button>
             <button type="button" className={headerClass(sortColumn === "date", styles)} onClick={() => handleSort("date")}>
-              DATE {sortArrow(sortColumn === "date", sortDirection, styles)}
+              Date {sortArrow(sortColumn === "date", sortDirection, styles)}
             </button>
             <button type="button" className={headerClass(sortColumn === "amount", styles)} onClick={() => handleSort("amount")}>
-              AMOUNT {sortArrow(sortColumn === "amount", sortDirection, styles)}
+              Amount {sortArrow(sortColumn === "amount", sortDirection, styles)}
             </button>
             <div />
           </div>
@@ -231,7 +281,7 @@ export default function InvoicesPage() {
                         router.push(url);
                       }}
                     >
-                      {row.invoiceName || formatInvoiceName({ providerName: getProvider(row), date })}
+                      {abbreviateInvoiceName(row.invoiceName || formatInvoiceName({ providerName: getProvider(row), date }))}
                     </a>
                     {row.source === "cc_transaction" && (
                       <span className={styles.ccBadge}>CC</span>
