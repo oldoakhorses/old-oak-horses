@@ -245,14 +245,36 @@
   min-width: 0;
 }
 
-.billName {
+.billNameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
 
+.billName {
   font-size: 13px;
   font-weight: 700;
   color: #1a1a2e;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.billCatPill {
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.billNotes {
+  font-size: 10px;
+  color: #6B7084;
+  font-style: italic;
 }
 
 .billMeta {

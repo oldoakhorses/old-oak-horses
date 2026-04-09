@@ -82,18 +82,26 @@ export const getOwnerInvoice = query({
 
     // Resolve source bill info for each line item
     const billIds = [...new Set(lineItems.map((i) => String(i.sourceBillId)))];
-    const billMap = new Map<string, { fileName: string; billId: string; invoiceDate?: string; providerName?: string }>();
+    const billMap = new Map<string, { fileName: string; billId: string; invoiceDate?: string; providerName?: string; category?: string; subcategory?: string; notes?: string }>();
     for (const billIdStr of billIds) {
       const bill = await ctx.db.get(billIdStr as Id<"bills">);
       if (bill) {
         const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
         const invoiceDate = (extracted.invoice_date ?? extracted.invoiceDate ?? "") as string;
         const providerName = (extracted.provider_name ?? extracted.providerName ?? "") as string;
+        let categorySlug: string | undefined;
+        if (bill.categoryId) {
+          const cat = await ctx.db.get(bill.categoryId);
+          if (cat) categorySlug = (cat as any).slug;
+        }
         billMap.set(billIdStr, {
           fileName: bill.fileName,
           billId: billIdStr,
           invoiceDate,
           providerName,
+          category: categorySlug,
+          subcategory: (bill as any).travelSubcategory ?? (bill as any).housingSubcategory ?? (bill as any).adminSubcategory ?? (bill as any).marketingSubcategory ?? (bill as any).groomingSubcategory ?? (bill as any).duesSubcategory ?? undefined,
+          notes: (bill as any).notes,
         });
       }
     }
@@ -107,6 +115,9 @@ export const getOwnerInvoice = query({
         fileName: string;
         invoiceDate: string;
         providerName: string;
+        category: string;
+        subcategory: string;
+        notes: string;
         items: typeof lineItems;
         total: number;
         approvedCount: number;
@@ -130,6 +141,9 @@ export const getOwnerInvoice = query({
         fileName: billInfo?.fileName ?? "Unknown Invoice",
         invoiceDate: billInfo?.invoiceDate ?? "",
         providerName: billInfo?.providerName ?? "",
+        category: billInfo?.category ?? "",
+        subcategory: billInfo?.subcategory ?? "",
+        notes: billInfo?.notes ?? "",
         items: [],
         total: 0,
         approvedCount: 0,

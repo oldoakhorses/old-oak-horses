@@ -13,13 +13,29 @@ const CATEGORY_COLORS: Record<string, string> = {
   veterinary: "#22C583",
   farrier: "#F59E0B",
   "feed-bedding": "#4A5BDB",
+  feed_bedding: "#4A5BDB",
   stabling: "#A78BFA",
   bodywork: "#14B8A6",
   "horse-transport": "#EF4444",
+  horse_transport: "#EF4444",
+  travel: "#EC4899",
+  housing: "#A78BFA",
   supplies: "#F97316",
   "grooming-supplies": "#F97316",
+  grooming: "#0EA5E9",
   supplements: "#34D399",
   insurance: "#0EA5E9",
+  admin: "#6B7084",
+  "show-expenses": "#4A5BDB",
+  show_expenses: "#4A5BDB",
+  "dues-registrations": "#4A5BDB",
+  dues_registrations: "#4A5BDB",
+  "riding-training": "#EC4899",
+  marketing: "#A78BFA",
+  commissions: "#6B7084",
+  "prize-money": "#22C55E",
+  income: "#16A34A",
+  equity: "#8B5CF6",
   other: "#9EA2B0",
 };
 
@@ -221,7 +237,17 @@ export default function OwnerInvoiceDetailPage() {
                   <div className={styles.billRow} onClick={() => toggleExpand(expandKey)}>
                     <span className={styles.expandArrow}>{isExpanded ? "▾" : "▸"}</span>
                     <div className={styles.billInfo}>
-                      <div className={styles.billName}>{displayName}</div>
+                      <div className={styles.billNameRow}>
+                        <span className={styles.billName}>{displayName}</span>
+                        {billGroup.category ? (
+                          <span
+                            className={styles.billCatPill}
+                            style={{ background: CATEGORY_COLORS[billGroup.category] ?? "#9EA2B0" }}
+                          >
+                            {prettyCat(billGroup.subcategory || billGroup.category)}
+                          </span>
+                        ) : null}
+                      </div>
                       <div className={styles.billMeta}>
                         {billGroup.items.length} item{billGroup.items.length !== 1 ? "s" : ""}
                         {allBillApproved ? (
@@ -231,6 +257,9 @@ export default function OwnerInvoiceDetailPage() {
                             {billGroup.approvedCount}/{billGroup.items.length} approved
                           </span>
                         )}
+                        {billGroup.notes ? (
+                          <span className={styles.billNotes}>{billGroup.notes}</span>
+                        ) : null}
                       </div>
                     </div>
                     <Link
