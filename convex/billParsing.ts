@@ -74,7 +74,7 @@ export const parseBillPdf = internalAction({
       console.log("2. Extracting text from PDF...");
       const textExtractionResponse = await client.messages.create({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 1600,
+        max_tokens: 4096,
         temperature: 0,
         messages: [
           {
@@ -1251,6 +1251,8 @@ ${PROVIDER_CONTACT_PROMPT}`;
   if (categorySlug === "veterinary") {
     return `Extract all data from this veterinary invoice as strict JSON.
 
+IMPORTANT: This PDF may have multiple pages. A common format is a STATEMENT page (summary with amounts due, aging) followed by an INVOICE DETAIL page with the actual line items (DATE OF SERVICE, VET, PROFESSIONAL SERVICE, FEES). You MUST read ALL pages. The line items are on the detail/invoice page, NOT the summary/statement page.
+
 This may contain MULTIPLE patient sections in one PDF. If there are multiple "Patient ID:" blocks:
 - Parse each patient section separately.
 - Each section has its own Patient name, Invoice Date, Invoice Number, Product/Service table, and Invoice Total.
@@ -1260,12 +1262,13 @@ This may contain MULTIPLE patient sections in one PDF. If there are multiple "Pa
 - Capture footer Subtotal, Tax, and Professional Discount when present.
 
 For each line item extract:
-- description
-- quantity
+- description (the professional service performed)
+- quantity (default 1)
 - unit_price
 - tax (if present)
-- total_usd (use Amount column value as authoritative)
-- horse_name when inferable from patient/description
+- total_usd (use the FEES/Amount column value as authoritative)
+- horse_name when inferable from patient/reference name in the invoice header
+- date_of_service if shown per line item
 
 Return strict JSON only with:
 - provider_name
@@ -1274,7 +1277,7 @@ Return strict JSON only with:
 - subtotal
 - tax_total_usd
 - discount (negative number when present)
-- invoice_total_usd
+- invoice_total_usd (use "Total Due" or "TOTAL FEES" or "Amount Due" — NOT $0.00 from a balance line)
 - sections[] when multiple patient sections are present
 - line_items[] flattened across all sections`;
   }
