@@ -437,6 +437,62 @@ async function createBillFromTransaction(
   const absAmount = Math.abs(txn.amount);
   const billingPeriod = txn.postingDate.slice(0, 7); // "2026-03" from "2026-03-18"
 
+  const hasHorses = txn.assignType === "horse" && txn.assignedHorses && txn.assignedHorses.length > 0;
+  const hasPeople = txn.assignType === "person" && txn.assignedPeople && txn.assignedPeople.length > 0;
+  const isWholeAssign = hasHorses || hasPeople;
+
+  // Determine split mode: check if all amounts are equal (even) or differ (custom)
+  let splitMode: "even" | "custom" | undefined;
+  if (hasHorses && txn.assignedHorses!.length > 1) {
+    const amounts = txn.assignedHorses!.map((h) => round2(h.amount));
+    splitMode = amounts.every((a) => a === amounts[0]) ? "even" : "custom";
+  } else if (hasPeople && txn.assignedPeople!.length > 1) {
+    const amounts = txn.assignedPeople!.map((p) => round2(p.amount));
+    splitMode = amounts.every((a) => a === amounts[0]) ? "even" : "custom";
+  } else if (isWholeAssign) {
+    splitMode = "even";
+  }
+
+  // Build line items with assignment data (same structure as PDF-approved bills)
+  const lineItem: Record<string, unknown> = {
+    description: txn.description,
+    amount: absAmount,
+    total_usd: absAmount,
+    category: txn.category || undefined,
+    subcategory: txn.subcategory || undefined,
+    confirmed: true,
+    confidence: "manual",
+  };
+
+  if (hasHorses) {
+    const firstHorse = txn.assignedHorses![0];
+    lineItem.assigneeType = "horse";
+    lineItem.assigneeId = String(firstHorse.horseId);
+    lineItem.assignee = String(firstHorse.horseId);
+    lineItem.entityType = "horse";
+    lineItem.entityId = String(firstHorse.horseId);
+    lineItem.entityName = firstHorse.horseName;
+    lineItem.matched_horse_id = String(firstHorse.horseId);
+    lineItem.matchedHorseId = String(firstHorse.horseId);
+    lineItem.horse_name = firstHorse.horseName;
+    lineItem.horseName = firstHorse.horseName;
+    lineItem.match_confidence = "manual";
+    // Store all horse IDs for whole-invoice multi-horse split
+    lineItem.horses = txn.assignedHorses!.map((h) => String(h.horseId));
+  } else if (hasPeople) {
+    const firstPerson = txn.assignedPeople![0];
+    lineItem.assigneeType = "person";
+    lineItem.assigneeId = String(firstPerson.personId);
+    lineItem.assignee = String(firstPerson.personId);
+    lineItem.entityType = "person";
+    lineItem.entityId = String(firstPerson.personId);
+    lineItem.entityName = firstPerson.personName;
+    lineItem.people = txn.assignedPeople!.map((p) => String(p.personId));
+  } else if (txn.assignType === "business") {
+    lineItem.assigneeType = "business_general";
+    lineItem.confirmed = true;
+  }
+
   const billId = await ctx.db.insert("bills", {
     fileName: txn.description,
     invoiceName: txn.description,
@@ -446,20 +502,24 @@ async function createBillFromTransaction(
     uploadedAt: Date.now(),
     isApproved: true,
     approvedAt: Date.now(),
+    providerConfirmed: true,
     source: "cc_transaction" as const,
     ccTransactionId: txn._id,
     categoryId,
+    assignMode: isWholeAssign ? ("whole" as const) : undefined,
+    splitMode,
     extractedData: {
       invoice_total_usd: absAmount,
       invoice_date: txn.postingDate,
       provider_name: txn.description,
+      line_items: [lineItem],
     },
     ...(txn.assignType === "horse" || txn.assignType === "person"
       ? { assignType: txn.assignType as "horse" | "person" }
       : {}),
-    ...(txn.assignType === "horse" && txn.assignedHorses
+    ...(hasHorses
       ? {
-          assignedHorses: txn.assignedHorses.map((h) => ({
+          assignedHorses: txn.assignedHorses!.map((h) => ({
             horseId: h.horseId,
             horseName: h.horseName,
             amount: h.amount,
@@ -468,10 +528,11 @@ async function createBillFromTransaction(
           })),
         }
       : {}),
-    ...(txn.assignType === "person" && txn.assignedPeople
+    ...(hasPeople
       ? {
-          assignedPeople: txn.assignedPeople.map((p) => ({
+          assignedPeople: txn.assignedPeople!.map((p) => ({
             personId: p.personId,
+            personName: p.personName,
             amount: p.amount,
           })),
         }
