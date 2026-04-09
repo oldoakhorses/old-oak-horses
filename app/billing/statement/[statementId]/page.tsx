@@ -254,12 +254,23 @@ export default function StatementReconcilePage() {
   function addHorse(horseId: Id<"horses">, horseName: string) {
     if (selectedHorses.find((h) => String(h.horseId) === String(horseId))) return;
     const txn = txns.find((t) => String(t._id) === assignModal);
-    const remaining = Math.abs(txn?.amount ?? 0) - selectedHorses.reduce((s, h) => s + h.amount, 0);
-    setSelectedHorses([...selectedHorses, { horseId, horseName, amount: Math.round(remaining * 100) / 100 }]);
+    const total = Math.abs(txn?.amount ?? 0);
+    const newCount = selectedHorses.length + 1;
+    const evenAmount = Math.round((total / newCount) * 100) / 100;
+    const updated = selectedHorses.map((h) => ({ ...h, amount: evenAmount }));
+    setSelectedHorses([...updated, { horseId, horseName, amount: evenAmount }]);
   }
 
   function removeHorse(idx: number) {
-    setSelectedHorses(selectedHorses.filter((_, i) => i !== idx));
+    const txn = txns.find((t) => String(t._id) === assignModal);
+    const total = Math.abs(txn?.amount ?? 0);
+    const remaining = selectedHorses.filter((_, i) => i !== idx);
+    if (remaining.length > 0) {
+      const evenAmount = Math.round((total / remaining.length) * 100) / 100;
+      setSelectedHorses(remaining.map((h) => ({ ...h, amount: evenAmount })));
+    } else {
+      setSelectedHorses(remaining);
+    }
   }
 
   function updateHorseAmount(idx: number, amount: number) {
