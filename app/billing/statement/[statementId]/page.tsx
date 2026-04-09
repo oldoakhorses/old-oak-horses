@@ -421,15 +421,13 @@ export default function StatementReconcilePage() {
                   <div className={styles.txnExpanded}>
                     <div className={styles.txnFullDesc}>{txn.description}</div>
                     <div className={styles.txnActions}>
-                      {isDebit ? (
-                        <button
-                          type="button"
-                          className={styles.btnAction}
-                          onClick={(e) => { e.stopPropagation(); setMatchModal(String(txn._id)); setBillSearch(""); }}
-                        >
-                          {txn.matchedBillId ? "change match" : "match to invoice"}
-                        </button>
-                      ) : null}
+                      <button
+                        type="button"
+                        className={styles.btnAction}
+                        onClick={(e) => { e.stopPropagation(); setMatchModal(String(txn._id)); setBillSearch(""); }}
+                      >
+                        {txn.matchedBillId ? "change match" : "match to invoice"}
+                      </button>
                       <button
                         type="button"
                         className={styles.btnAction}
