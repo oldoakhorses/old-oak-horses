@@ -435,6 +435,7 @@ async function createBillFromTransaction(
   }
 
   const absAmount = Math.abs(txn.amount);
+  const isCredit = txn.amount > 0;
   const billingPeriod = txn.postingDate.slice(0, 7); // "2026-03" from "2026-03-18"
 
   const hasHorses = txn.assignType === "horse" && txn.assignedHorses && txn.assignedHorses.length > 0;
@@ -513,6 +514,7 @@ async function createBillFromTransaction(
       invoice_date: txn.postingDate,
       provider_name: txn.description,
       line_items: [lineItem],
+      isCredit,
     },
     ...(txn.assignType === "horse" || txn.assignType === "person"
       ? { assignType: txn.assignType as "horse" | "person" }
@@ -800,6 +802,7 @@ export const restoreCcReconcileExtractedData = mutation({
         invoice_date: extracted.invoice_date ?? txn.postingDate,
         provider_name: extracted.provider_name ?? txn.description,
         line_items: [lineItem],
+        isCredit: txn.amount > 0,
       };
 
       await ctx.db.patch(bill._id, {
@@ -814,5 +817,40 @@ export const restoreCcReconcileExtractedData = mutation({
     }
 
     return { restored, count: restored.length };
+  },
+});
+
+/**
+ * Backfill `isCredit` flag on extractedData for CC-reconcile bills.
+ * Reads the source ccTransaction.amount sign — positive = credit (money in).
+ * Safe to re-run; only patches bills missing the flag.
+ */
+export const backfillCcCreditFlag = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const ccBills = await ctx.db
+      .query("bills")
+      .filter((q) => q.eq(q.field("source"), "cc_transaction"))
+      .collect();
+
+    let updated = 0;
+    let credits = 0;
+    for (const bill of ccBills) {
+      if (!bill.ccTransactionId) continue;
+      const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+      if (typeof extracted.isCredit === "boolean") continue;
+
+      const txn = await ctx.db.get(bill.ccTransactionId);
+      if (!txn) continue;
+
+      const isCredit = txn.amount > 0;
+      if (isCredit) credits++;
+      await ctx.db.patch(bill._id, {
+        extractedData: { ...extracted, isCredit },
+      });
+      updated++;
+    }
+
+    return { updated, credits };
   },
 });

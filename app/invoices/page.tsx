@@ -65,6 +65,14 @@ function abbreviateInvoiceName(name: string, maxLen = 50): string {
 /** Categories where money comes IN (income) — amounts shown as positive */
 const INCOME_CATEGORIES = new Set(["prize-money", "prize_money", "income"]);
 
+/** A row represents money coming IN if its category is income OR if a CC
+ *  transaction was a credit (positive amount on the statement). */
+function isIncomeRow(row: any) {
+  const key = (row.categorySlug ?? "").toString().toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
+  if (INCOME_CATEGORIES.has(key)) return true;
+  return row?.extractedData?.isCredit === true;
+}
+
 const CATEGORY_COLORS: Record<string, { bg: string; color: string; label: string }> = {
   veterinary: { bg: "rgba(74,91,219,0.08)", color: "#4A5BDB", label: "Veterinary" },
   farrier: { bg: "rgba(20,184,166,0.08)", color: "#14B8A6", label: "Farrier" },
@@ -142,10 +150,8 @@ export default function InvoicesPage() {
         const bTime = Date.parse(getInvoiceDate(b));
         return sortDirection === "asc" ? aTime - bTime : bTime - aTime;
       }
-      const aKey = normalizeKey(a.categorySlug ?? slugify(a.categoryName ?? ""));
-      const bKey = normalizeKey(b.categorySlug ?? slugify(b.categoryName ?? ""));
-      const aAmount = INCOME_CATEGORIES.has(aKey) ? getTotal(a) : -getTotal(a);
-      const bAmount = INCOME_CATEGORIES.has(bKey) ? getTotal(b) : -getTotal(b);
+      const aAmount = isIncomeRow(a) ? getTotal(a) : -getTotal(a);
+      const bAmount = isIncomeRow(b) ? getTotal(b) : -getTotal(b);
       return sortDirection === "asc" ? aAmount - bAmount : bAmount - aAmount;
     });
     return sorted;
@@ -273,7 +279,7 @@ export default function InvoicesPage() {
           {filtered.map((row) => {
             const date = getInvoiceDate(row);
             const rawTotal = getTotal(row);
-            const isIncome = INCOME_CATEGORIES.has(normalizeKey(row.categorySlug ?? slugify(row.categoryName ?? "")));
+            const isIncome = isIncomeRow(row);
             const total = isIncome ? rawTotal : -rawTotal;
             const categoryKey = normalizeKey(row.categorySlug ?? slugify(row.categoryName ?? ""));
             const categoryColor = CATEGORY_COLORS[categoryKey] ?? {
