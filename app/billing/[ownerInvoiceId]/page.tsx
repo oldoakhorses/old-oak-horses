@@ -445,9 +445,11 @@ export default function OwnerInvoiceDetailPage() {
               const expandKey = `${horseGroup.horseId ?? "gen"}:${billGroup.billId}`;
               const isExpanded = expanded.has(expandKey);
               const allBillApproved = billGroup.approvedCount === billGroup.items.length;
-              const displayName = billGroup.providerName
-                ? `${billGroup.providerName}${billGroup.invoiceDate ? ` \u2014 ${fmtDate(billGroup.invoiceDate)}` : ""}`
-                : billGroup.fileName;
+              const displayName = (billGroup.invoiceName && billGroup.invoiceName.trim().length > 0)
+                ? billGroup.invoiceName
+                : billGroup.providerName
+                  ? `${billGroup.providerName}${billGroup.invoiceDate ? ` \u2014 ${fmtDate(billGroup.invoiceDate)}` : ""}`
+                  : billGroup.fileName;
 
               return (
                 <div key={billGroup.billId} className={styles.billGroup}>

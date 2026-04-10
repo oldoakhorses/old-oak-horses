@@ -82,7 +82,7 @@ export const getOwnerInvoice = query({
 
     // Resolve source bill info for each line item
     const billIds = [...new Set(lineItems.map((i) => String(i.sourceBillId)))];
-    const billMap = new Map<string, { fileName: string; billId: string; invoiceDate?: string; providerName?: string; category?: string; subcategory?: string; notes?: string }>();
+    const billMap = new Map<string, { fileName: string; billId: string; invoiceName?: string; invoiceDate?: string; providerName?: string; category?: string; subcategory?: string; notes?: string }>();
     for (const billIdStr of billIds) {
       const bill = await ctx.db.get(billIdStr as Id<"bills">);
       if (bill) {
@@ -97,6 +97,7 @@ export const getOwnerInvoice = query({
         billMap.set(billIdStr, {
           fileName: bill.fileName,
           billId: billIdStr,
+          invoiceName: typeof bill.invoiceName === "string" && bill.invoiceName.trim().length > 0 ? bill.invoiceName : undefined,
           invoiceDate,
           providerName,
           category: categorySlug,
@@ -113,6 +114,7 @@ export const getOwnerInvoice = query({
       byBill: Map<string, {
         billId: string;
         fileName: string;
+        invoiceName: string;
         invoiceDate: string;
         providerName: string;
         category: string;
@@ -139,6 +141,7 @@ export const getOwnerInvoice = query({
       const billGroup = group.byBill.get(billKey) ?? {
         billId: billKey,
         fileName: billInfo?.fileName ?? "Unknown Invoice",
+        invoiceName: billInfo?.invoiceName ?? "",
         invoiceDate: billInfo?.invoiceDate ?? "",
         providerName: billInfo?.providerName ?? "",
         category: billInfo?.category ?? "",

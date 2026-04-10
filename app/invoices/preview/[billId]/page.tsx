@@ -462,6 +462,22 @@ export default function InvoicePreviewPage() {
 
   const providerName = bill?.extractedProviderContact?.providerName || (bill?.provider?.name ?? bill?.customProviderName ?? "Unknown");
   const previewTitle = formatInvoiceName({ providerName: bill?.providerName ?? providerName, date: bill?.date });
+  // Display name for the "INVOICE NAME" field. Priority:
+  //   1. Saved bill.invoiceName (user-edited or pre-set, e.g. CC txn description)
+  //   2. For uploaded bills: "{contact/provider} — {invoice date}"
+  //   3. For CC bills (no PDF): the CC line-item / txn description
+  const displayInvoiceName = (() => {
+    const saved = String(bill?.invoiceName ?? "").trim();
+    if (saved) return saved;
+    const isCc = bill?.source === "cc_transaction" || !bill?.fileId;
+    if (isCc) {
+      const lineDesc = String((Array.isArray((extracted as any)?.line_items) ? (extracted as any).line_items[0]?.description : "") ?? "").trim();
+      const fromExtracted = String((extracted as any)?.provider_name ?? "").trim();
+      return lineDesc || fromExtracted || previewTitle;
+    }
+    const invoiceDate = String((extracted as any)?.invoice_date ?? (extracted as any)?.invoiceDate ?? "").trim();
+    return formatInvoiceName({ providerName: bill?.providerName ?? providerName, date: invoiceDate || bill?.date });
+  })();
   const providerDetected = Boolean(bill?.providerDetected ?? bill?.providerId);
   const providerConfirmed = Boolean((bill?.providerConfirmed ?? bill?.providerId) && !providerEdit);
 
@@ -1576,14 +1592,30 @@ export default function InvoicePreviewPage() {
                   {bill.originalPdfUrl ? (
                     <a className={styles.pdfButton} href={bill.originalPdfUrl} target="_blank" rel="noreferrer">view original ↗</a>
                   ) : null}
-                  {!detailsEdit ? <button type="button" className={styles.changeLink} onClick={() => setDetailsEdit(true)}>edit</button> : null}
+                  {!detailsEdit ? (
+                    <button
+                      type="button"
+                      className={styles.changeLink}
+                      onClick={() => {
+                        // Seed invoiceName with the currently displayed value so a
+                        // bare "save" persists the visible name (not blank).
+                        setDetails((prev) => ({
+                          ...prev,
+                          invoiceName: prev.invoiceName || displayInvoiceName,
+                        }));
+                        setDetailsEdit(true);
+                      }}
+                    >
+                      edit
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
               {detailsEdit ? (
                 <>
                   <div className={styles.detailsGrid}>
-                    <InputField label="INVOICE NAME" value={details.invoiceName || previewTitle} onChange={(value) => setDetails((prev) => ({ ...prev, invoiceName: value }))} />
+                    <InputField label="INVOICE NAME" value={details.invoiceName || displayInvoiceName} onChange={(value) => setDetails((prev) => ({ ...prev, invoiceName: value }))} />
                     <InputField label="INVOICE #" value={details.invoiceNumber} onChange={(value) => setDetails((prev) => ({ ...prev, invoiceNumber: value }))} />
                     <InputField label="DATE" value={details.invoiceDate} onChange={(value) => setDetails((prev) => ({ ...prev, invoiceDate: value }))} />
                     <InputField label="DUE DATE" value={details.dueDate} onChange={(value) => setDetails((prev) => ({ ...prev, dueDate: value }))} />
@@ -1609,7 +1641,7 @@ export default function InvoicePreviewPage() {
               ) : (
                 <>
                   <div className={styles.detailsRow}>
-                    {details.invoiceName ? <DisplayField label="INVOICE NAME" value={details.invoiceName} /> : null}
+                    <DisplayField label="INVOICE NAME" value={details.invoiceName || displayInvoiceName} />
                     <DisplayField label="INVOICE #" value={details.invoiceNumber || "—"} />
                     <DisplayField label="DATE" value={formatDate(details.invoiceDate)} />
                     {details.dueDate ? <DisplayField label="DUE DATE" value={formatDate(details.dueDate)} /> : null}

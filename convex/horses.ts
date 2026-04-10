@@ -448,6 +448,7 @@ async function collectHorseInvoices(ctx: any, horseId: any) {
     categoryName: string;
     providerName: string;
     providerSlug: string;
+    invoiceName: string | null;
     invoiceNumber: string;
     date: string | null;
     uploadedAt: number;
@@ -480,6 +481,7 @@ async function collectHorseInvoices(ctx: any, horseId: any) {
       categoryName: categoryName,
       providerName,
       providerSlug,
+      invoiceName: typeof bill.invoiceName === "string" && bill.invoiceName.trim().length > 0 ? bill.invoiceName : null,
       invoiceNumber: String(extracted.invoice_number ?? bill.fileName ?? ""),
       date: invoiceDate,
       uploadedAt: bill.uploadedAt,

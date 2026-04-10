@@ -1,4 +1,6 @@
 export type InvoiceNameInput = {
+  /** User-saved/canonical name. If present, takes precedence over computed. */
+  invoiceName?: string | null;
   providerName?: string | null;
   provider?: string | null;
   date?: string | number | Date | null;
@@ -22,6 +24,10 @@ export function toIsoDateString(value?: string | number | Date | null) {
 }
 
 export function formatInvoiceName(input: InvoiceNameInput) {
+  // 1. Saved/canonical invoice name wins (set by user edits or by CC import).
+  const saved = input.invoiceName?.trim();
+  if (saved) return saved;
+
   const provider =
     input.providerName?.trim() ||
     input.provider?.trim() ||
