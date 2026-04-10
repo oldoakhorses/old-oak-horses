@@ -8,6 +8,39 @@
   font-weight: 700;
 }
 
+.tabs {
+  display: inline-flex;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.tab,
+.tabActive {
+  font-size: 10px;
+  padding: 8px 16px;
+  border: none;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.tab {
+  background: transparent;
+  color: #6b7084;
+}
+
+.tab:hover {
+  color: #1a1a2e;
+}
+
+.tabActive {
+  background: #1a1a2e;
+  color: #fff;
+  font-weight: 700;
+}
+
 .filters {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 180px)) minmax(0, 220px);

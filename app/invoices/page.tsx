@@ -11,6 +11,7 @@ import styles from "./invoices.module.css";
 
 type SortColumn = "invoice" | "category" | "date" | "amount" | null;
 type SortDirection = "asc" | "desc";
+type InvoiceTab = "pending" | "approved";
 
 /** Clean up raw CC descriptions and ALL-CAPS names into readable abbreviated titles */
 function abbreviateInvoiceName(name: string, maxLen = 50): string {
@@ -91,6 +92,7 @@ export default function InvoicesPage() {
   const deleteBill = useMutation(api.bills.deleteBill);
   const updateBillNotes = useMutation(api.bills.updateBillNotes);
 
+  const [activeTab, setActiveTab] = useState<InvoiceTab>("pending");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -105,9 +107,13 @@ export default function InvoicesPage() {
 
   const categories = useMemo(() => ["all", ...new Set(rows.map((row) => row.categoryName))], [rows]);
 
+  const approvedRows = useMemo(() => rows.filter((row) => row.isApproved === true), [rows]);
+  const pendingRows = useMemo(() => rows.filter((row) => row.isApproved !== true), [rows]);
+
   const filtered = useMemo(() => {
+    const tabRows = activeTab === "approved" ? approvedRows : pendingRows;
     const q = searchQuery.toLowerCase().trim();
-    const base = rows.filter((row) => {
+    const base = tabRows.filter((row) => {
       const date = getInvoiceDate(row);
       const categoryPass = categoryFilter === "all" || row.categoryName === categoryFilter;
       const fromPass = !fromDate || date >= fromDate;
@@ -144,7 +150,7 @@ export default function InvoicesPage() {
       return sortDirection === "asc" ? aAmount - bAmount : bAmount - aAmount;
     });
     return sorted;
-  }, [rows, categoryFilter, fromDate, toDate, searchQuery, sortColumn, sortDirection]);
+  }, [activeTab, approvedRows, pendingRows, categoryFilter, fromDate, toDate, searchQuery, sortColumn, sortDirection]);
 
   function handleSort(column: Exclude<SortColumn, null>) {
     if (sortColumn === column) {
@@ -200,6 +206,23 @@ export default function InvoicesPage() {
         <div className={styles.header}>
           <div className="ui-label">// Invoices</div>
           <h1 className={styles.title}>Invoices</h1>
+        </div>
+
+        <div className={styles.tabs}>
+          <button
+            type="button"
+            className={activeTab === "pending" ? styles.tabActive : styles.tab}
+            onClick={() => setActiveTab("pending")}
+          >
+            Pending ({pendingRows.length})
+          </button>
+          <button
+            type="button"
+            className={activeTab === "approved" ? styles.tabActive : styles.tab}
+            onClick={() => setActiveTab("approved")}
+          >
+            Approved ({approvedRows.length})
+          </button>
         </div>
 
         <section className={styles.filters}>
@@ -412,7 +435,11 @@ export default function InvoicesPage() {
               </div>
             );
           })}
-          {filtered.length === 0 ? <div className={styles.empty}>No invoices found.</div> : null}
+          {filtered.length === 0 ? (
+            <div className={styles.empty}>
+              {activeTab === "pending" ? "No pending invoices." : "No approved invoices."}
+            </div>
+          ) : null}
         </section>
       </main>
 
