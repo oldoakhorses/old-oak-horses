@@ -184,7 +184,7 @@ export default function BillingPage() {
                   <Link key={stmt._id} href={`/billing/statement/${stmt._id}`} className={styles.stmtRow}>
                     <div className={styles.stmtInfo}>
                       <div className={styles.stmtName}>
-                        {stmt.accountLast4 ? `•••• ${stmt.accountLast4}` : stmt.fileName}
+                        {stmt.displayName ?? (stmt.accountLast4 ? `•••• ${stmt.accountLast4}` : stmt.fileName)}
                       </div>
                       <div className={styles.stmtMeta}>
                         {stmt.transactionCount} transactions &middot; uploaded {fmtDate(stmt.uploadedAt)}

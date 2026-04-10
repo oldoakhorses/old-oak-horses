@@ -471,6 +471,8 @@ export default defineSchema({
 
   ccStatements: defineTable({
     fileName: v.string(),
+    /** Optional user-edited display name; falls back to fileName when absent. */
+    displayName: v.optional(v.string()),
     accountLast4: v.optional(v.string()),
     uploadedAt: v.number(),
     transactionCount: v.number(),

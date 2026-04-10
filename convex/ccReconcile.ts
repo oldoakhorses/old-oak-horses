@@ -664,6 +664,20 @@ export const approveStatement = mutation({
   },
 });
 
+/** Rename a statement (sets/clears the displayName override) */
+export const renameStatement = mutation({
+  args: {
+    statementId: v.id("ccStatements"),
+    displayName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const trimmed = args.displayName?.trim();
+    await ctx.db.patch(args.statementId, {
+      displayName: trimmed && trimmed.length > 0 ? trimmed : undefined,
+    });
+  },
+});
+
 /** Delete a statement and all its transactions */
 export const deleteStatement = mutation({
   args: { statementId: v.id("ccStatements") },
