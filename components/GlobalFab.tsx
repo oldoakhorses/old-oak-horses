@@ -29,6 +29,7 @@ type DocumentFormState = {
   horseId: Id<"horses"> | "";
   name: string;
   tag: DocumentTag | "";
+  documentDate: string;
   notes: string;
 };
 
@@ -112,6 +113,7 @@ function createInitialDocumentForm(): DocumentFormState {
     horseId: "",
     name: "",
     tag: "",
+    documentDate: getTodayDate(),
     notes: "",
   };
 }
@@ -511,6 +513,10 @@ export default function GlobalFab() {
       const payload = await uploadResponse.json();
       const storageId = payload.storageId as Id<"_storage">;
 
+      const parsedDocumentDate = documentForm.documentDate
+        ? new Date(`${documentForm.documentDate}T00:00:00`).getTime()
+        : undefined;
+
       await uploadDocument({
         name: documentForm.name.trim(),
         tag: documentForm.tag,
@@ -519,6 +525,7 @@ export default function GlobalFab() {
         fileName: documentFile.name,
         fileType: documentFile.type || undefined,
         fileSize: documentFile.size || undefined,
+        documentDate: Number.isFinite(parsedDocumentDate) ? parsedDocumentDate : undefined,
         notes: documentForm.notes.trim() || undefined,
       });
 
@@ -834,6 +841,15 @@ export default function GlobalFab() {
                   <option value="registration">Registration</option>
                   <option value="other">Other</option>
                 </select>
+              </RecordField>
+
+              <RecordField label="DOCUMENT DATE">
+                <input
+                  className={styles.recordInput}
+                  type="date"
+                  value={documentForm.documentDate}
+                  onChange={(event) => setDocumentForm((prev) => ({ ...prev, documentDate: event.target.value }))}
+                />
               </RecordField>
 
               <RecordField label="NOTES">

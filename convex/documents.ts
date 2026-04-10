@@ -17,6 +17,7 @@ export const upload = mutation({
     fileName: v.string(),
     fileType: v.optional(v.string()),
     fileSize: v.optional(v.number()),
+    documentDate: v.optional(v.number()),
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -43,7 +44,9 @@ export const listByHorse = query({
         fileUrl: await ctx.storage.getUrl(row.fileStorageId),
       }))
     );
-    return withUrls.sort((a, b) => b.uploadedAt - a.uploadedAt);
+    return withUrls.sort(
+      (a, b) => (b.documentDate ?? b.uploadedAt) - (a.documentDate ?? a.uploadedAt)
+    );
   },
 });
 

@@ -330,6 +330,7 @@ export default defineSchema({
     fileType: v.optional(v.string()),
     fileSize: v.optional(v.number()),
     uploadedAt: v.number(),
+    documentDate: v.optional(v.number()),
     notes: v.optional(v.string())
   })
     .index("by_horse", ["horseId"])

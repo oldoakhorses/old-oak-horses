@@ -877,7 +877,7 @@ export default function HorseProfilePage() {
                   <span className={styles.tagBadge} style={{ background: TAG_COLORS[doc.tag].bg, color: TAG_COLORS[doc.tag].color }}>
                     {TAG_LABELS[doc.tag]}
                   </span>
-                  <span className={styles.docDate}>{formatDateLong(doc.uploadedAt)}</span>
+                  <span className={styles.docDate}>{formatDateLong(doc.documentDate ?? doc.uploadedAt)}</span>
                   <div className={styles.docMenuWrap}>
                     <button
                       type="button"
