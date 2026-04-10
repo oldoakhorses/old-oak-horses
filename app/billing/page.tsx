@@ -99,6 +99,9 @@ export default function BillingPage() {
   const activePeriod = dateToPeriod(startDate);
 
   const invoices = useQuery(api.billing.listOwnerInvoices, activePeriod ? { billingPeriod: activePeriod } : {}) ?? [];
+  const allInvoices = useQuery(api.billing.listOwnerInvoices, {}) ?? [];
+  const sentInvoices = allInvoices.filter((inv) => inv.status === "sent");
+  const manageInvoices = invoices.filter((inv) => inv.status === "draft" || inv.status === "finalized" || inv.status === "paid");
   const preview = useQuery(
     api.billing.previewBillingPeriod,
     startDate && endDate ? { startDate, endDate } : "skip"
@@ -207,12 +210,59 @@ export default function BillingPage() {
         {/* Divider */}
         <div className={styles.divider} />
 
-        {/* Owner invoices section */}
+        {/* Owner invoices section — shows only SENT invoices */}
         <div className={styles.sectionCard}>
           <div className={styles.sectionHeader}>
             <div>
               <div className={styles.sectionTitle}>owner invoices</div>
-              <div className={styles.sectionSub}>batch approved invoice line items by owner</div>
+              <div className={styles.sectionSub}>invoices that have been sent to owners</div>
+            </div>
+          </div>
+
+          {sentInvoices.length > 0 ? (
+            <div className={styles.invoicesList}>
+              <div className={styles.listHeader}>
+                <div>OWNER</div>
+                <div>PERIOD</div>
+                <div>LINE ITEMS</div>
+                <div>APPROVED</div>
+                <div>TOTAL</div>
+                <div>STATUS</div>
+              </div>
+              {sentInvoices.map((inv) => {
+                const statusInfo = STATUS_LABELS[inv.status] ?? STATUS_LABELS.sent;
+                return (
+                  <Link key={inv._id} href={`/billing/${inv._id}`} className={styles.invoiceRow}>
+                    <div className={styles.invoiceOwner}>{inv.ownerName}</div>
+                    <div className={styles.invoicePeriod}>{fmtPeriod(inv.billingPeriod)}</div>
+                    <div className={styles.invoiceMeta}>{inv.lineItemCount}</div>
+                    <div className={styles.invoiceMeta}>
+                      {inv.approvedLineItemCount}/{inv.lineItemCount}
+                    </div>
+                    <div className={styles.invoiceTotal}>{fmtUSD(inv.totalAmount)}</div>
+                    <div>
+                      <span className={styles.statusBadge} style={{ color: statusInfo.color, background: statusInfo.bg }}>
+                        {statusInfo.label}
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <div className={styles.stmtEmpty}>no sent invoices yet</div>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className={styles.divider} />
+
+        {/* Manage / generate invoices section */}
+        <div className={styles.sectionCard}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <div className={styles.sectionTitle}>manage invoices</div>
+              <div className={styles.sectionSub}>generate and review draft invoices for a billing period</div>
             </div>
           </div>
         </div>
@@ -244,7 +294,7 @@ export default function BillingPage() {
         </div>
 
         {/* Preview of what would be generated */}
-        {preview && preview.length > 0 && invoices.length === 0 ? (
+        {preview && preview.length > 0 && manageInvoices.length === 0 ? (
           <div className={styles.previewCard}>
             <div className={styles.previewTitle}>preview for {startDate} → {endDate}</div>
             <div className={styles.previewSub}>
@@ -262,8 +312,8 @@ export default function BillingPage() {
           </div>
         ) : null}
 
-        {/* Existing owner invoices */}
-        {invoices.length > 0 ? (
+        {/* Draft / finalized owner invoices for the active period */}
+        {manageInvoices.length > 0 ? (
           <div className={styles.invoicesList}>
             <div className={styles.listHeader}>
               <div>OWNER</div>
@@ -273,7 +323,7 @@ export default function BillingPage() {
               <div>TOTAL</div>
               <div>STATUS</div>
             </div>
-            {invoices.map((inv) => {
+            {manageInvoices.map((inv) => {
               const statusInfo = STATUS_LABELS[inv.status] ?? STATUS_LABELS.draft;
               return (
                 <Link key={inv._id} href={`/billing/${inv._id}`} className={styles.invoiceRow}>

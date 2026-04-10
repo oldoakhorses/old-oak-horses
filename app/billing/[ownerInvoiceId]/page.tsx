@@ -101,6 +101,7 @@ export default function OwnerInvoiceDetailPage() {
   const [notesValue, setNotesValue] = useState("");
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingItemDesc, setEditingItemDesc] = useState("");
+  const [openMenuItemId, setOpenMenuItemId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState("");
 
@@ -490,71 +491,104 @@ export default function OwnerInvoiceDetailPage() {
 
                   {isExpanded ? (
                     <div className={styles.lineItemsContainer}>
-                      {billGroup.items.map((item) => (
-                        <div key={item._id} className={`${styles.lineItemRow} ${item.isApproved ? styles.lineItemApproved : ""}`}>
-                          <button
-                            type="button"
-                            className={`${styles.checkbox} ${item.isApproved ? styles.checkboxChecked : ""}`}
-                            onClick={() => approveItem({ lineItemId: item._id, approved: !item.isApproved })}
-                            disabled={invoice.status !== "draft"}
-                          >
-                            {item.isApproved ? "✓" : ""}
-                          </button>
-                          <div className={styles.lineItemInfo}>
-                            {isEditing && editingItemId === String(item._id) ? (
-                              <input
-                                className={styles.lineItemDescInput}
-                                value={editingItemDesc}
-                                onChange={(e) => setEditingItemDesc(e.target.value)}
-                                onBlur={async () => {
-                                  if (editingItemDesc.trim() && editingItemDesc !== item.description) {
-                                    await updateLineItemDesc({ lineItemId: item._id, description: editingItemDesc });
-                                  }
-                                  setEditingItemId(null);
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                                  if (e.key === "Escape") setEditingItemId(null);
-                                }}
-                                autoFocus
-                              />
-                            ) : (
-                              <div
-                                className={`${styles.lineItemDesc} ${isEditing ? styles.lineItemDescEditable : ""}`}
-                                onClick={() => {
-                                  if (isEditing) {
-                                    setEditingItemId(String(item._id));
-                                    setEditingItemDesc(item.description);
-                                  }
-                                }}
-                              >
-                                {item.description}
-                              </div>
-                            )}
-                            {item.category ? (
-                              <span
-                                className={styles.catPill}
-                                style={{
-                                  background: CATEGORY_COLORS[item.category] ?? "#9EA2B0",
-                                }}
-                              >
-                                {prettyCat(item.subcategory ?? item.category)}
-                              </span>
-                            ) : null}
-                          </div>
-                          <div className={styles.lineItemAmount}>{fmtUSD(item.amount)}</div>
-                          {isEditing ? (
+                      {billGroup.items.map((item) => {
+                        const itemIdStr = String(item._id);
+                        const canRename = invoice.status === "draft";
+                        const isRenaming = editingItemId === itemIdStr;
+                        const isMenuOpen = openMenuItemId === itemIdStr;
+                        return (
+                          <div key={item._id} className={`${styles.lineItemRow} ${item.isApproved ? styles.lineItemApproved : ""}`}>
                             <button
                               type="button"
-                              className={styles.btnDeleteItem}
-                              onClick={() => deleteLineItem({ lineItemId: item._id })}
-                              title="Remove from invoice"
+                              className={`${styles.checkbox} ${item.isApproved ? styles.checkboxChecked : ""}`}
+                              onClick={() => approveItem({ lineItemId: item._id, approved: !item.isApproved })}
+                              disabled={invoice.status !== "draft"}
                             >
-                              ×
+                              {item.isApproved ? "✓" : ""}
                             </button>
-                          ) : null}
-                        </div>
-                      ))}
+                            <div className={styles.lineItemInfo}>
+                              {isRenaming ? (
+                                <input
+                                  className={styles.lineItemDescInput}
+                                  value={editingItemDesc}
+                                  onChange={(e) => setEditingItemDesc(e.target.value)}
+                                  onBlur={async () => {
+                                    if (editingItemDesc.trim() && editingItemDesc !== item.description) {
+                                      await updateLineItemDesc({ lineItemId: item._id, description: editingItemDesc });
+                                    }
+                                    setEditingItemId(null);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                                    if (e.key === "Escape") setEditingItemId(null);
+                                  }}
+                                  autoFocus
+                                />
+                              ) : (
+                                <div className={styles.lineItemDesc}>{item.description}</div>
+                              )}
+                              {item.category ? (
+                                <span
+                                  className={styles.catPill}
+                                  style={{
+                                    background: CATEGORY_COLORS[item.category] ?? "#9EA2B0",
+                                  }}
+                                >
+                                  {prettyCat(item.subcategory ?? item.category)}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className={styles.lineItemAmount}>{fmtUSD(item.amount)}</div>
+                            <div className={styles.lineItemMenuWrap}>
+                              <button
+                                type="button"
+                                className={styles.btnMenuDots}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenMenuItemId(isMenuOpen ? null : itemIdStr);
+                                }}
+                                title="More actions"
+                                aria-label="More actions"
+                              >
+                                ⋯
+                              </button>
+                              {isMenuOpen ? (
+                                <>
+                                  <div
+                                    className={styles.menuBackdrop}
+                                    onClick={() => setOpenMenuItemId(null)}
+                                  />
+                                  <div className={styles.menuDropdown} onClick={(e) => e.stopPropagation()}>
+                                    {canRename ? (
+                                      <button
+                                        type="button"
+                                        className={styles.menuItem}
+                                        onClick={() => {
+                                          setEditingItemId(itemIdStr);
+                                          setEditingItemDesc(item.description);
+                                          setOpenMenuItemId(null);
+                                        }}
+                                      >
+                                        edit name
+                                      </button>
+                                    ) : null}
+                                    <button
+                                      type="button"
+                                      className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                                      onClick={async () => {
+                                        setOpenMenuItemId(null);
+                                        await deleteLineItem({ lineItemId: item._id });
+                                      }}
+                                    >
+                                      remove from invoice
+                                    </button>
+                                  </div>
+                                </>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : null}
                 </div>

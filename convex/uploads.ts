@@ -271,7 +271,12 @@ export const reassignAndReparse: any = action({
       adminSubcategory: args.adminSubcategory,
       duesSubcategory: args.duesSubcategory,
     });
-    await ctx.scheduler.runAfter(0, internal.billParsing.parseBillPdf, { billId: args.billId });
+    // Only re-parse if the bill actually has a PDF. CC-reconcile bills
+    // have no fileId, so parsing would fail and leave the bill errored.
+    const bill = await ctx.runQuery(internal.bills.getBill, { billId: args.billId });
+    if (bill?.fileId) {
+      await ctx.scheduler.runAfter(0, internal.billParsing.parseBillPdf, { billId: args.billId });
+    }
   }
 });
 

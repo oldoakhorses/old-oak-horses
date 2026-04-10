@@ -91,6 +91,7 @@ export default function InvoicesPage() {
   const deleteBill = useMutation(api.bills.deleteBill);
   const updateBillNotes = useMutation(api.bills.updateBillNotes);
 
+  const [tab, setTab] = useState<"pending" | "approved">("pending");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -103,12 +104,16 @@ export default function InvoicesPage() {
   const [editingNotes, setEditingNotes] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
+  const pendingCount = useMemo(() => rows.filter((row) => !row.isApproved).length, [rows]);
+  const approvedCount = useMemo(() => rows.filter((row) => Boolean(row.isApproved)).length, [rows]);
+
   const categories = useMemo(() => ["all", ...new Set(rows.map((row) => row.categoryName))], [rows]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     const base = rows.filter((row) => {
       const date = getInvoiceDate(row);
+      const tabPass = tab === "approved" ? Boolean(row.isApproved) : !row.isApproved;
       const categoryPass = categoryFilter === "all" || row.categoryName === categoryFilter;
       const fromPass = !fromDate || date >= fromDate;
       const toPass = !toDate || date <= toDate;
@@ -116,7 +121,7 @@ export default function InvoicesPage() {
         || (row.categoryName ?? "").toLowerCase().includes(q)
         || (getProvider(row)).toLowerCase().includes(q)
         || date.includes(q);
-      return categoryPass && fromPass && toPass && searchPass;
+      return tabPass && categoryPass && fromPass && toPass && searchPass;
     });
 
     const sorted = [...base];
@@ -144,7 +149,7 @@ export default function InvoicesPage() {
       return sortDirection === "asc" ? aAmount - bAmount : bAmount - aAmount;
     });
     return sorted;
-  }, [rows, categoryFilter, fromDate, toDate, searchQuery, sortColumn, sortDirection]);
+  }, [rows, tab, categoryFilter, fromDate, toDate, searchQuery, sortColumn, sortDirection]);
 
   function handleSort(column: Exclude<SortColumn, null>) {
     if (sortColumn === column) {
@@ -200,6 +205,27 @@ export default function InvoicesPage() {
         <div className={styles.header}>
           <div className="ui-label">// Invoices</div>
           <h1 className={styles.title}>Invoices</h1>
+        </div>
+
+        <div className={styles.tabs} role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "pending"}
+            className={`${styles.tab} ${tab === "pending" ? styles.tabActive : ""}`}
+            onClick={() => setTab("pending")}
+          >
+            Pending <span className={styles.tabCount}>{pendingCount}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "approved"}
+            className={`${styles.tab} ${tab === "approved" ? styles.tabActive : ""}`}
+            onClick={() => setTab("approved")}
+          >
+            Approved <span className={styles.tabCount}>{approvedCount}</span>
+          </button>
         </div>
 
         <section className={styles.filters}>

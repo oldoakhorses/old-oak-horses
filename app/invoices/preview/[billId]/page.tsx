@@ -389,7 +389,9 @@ export default function InvoicePreviewPage() {
 
       nextLineStates[index] = {
         assignees,
-        confirmed: (isSplitAll || splitAllByParsedHorse) ? true : (assignees.length > 0 || Boolean(row.confirmed)),
+        // Default: all line items start CHECKED. Users can uncheck to exclude.
+        // Only honor an explicit `false` from a previously saved state.
+        confirmed: row.confirmed !== false,
         category: normalizeCategory(String(row.category ?? ""), categorySlug),
         subcategory: String(row.subcategory ?? ""),
         subcategoryAutoDetected: Boolean(row.subcategoryAutoDetected),

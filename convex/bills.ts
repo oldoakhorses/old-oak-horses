@@ -3,6 +3,7 @@ import { internalMutation, internalQuery, mutation, query } from "./_generated/s
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { normalizeAliasKey } from "./matchHorse";
+import { syncApprovedBillIntoDraftInvoices } from "./billing";
 
 /** Convert a category slug like "feed-bedding" to display name "Feed & Bedding" */
 function formatCategorySlug(slug: string): string {
@@ -1685,14 +1686,25 @@ export const reassignBillProvider = internalMutation({
     duesSubcategory: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const existing = await ctx.db.get(args.billId);
+    if (!existing) throw new Error("Bill not found");
+
+    // Only wipe extractedData + set status=parsing when we can actually
+    // re-parse a PDF. CC-reconcile bills (and any other bill without a fileId)
+    // don't have a PDF to re-parse, so nuking extractedData would leave them
+    // permanently empty (→ $0 totals, no line items).
+    const hasPdf = Boolean(existing.fileId);
+
     const patch: Record<string, unknown> = {
       providerId: args.providerId,
       customProviderName: args.providerId ? undefined : args.customProviderName,
       adminSubcategory: args.adminSubcategory,
       duesSubcategory: args.duesSubcategory,
-      status: "parsing",
-      extractedData: undefined,
     };
+    if (hasPdf) {
+      patch.status = "parsing";
+      patch.extractedData = undefined;
+    }
     if (args.categoryId) patch.categoryId = args.categoryId;
     if (args.contactId) patch.contactId = args.contactId;
     await ctx.db.patch(args.billId, patch);
@@ -2373,6 +2385,14 @@ async function approveBillById(ctx: any, billId: Id<"bills">) {
     approvedAt: Date.now(),
     status: "done"
   });
+
+  // Auto-insert charges into any existing draft owner invoices that cover
+  // this bill's period, so drafts stay in sync as bills are approved.
+  try {
+    await syncApprovedBillIntoDraftInvoices(ctx, billId);
+  } catch (err) {
+    console.error("syncApprovedBillIntoDraftInvoices failed", err);
+  }
 
   // Schedule Dropbox upload in the background
   await ctx.scheduler.runAfter(0, internal.dropbox.uploadInvoiceToDropbox, { billId });

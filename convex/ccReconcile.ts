@@ -720,3 +720,99 @@ export const getMatchableBills = query({
       .sort((a, b) => (b.billingPeriod ?? "").localeCompare(a.billingPeriod ?? "") || a.fileName.localeCompare(b.fileName));
   },
 });
+
+/**
+ * One-shot restore for CC-reconcile bills whose extractedData got wiped
+ * (bug: reassignBillProvider used to nuke extractedData even for bills
+ * without a PDF, causing invoice_total_usd to disappear → $0 totals).
+ *
+ * For each CC-reconcile bill (source="cc_transaction") whose extractedData
+ * is missing/empty, rebuild it from the source ccTransaction.
+ */
+export const restoreCcReconcileExtractedData = mutation({
+  args: { billId: v.optional(v.id("bills")) },
+  handler: async (ctx, args) => {
+    const candidates = args.billId
+      ? [await ctx.db.get(args.billId)].filter(Boolean)
+      : await ctx.db
+          .query("bills")
+          .filter((q) => q.eq(q.field("source"), "cc_transaction"))
+          .collect();
+
+    const restored: Array<{ billId: Id<"bills">; total: number; description: string }> = [];
+
+    for (const bill of candidates) {
+      if (!bill) continue;
+      const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+      const hasTotal = typeof extracted.invoice_total_usd === "number" && extracted.invoice_total_usd > 0;
+      const lineItems = Array.isArray((extracted as any).line_items) ? (extracted as any).line_items : [];
+      const hasLines = lineItems.length > 0;
+      // Skip bills that already have valid data
+      if (hasTotal && hasLines) continue;
+
+      if (!bill.ccTransactionId) continue;
+      const txn = await ctx.db.get(bill.ccTransactionId);
+      if (!txn) continue;
+
+      const absAmount = Math.abs(txn.amount);
+      const hasHorses = txn.assignType === "horse" && (bill.assignedHorses?.length ?? 0) > 0;
+      const hasPeople = txn.assignType === "person" && (bill.assignedPeople?.length ?? 0) > 0;
+
+      const lineItem: Record<string, unknown> = {
+        description: txn.description,
+        amount: absAmount,
+        total_usd: absAmount,
+        category: txn.category || undefined,
+        subcategory: txn.subcategory || undefined,
+        confirmed: true,
+        confidence: "manual",
+      };
+
+      if (hasHorses) {
+        const firstHorse = bill.assignedHorses![0];
+        lineItem.assigneeType = "horse";
+        lineItem.assigneeId = String(firstHorse.horseId);
+        lineItem.assignee = String(firstHorse.horseId);
+        lineItem.entityType = "horse";
+        lineItem.entityId = String(firstHorse.horseId);
+        lineItem.entityName = firstHorse.horseName;
+        lineItem.matched_horse_id = String(firstHorse.horseId);
+        lineItem.matchedHorseId = String(firstHorse.horseId);
+        lineItem.horse_name = firstHorse.horseName;
+        lineItem.horseName = firstHorse.horseName;
+        lineItem.match_confidence = "manual";
+        lineItem.horses = bill.assignedHorses!.map((h: any) => String(h.horseId));
+      } else if (hasPeople) {
+        const firstPerson = bill.assignedPeople![0];
+        lineItem.assigneeType = "person";
+        lineItem.assigneeId = String(firstPerson.personId);
+        lineItem.assignee = String(firstPerson.personId);
+        lineItem.entityType = "person";
+        lineItem.entityId = String(firstPerson.personId);
+        lineItem.people = bill.assignedPeople!.map((p: any) => String(p.personId));
+      } else if (txn.assignType === "business") {
+        lineItem.assigneeType = "business_general";
+      }
+
+      const nextExtracted: Record<string, unknown> = {
+        ...extracted,
+        invoice_total_usd: absAmount,
+        invoice_date: extracted.invoice_date ?? txn.postingDate,
+        provider_name: extracted.provider_name ?? txn.description,
+        line_items: [lineItem],
+      };
+
+      await ctx.db.patch(bill._id, {
+        extractedData: nextExtracted,
+        // If a previous reparse attempt left the bill in error/parsing state,
+        // restore it to done since these were approved CC bills.
+        status: "done" as const,
+        errorMessage: undefined,
+      });
+
+      restored.push({ billId: bill._id, total: absAmount, description: txn.description });
+    }
+
+    return { restored, count: restored.length };
+  },
+});

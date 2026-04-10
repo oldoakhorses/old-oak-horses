@@ -871,18 +871,200 @@ export const addBillCharges = mutation({
   },
 });
 
-/** Delete a single line item from an owner invoice */
+/** Delete (omit) a single line item from an owner invoice — allowed on any status */
 export const deleteLineItem = mutation({
   args: { lineItemId: v.id("ownerInvoiceLineItems") },
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.lineItemId);
     if (!item) throw new Error("Line item not found");
-    const invoice = await ctx.db.get(item.ownerInvoiceId);
-    if (invoice && invoice.status !== "draft") throw new Error("Can only delete items from draft invoices");
     await ctx.db.delete(args.lineItemId);
     if (item.ownerInvoiceId) await recalcInvoiceTotals(ctx, item.ownerInvoiceId);
   },
 });
+
+/**
+ * Auto-add an approved bill's horse charges into any existing DRAFT owner
+ * invoices that cover the bill's period. This keeps draft invoices in sync
+ * as users continue to approve new bills during an open billing cycle.
+ *
+ * - Matches draft invoices where the bill's date falls in the invoice period
+ *   (matching by billingPeriod string YYYY-MM against the bill's date).
+ * - Skips any draft invoice that already has a line item referencing this bill.
+ * - Only inserts charges for horses that belong to the invoice's owner.
+ */
+export async function syncApprovedBillIntoDraftInvoices(
+  ctx: any,
+  billId: Id<"bills">
+): Promise<{ invoicesUpdated: number; lineItemsAdded: number }> {
+  const bill = await ctx.db.get(billId);
+  if (!bill || bill.status !== "done" || !bill.isApproved) {
+    return { invoicesUpdated: 0, lineItemsAdded: 0 };
+  }
+
+  // Resolve the bill's effective date (YYYY-MM-DD) and month key (YYYY-MM)
+  const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+  const invoiceDateStr = String(extracted.invoice_date ?? extracted.invoiceDate ?? "").trim();
+  let dateStr = "";
+  if (invoiceDateStr) {
+    const parsed = new Date(invoiceDateStr);
+    if (!isNaN(parsed.getTime())) dateStr = parsed.toISOString().slice(0, 10);
+  }
+  if (!dateStr && bill.billingPeriod) dateStr = `${bill.billingPeriod}-01`;
+  if (!dateStr) dateStr = new Date(bill.uploadedAt).toISOString().slice(0, 10);
+  const monthKey = dateStr.slice(0, 7);
+
+  // Build horse → owner + horse name map
+  const horses = await ctx.db.query("horses").collect();
+  const horseOwner = new Map<string, Id<"owners">>();
+  const horseNames = new Map<string, string>();
+  for (const h of horses) {
+    if (h.ownerId) horseOwner.set(String(h._id), h.ownerId);
+    horseNames.set(String(h._id), h.name);
+  }
+
+  // Build per-owner pending line items for this bill
+  type PendingItem = {
+    ownerId: Id<"owners">;
+    horseId?: Id<"horses">;
+    horseName?: string;
+    description: string;
+    category?: string;
+    subcategory?: string;
+    amount: number;
+    sourceLineItemIndex?: number;
+  };
+  const pending = new Map<string, PendingItem[]>();
+
+  const lineItems = getLineItems(extracted);
+  const assigned = Array.isArray(bill.assignedHorses) ? bill.assignedHorses : [];
+  const ha = Array.isArray(bill.horseAssignments) ? bill.horseAssignments : [];
+  const splits = Array.isArray(bill.splitLineItems) ? bill.splitLineItems : [];
+  const horsesPerIdx = new Map<number, number>();
+  for (const h of ha) {
+    horsesPerIdx.set(h.lineItemIndex, (horsesPerIdx.get(h.lineItemIndex) ?? 0) + 1);
+  }
+
+  let categorySlug: string | undefined;
+  if (bill.categoryId) {
+    const cat = await ctx.db.get(bill.categoryId);
+    if (cat) categorySlug = (cat as any).slug;
+  }
+
+  function pushItem(ownerId: Id<"owners">, item: Omit<PendingItem, "ownerId">) {
+    const key = String(ownerId);
+    const arr = pending.get(key) ?? [];
+    arr.push({ ownerId, ...item });
+    pending.set(key, arr);
+  }
+
+  if (assigned.length > 0) {
+    for (const row of assigned) {
+      const hId = row.horseId;
+      const oId = horseOwner.get(String(hId));
+      if (!oId) continue;
+      const horseLineIdxs = ha.filter((h: any) => String(h.horseId) === String(hId)).map((h: any) => h.lineItemIndex);
+      if (horseLineIdxs.length > 0) {
+        for (const idx of horseLineIdxs) {
+          const li = lineItems[idx] as Record<string, unknown> | undefined;
+          const split = splits.find((s: any) => s.lineItemIndex === idx);
+          const splitAmount = split?.splits.find((sp: any) => String(sp.horseId) === String(hId))?.amount;
+          const shareCount = horsesPerIdx.get(idx) ?? 1;
+          const fallbackAmount = shareCount > 1
+            ? lineItemAmount(li ?? {}) / shareCount
+            : lineItemAmount(li ?? {});
+          pushItem(oId, {
+            horseId: hId,
+            horseName: row.horseName,
+            description: String(li?.description ?? bill.fileName),
+            category: categorySlug ?? (typeof li?.category === "string" ? li.category : undefined),
+            subcategory: typeof li?.subcategory === "string" ? li.subcategory : undefined,
+            amount: round2(splitAmount ?? fallbackAmount),
+            sourceLineItemIndex: idx,
+          });
+        }
+      } else {
+        pushItem(oId, {
+          horseId: hId,
+          horseName: row.horseName,
+          description: bill.fileName,
+          category: categorySlug,
+          amount: round2(typeof row.amount === "number" ? row.amount : 0),
+        });
+      }
+    }
+  } else if (ha.length > 0) {
+    for (const row of ha) {
+      const hId = row.horseId;
+      if (!hId) continue;
+      const oId = horseOwner.get(String(hId));
+      if (!oId) continue;
+      const li = lineItems[row.lineItemIndex] as Record<string, unknown> | undefined;
+      const split = splits.find((s: any) => s.lineItemIndex === row.lineItemIndex);
+      const splitAmount = split?.splits.find((sp: any) => String(sp.horseId) === String(hId))?.amount;
+      const shareCount = horsesPerIdx.get(row.lineItemIndex) ?? 1;
+      const fallbackAmount = shareCount > 1
+        ? lineItemAmount(li ?? {}) / shareCount
+        : lineItemAmount(li ?? {});
+      pushItem(oId, {
+        horseId: hId,
+        horseName: row.horseName ?? horseNames.get(String(hId)),
+        description: String(li?.description ?? bill.fileName),
+        category: categorySlug ?? (typeof li?.category === "string" ? li.category : undefined),
+        subcategory: typeof li?.subcategory === "string" ? li.subcategory : undefined,
+        amount: round2(splitAmount ?? fallbackAmount),
+        sourceLineItemIndex: row.lineItemIndex,
+      });
+    }
+  } else {
+    // No horse assignment — nothing to auto-add for this bill
+    return { invoicesUpdated: 0, lineItemsAdded: 0 };
+  }
+
+  if (pending.size === 0) return { invoicesUpdated: 0, lineItemsAdded: 0 };
+
+  // Find draft owner invoices for these owners covering the bill's month
+  const allInvoices = await ctx.db.query("ownerInvoices").collect();
+  const touchedInvoices = new Set<string>();
+  let lineItemsAdded = 0;
+
+  for (const [ownerIdStr, items] of pending.entries()) {
+    const matches = allInvoices.filter(
+      (inv: any) => inv.status === "draft" && String(inv.ownerId) === ownerIdStr && inv.billingPeriod === monthKey
+    );
+    if (matches.length === 0) continue;
+
+    for (const inv of matches) {
+      // Skip if this bill already has line items on the invoice
+      const existing = await ctx.db
+        .query("ownerInvoiceLineItems")
+        .withIndex("by_owner_invoice", (q: any) => q.eq("ownerInvoiceId", inv._id))
+        .collect();
+      const alreadyHasBill = existing.some((i: any) => String(i.sourceBillId) === String(billId));
+      if (alreadyHasBill) continue;
+
+      for (const item of items) {
+        await ctx.db.insert("ownerInvoiceLineItems", {
+          ownerInvoiceId: inv._id,
+          sourceBillId: billId,
+          horseId: item.horseId,
+          horseName: item.horseName,
+          description: item.description,
+          category: item.category,
+          subcategory: item.subcategory,
+          amount: item.amount,
+          sourceLineItemIndex: item.sourceLineItemIndex,
+          isApproved: false,
+          createdAt: Date.now(),
+        });
+        lineItemsAdded++;
+      }
+      touchedInvoices.add(String(inv._id));
+      await recalcInvoiceTotals(ctx, inv._id);
+    }
+  }
+
+  return { invoicesUpdated: touchedInvoices.size, lineItemsAdded };
+}
 
 /** Recalculate owner invoice totals from line items */
 async function recalcInvoiceTotals(ctx: any, ownerInvoiceId: Id<"ownerInvoices">) {
