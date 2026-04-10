@@ -9,7 +9,17 @@ import styles from "@/app/dashboard/dashboard.module.css";
 
 type RecordType = "veterinary" | "medication" | "farrier" | "bodywork" | "other";
 type PanelMode = "record" | "document" | "invoice" | null;
-type DocumentTag = "coggins" | "health_certificate" | "horse_agreement" | "insurance" | "registration" | "other";
+type DocumentTag =
+  | "coggins"
+  | "health_certificate"
+  | "horse_agreement"
+  | "insurance"
+  | "registration"
+  | "contract"
+  | "id"
+  | "tax"
+  | "other";
+type DocumentSubject = "horse" | "person";
 
 type RecordFormState = {
   horseIds: Id<"horses">[];
@@ -26,7 +36,9 @@ type RecordFormState = {
 };
 
 type DocumentFormState = {
+  subject: DocumentSubject;
   horseId: Id<"horses"> | "";
+  personId: Id<"people"> | "";
   name: string;
   tag: DocumentTag | "";
   documentDate: string;
@@ -69,8 +81,28 @@ const DOCUMENT_TAG_LABELS: Record<DocumentTag, string> = {
   horse_agreement: "Horse Agreement",
   insurance: "Insurance",
   registration: "Registration",
+  contract: "Contract",
+  id: "ID",
+  tax: "Tax",
   other: "Other",
 };
+
+const HORSE_DOCUMENT_TAGS: DocumentTag[] = [
+  "coggins",
+  "health_certificate",
+  "horse_agreement",
+  "insurance",
+  "registration",
+  "other",
+];
+
+const PERSON_DOCUMENT_TAGS: DocumentTag[] = [
+  "contract",
+  "id",
+  "insurance",
+  "tax",
+  "other",
+];
 
 const recordTypeOptions: Array<{ type: RecordType; label: string }> = [
   { type: "veterinary", label: "Veterinary" },
@@ -110,7 +142,9 @@ function createInitialRecordForm(): RecordFormState {
 
 function createInitialDocumentForm(): DocumentFormState {
   return {
+    subject: "horse",
     horseId: "",
+    personId: "",
     name: "",
     tag: "",
     documentDate: getTodayDate(),
@@ -167,6 +201,7 @@ export default function GlobalFab() {
   const invoiceFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const activeHorses = useQuery(api.horses.getActiveHorses) ?? [];
+  const activePeople = useQuery(api.people.getAllPeople) ?? [];
   const categories = useQuery(api.categories.getAllCategories) ?? [];
   const recordProviderCategory = selectedRecordType ? RECORD_TYPE_TO_CATEGORY[selectedRecordType] : "";
   const recordProviders =
@@ -226,6 +261,7 @@ export default function GlobalFab() {
     if (panel !== "document" && panel !== "record" && panel !== "invoice") return;
 
     const horseId = searchParams.get("horseId") as Id<"horses"> | null;
+    const personId = searchParams.get("personId") as Id<"people"> | null;
     const date = searchParams.get("date") || undefined;
 
     if (panel === "record") {
@@ -242,17 +278,20 @@ export default function GlobalFab() {
       }
     }
 
-    if (horseId) {
-      if (panel === "document") {
-        setDocumentForm((prev) => ({ ...prev, horseId }));
-      } else {
-        setRecordForm((prev) => ({ ...prev, horseIds: prev.horseIds.includes(horseId) ? prev.horseIds : [...prev.horseIds, horseId] }));
+    if (panel === "document") {
+      if (personId) {
+        setDocumentForm((prev) => ({ ...prev, subject: "person", personId, horseId: "" }));
+      } else if (horseId) {
+        setDocumentForm((prev) => ({ ...prev, subject: "horse", horseId, personId: "" }));
       }
+    } else if (panel === "record" && horseId) {
+      setRecordForm((prev) => ({ ...prev, horseIds: prev.horseIds.includes(horseId) ? prev.horseIds : [...prev.horseIds, horseId] }));
     }
 
     const params = new URLSearchParams(searchParams.toString());
     params.delete("panel");
     params.delete("horseId");
+    params.delete("personId");
     params.delete("date");
     const next = params.toString();
     router.replace(next ? `${pathname}?${next}` : pathname);
@@ -493,8 +532,14 @@ export default function GlobalFab() {
 
   async function onUploadDocument(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!documentFile || !documentForm.horseId || !documentForm.name.trim() || !documentForm.tag) {
-      setDocumentError("File, horse, document name, and tag are required.");
+    const hasSubject =
+      documentForm.subject === "horse" ? !!documentForm.horseId : !!documentForm.personId;
+    if (!documentFile || !hasSubject || !documentForm.name.trim() || !documentForm.tag) {
+      setDocumentError(
+        documentForm.subject === "horse"
+          ? "File, horse, document name, and tag are required."
+          : "File, person, document name, and tag are required."
+      );
       return;
     }
 
@@ -520,7 +565,8 @@ export default function GlobalFab() {
       await uploadDocument({
         name: documentForm.name.trim(),
         tag: documentForm.tag,
-        horseId: documentForm.horseId,
+        horseId: documentForm.subject === "horse" ? (documentForm.horseId as Id<"horses">) : undefined,
+        personId: documentForm.subject === "person" ? (documentForm.personId as Id<"people">) : undefined,
         fileStorageId: storageId,
         fileName: documentFile.name,
         fileType: documentFile.type || undefined,
@@ -753,7 +799,9 @@ export default function GlobalFab() {
               <div className={styles.recordSuccessTitle}>document uploaded</div>
               <div className={styles.recordSuccessSub}>
                 {(documentForm.tag ? DOCUMENT_TAG_LABELS[documentForm.tag] : "Document")} —{" "}
-                {activeHorses.find((horse) => horse._id === documentForm.horseId)?.name ?? "Horse"}
+                {documentForm.subject === "person"
+                  ? activePeople.find((person) => person._id === documentForm.personId)?.name ?? "Person"
+                  : activeHorses.find((horse) => horse._id === documentForm.horseId)?.name ?? "Horse"}
               </div>
             </div>
           ) : (
@@ -803,27 +851,65 @@ export default function GlobalFab() {
                 )}
               </div>
 
-              <RecordField label="HORSE" required>
+              <RecordField label="ASSIGN TO" required>
                 <select
                   className={styles.recordInput}
-                  value={documentForm.horseId}
-                  onChange={(event) => setDocumentForm((prev) => ({ ...prev, horseId: event.target.value as Id<"horses"> | "" }))}
+                  value={documentForm.subject}
+                  onChange={(event) =>
+                    setDocumentForm((prev) => ({
+                      ...prev,
+                      subject: event.target.value as DocumentSubject,
+                      tag: "",
+                    }))
+                  }
                 >
-                  <option value="">select horse...</option>
-                  {activeHorses.map((horse) => (
-                    <option key={horse._id} value={horse._id}>
-                      {horse.name}
-                    </option>
-                  ))}
+                  <option value="horse">Horse</option>
+                  <option value="person">Team member</option>
                 </select>
               </RecordField>
+
+              {documentForm.subject === "horse" ? (
+                <RecordField label="HORSE" required>
+                  <select
+                    className={styles.recordInput}
+                    value={documentForm.horseId}
+                    onChange={(event) => setDocumentForm((prev) => ({ ...prev, horseId: event.target.value as Id<"horses"> | "" }))}
+                  >
+                    <option value="">select horse...</option>
+                    {activeHorses.map((horse) => (
+                      <option key={horse._id} value={horse._id}>
+                        {horse.name}
+                      </option>
+                    ))}
+                  </select>
+                </RecordField>
+              ) : (
+                <RecordField label="TEAM MEMBER" required>
+                  <select
+                    className={styles.recordInput}
+                    value={documentForm.personId}
+                    onChange={(event) => setDocumentForm((prev) => ({ ...prev, personId: event.target.value as Id<"people"> | "" }))}
+                  >
+                    <option value="">select team member...</option>
+                    {activePeople.map((person) => (
+                      <option key={person._id} value={person._id}>
+                        {person.name}
+                      </option>
+                    ))}
+                  </select>
+                </RecordField>
+              )}
 
               <RecordField label="DOCUMENT NAME" required>
                 <input
                   className={styles.recordInput}
                   value={documentForm.name}
                   onChange={(event) => setDocumentForm((prev) => ({ ...prev, name: event.target.value }))}
-                  placeholder="e.g., Q1 2026 Coggins - Ben"
+                  placeholder={
+                    documentForm.subject === "person"
+                      ? "e.g., 2026 Rider Contract - Lucy"
+                      : "e.g., Q1 2026 Coggins - Ben"
+                  }
                 />
               </RecordField>
 
@@ -834,12 +920,11 @@ export default function GlobalFab() {
                   onChange={(event) => setDocumentForm((prev) => ({ ...prev, tag: event.target.value as DocumentTag | "" }))}
                 >
                   <option value="">select tag...</option>
-                  <option value="coggins">Coggins</option>
-                  <option value="health_certificate">Health Certificate</option>
-                  <option value="horse_agreement">Horse Agreement</option>
-                  <option value="insurance">Insurance</option>
-                  <option value="registration">Registration</option>
-                  <option value="other">Other</option>
+                  {(documentForm.subject === "person" ? PERSON_DOCUMENT_TAGS : HORSE_DOCUMENT_TAGS).map((tag) => (
+                    <option key={tag} value={tag}>
+                      {DOCUMENT_TAG_LABELS[tag]}
+                    </option>
+                  ))}
                 </select>
               </RecordField>
 
@@ -1199,7 +1284,13 @@ export default function GlobalFab() {
               type="submit"
               form="document-form"
               className={styles.recordSaveBtn}
-              disabled={!documentFile || !documentForm.horseId || !documentForm.name.trim() || !documentForm.tag || documentUploading}
+              disabled={
+                !documentFile ||
+                (documentForm.subject === "horse" ? !documentForm.horseId : !documentForm.personId) ||
+                !documentForm.name.trim() ||
+                !documentForm.tag ||
+                documentUploading
+              }
             >
               {documentUploading ? "uploading..." : "upload document"}
             </button>

@@ -23,6 +23,7 @@ type NavAction = {
 const NAV_ITEMS = [
   { label: "dashboard", href: "/dashboard", icon: "📊" },
   { label: "horses", href: "/horses", icon: "🐴" },
+  { label: "team", href: "/team", icon: "🧑‍🤝‍🧑" },
   { label: "records", href: "/records", icon: "📋" },
   { label: "invoices", href: "/invoices", icon: "📄" },
   { label: "owners", href: "/owners", icon: "👥" },

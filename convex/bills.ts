@@ -746,6 +746,119 @@ export const getSalarySpendByPerson = query({
   }
 });
 
+/**
+ * Returns spend + recent invoices for a single person.
+ * Aggregates across personAssignments, splitPersonLineItems (invoice uploads)
+ * and assignedPeople on bills generated from CC transactions.
+ */
+export const getPersonSpendSummary = query({
+  args: { personId: v.id("people") },
+  handler: async (ctx, args) => {
+    const person = await ctx.db.get(args.personId);
+    if (!person) return null;
+
+    // Collect all approved bills. Person data lives on the bill itself, so we need to scan.
+    const allBills = (await ctx.db.query("bills").withIndex("by_uploadedAt").collect()).filter(isApprovedBill);
+
+    type InvoiceEntry = {
+      billId: string;
+      amount: number;
+      billingPeriod: string;
+      invoiceDate: number;
+      uploadedAt: number;
+      providerName: string;
+      fileName: string;
+      categorySlug?: string;
+      source?: string;
+    };
+
+    const entries: InvoiceEntry[] = [];
+    let totalSpend = 0;
+
+    const nowPeriod = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const today = new Date();
+    const currentPeriod = nowPeriod(today);
+    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const previousPeriod = nowPeriod(lastMonth);
+    let currentMonthSpend = 0;
+    let previousMonthSpend = 0;
+
+    const byCategory = new Map<string, number>();
+
+    for (const bill of allBills) {
+      let billPersonTotal = 0;
+
+      for (const row of bill.personAssignments ?? []) {
+        if (row.personId && String(row.personId) === String(args.personId)) {
+          billPersonTotal += getLineItemTotalUsdByIndex(bill.extractedData, row.lineItemIndex);
+        }
+      }
+      for (const row of bill.splitPersonLineItems ?? []) {
+        for (const split of row.splits) {
+          if (String(split.personId) === String(args.personId)) {
+            billPersonTotal += split.amount;
+          }
+        }
+      }
+      for (const row of bill.assignedPeople ?? []) {
+        if (String(row.personId) === String(args.personId)) {
+          billPersonTotal += row.amount;
+        }
+      }
+
+      if (billPersonTotal <= 0) continue;
+
+      const resolved = await resolveContactForBill(ctx, bill as any);
+      const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+      const invoiceDate = getInvoiceDateSortValue(bill);
+
+      totalSpend += billPersonTotal;
+
+      if (bill.billingPeriod === currentPeriod) currentMonthSpend += billPersonTotal;
+      if (bill.billingPeriod === previousPeriod) previousMonthSpend += billPersonTotal;
+
+      // Derive category slug (bill-level or first line item category)
+      let categorySlug: string | undefined;
+      if (bill.categoryId) {
+        const cat = await ctx.db.get(bill.categoryId);
+        if (cat && "slug" in cat) categorySlug = (cat as any).slug;
+      }
+      if (!categorySlug && Array.isArray(bill.lineItemCategories) && bill.lineItemCategories.length > 0) {
+        categorySlug = bill.lineItemCategories[0];
+      }
+      if (categorySlug) {
+        byCategory.set(categorySlug, (byCategory.get(categorySlug) ?? 0) + billPersonTotal);
+      }
+
+      entries.push({
+        billId: String(bill._id),
+        amount: billPersonTotal,
+        billingPeriod: bill.billingPeriod,
+        invoiceDate,
+        uploadedAt: bill.uploadedAt,
+        providerName: resolved?.name ?? bill.customProviderName ?? (typeof extracted.provider_name === "string" ? extracted.provider_name : "Unknown"),
+        fileName: bill.invoiceName ?? bill.fileName,
+        categorySlug,
+        source: bill.source,
+      });
+    }
+
+    entries.sort((a, b) => b.invoiceDate - a.invoiceDate);
+
+    return {
+      person,
+      totalSpend,
+      currentMonthSpend,
+      previousMonthSpend,
+      invoiceCount: entries.length,
+      byCategory: [...byCategory.entries()]
+        .map(([slug, amount]) => ({ slug, amount }))
+        .sort((a, b) => b.amount - a.amount),
+      invoices: entries,
+    };
+  },
+});
+
 export const getFeedBeddingBills = query({
   args: {
     categoryId: v.id("categories"),

@@ -1,0 +1,604 @@
+.loadingState {
+  padding: 40px;
+  text-align: center;
+  font-size: 12px;
+  color: #9ea2b0;
+}
+
+.headerCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 24px 26px;
+  margin-bottom: 20px;
+}
+
+.headerTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.personAvatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: #f2f3f7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.personName {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a2e;
+  line-height: 1.1;
+}
+
+.editNameInput {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a2e;
+  background: #f2f3f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.personMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.roleBadge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(74, 91, 219, 0.08);
+  color: #4a5bdb;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.editRoleSelect {
+  font-size: 11px;
+  padding: 6px 10px;
+  background: #f2f3f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  color: #1a1a2e;
+}
+
+.statusActive,
+.statusInactive {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.statusActive {
+  background: rgba(34, 197, 131, 0.08);
+  color: #22c583;
+}
+
+.statusInactive {
+  background: #f0f1f5;
+  color: #9ea2b0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btnFilled,
+.btnSave {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 9px 16px;
+  border-radius: 6px;
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  cursor: pointer;
+}
+
+.btnFilled:hover,
+.btnSave:hover {
+  background: #2a2a4e;
+}
+
+.btnOutlined,
+.btnCancel {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 9px 16px;
+  border-radius: 6px;
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #6b7084;
+  cursor: pointer;
+}
+
+.btnOutlined:hover,
+.btnCancel:hover {
+  border-color: #4a5bdb;
+  color: #4a5bdb;
+}
+
+.btnDelete {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 9px 16px;
+  border-radius: 6px;
+  border: none;
+  background: #e5484d;
+  color: #fff;
+  cursor: pointer;
+}
+
+.spendRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.spendTotalCard,
+.spendBreakdownCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 22px 26px;
+}
+
+.spendLabel {
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.spendTotal {
+  font-size: 28px;
+  font-weight: 700;
+  margin-top: 4px;
+  color: #1a1a2e;
+}
+
+.momUp,
+.momDown {
+  font-size: 10px;
+  margin-top: 6px;
+  font-weight: 700;
+}
+
+.momUp {
+  color: #e5484d;
+}
+
+.momDown {
+  color: #22c583;
+}
+
+.spendSubRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  margin-top: 8px;
+  border-top: 1px solid #f0f1f5;
+}
+
+.spendSubLabel {
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.spendSubValue {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.breakdownList {
+  margin-top: 10px;
+}
+
+.breakdownEmpty {
+  margin-top: 14px;
+  font-size: 11px;
+  color: #9ea2b0;
+}
+
+.breakdownRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.breakdownName {
+  font-size: 10px;
+  color: #6b7084;
+  width: 100px;
+  flex-shrink: 0;
+}
+
+.breakdownTrack {
+  height: 6px;
+  border-radius: 3px;
+  flex: 1;
+  background: #f0f1f5;
+  overflow: hidden;
+}
+
+.breakdownFill {
+  height: 100%;
+  border-radius: 3px;
+  display: block;
+}
+
+.breakdownAmount {
+  font-size: 10px;
+  font-weight: 700;
+  color: #1a1a2e;
+  width: 80px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.invoicesSection {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.sectionHeader {
+  padding: 18px 26px;
+  border-bottom: 1px solid #e8eaf0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.sectionCount {
+  font-size: 10px;
+  color: #9ea2b0;
+}
+
+.invoiceRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 26px;
+  border-bottom: 1px solid #f0f1f5;
+  text-decoration: none;
+}
+
+.invoiceRow:hover {
+  background: #fafafc;
+  cursor: pointer;
+}
+
+.invoiceRow:last-child {
+  border-bottom: none;
+}
+
+.invoiceLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.invoiceLabelBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dotApproved,
+.dotPending {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dotApproved {
+  background: #22c583;
+}
+
+.dotPending {
+  background: #d0d2d8;
+}
+
+.invoiceLabel {
+  font-size: 12px;
+  color: #1a1a2e;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.invoiceMeta {
+  font-size: 10px;
+  color: #9ea2b0;
+}
+
+.invoiceAmount {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a2e;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.emptyInvoices {
+  text-align: center;
+  font-size: 12px;
+  color: #9ea2b0;
+  padding: 40px;
+}
+
+.viewAll {
+  font-size: 10px;
+  color: #4a5bdb;
+  text-align: center;
+  padding: 12px;
+  cursor: pointer;
+  border-top: 1px solid #f0f1f5;
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  width: 100%;
+}
+
+.documentsCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.documentsHeader {
+  padding: 18px 26px;
+  border-bottom: 1px solid #e8eaf0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.documentsTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.documentsCount {
+  font-size: 10px;
+  color: #9ea2b0;
+  margin-top: 2px;
+}
+
+.btnAddDoc {
+  font-size: 10px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #6b7084;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btnAddDoc:hover {
+  border-color: #4a5bdb;
+  color: #4a5bdb;
+}
+
+.docHeader {
+  display: grid;
+  grid-template-columns: 1fr 140px 120px 40px;
+  padding: 10px 26px;
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e8eaf0;
+}
+
+.docRow {
+  display: grid;
+  grid-template-columns: 1fr 140px 120px 40px;
+  padding: 12px 26px;
+  align-items: center;
+  border-bottom: 1px solid #f0f1f5;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.docRow:hover {
+  background: #fafafc;
+}
+
+.docRow:last-child {
+  border-bottom: none;
+}
+
+.docName {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a2e;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tagBadge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: capitalize;
+  display: inline-block;
+  width: fit-content;
+}
+
+.docDate {
+  font-size: 11px;
+  color: #6b7084;
+}
+
+.docMenuWrap {
+  position: relative;
+}
+
+.docMenuButton {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #9ea2b0;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.docMenuButton:hover {
+  background: #f2f3f7;
+}
+
+.docMenuDropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  padding: 6px 0;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 20;
+}
+
+.docMenuItem {
+  font-size: 11px;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: #6b7084;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.docMenuItem:hover {
+  background: #fafafc;
+}
+
+.docMenuDivider {
+  border-top: 1px solid #e8eaf0;
+  margin: 4px 0;
+}
+
+.docMenuItemDanger {
+  color: #e5484d;
+}
+
+.documentsEmpty {
+  text-align: center;
+  font-size: 12px;
+  color: #9ea2b0;
+  padding: 40px 26px;
+}
+
+.documentsEmptyTitle {
+  font-weight: 700;
+}
+
+.documentsEmptySub {
+  margin-top: 6px;
+}
+
+.deleteText {
+  margin: 0 0 18px;
+  font-size: 12px;
+  color: #6b7084;
+  line-height: 1.5;
+}
+
+.deleteActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 920px) {
+  .spendRow {
+    grid-template-columns: 1fr;
+  }
+
+  .headerTop {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .headerActions {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 640px) {
+  .personName {
+    font-size: 22px;
+  }
+
+  .spendTotal {
+    font-size: 22px;
+  }
+
+  .docHeader {
+    display: none;
+  }
+
+  .docRow {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}

@@ -1,18 +1,24 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
+const DOCUMENT_TAG_VALIDATOR = v.union(
+  v.literal("coggins"),
+  v.literal("health_certificate"),
+  v.literal("horse_agreement"),
+  v.literal("insurance"),
+  v.literal("registration"),
+  v.literal("contract"),
+  v.literal("id"),
+  v.literal("tax"),
+  v.literal("other")
+);
+
 export const upload = mutation({
   args: {
     name: v.string(),
-    tag: v.union(
-      v.literal("coggins"),
-      v.literal("health_certificate"),
-      v.literal("horse_agreement"),
-      v.literal("insurance"),
-      v.literal("registration"),
-      v.literal("other")
-    ),
-    horseId: v.id("horses"),
+    tag: DOCUMENT_TAG_VALIDATOR,
+    horseId: v.optional(v.id("horses")),
+    personId: v.optional(v.id("people")),
     fileStorageId: v.id("_storage"),
     fileName: v.string(),
     fileType: v.optional(v.string()),
@@ -21,6 +27,9 @@ export const upload = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    if (!args.horseId && !args.personId) {
+      throw new Error("Document must be associated with a horse or a person");
+    }
     return await ctx.db.insert("documents", {
       ...args,
       name: args.name.trim(),
@@ -36,6 +45,26 @@ export const listByHorse = query({
     const rows = await ctx.db
       .query("documents")
       .withIndex("by_horse", (q) => q.eq("horseId", args.horseId))
+      .collect();
+
+    const withUrls = await Promise.all(
+      rows.map(async (row) => ({
+        ...row,
+        fileUrl: await ctx.storage.getUrl(row.fileStorageId),
+      }))
+    );
+    return withUrls.sort(
+      (a, b) => (b.documentDate ?? b.uploadedAt) - (a.documentDate ?? a.uploadedAt)
+    );
+  },
+});
+
+export const listByPerson = query({
+  args: { personId: v.id("people") },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("documents")
+      .withIndex("by_person", (q) => q.eq("personId", args.personId))
       .collect();
 
     const withUrls = await Promise.all(

@@ -11,7 +11,16 @@ import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
 import styles from "./profile.module.css";
 
-type DocumentTag = "coggins" | "health_certificate" | "horse_agreement" | "insurance" | "registration" | "other";
+type DocumentTag =
+  | "coggins"
+  | "health_certificate"
+  | "horse_agreement"
+  | "insurance"
+  | "registration"
+  | "contract"
+  | "id"
+  | "tax"
+  | "other";
 type RecordType = "veterinary" | "medication" | "farrier" | "bodywork" | "other";
 
 type HorseRecord = {
@@ -84,6 +93,9 @@ const TAG_COLORS: Record<DocumentTag, { bg: string; color: string }> = {
   horse_agreement: { bg: "rgba(245,158,11,0.08)", color: "#F59E0B" },
   insurance: { bg: "rgba(236,72,153,0.08)", color: "#EC4899" },
   registration: { bg: "rgba(167,139,250,0.08)", color: "#A78BFA" },
+  contract: { bg: "rgba(245,158,11,0.08)", color: "#F59E0B" },
+  id: { bg: "rgba(74,91,219,0.08)", color: "#4A5BDB" },
+  tax: { bg: "rgba(34,197,131,0.08)", color: "#22C583" },
   other: { bg: "#F0F1F5", color: "#6B7084" },
 };
 
@@ -93,6 +105,9 @@ const TAG_LABELS: Record<DocumentTag, string> = {
   horse_agreement: "Agreement",
   insurance: "Insurance",
   registration: "Registration",
+  contract: "Contract",
+  id: "ID",
+  tax: "Tax",
   other: "Other",
 };
 

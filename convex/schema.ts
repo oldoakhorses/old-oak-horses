@@ -322,9 +322,13 @@ export default defineSchema({
       v.literal("horse_agreement"),
       v.literal("insurance"),
       v.literal("registration"),
+      v.literal("contract"),
+      v.literal("id"),
+      v.literal("tax"),
       v.literal("other")
     ),
-    horseId: v.id("horses"),
+    horseId: v.optional(v.id("horses")),
+    personId: v.optional(v.id("people")),
     fileStorageId: v.id("_storage"),
     fileName: v.string(),
     fileType: v.optional(v.string()),
@@ -334,6 +338,7 @@ export default defineSchema({
     notes: v.optional(v.string())
   })
     .index("by_horse", ["horseId"])
+    .index("by_person", ["personId"])
     .index("by_tag", ["tag"]),
 
   people: defineTable({

@@ -17,6 +17,11 @@ export const getAllPeople = query(async (ctx) => {
   });
 });
 
+export const listAll = query(async (ctx) => {
+  const rows = await ctx.db.query("people").collect();
+  return rows.sort((a, b) => a.name.localeCompare(b.name));
+});
+
 export const list = query(async (ctx) => {
   const rows = await ctx.db.query("people").withIndex("by_active", (q) => q.eq("isActive", true)).collect();
   return rows.sort((a, b) => {
@@ -78,6 +83,16 @@ export const deactivatePerson = mutation({
     const row = await ctx.db.get(args.id);
     if (!row) throw new Error("Person not found");
     await ctx.db.patch(args.id, { isActive: false });
+    return args.id;
+  }
+});
+
+export const setPersonActive = mutation({
+  args: { id: v.id("people"), isActive: v.boolean() },
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.id);
+    if (!row) throw new Error("Person not found");
+    await ctx.db.patch(args.id, { isActive: args.isActive });
     return args.id;
   }
 });
