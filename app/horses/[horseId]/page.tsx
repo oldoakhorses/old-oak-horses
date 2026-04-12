@@ -720,7 +720,7 @@ export default function HorseProfilePage() {
                                   <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10, color: "#4A5BDB", cursor: "pointer" }}>
                                     <input
                                       type="file"
-                                      accept=".pdf,.jpg,.jpeg,.png"
+                                      accept=".pdf,.jpg,.jpeg,.png,.mp4,.mov,.webm"
                                       style={{ display: "none" }}
                                       onChange={(event) => {
                                         event.stopPropagation();

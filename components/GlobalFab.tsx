@@ -822,7 +822,7 @@ export default function GlobalFab() {
                 <input
                   ref={documentFileInputRef}
                   type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  accept=".pdf,.jpg,.jpeg,.png,.mp4,.mov,.webm"
                   className={styles.fileInput}
                   onChange={(event: ChangeEvent<HTMLInputElement>) => handleDocumentFileSelect(event.target.files?.[0] ?? null)}
                 />
@@ -831,7 +831,7 @@ export default function GlobalFab() {
                     <div className={styles.docDropzoneIcon}>📄</div>
                     <div className={styles.docDropzoneTitle}>drop file here</div>
                     <div className={styles.docDropzoneBrowse}>or click to browse</div>
-                    <div className={styles.docDropzoneTypes}>PDF, JPG, PNG — max 10MB</div>
+                    <div className={styles.docDropzoneTypes}>PDF, JPG, PNG, MP4, MOV — max 10MB</div>
                   </>
                 ) : (
                   <>
@@ -1247,7 +1247,7 @@ export default function GlobalFab() {
                 <input
                   type="file"
                   className={styles.fileInput}
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  accept=".pdf,.jpg,.jpeg,.png,.mp4,.mov,.webm"
                   onChange={(e) => {
                     void handleRecordAttachmentSelect(e.target.files?.[0] ?? null);
                   }}
@@ -1255,7 +1255,7 @@ export default function GlobalFab() {
                 <div className={styles.dropZoneText}>
                   drop file or <span className={styles.dropZoneBrowse}>browse</span>
                 </div>
-                <div className={styles.dropZoneSubtext}>PDF, JPG, PNG — max 10MB</div>
+                <div className={styles.dropZoneSubtext}>PDF, JPG, PNG, MP4, MOV — max 10MB</div>
                 {recordAttachment ? <div className={styles.dropZoneFile}>{recordAttachment.name}</div> : null}
                 {recordDetecting ? <div className={styles.dropZoneFile}>detecting report...</div> : null}
               </label>
