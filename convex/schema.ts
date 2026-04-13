@@ -219,6 +219,9 @@ export default defineSchema({
     status: v.union(v.literal("active"), v.literal("inactive"), v.literal("past")),
     isSold: v.optional(v.boolean()),
     soldDate: v.optional(v.number()),
+    /** Timestamp when horse became inactive/past. Used to determine if
+     *  a horse was active at the time a bill was uploaded. */
+    inactiveSince: v.optional(v.number()),
     createdAt: v.number()
   })
     .index("by_name", ["name"])

@@ -115,6 +115,7 @@ export const setHorseStatus = mutation({
       status: "active" | "inactive";
       isSold?: boolean;
       soldDate?: number | undefined;
+      inactiveSince?: number | undefined;
     } = { status: args.status };
 
     if (args.isSold) {
@@ -124,6 +125,13 @@ export const setHorseStatus = mutation({
     if (args.status === "active") {
       updates.isSold = false;
       updates.soldDate = undefined;
+      updates.inactiveSince = undefined;
+    } else {
+      // Mark when horse became inactive
+      const horse = await ctx.db.get(args.horseId);
+      if (horse && !horse.inactiveSince) {
+        updates.inactiveSince = Date.now();
+      }
     }
 
     await ctx.db.patch(args.horseId, updates);

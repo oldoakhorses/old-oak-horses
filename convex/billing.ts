@@ -228,6 +228,8 @@ export const previewBillingPeriod = query({
     for (const bill of approvedBills) {
       const alreadyBilled = existingBillIds.has(String(bill._id));
       const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+      // Skip credit bills (deposits/money-in) — not charges to bill out
+      if (extracted.isCredit === true) continue;
       const lineItems = getLineItems(extracted);
 
       // Get horse assignments for this bill
@@ -334,6 +336,9 @@ export const generateOwnerInvoices = mutation({
       if (existingBillIds.has(String(bill._id))) continue;
 
       const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+      // Skip credit bills (deposits/money-in) — not charges to bill out
+      if (extracted.isCredit === true) continue;
+
       const lineItems = getLineItems(extracted);
       const assigned = Array.isArray(bill.assignedHorses) ? bill.assignedHorses : [];
       const ha = Array.isArray(bill.horseAssignments) ? bill.horseAssignments : [];
@@ -422,16 +427,19 @@ export const generateOwnerInvoices = mutation({
       }
     }
 
-    // ── Business General charges: split evenly across each owner's active horses ──
+    // ── Business General charges: split evenly across ALL active horses ──
     // Find bills that are business_general (no horse assignment, assignType not horse/person)
+    // Exclude credit bills (deposits/money-in) — they are not charges to bill out
     const businessGeneralBills = approvedBills.filter((b) => {
       if (existingBillIds.has(String(b._id))) return false;
+      // Skip credit bills (money coming in)
+      const ext = (b.extractedData ?? {}) as Record<string, unknown>;
+      if (ext.isCredit === true) return false;
       // Already processed above as horse-assigned
       if (Array.isArray(b.assignedHorses) && b.assignedHorses.length > 0) return false;
       if (Array.isArray(b.horseAssignments) && (b.horseAssignments as any[]).length > 0) return false;
       // Check if it's a business or business_general bill
-      const extracted = (b.extractedData ?? {}) as Record<string, unknown>;
-      const lineItems = Array.isArray(extracted.line_items) ? extracted.line_items as any[] : [];
+      const lineItems = Array.isArray(ext.line_items) ? ext.line_items as any[] : [];
       const isBusiness = (b as any).assignType === "business"
         || (!b.assignedPeople || b.assignedPeople.length === 0)
           && lineItems.some((li: any) => li.assigneeType === "business_general");
@@ -443,68 +451,83 @@ export const generateOwnerInvoices = mutation({
 
     if (businessGeneralBills.length > 0) {
       // Build map: ownerId -> active horse list
+      // A horse counts as "active at bill time" if it is currently active OR
+      // if it became inactive after the bill was uploaded (inactiveSince > bill.uploadedAt).
       const ownerHorses = new Map<string, Array<{ id: Id<"horses">; name: string }>>();
+      // Collect ALL active horses (across all owners) for the denominator
+      const allActiveHorses: Array<{ id: Id<"horses">; name: string; ownerId: string }> = [];
       for (const h of horses) {
-        if (!h.ownerId || h.status !== "active" || h.isSold) continue;
+        if (!h.ownerId || h.isSold) continue;
+        // Horse is eligible if currently active, or became inactive after
+        // the billing period started (i.e. was still active when bills were uploaded)
+        const isCurrentlyActive = h.status === "active";
+        const wasActiveInPeriod = h.inactiveSince
+          ? h.inactiveSince >= (new Date(args.billingPeriod + "-01").getTime())
+          : false;
+        if (!isCurrentlyActive && !wasActiveInPeriod) continue;
         const key = String(h.ownerId);
         const list = ownerHorses.get(key) ?? [];
         list.push({ id: h._id, name: h.name });
         ownerHorses.set(key, list);
+        allActiveHorses.push({ id: h._id, name: h.name, ownerId: key });
       }
 
-      for (const bill of businessGeneralBills) {
-        const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
-        const lineItems = getLineItems(extracted);
-        const providerName = String(extracted.provider_name ?? extracted.providerName ?? bill.fileName ?? "");
-        let categorySlug: string | undefined;
-        if (bill.categoryId) {
-          const cat = await ctx.db.get(bill.categoryId);
-          if (cat) categorySlug = (cat as any).slug;
-        }
+      const totalActiveHorses = allActiveHorses.length;
+      if (totalActiveHorses === 0) {
+        // No active horses — skip business general entirely
+      } else {
+        for (const bill of businessGeneralBills) {
+          const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+          const lineItems = getLineItems(extracted);
+          const providerName = String(extracted.provider_name ?? extracted.providerName ?? bill.fileName ?? "");
+          let categorySlug: string | undefined;
+          if (bill.categoryId) {
+            const cat = await ctx.db.get(bill.categoryId);
+            if (cat) categorySlug = (cat as any).slug;
+          }
 
-        // For each owner that has active horses, split this bill's total
-        for (const [ownerIdStr, ownerHorseList] of ownerHorses.entries()) {
-          if (ownerHorseList.length === 0) continue;
-          const items = ownerItems.get(ownerIdStr) ?? [];
+          // Split across ALL active horses, grouped back per owner
+          for (const [ownerIdStr, ownerHorseList] of ownerHorses.entries()) {
+            if (ownerHorseList.length === 0) continue;
+            const items = ownerItems.get(ownerIdStr) ?? [];
 
-          if (lineItems.length > 0) {
-            // Split each line item across all owner's horses
-            for (let idx = 0; idx < lineItems.length; idx++) {
-              const li = lineItems[idx] as Record<string, unknown>;
-              const liAmount = lineItemAmount(li);
-              if (liAmount === 0) continue;
-              const perHorse = round2(liAmount / ownerHorseList.length);
+            if (lineItems.length > 0) {
+              for (let idx = 0; idx < lineItems.length; idx++) {
+                const li = lineItems[idx] as Record<string, unknown>;
+                const liAmount = lineItemAmount(li);
+                if (liAmount === 0) continue;
+                const perHorse = round2(liAmount / totalActiveHorses);
+                for (const horse of ownerHorseList) {
+                  items.push({
+                    sourceBillId: bill._id,
+                    horseId: horse.id,
+                    horseName: horse.name,
+                    description: `${String(li.description ?? providerName)} (shared)`,
+                    category: categorySlug ?? (typeof li.category === "string" ? li.category : undefined),
+                    subcategory: typeof li.subcategory === "string" ? li.subcategory : undefined,
+                    amount: perHorse,
+                    sourceLineItemIndex: idx,
+                  });
+                }
+              }
+            } else {
+              const total = typeof extracted.invoice_total_usd === "number"
+                ? extracted.invoice_total_usd : 0;
+              if (total === 0) continue;
+              const perHorse = round2(total / totalActiveHorses);
               for (const horse of ownerHorseList) {
                 items.push({
                   sourceBillId: bill._id,
                   horseId: horse.id,
                   horseName: horse.name,
-                  description: `${String(li.description ?? providerName)} (shared)`,
-                  category: categorySlug ?? (typeof li.category === "string" ? li.category : undefined),
-                  subcategory: typeof li.subcategory === "string" ? li.subcategory : undefined,
+                  description: `${providerName || bill.fileName} (shared)`,
+                  category: categorySlug,
                   amount: perHorse,
-                  sourceLineItemIndex: idx,
                 });
               }
             }
-          } else {
-            // Bill has no line items — split total as single charge
-            const total = typeof extracted.invoice_total_usd === "number"
-              ? extracted.invoice_total_usd : 0;
-            if (total === 0) continue;
-            const perHorse = round2(total / ownerHorseList.length);
-            for (const horse of ownerHorseList) {
-              items.push({
-                sourceBillId: bill._id,
-                horseId: horse.id,
-                horseName: horse.name,
-                description: `${providerName || bill.fileName} (shared)`,
-                category: categorySlug,
-                amount: perHorse,
-              });
-            }
+            ownerItems.set(ownerIdStr, items);
           }
-          ownerItems.set(ownerIdStr, items);
         }
       }
     }
@@ -1131,6 +1154,9 @@ export const createOwnerInvoiceForOwner = mutation({
 
     for (const bill of approvedBills) {
       const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+      // Skip credit bills (deposits/money-in) — not charges to bill out
+      if (extracted.isCredit === true) continue;
+
       const lineItems = getLineItems(extracted);
       const assigned = Array.isArray(bill.assignedHorses) ? bill.assignedHorses : [];
       const ha = Array.isArray(bill.horseAssignments) ? bill.horseAssignments : [];
@@ -1197,14 +1223,27 @@ export const createOwnerInvoiceForOwner = mutation({
       }
     }
 
-    // Business-general charges: split evenly across this owner's active horses
+    // Business-general charges: split evenly across ALL active horses (not just this owner's)
+    // Then only include the line items for this owner's horses.
+    // Exclude credit bills (deposits/money-in).
     const activeHorses = ownerHorses.filter((h) => h.status === "active" && !h.isSold);
-    if (activeHorses.length > 0) {
+    // Count ALL active horses across all owners for the denominator
+    const totalActiveHorseCount = horses.filter((h) => {
+      if (h.isSold) return false;
+      if (h.status === "active") return true;
+      // Was active in billing period
+      if (h.inactiveSince && h.inactiveSince >= new Date(args.billingPeriod + "-01").getTime()) return true;
+      return false;
+    }).length;
+
+    if (activeHorses.length > 0 && totalActiveHorseCount > 0) {
       const businessGeneralBills = approvedBills.filter((b) => {
+        // Skip credits
+        const ext = (b.extractedData ?? {}) as Record<string, unknown>;
+        if (ext.isCredit === true) return false;
         if (Array.isArray(b.assignedHorses) && b.assignedHorses.length > 0) return false;
         if (Array.isArray(b.horseAssignments) && (b.horseAssignments as any[]).length > 0) return false;
-        const extracted = (b.extractedData ?? {}) as Record<string, unknown>;
-        const lis = Array.isArray(extracted.line_items) ? extracted.line_items as any[] : [];
+        const lis = Array.isArray(ext.line_items) ? ext.line_items as any[] : [];
         const isBusiness = (b as any).assignType === "business"
           || (!b.assignedPeople || b.assignedPeople.length === 0)
             && lis.some((li: any) => li.assigneeType === "business_general");
@@ -1227,7 +1266,7 @@ export const createOwnerInvoiceForOwner = mutation({
             const li = lineItems[idx] as Record<string, unknown>;
             const liAmount = lineItemAmount(li);
             if (liAmount === 0) continue;
-            const perHorse = round2(liAmount / activeHorses.length);
+            const perHorse = round2(liAmount / totalActiveHorseCount);
             for (const horse of activeHorses) {
               items.push({
                 sourceBillId: bill._id,
@@ -1244,7 +1283,7 @@ export const createOwnerInvoiceForOwner = mutation({
         } else {
           const total = typeof extracted.invoice_total_usd === "number" ? extracted.invoice_total_usd : 0;
           if (total === 0) continue;
-          const perHorse = round2(total / activeHorses.length);
+          const perHorse = round2(total / totalActiveHorseCount);
           for (const horse of activeHorses) {
             items.push({
               sourceBillId: bill._id,
