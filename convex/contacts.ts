@@ -176,6 +176,7 @@ export const updateContact = mutation({
     accountNumber: v.optional(v.string()),
     fullName: v.optional(v.string()),
     contactName: v.optional(v.string()),
+    contactStatus: v.optional(v.union(v.literal("active"), v.literal("invoice_only"))),
   },
   handler: async (ctx, args) => {
     const contactId = args.contactId ?? args.id;
@@ -200,6 +201,7 @@ export const updateContact = mutation({
       accountNumber: args.accountNumber !== undefined ? trimOrUndefined(args.accountNumber) : undefined,
       fullName: args.fullName !== undefined ? trimOrUndefined(args.fullName) : undefined,
       contactName: args.contactName !== undefined ? trimOrUndefined(args.contactName) : undefined,
+      contactStatus: args.contactStatus,
     } as const;
     const updates = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
     if (args.location !== undefined && !normalizeLocation(args.location)) {

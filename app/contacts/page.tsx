@@ -85,6 +85,7 @@ const EMPTY_FORM: ContactFormState = {
 };
 
 export default function ContactsPage() {
+  const [tab, setTab] = useState<"active" | "invoice_only">("active");
   const [locationFilter, setLocationFilter] = useState<LocationValue>("all");
   const [search, setSearch] = useState("");
   const [sortColumn, setSortColumn] = useState<SortColumn>(null);
@@ -104,13 +105,24 @@ export default function ContactsPage() {
 
   const createContact = useMutation(api.contacts.createContact);
   const deleteContact = useMutation(api.contacts.deleteContact);
+  const updateContact = useMutation(api.contacts.updateContact);
 
   const providerLookup = useMemo(() => new Map(providers.map((provider) => [String(provider._id), provider])), [providers]);
 
+  const tabContacts = useMemo(() => {
+    return contacts.filter((c) => {
+      const status = (c as any).contactStatus ?? "active";
+      return status === tab;
+    });
+  }, [contacts, tab]);
+
+  const activeCount = useMemo(() => contacts.filter((c) => ((c as any).contactStatus ?? "active") === "active").length, [contacts]);
+  const invoiceOnlyCount = useMemo(() => contacts.filter((c) => ((c as any).contactStatus) === "invoice_only").length, [contacts]);
+
   const filteredContacts = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return contacts;
-    return contacts.filter((contact) => {
+    if (!query) return tabContacts;
+    return tabContacts.filter((contact) => {
       const provider = contact.providerId ? providerLookup.get(String(contact.providerId)) : null;
       const providerName = contact.providerName ?? contact.company ?? provider?.name ?? "";
       const location = (contact.location as Exclude<LocationValue, "all"> | undefined) ?? "";
@@ -119,7 +131,7 @@ export default function ContactsPage() {
       const haystack = [contact.name, providerName, locationLabel, category].join(" ").toLowerCase();
       return haystack.includes(query);
     });
-  }, [contacts, providerLookup, search]);
+  }, [tabContacts, providerLookup, search]);
 
   const sortedContacts = useMemo(() => {
     const rows = [...filteredContacts];
@@ -256,6 +268,23 @@ export default function ContactsPage() {
             <option value="can">CAN</option>
           </select>
         </section>
+
+        <div className={styles.tabs}>
+          <button
+            type="button"
+            className={`${styles.tab} ${tab === "active" ? styles.tabActive : ""}`}
+            onClick={() => setTab("active")}
+          >
+            active <span className={styles.tabCount}>{activeCount}</span>
+          </button>
+          <button
+            type="button"
+            className={`${styles.tab} ${tab === "invoice_only" ? styles.tabActive : ""}`}
+            onClick={() => setTab("invoice_only")}
+          >
+            invoice only <span className={styles.tabCount}>{invoiceOnlyCount}</span>
+          </button>
+        </div>
 
         <section className={styles.contactsCard}>
           {isAdding ? (
@@ -401,6 +430,18 @@ export default function ContactsPage() {
                             }}
                           >
                             Edit Contact
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.menuItem}
+                            onClick={async () => {
+                              setOpenMenuId(null);
+                              const currentStatus = (contact as any).contactStatus ?? "active";
+                              const newStatus = currentStatus === "active" ? "invoice_only" : "active";
+                              await updateContact({ contactId: contact._id, contactStatus: newStatus });
+                            }}
+                          >
+                            {((contact as any).contactStatus ?? "active") === "active" ? "Move to Invoice Only" : "Move to Active"}
                           </button>
                           <div className={styles.menuDivider} />
                           <button type="button" className={`${styles.menuItem} ${styles.menuItemDanger}`} onClick={() => handleDeleteContact(contactId)}>

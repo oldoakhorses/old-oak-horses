@@ -265,6 +265,8 @@ export default defineSchema({
     extractionPrompt: v.optional(v.string()),
     expectedFields: v.optional(v.array(v.string())),
     notes: v.optional(v.string()),
+    /** "active" (default) or "invoice_only" — controls which tab the contact appears in */
+    contactStatus: v.optional(v.union(v.literal("active"), v.literal("invoice_only"))),
     createdAt: v.number(),
     updatedAt: v.optional(v.number())
   })

@@ -603,3 +603,43 @@
     width: 100%;
   }
 }
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 0;
+  border-bottom: 1px solid #e8eaf0;
+}
+
+.tab {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 20px;
+  border: none;
+  background: none;
+  color: #9ea2b0;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  text-transform: lowercase;
+}
+
+.tab:hover {
+  color: #1a1a2e;
+}
+
+.tabActive {
+  color: #4a5bdb;
+  border-bottom-color: #4a5bdb;
+}
+
+.tabCount {
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(158, 162, 176, 0.15);
+  color: inherit;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-left: 4px;
+}
