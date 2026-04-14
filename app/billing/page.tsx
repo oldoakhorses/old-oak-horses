@@ -88,6 +88,8 @@ export default function BillingPage() {
   const statements = useQuery(api.ccReconcile.listStatements) ?? [];
   const uploadStatement = useMutation(api.ccReconcile.uploadStatement);
   const deleteStatement = useMutation(api.ccReconcile.deleteStatement);
+  const cleanCcBillNames = useMutation(api.ccReconcile.cleanCcBillNames);
+  const [cleaningNames, setCleaningNames] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -109,6 +111,20 @@ export default function BillingPage() {
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function handleCleanCcBillNames() {
+    if (cleaningNames) return;
+    if (!confirm("Clean up invoice names for all CC-statement bills? This will match against existing contacts and rename.")) return;
+    setCleaningNames(true);
+    try {
+      const result = await cleanCcBillNames();
+      alert(`Renamed ${result.updated} of ${result.totalCcBills} CC bills (${result.matched} linked to contacts).`);
+    } catch {
+      alert("Failed to clean CC bill names");
+    } finally {
+      setCleaningNames(false);
     }
   }
 
@@ -189,17 +205,27 @@ export default function BillingPage() {
               <div className={styles.sectionTitle}>1. credit card statements</div>
               <div className={styles.sectionSub}>upload, review, and approve line items from CSV bank statements</div>
             </div>
-            <label className={styles.btnUpload}>
-              {uploading ? "uploading..." : "upload CSV"}
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".csv"
-                style={{ display: "none" }}
-                onChange={handleCSVUpload}
-                disabled={uploading}
-              />
-            </label>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button
+                type="button"
+                className={styles.rowActionLink}
+                onClick={() => void handleCleanCcBillNames()}
+                disabled={cleaningNames}
+              >
+                {cleaningNames ? "cleaning..." : "clean names"}
+              </button>
+              <label className={styles.btnUpload}>
+                {uploading ? "uploading..." : "upload CSV"}
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".csv"
+                  style={{ display: "none" }}
+                  onChange={handleCSVUpload}
+                  disabled={uploading}
+                />
+              </label>
+            </div>
           </div>
 
           {statements.length > 0 ? (

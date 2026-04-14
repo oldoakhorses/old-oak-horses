@@ -88,6 +88,8 @@ export default function ContactDetailPage() {
     website: "",
     accountNumber: "",
     category: "",
+    location: "",
+    notes: "",
   });
 
   function startEdit() {
@@ -102,6 +104,8 @@ export default function ContactDetailPage() {
       website: contact.website ?? "",
       accountNumber: contact.accountNumber ?? "",
       category: contact.category ?? "",
+      location: contact.location ?? "",
+      notes: contact.notes ?? "",
     });
     setEditing(true);
   }
@@ -121,6 +125,8 @@ export default function ContactDetailPage() {
         website: editForm.website || undefined,
         accountNumber: editForm.accountNumber || undefined,
         category: editForm.category || undefined,
+        location: editForm.location || undefined,
+        notes: editForm.notes || undefined,
       });
       setEditing(false);
     } catch {
@@ -223,6 +229,28 @@ export default function ContactDetailPage() {
                 <option value="equity">Equity</option>
               </select>
             </div>
+            <div className={styles.editField}>
+              <span className={styles.label}>LOCATION</span>
+              <select className={styles.editInput} value={editForm.location} onChange={(e) => setEditForm((p) => ({ ...p, location: e.target.value }))}>
+                <option value="">— select location —</option>
+                <option value="wellington">Wellington</option>
+                <option value="thermal">Thermal</option>
+                <option value="ocala">Ocala</option>
+                <option value="la">LA</option>
+                <option value="eu">EU</option>
+                <option value="can">Canada</option>
+              </select>
+            </div>
+            <div className={styles.editField} style={{ gridColumn: "1 / -1" }}>
+              <span className={styles.label}>NOTES</span>
+              <textarea
+                className={styles.editInput}
+                value={editForm.notes}
+                onChange={(e) => setEditForm((p) => ({ ...p, notes: e.target.value }))}
+                rows={3}
+                style={{ resize: "vertical", minHeight: 60, fontFamily: "inherit" }}
+              />
+            </div>
             <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, marginTop: 8 }}>
               <button type="button" className={styles.cancelBtn} onClick={() => setEditing(false)}>cancel</button>
               <button type="button" className={styles.saveBtn} disabled={saving} onClick={() => void handleSave()}>
@@ -255,6 +283,9 @@ export default function ContactDetailPage() {
             ) : null}
             {contact.location ? (
               <div><span className={styles.label}>LOCATION</span><span className={styles.value}>{contact.location}</span></div>
+            ) : null}
+            {contact.notes ? (
+              <div style={{ gridColumn: "1 / -1" }}><span className={styles.label}>NOTES</span><span className={styles.value} style={{ whiteSpace: "pre-wrap" }}>{contact.notes}</span></div>
             ) : null}
           </div>
         )}

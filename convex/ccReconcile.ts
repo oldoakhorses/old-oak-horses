@@ -20,6 +20,107 @@ function extractKeywords(desc: string): string[] {
   return norm.split(" ").filter((w) => w.length > 2 && !noise.has(w));
 }
 
+/** Strip payment-processor noise and locations from a raw CC description. */
+function cleanCcDescription(raw: string): string {
+  let s = (raw ?? "").toString().trim();
+  if (!s) return "";
+
+  // Strip leading transaction-type prefixes
+  s = s.replace(/^(ACH\s+(DEBIT|CREDIT)|POS\s+(DEBIT|PURCHASE)|DEBIT\s+PURCHASE|CHECKCARD|PURCHASE\s+AUTHORIZED\s+ON(\s+\d{2}\/\d{2})?|RECURRING\s+PAYMENT)\s*/i, "");
+
+  // Strip payment processor prefixes: SQ *, TST*, SP *, PAYPAL *, IN *, PY *, PP *, SQU*, TSTT*
+  s = s.replace(/^(SQ|SQU|TST|TSTT|SP|SPK|PAYPAL|PY|PP|IN|INT|VENMO|STRIPE|CASH\s+APP)\s*\*+\s*/i, "");
+
+  // Special-case Amazon variants
+  s = s.replace(/^(AMZN\s+Mktp(\s+US)?|AMAZON\.COM|AMAZON\s+MKTPLACE)\b.*$/i, "Amazon");
+  s = s.replace(/^AMZN\s+DIGITAL.*$/i, "Amazon Digital");
+
+  // Strip trailing " CC:" / " CC#" / " CC" tags
+  s = s.replace(/\s+CC[:#]?\s*$/i, "");
+
+  // Strip trailing long phone number patterns
+  s = s.replace(/\s+\+?\d{3}[-.\s]?\d{3}[-.\s]?\d{4}.*$/, "");
+  s = s.replace(/\s+\d{10,}.*$/, "");
+
+  // Strip trailing store / transaction ref numbers (" #12345", " 12345", " No. 1234")
+  s = s.replace(/\s+#\s*\d{3,}.*$/, "");
+  s = s.replace(/\s+NO\.?\s*\d{3,}.*$/i, "");
+  s = s.replace(/\s+\d{4,}\s*$/, "");
+
+  // Strip trailing known cities (with optional state abbrev)
+  const cities = [
+    "WELLINGTON", "THERMAL", "OCALA", "LOS ANGELES", "MIAMI", "ORLANDO",
+    "PALM BEACH", "WEST PALM BCH", "W PALM BCH", "LAKE WORTH", "LOXAHATCHEE",
+    "BOCA RATON", "DEERFIELD BCH", "JUPITER", "TAMPA", "GAINESVILLE",
+    "LEXINGTON", "LOUISVILLE", "SARATOGA", "SAN FRANCISCO", "NEW YORK",
+    "TORONTO", "VANCOUVER", "MONTREAL", "LONDON", "PARIS", "AMSTERDAM"
+  ];
+  const cityRe = new RegExp(`\\s+(${cities.join("|")})(\\s+[A-Z]{2})?\\s*$`, "i");
+  s = s.replace(cityRe, "");
+
+  // Strip trailing US state codes / CA provinces
+  s = s.replace(/\s+(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|ON|BC|QC|AB|MB|SK|NS|NB)\s*$/i, "");
+
+  // Strip dangling truncated suffixes like " & S", " & T", " &"
+  s = s.replace(/\s+&\s*[A-Z]?\s*$/i, "");
+  // Strip trailing generic tokens we don't want in the name
+  s = s.replace(/\s+(STORE|LLC|INC|CORP|CO|LTD|USA|US)\s*$/i, "");
+
+  // Collapse whitespace
+  s = s.replace(/\s+/g, " ").trim();
+
+  return s;
+}
+
+function toTitleCase(s: string): string {
+  if (!s) return s;
+  const lowers = new Set(["and", "of", "the", "for", "in", "to", "a", "an", "at", "or", "on", "by"]);
+  const words = s.toLowerCase().split(/\s+/);
+  return words
+    .map((w, i) => {
+      if (i > 0 && lowers.has(w)) return w;
+      // preserve ampersand and apostrophes
+      return w.replace(/([a-z])([a-z']*)/i, (_m, first, rest) => first.toUpperCase() + rest);
+    })
+    .join(" ");
+}
+
+/** Find the best existing contact that matches a cleaned CC description.
+ *  Requires ALL of the contact's name keywords to appear in the description. */
+async function findBestContactMatch(ctx: any, cleanedDesc: string) {
+  const descKeywords = extractKeywords(cleanedDesc);
+  if (descKeywords.length === 0) return null;
+  const descKeys = new Set(descKeywords);
+
+  const contacts = await ctx.db.query("contacts").collect();
+  let best: any = null;
+  let bestScore = 0;
+  for (const c of contacts) {
+    const name = (c.name ?? "").toString();
+    if (!name) continue;
+    const contactKeywords = extractKeywords(name);
+    if (contactKeywords.length === 0) continue;
+    const allPresent = contactKeywords.every((k: string) => descKeys.has(k));
+    if (!allPresent) continue;
+    // Score = number of contact keywords matched (more specific wins)
+    const score = contactKeywords.length;
+    if (score > bestScore) {
+      bestScore = score;
+      best = c;
+    }
+  }
+  return best;
+}
+
+/** Resolve the display name for a CC transaction: matched contact name, or cleaned+title-cased description. */
+async function resolveCcDisplayName(ctx: any, rawDescription: string): Promise<{ displayName: string; contactId?: Id<"contacts"> }> {
+  const cleaned = cleanCcDescription(rawDescription);
+  if (!cleaned) return { displayName: rawDescription };
+  const match = await findBestContactMatch(ctx, cleaned);
+  if (match) return { displayName: match.name, contactId: match._id };
+  return { displayName: toTitleCase(cleaned) };
+}
+
 // ── queries ──────────────────────────────────────────────────────────────
 export const listStatements = query({
   handler: async (ctx) => {
@@ -494,10 +595,14 @@ async function createBillFromTransaction(
     lineItem.confirmed = true;
   }
 
+  // Clean the CC description into a nicer invoice name, matching against contacts when possible
+  const { displayName, contactId: matchedContactId } = await resolveCcDisplayName(ctx, txn.description);
+
   const billId = await ctx.db.insert("bills", {
-    fileName: txn.description,
-    invoiceName: txn.description,
-    customProviderName: txn.description,
+    fileName: displayName,
+    invoiceName: displayName,
+    customProviderName: displayName,
+    contactId: matchedContactId,
     status: "done" as const,
     billingPeriod,
     uploadedAt: Date.now(),
@@ -512,7 +617,7 @@ async function createBillFromTransaction(
     extractedData: {
       invoice_total_usd: absAmount,
       invoice_date: txn.postingDate,
-      provider_name: txn.description,
+      provider_name: displayName,
       line_items: [lineItem],
       isCredit,
     },
@@ -831,6 +936,81 @@ export const restoreCcReconcileExtractedData = mutation({
     }
 
     return { restored, count: restored.length };
+  },
+});
+
+/**
+ * Clean up invoice display names on bills that came from CC statements.
+ * Strips payment-processor prefixes, locations, and trailing noise from the raw
+ * CC description, then attempts to match against an existing contact. If a
+ * match is found, the contact's name is used and bill.contactId is linked.
+ * Otherwise a title-cased cleaned version is stored.
+ * Safe to re-run — only patches bills whose current name differs from the target.
+ */
+export const cleanCcBillNames = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const ccBills = await ctx.db
+      .query("bills")
+      .filter((q) => q.eq(q.field("source"), "cc_transaction"))
+      .collect();
+
+    let updated = 0;
+    let matchedCount = 0;
+    let skipped = 0;
+
+    for (const bill of ccBills) {
+      // Prefer the original ccTransaction description (most trustworthy source)
+      let rawDescription: string | undefined;
+      if (bill.ccTransactionId) {
+        const txn = await ctx.db.get(bill.ccTransactionId);
+        if (txn && typeof txn.description === "string") {
+          rawDescription = txn.description;
+        }
+      }
+      if (!rawDescription) {
+        const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+        rawDescription =
+          (typeof extracted.provider_name === "string" ? extracted.provider_name : undefined) ??
+          bill.fileName ??
+          bill.invoiceName;
+      }
+      if (!rawDescription) {
+        skipped++;
+        continue;
+      }
+
+      const { displayName, contactId: matchedContactId } = await resolveCcDisplayName(ctx, rawDescription);
+      if (!displayName) {
+        skipped++;
+        continue;
+      }
+
+      const currentDisplay = bill.invoiceName ?? bill.fileName ?? "";
+      const sameName = currentDisplay === displayName;
+      const sameContact = (bill.contactId ?? undefined) === (matchedContactId ?? undefined);
+      if (sameName && sameContact) {
+        skipped++;
+        continue;
+      }
+
+      const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+      const updates: Record<string, unknown> = {
+        fileName: displayName,
+        invoiceName: displayName,
+        customProviderName: displayName,
+        extractedData: { ...extracted, provider_name: displayName },
+      };
+      if (matchedContactId && !bill.contactId) {
+        updates.contactId = matchedContactId;
+        matchedCount++;
+      }
+
+      await ctx.db.patch(bill._id, updates as any);
+      updated++;
+    }
+
+    return { totalCcBills: ccBills.length, updated, matched: matchedCount, skipped };
   },
 });
 

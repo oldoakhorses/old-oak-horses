@@ -217,20 +217,20 @@ export default function InvoicesPage() {
           <button
             type="button"
             role="tab"
-            aria-selected={tab === "pending"}
-            className={`${styles.tab} ${tab === "pending" ? styles.tabActive : ""}`}
-            onClick={() => setTab("pending")}
-          >
-            Pending <span className={styles.tabCount}>{pendingCount}</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
             aria-selected={tab === "approved"}
             className={`${styles.tab} ${tab === "approved" ? styles.tabActive : ""}`}
             onClick={() => setTab("approved")}
           >
             Approved <span className={styles.tabCount}>{approvedCount}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "pending"}
+            className={`${styles.tab} ${tab === "pending" ? styles.tabActive : ""}`}
+            onClick={() => setTab("pending")}
+          >
+            Pending <span className={styles.tabCount}>{pendingCount}</span>
           </button>
         </div>
 
