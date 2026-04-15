@@ -1610,7 +1610,7 @@ export default function InvoicePreviewPage() {
                     type="button"
                     className={styles.changeLink}
                     onClick={onReparseBill}
-                    disabled={reparsing || isParsing}
+                    disabled={reparsing || !!isParsing}
                     title="Re-run the bill parser on this invoice"
                   >
                     {reparsing || isParsing ? "re-parsing..." : "re-parse"}
