@@ -310,6 +310,7 @@ export default function InvoicePreviewPage() {
   const updateBillNotes = useMutation(api.bills.updateBillNotes);
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
+  const triggerBillParsing = useMutation(api.bills.triggerBillParsing);
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [recordForm, setRecordForm] = useState<RecordFormState>({
     horseIds: [], date: "", recordType: "other", customType: "",
@@ -841,6 +842,19 @@ export default function InvoicePreviewPage() {
         </button>
       </div>
     );
+  }
+
+  async function onReparseBill() {
+    if (!bill) return;
+    if (!confirm("Re-parse this invoice from scratch? Any manual edits to extracted line items will be overwritten.")) return;
+    setError("");
+    try {
+      setReparsing(true);
+      await triggerBillParsing({ billId });
+    } catch (err) {
+      setReparsing(false);
+      setError(err instanceof Error ? err.message : "Failed to re-parse");
+    }
   }
 
   async function onConfirmProvider() {
@@ -1592,6 +1606,15 @@ export default function InvoicePreviewPage() {
                   {bill.originalPdfUrl ? (
                     <a className={styles.pdfButton} href={bill.originalPdfUrl} target="_blank" rel="noreferrer">view original ↗</a>
                   ) : null}
+                  <button
+                    type="button"
+                    className={styles.changeLink}
+                    onClick={onReparseBill}
+                    disabled={reparsing || isParsing}
+                    title="Re-run the bill parser on this invoice"
+                  >
+                    {reparsing || isParsing ? "re-parsing..." : "re-parse"}
+                  </button>
                   {!detailsEdit ? (
                     <button
                       type="button"
