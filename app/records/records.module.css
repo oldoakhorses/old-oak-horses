@@ -30,106 +30,90 @@
   background: #2a2a4e;
 }
 
-.filterBar {
+/* Tabs — matches invoices page */
+.tabs {
   display: flex;
-  gap: 8px;
-  align-items: center;
+  gap: 4px;
   margin-bottom: 16px;
-  flex-wrap: wrap;
+  border-bottom: 1px solid #e8eaf0;
 }
 
-.recordsTabs {
-  display: inline-flex;
-  border: 1px solid #e8eaf0;
-  border-radius: 8px;
-  overflow: hidden;
-  flex: 0 0 auto;
-  height: 34px;
-}
-
-.recordsTab {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 0 16px;
-  height: 100%;
-  border: none;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  text-transform: lowercase;
-  letter-spacing: 0.02em;
-}
-
-.recordsTabActive {
-  background: #1a1a2e;
-  color: #fff;
-}
-
-.recordsTabInactive {
+.tab {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7084;
   background: transparent;
-  color: #6b7084;
-}
-
-.recordsTabInactive:hover {
-  background: #f2f3f7;
-}
-
-.searchWrap {
-  position: relative;
-  flex: 1 1 200px;
-  max-width: 280px;
-  height: 34px;
-}
-
-.searchIcon {
-  position: absolute;
-  left: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 11px;
-  color: #9ea2b0;
-  pointer-events: none;
-}
-
-.recordsSearch {
-  font-size: 11px;
-  padding: 0 12px 0 30px;
-  background: #fff;
-  border: 1px solid #e8eaf0;
-  border-radius: 6px;
-  color: #1a1a2e;
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-  outline: none;
-}
-
-.recordsSearch:focus {
-  border-color: #4a5bdb;
-}
-
-.recordsSearch::placeholder {
-  color: #c4c7d0;
-}
-
-.filterDropdown {
-  font-size: 11px;
-  padding: 0 26px 0 10px;
-  height: 34px;
-  border-radius: 6px;
-  border: 1px solid #e8eaf0;
-  background: #fff;
-  color: #6b7084;
-  appearance: none;
+  border: none;
+  padding: 10px 18px;
   cursor: pointer;
-  width: auto;
-  flex: 0 0 auto;
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%239EA2B0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: inherit;
 }
 
-.filterDropdown:focus {
+.tab:hover {
+  color: #1a1a2e;
+}
+
+.tabActive {
+  color: #4a5bdb;
+  border-bottom-color: #4a5bdb;
+}
+
+.tabCount {
+  font-size: 10px;
+  font-weight: 700;
+  background: #f2f3f7;
+  color: #6b7084;
+  padding: 2px 7px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.tabActive .tabCount {
+  background: rgba(74, 91, 219, 0.1);
+  color: #4a5bdb;
+}
+
+/* Filters — matches invoices page */
+.filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 180px)) minmax(0, 220px);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.filters label {
+  display: grid;
+  gap: 6px;
+}
+
+.filters span {
+  font-size: 10px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+}
+
+.filters select,
+.filters input {
+  width: 100%;
+  background: #f2f3f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 12px;
+  box-sizing: border-box;
+  color: #1a1a2e;
   outline: none;
+  font-family: inherit;
+}
+
+.filters select:focus,
+.filters input:focus {
   border-color: #4a5bdb;
 }
 
@@ -1037,6 +1021,10 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+  }
+
+  .filters {
+    grid-template-columns: 1fr;
   }
 
   .recordPanel {

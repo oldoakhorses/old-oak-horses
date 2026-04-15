@@ -11,6 +11,40 @@ import { formatInvoiceName } from "@/lib/formatInvoiceName";
 import styles from "./records.module.css";
 
 type RecordType = "veterinary" | "medication" | "farrier" | "bodywork" | "other";
+type VetSubcategory =
+  | "vaccination"
+  | "treatment"
+  | "medication"
+  | "joint_injections"
+  | "exams_diagnostics"
+  | "vaccinations"
+  | "shockwave"
+  | "sedation"
+  | "fees"
+  | "lab_work"
+  | "other";
+
+const VET_SUBCATEGORY_OPTIONS: Array<{ value: VetSubcategory; label: string }> = [
+  { value: "medication", label: "Medication" },
+  { value: "joint_injections", label: "Joint Injections" },
+  { value: "exams_diagnostics", label: "Exams & Diagnostics" },
+  { value: "vaccinations", label: "Vaccinations" },
+  { value: "shockwave", label: "Shockwave" },
+  { value: "sedation", label: "Sedation" },
+  { value: "fees", label: "Fees" },
+  { value: "lab_work", label: "Lab Work" },
+  { value: "other", label: "Other" },
+];
+
+function vetSubcategoryLabel(value?: string | null) {
+  if (!value) return null;
+  const found = VET_SUBCATEGORY_OPTIONS.find((o) => o.value === value);
+  if (found) return found.label;
+  // Legacy values
+  if (value === "vaccination") return "Vaccinations";
+  if (value === "treatment") return "Treatment";
+  return null;
+}
 type Tab = "upcoming" | "past";
 type SortColumn = "record" | "horse" | "provider" | "category" | "date";
 type UpcomingRange = "all" | "7d" | "30d" | "3m" | "6m";
@@ -25,7 +59,7 @@ type GlobalRecord = {
   customType?: string;
   date: number;
   providerName?: string;
-  visitType?: "vaccination" | "treatment";
+  visitType?: VetSubcategory;
   vaccineName?: string;
   treatmentDescription?: string;
   serviceType?: string;
@@ -62,7 +96,7 @@ type RecordFormState = {
   selectedProvider: string;
   providerName: string;
   customType: string;
-  visitType: "" | "vaccination" | "treatment";
+  visitType: "" | VetSubcategory;
   vaccineName: string;
   treatmentDescription: string;
   serviceType: string;
@@ -407,14 +441,6 @@ export default function RecordsPage() {
           date: new Date(`${recordForm.date}T00:00:00`).getTime(),
           providerName,
           visitType: selectedRecordType === "veterinary" ? recordForm.visitType || undefined : undefined,
-          vaccineName:
-            selectedRecordType === "veterinary" && recordForm.visitType === "vaccination"
-              ? recordForm.vaccineName.trim() || undefined
-              : undefined,
-          treatmentDescription:
-            selectedRecordType === "veterinary" && recordForm.visitType === "treatment"
-              ? recordForm.treatmentDescription.trim() || undefined
-              : undefined,
           serviceType: selectedRecordType === "farrier" ? recordForm.serviceType || undefined : undefined,
           isUpcoming: false,
           notes: recordForm.notes.trim() || undefined,
@@ -430,14 +456,6 @@ export default function RecordsPage() {
             date: new Date(`${recordForm.nextVisitDate}T00:00:00`).getTime(),
             providerName,
             visitType: selectedRecordType === "veterinary" ? recordForm.visitType || undefined : undefined,
-            vaccineName:
-              selectedRecordType === "veterinary" && recordForm.visitType === "vaccination"
-                ? recordForm.vaccineName.trim() || undefined
-                : undefined,
-            treatmentDescription:
-              selectedRecordType === "veterinary" && recordForm.visitType === "treatment"
-                ? recordForm.treatmentDescription.trim() || undefined
-                : undefined,
             serviceType: selectedRecordType === "farrier" ? recordForm.serviceType || undefined : undefined,
             isUpcoming: true,
             linkedRecordId: mainRecordId,
@@ -554,86 +572,95 @@ export default function RecordsPage() {
           </button>
         </section>
 
-        <section className={styles.filterBar}>
-          <div className={styles.recordsTabs}>
-            <button
-              type="button"
-              className={`${styles.recordsTab} ${activeTab === "past" ? styles.recordsTabActive : styles.recordsTabInactive}`}
-              onClick={() => setActiveTab("past")}
-            >
-              past ({pastRecordsBase.length})
-            </button>
-            <button
-              type="button"
-              className={`${styles.recordsTab} ${activeTab === "upcoming" ? styles.recordsTabActive : styles.recordsTabInactive}`}
-              onClick={() => setActiveTab("upcoming")}
-            >
-              upcoming ({upcomingRecordsBase.length})
-            </button>
-          </div>
+        <div className={styles.tabs} role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "past"}
+            className={`${styles.tab} ${activeTab === "past" ? styles.tabActive : ""}`}
+            onClick={() => setActiveTab("past")}
+          >
+            Past <span className={styles.tabCount}>{pastRecordsBase.length}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "upcoming"}
+            className={`${styles.tab} ${activeTab === "upcoming" ? styles.tabActive : ""}`}
+            onClick={() => setActiveTab("upcoming")}
+          >
+            Upcoming <span className={styles.tabCount}>{upcomingRecordsBase.length}</span>
+          </button>
+        </div>
 
-          <div className={styles.searchWrap}>
-            <span className={styles.searchIcon}>🔍</span>
+        <section className={styles.filters}>
+          <label>
+            <span>Type</span>
+            <select
+              value={typeFilter}
+              onChange={(event) => setTypeFilter(event.target.value as "all" | RecordType)}
+            >
+              <option value="all">All</option>
+              <option value="veterinary">Veterinary</option>
+              <option value="medication">Medication</option>
+              <option value="farrier">Farrier</option>
+              <option value="bodywork">Bodywork</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label>
+            <span>Horse</span>
+            <select
+              value={horseFilter}
+              onChange={(event) => setHorseFilter((event.target.value as Id<"horses"> | "all") || "all")}
+            >
+              <option value="all">All</option>
+              {activeHorses.map((horse) => (
+                <option key={horse._id} value={horse._id}>
+                  {horse.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {activeTab === "upcoming" ? (
+            <label>
+              <span>Range</span>
+              <select
+                value={upcomingRange}
+                onChange={(event) => setUpcomingRange(event.target.value as UpcomingRange)}
+              >
+                <option value="all">All time</option>
+                <option value="7d">Next 7 Days</option>
+                <option value="30d">Next 30 Days</option>
+                <option value="3m">Next 3 Months</option>
+                <option value="6m">Next 6 Months</option>
+              </select>
+            </label>
+          ) : (
+            <label>
+              <span>Range</span>
+              <select
+                value={pastRange}
+                onChange={(event) => setPastRange(event.target.value as PastRange)}
+              >
+                <option value="all">All time</option>
+                <option value="7d">Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
+                <option value="3m">Last 3 Months</option>
+                <option value="6m">Last 6 Months</option>
+                <option value="1y">Last Year</option>
+              </select>
+            </label>
+          )}
+          <label>
+            <span>Search</span>
             <input
-              className={styles.recordsSearch}
+              type="text"
+              placeholder="search records..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="search..."
             />
-          </div>
-
-          <select
-            className={styles.filterDropdown}
-            value={typeFilter}
-            onChange={(event) => setTypeFilter(event.target.value as "all" | RecordType)}
-          >
-            <option value="all">all types</option>
-            <option value="veterinary">veterinary</option>
-            <option value="medication">medication</option>
-            <option value="farrier">farrier</option>
-            <option value="bodywork">bodywork</option>
-            <option value="other">other</option>
-          </select>
-
-          <select
-            className={styles.filterDropdown}
-            value={horseFilter}
-            onChange={(event) => setHorseFilter((event.target.value as Id<"horses"> | "all") || "all")}
-          >
-            <option value="all">all horses</option>
-            {activeHorses.map((horse) => (
-              <option key={horse._id} value={horse._id}>
-                {horse.name}
-              </option>
-            ))}
-          </select>
-
-          {activeTab === "upcoming" ? (
-            <select
-              className={styles.filterDropdown}
-              value={upcomingRange}
-              onChange={(event) => setUpcomingRange(event.target.value as UpcomingRange)}
-            >
-              <option value="all">all time</option>
-              <option value="7d">next 7 days</option>
-              <option value="30d">next 30 days</option>
-              <option value="3m">next 3 months</option>
-              <option value="6m">next 6 months</option>
-            </select>
-          ) : (
-            <select
-              className={styles.filterDropdown}
-              value={pastRange}
-              onChange={(event) => setPastRange(event.target.value as PastRange)}
-            >
-              <option value="all">all time</option>
-              <option value="7d">last 7 days</option>
-              <option value="30d">last 30 days</option>
-              <option value="3m">last 3 months</option>
-              <option value="6m">last 6 months</option>
-              <option value="1y">last year</option>
-            </select>
-          )}
+          </label>
         </section>
 
         <div className={styles.resultsCount}>
@@ -1137,38 +1164,19 @@ export default function RecordsPage() {
             {selectedRecordType ? (
               <>
                 {selectedRecordType === "veterinary" ? (
-                  <RecordField label="VISIT TYPE">
+                  <RecordField label="SUBCATEGORY">
                     <select
                       className={styles.recordInput}
                       value={recordForm.visitType}
-                      onChange={(event) => setRecordForm((prev) => ({ ...prev, visitType: event.target.value as "" | "vaccination" | "treatment" }))}
+                      onChange={(event) => setRecordForm((prev) => ({ ...prev, visitType: event.target.value as RecordFormState["visitType"] }))}
                     >
                       <option value="">select...</option>
-                      <option value="vaccination">Vaccination</option>
-                      <option value="treatment">Treatment</option>
+                      {VET_SUBCATEGORY_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
                     </select>
-                  </RecordField>
-                ) : null}
-
-                {selectedRecordType === "veterinary" && recordForm.visitType === "vaccination" ? (
-                  <RecordField label="VACCINE NAME">
-                    <input
-                      className={styles.recordInput}
-                      value={recordForm.vaccineName}
-                      onChange={(event) => setRecordForm((prev) => ({ ...prev, vaccineName: event.target.value }))}
-                      placeholder="e.g., Flu/Rhino, Coggins, West Nile"
-                    />
-                  </RecordField>
-                ) : null}
-
-                {selectedRecordType === "veterinary" && recordForm.visitType === "treatment" ? (
-                  <RecordField label="TREATMENT DESCRIPTION">
-                    <input
-                      className={styles.recordInput}
-                      value={recordForm.treatmentDescription}
-                      onChange={(event) => setRecordForm((prev) => ({ ...prev, treatmentDescription: event.target.value }))}
-                      placeholder="e.g., Laceration repair, Lameness exam"
-                    />
                   </RecordField>
                 ) : null}
 
@@ -1425,7 +1433,7 @@ function filterByDate(timestamp: number, range: UpcomingRange | PastRange, tab: 
 
 function getRecordSubtype(record: GlobalRecord) {
   if (record.type === "veterinary" && record.visitType) {
-    return record.visitType === "vaccination" ? "Vaccination" : "Treatment";
+    return vetSubcategoryLabel(record.visitType);
   }
   if (record.type === "farrier" && record.serviceType) {
     return record.serviceType;

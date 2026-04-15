@@ -546,13 +546,8 @@
     align-items: stretch;
   }
 
-  .filterRow {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .searchWrapper {
-    max-width: none;
+  .filters {
+    grid-template-columns: 1fr;
   }
 
   .contactsHeader {
@@ -604,25 +599,28 @@
   }
 }
 
-/* Tabs */
+/* Tabs — matches invoices page */
 .tabs {
   display: flex;
-  gap: 0;
-  margin-bottom: 0;
+  gap: 4px;
+  margin-bottom: 16px;
   border-bottom: 1px solid #e8eaf0;
 }
 
 .tab {
   font-size: 12px;
-  font-weight: 700;
-  padding: 10px 20px;
+  font-weight: 600;
+  color: #6b7084;
+  background: transparent;
   border: none;
-  background: none;
-  color: #9ea2b0;
+  padding: 10px 18px;
   cursor: pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
-  text-transform: lowercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: inherit;
 }
 
 .tab:hover {
@@ -637,9 +635,53 @@
 .tabCount {
   font-size: 10px;
   font-weight: 700;
-  background: rgba(158, 162, 176, 0.15);
-  color: inherit;
-  padding: 1px 6px;
-  border-radius: 8px;
-  margin-left: 4px;
+  background: #f2f3f7;
+  color: #6b7084;
+  padding: 2px 7px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.tabActive .tabCount {
+  background: rgba(74, 91, 219, 0.1);
+  color: #4a5bdb;
+}
+
+/* Filters — matches invoices page */
+.filters {
+  display: grid;
+  grid-template-columns: minmax(0, 180px) minmax(0, 220px);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.filters label {
+  display: grid;
+  gap: 6px;
+}
+
+.filters span {
+  font-size: 10px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+}
+
+.filters select,
+.filters input {
+  width: 100%;
+  background: #f2f3f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 12px;
+  box-sizing: border-box;
+  color: #1a1a2e;
+  outline: none;
+  font-family: inherit;
+}
+
+.filters select:focus,
+.filters input:focus {
+  border-color: #4a5bdb;
 }

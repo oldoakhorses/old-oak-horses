@@ -244,47 +244,53 @@ export default function ContactsPage() {
           </button>
         </section>
 
-        <section className={styles.filterRow}>
-          <div className={styles.searchWrapper}>
-            <span className={styles.searchIcon}>⌕</span>
+        <div className={styles.tabs} role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "active"}
+            className={`${styles.tab} ${tab === "active" ? styles.tabActive : ""}`}
+            onClick={() => setTab("active")}
+          >
+            Active <span className={styles.tabCount}>{activeCount}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "invoice_only"}
+            className={`${styles.tab} ${tab === "invoice_only" ? styles.tabActive : ""}`}
+            onClick={() => setTab("invoice_only")}
+          >
+            Invoice Only <span className={styles.tabCount}>{invoiceOnlyCount}</span>
+          </button>
+        </div>
+
+        <section className={styles.filters}>
+          <label>
+            <span>Location</span>
+            <select
+              value={locationFilter}
+              onChange={(event) => setLocationFilter(event.target.value as LocationValue)}
+            >
+              <option value="all">All</option>
+              <option value="wellington">Wellington</option>
+              <option value="thermal">Thermal</option>
+              <option value="ocala">Ocala</option>
+              <option value="la">LA</option>
+              <option value="eu">EU</option>
+              <option value="can">CAN</option>
+            </select>
+          </label>
+          <label>
+            <span>Search</span>
             <input
-              className={styles.searchInput}
+              type="text"
               placeholder="search contacts..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
-          </div>
-          <select
-            className={styles.locationFilter}
-            value={locationFilter}
-            onChange={(event) => setLocationFilter(event.target.value as LocationValue)}
-          >
-            <option value="all">All Locations</option>
-            <option value="wellington">Wellington</option>
-            <option value="thermal">Thermal</option>
-            <option value="ocala">Ocala</option>
-            <option value="la">LA</option>
-            <option value="eu">EU</option>
-            <option value="can">CAN</option>
-          </select>
+          </label>
         </section>
-
-        <div className={styles.tabs}>
-          <button
-            type="button"
-            className={`${styles.tab} ${tab === "active" ? styles.tabActive : ""}`}
-            onClick={() => setTab("active")}
-          >
-            active <span className={styles.tabCount}>{activeCount}</span>
-          </button>
-          <button
-            type="button"
-            className={`${styles.tab} ${tab === "invoice_only" ? styles.tabActive : ""}`}
-            onClick={() => setTab("invoice_only")}
-          >
-            invoice only <span className={styles.tabCount}>{invoiceOnlyCount}</span>
-          </button>
-        </div>
 
         <section className={styles.contactsCard}>
           {isAdding ? (
