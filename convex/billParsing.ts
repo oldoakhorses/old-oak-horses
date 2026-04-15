@@ -8,6 +8,7 @@ import { internal } from "./_generated/api";
 import { matchHorseName, normalizeAliasKey } from "./matchHorse";
 import { matchPersonName } from "./matchPerson";
 import { matchProvider } from "./providerMatching";
+import { HORSE_ALIASES } from "./horseAliases";
 
 const TRAVEL_SUBCATEGORY_SLUGS = new Set(["flights", "trains", "rental-car", "gas", "meals", "hotels"]);
 const HOUSING_SUBCATEGORY_SLUGS = new Set(["rider-housing", "groom-housing"]);
@@ -179,16 +180,19 @@ export const parseBillPdf = internalAction({
       if (categorySlug === "feed-bedding") {
         parsed = enforceFeedBeddingClassification(parsed);
       }
-      if (categorySlug === "bodywork") {
-        parsed = splitBodyworkEmbeddedHorseItems(parsed);
-        parsed = preferBrandedProviderName(parsed);
-      }
+      // Fetch registered horses/people/aliases up-front so bodywork splitting
+      // (which needs to detect horse names embedded in descriptions) can use
+      // real DB data instead of a hardcoded list.
       const [registeredHorses, registeredPeople, dynamicHorseAliases, dynamicPersonAliases] = await Promise.all([
         ctx.runQuery(internal.bills.getAllHorsesForMatching, {}),
         ctx.runQuery(internal.bills.getAllPeopleForMatching, {}),
         ctx.runQuery(internal.bills.getHorseAliasesForMatching, {}),
         ctx.runQuery(internal.bills.getPersonAliasesForMatching, {})
       ]);
+      if (categorySlug === "bodywork") {
+        parsed = splitBodyworkEmbeddedHorseItems(parsed, registeredHorses, dynamicHorseAliases);
+        parsed = preferBrandedProviderName(parsed);
+      }
       // When no bill-level category, match both horses and people (per-line-item categories will guide usage)
       const matchHorses = categorySlug ? HORSE_BASED_CATEGORIES.has(categorySlug) : true;
       const matchPeople = categorySlug ? PERSON_BASED_CATEGORIES.has(categorySlug) : true;
@@ -2296,20 +2300,27 @@ function round2(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-function splitBodyworkEmbeddedHorseItems(parsed: Record<string, unknown>) {
+function splitBodyworkEmbeddedHorseItems(
+  parsed: Record<string, unknown>,
+  registeredHorses: Array<{ _id: string; name: string }>,
+  dynamicHorseAliases: Array<{ alias: string; horseName: string }>
+) {
   const normalized = { ...parsed };
   const lineItems = getLineItems(normalized).map((item) => ({ ...(item as Record<string, unknown>) }));
   const splitItems: Array<Record<string, unknown>> = [];
+  const patterns = buildHorseDetectionPatterns(registeredHorses, dynamicHorseAliases);
 
   for (const row of lineItems) {
     const baseDescription = pickString(row, ["description"]) ?? "Line item";
     const horseField = pickString(row, ["horse_name", "horseName", "activity", "notes", "detail", "details"]) ?? "";
-    const combined = `${baseDescription} ${horseField}`.toLowerCase();
-    const detected = detectBodyworkHorseNames(combined);
+    const combined = `${baseDescription} ${horseField}`;
+    const detected = detectBodyworkHorseNames(combined, patterns);
     const amount = pickNumber(row, ["total_usd", "amount_usd", "amount", "total", "amount_original", "originalAmount"]) ?? 0;
     const quantity = pickNumber(row, ["quantity", "qty"]) ?? undefined;
-    const extras = stripHorseNamesFromText(horseField);
-    const description = extras ? `${baseDescription} ${extras}`.replace(/\s+/g, " ").trim() : baseDescription;
+    // Clean both the description and the horseField, then rebuild a clean description.
+    const cleanedBase = stripHorseNamesFromText(baseDescription, patterns) || baseDescription;
+    const extras = stripHorseNamesFromText(horseField, patterns);
+    const description = extras ? `${cleanedBase} ${extras}`.replace(/\s+/g, " ").trim() : cleanedBase;
 
     if (detected.length > 1 && amount > 0) {
       const perHorse = round2(amount / detected.length);
@@ -2347,37 +2358,83 @@ function splitBodyworkEmbeddedHorseItems(parsed: Record<string, unknown>) {
   return normalized;
 }
 
-function detectBodyworkHorseNames(text: string) {
-  const horses = ["ben", "carlin", "gigi", "valentina", "gaby", "gaby de courcel", "numero valentina z", "chino 29"];
+/**
+ * Build a list of (regex, canonicalName) pairs for detecting horse names in
+ * free text. Sources: registered horse names, static HORSE_ALIASES, and
+ * dynamic aliases from the DB. Longest aliases are tried first so that
+ * multi-word names ("Gaby de Courcel") take precedence over prefixes ("Gaby").
+ */
+function buildHorseDetectionPatterns(
+  registeredHorses: Array<{ _id: string; name: string }>,
+  dynamicHorseAliases: Array<{ alias: string; horseName: string }>
+): Array<{ regex: RegExp; canonical: string }> {
+  const registeredNames = new Set(registeredHorses.map((h) => h.name));
+  const pairs: Array<{ alias: string; canonical: string }> = [];
+
+  // Registered horse full names
+  for (const h of registeredHorses) {
+    pairs.push({ alias: h.name, canonical: h.name });
+  }
+  // Static aliases (ignore __split_all__ sentinel; only include aliases that
+  // map to a horse that actually exists in the DB)
+  for (const [alias, canonical] of Object.entries(HORSE_ALIASES)) {
+    if (canonical === "__split_all__") continue;
+    if (!registeredNames.has(canonical)) continue;
+    pairs.push({ alias, canonical });
+  }
+  // Dynamic aliases
+  for (const row of dynamicHorseAliases) {
+    if (row.horseName === "__split_all__") continue;
+    if (!registeredNames.has(row.horseName)) continue;
+    pairs.push({ alias: row.alias, canonical: row.horseName });
+  }
+
+  // Dedupe by normalized alias, keeping the first occurrence
+  const seen = new Set<string>();
+  const unique: Array<{ alias: string; canonical: string }> = [];
+  for (const p of pairs) {
+    const key = p.alias.trim().toLowerCase();
+    if (!key) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(p);
+  }
+
+  // Sort longest-first so "Gaby de Courcel" wins over "Gaby"
+  unique.sort((a, b) => b.alias.length - a.alias.length);
+
+  return unique.map((p) => ({
+    regex: new RegExp(`\\b${escapeRegex(p.alias)}\\b`, "i"),
+    canonical: p.canonical,
+  }));
+}
+
+function detectBodyworkHorseNames(
+  text: string,
+  patterns: Array<{ regex: RegExp; canonical: string }>
+): string[] {
   const found: string[] = [];
-  for (const horse of horses) {
-    const pattern = new RegExp(`\\b${escapeRegex(horse)}\\b`, "i");
-    if (!pattern.test(text)) continue;
-    if (horse === "valentina") {
-      found.push("Numero Valentina Z");
-      continue;
-    }
-    if (horse === "gaby de courcel") {
-      if (!found.includes("Gaby")) found.push("Gaby");
-      continue;
-    }
-    const label = horse
-      .split(" ")
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(" ");
-    if (!found.includes(label)) found.push(label);
+  // Walk patterns longest-first and strip matches as we go, so a long alias
+  // ("Gaby de Courcel") doesn't leave behind "Gaby" to be re-detected.
+  let remaining = text;
+  for (const { regex, canonical } of patterns) {
+    if (!regex.test(remaining)) continue;
+    if (!found.includes(canonical)) found.push(canonical);
+    remaining = remaining.replace(new RegExp(regex.source, "ig"), " ");
   }
   return found;
 }
 
-function stripHorseNamesFromText(text: string) {
+function stripHorseNamesFromText(
+  text: string,
+  patterns: Array<{ regex: RegExp; canonical: string }>
+): string {
   if (!text) return "";
   let cleaned = text;
-  const horsePatterns = ["ben", "carlin", "gigi", "valentina", "gaby", "gaby de courcel", "numero valentina z", "chino 29"];
-  for (const horse of horsePatterns) {
-    cleaned = cleaned.replace(new RegExp(`\\b${escapeRegex(horse)}\\b`, "ig"), "");
+  for (const { regex } of patterns) {
+    cleaned = cleaned.replace(new RegExp(regex.source, "ig"), " ");
   }
-  cleaned = cleaned.replace(/^[,\s+/-]+|[,\s+/-]+$/g, "");
+  cleaned = cleaned.replace(/\s+/g, " ").replace(/^[,\s+/-]+|[,\s+/-]+$/g, "").trim();
   return cleaned.length > 0 ? cleaned : "";
 }
 
