@@ -132,7 +132,7 @@ export default function RecordsPage() {
   const allRecords = (useQuery(api.horseRecords.getAll) as GlobalRecord[] | undefined) ?? [];
   const activeHorses = useQuery(api.horses.getActiveHorses) ?? [];
 
-  const [activeTab, setActiveTab] = useState<Tab>("upcoming");
+  const [activeTab, setActiveTab] = useState<Tab>("past");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | RecordType>("all");
   const [horseFilter, setHorseFilter] = useState<"all" | Id<"horses">>("all");
@@ -554,40 +554,53 @@ export default function RecordsPage() {
           </button>
         </section>
 
-        <div className={styles.recordsTabs}>
-          <button
-            type="button"
-            className={`${styles.recordsTab} ${activeTab === "upcoming" ? styles.recordsTabActive : styles.recordsTabInactive}`}
-            onClick={() => setActiveTab("upcoming")}
-          >
-            Upcoming ({upcomingRecordsBase.length})
-          </button>
-          <button
-            type="button"
-            className={`${styles.recordsTab} ${activeTab === "past" ? styles.recordsTabActive : styles.recordsTabInactive}`}
-            onClick={() => setActiveTab("past")}
-          >
-            Past ({pastRecordsBase.length})
-          </button>
-        </div>
-
-        <section className={styles.filterRow}>
-          <div className={styles.searchWrap}>
-            <span className={styles.searchIcon}>🔍</span>
-            <input className={styles.recordsSearch} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="search records..." />
+        <section className={styles.filterBar}>
+          <div className={styles.recordsTabs}>
+            <button
+              type="button"
+              className={`${styles.recordsTab} ${activeTab === "past" ? styles.recordsTabActive : styles.recordsTabInactive}`}
+              onClick={() => setActiveTab("past")}
+            >
+              past ({pastRecordsBase.length})
+            </button>
+            <button
+              type="button"
+              className={`${styles.recordsTab} ${activeTab === "upcoming" ? styles.recordsTabActive : styles.recordsTabInactive}`}
+              onClick={() => setActiveTab("upcoming")}
+            >
+              upcoming ({upcomingRecordsBase.length})
+            </button>
           </div>
 
-          <select className={styles.filterDropdown} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as "all" | RecordType)}>
-            <option value="all">All Types</option>
-            <option value="veterinary">Veterinary</option>
-            <option value="medication">Medication</option>
-            <option value="farrier">Farrier</option>
-            <option value="bodywork">Bodywork</option>
-            <option value="other">Other</option>
+          <div className={styles.searchWrap}>
+            <span className={styles.searchIcon}>🔍</span>
+            <input
+              className={styles.recordsSearch}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="search..."
+            />
+          </div>
+
+          <select
+            className={styles.filterDropdown}
+            value={typeFilter}
+            onChange={(event) => setTypeFilter(event.target.value as "all" | RecordType)}
+          >
+            <option value="all">all types</option>
+            <option value="veterinary">veterinary</option>
+            <option value="medication">medication</option>
+            <option value="farrier">farrier</option>
+            <option value="bodywork">bodywork</option>
+            <option value="other">other</option>
           </select>
 
-          <select className={styles.filterDropdown} value={horseFilter} onChange={(event) => setHorseFilter((event.target.value as Id<"horses"> | "all") || "all")}>
-            <option value="all">All Horses</option>
+          <select
+            className={styles.filterDropdown}
+            value={horseFilter}
+            onChange={(event) => setHorseFilter((event.target.value as Id<"horses"> | "all") || "all")}
+          >
+            <option value="all">all horses</option>
             {activeHorses.map((horse) => (
               <option key={horse._id} value={horse._id}>
                 {horse.name}
@@ -596,21 +609,29 @@ export default function RecordsPage() {
           </select>
 
           {activeTab === "upcoming" ? (
-            <select className={styles.filterDropdown} value={upcomingRange} onChange={(event) => setUpcomingRange(event.target.value as UpcomingRange)}>
-              <option value="all">All</option>
-              <option value="7d">Next 7 Days</option>
-              <option value="30d">Next 30 Days</option>
-              <option value="3m">Next 3 Months</option>
-              <option value="6m">Next 6 Months</option>
+            <select
+              className={styles.filterDropdown}
+              value={upcomingRange}
+              onChange={(event) => setUpcomingRange(event.target.value as UpcomingRange)}
+            >
+              <option value="all">all time</option>
+              <option value="7d">next 7 days</option>
+              <option value="30d">next 30 days</option>
+              <option value="3m">next 3 months</option>
+              <option value="6m">next 6 months</option>
             </select>
           ) : (
-            <select className={styles.filterDropdown} value={pastRange} onChange={(event) => setPastRange(event.target.value as PastRange)}>
-              <option value="all">All Time</option>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-              <option value="3m">Last 3 Months</option>
-              <option value="6m">Last 6 Months</option>
-              <option value="1y">Last Year</option>
+            <select
+              className={styles.filterDropdown}
+              value={pastRange}
+              onChange={(event) => setPastRange(event.target.value as PastRange)}
+            >
+              <option value="all">all time</option>
+              <option value="7d">last 7 days</option>
+              <option value="30d">last 30 days</option>
+              <option value="3m">last 3 months</option>
+              <option value="6m">last 6 months</option>
+              <option value="1y">last year</option>
             </select>
           )}
         </section>
