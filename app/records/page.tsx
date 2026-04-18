@@ -79,6 +79,8 @@ type DisplayRecord = {
 };
 
 type EditState = {
+  type: RecordType;
+  visitType: "" | VetSubcategory;
   providerName: string;
   date: string;
   nextVisitDate: string;
@@ -172,6 +174,8 @@ export default function RecordsPage() {
   const [horseFilter, setHorseFilter] = useState<"all" | Id<"horses">>("all");
   const [upcomingRange, setUpcomingRange] = useState<UpcomingRange>("all");
   const [pastRange, setPastRange] = useState<PastRange>("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [sortColumn, setSortColumn] = useState<SortColumn>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
@@ -271,13 +275,15 @@ export default function RecordsPage() {
 
   const filteredRecords = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const range = activeTab === "upcoming" ? upcomingRange : pastRange;
+    const fromTs = fromDate ? new Date(`${fromDate}T00:00:00`).getTime() : null;
+    const toTs = toDate ? new Date(`${toDate}T23:59:59.999`).getTime() : null;
 
     return tabRecords.filter((row) => {
       const record = row.base;
       if (typeFilter !== "all" && record.type !== typeFilter) return false;
       if (horseFilter !== "all" && record.horseId !== horseFilter) return false;
-      if (!filterByDate(row.eventDate, range, activeTab)) return false;
+      if (fromTs !== null && row.eventDate < fromTs) return false;
+      if (toTs !== null && row.eventDate > toTs) return false;
 
       if (!term) return true;
       const bag = [
@@ -295,7 +301,7 @@ export default function RecordsPage() {
         .toLowerCase();
       return bag.includes(term);
     });
-  }, [tabRecords, activeTab, upcomingRange, pastRange, typeFilter, horseFilter, search]);
+  }, [tabRecords, typeFilter, horseFilter, search, fromDate, toDate]);
 
   const sortedRecords = useMemo(() => {
     const rows = [...filteredRecords];
@@ -516,11 +522,13 @@ export default function RecordsPage() {
     await updateRecordWithNextVisit({
       recordId: editingRecordId,
       updates: {
+        type: editState.type,
+        visitType: editState.type === "veterinary" && editState.visitType ? editState.visitType : undefined,
         providerName: editState.providerName || undefined,
         date: editState.date ? new Date(`${editState.date}T00:00:00`).getTime() : undefined,
         notes: editState.notes || undefined,
-        serviceType: editState.serviceType || undefined,
-        customType: editState.customType || undefined,
+        serviceType: editState.type === "farrier" ? editState.serviceType || undefined : undefined,
+        customType: editState.type === "other" ? editState.customType || undefined : undefined,
         vaccineName: editState.vaccineName || undefined,
         treatmentDescription: editState.treatmentDescription || undefined,
         billId: editState.billId ? editState.billId as Id<"bills"> : undefined,
@@ -595,7 +603,7 @@ export default function RecordsPage() {
 
         <section className={styles.filters}>
           <label>
-            <span>Type</span>
+            <span>Category</span>
             <select
               value={typeFilter}
               onChange={(event) => setTypeFilter(event.target.value as "all" | RecordType)}
@@ -622,36 +630,14 @@ export default function RecordsPage() {
               ))}
             </select>
           </label>
-          {activeTab === "upcoming" ? (
-            <label>
-              <span>Range</span>
-              <select
-                value={upcomingRange}
-                onChange={(event) => setUpcomingRange(event.target.value as UpcomingRange)}
-              >
-                <option value="all">All time</option>
-                <option value="7d">Next 7 Days</option>
-                <option value="30d">Next 30 Days</option>
-                <option value="3m">Next 3 Months</option>
-                <option value="6m">Next 6 Months</option>
-              </select>
-            </label>
-          ) : (
-            <label>
-              <span>Range</span>
-              <select
-                value={pastRange}
-                onChange={(event) => setPastRange(event.target.value as PastRange)}
-              >
-                <option value="all">All time</option>
-                <option value="7d">Last 7 Days</option>
-                <option value="30d">Last 30 Days</option>
-                <option value="3m">Last 3 Months</option>
-                <option value="6m">Last 6 Months</option>
-                <option value="1y">Last Year</option>
-              </select>
-            </label>
-          )}
+          <label>
+            <span>From</span>
+            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          </label>
+          <label>
+            <span>To</span>
+            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          </label>
           <label>
             <span>Search</span>
             <input
@@ -801,6 +787,8 @@ export default function RecordsPage() {
                               setExpandedId(record._id);
                               setEditingRecordId(record._id);
                               setEditState({
+                                type: record.type,
+                                visitType: (record.visitType || "") as "" | VetSubcategory,
                                 providerName: record.providerName || "",
                                 date: toDateInput(record.date),
                                 nextVisitDate: getLinkedUpcomingDateInput(record),
@@ -852,6 +840,57 @@ export default function RecordsPage() {
                                 onChange={(event) => setEditState({ ...editState, date: event.target.value })}
                               />
                             </ExpandedInput>
+                            <ExpandedInput label="RECORD TYPE">
+                              <select
+                                className={styles.expandedInput}
+                                value={editState.type}
+                                onChange={(event) => setEditState({ ...editState, type: event.target.value as RecordType, visitType: event.target.value === "veterinary" ? editState.visitType : "", serviceType: event.target.value === "farrier" ? editState.serviceType : "", customType: event.target.value === "other" ? editState.customType : "" })}
+                              >
+                                <option value="veterinary">Veterinary</option>
+                                <option value="medication">Medication</option>
+                                <option value="farrier">Farrier</option>
+                                <option value="bodywork">Bodywork</option>
+                                <option value="other">Other</option>
+                              </select>
+                            </ExpandedInput>
+                            {editState.type === "veterinary" ? (
+                              <ExpandedInput label="VISIT TYPE">
+                                <select
+                                  className={styles.expandedInput}
+                                  value={editState.visitType}
+                                  onChange={(event) => setEditState({ ...editState, visitType: event.target.value as "" | VetSubcategory })}
+                                >
+                                  <option value="">select...</option>
+                                  {VET_SUBCATEGORY_OPTIONS.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                  ))}
+                                </select>
+                              </ExpandedInput>
+                            ) : null}
+                            {editState.type === "farrier" ? (
+                              <ExpandedInput label="SERVICE TYPE">
+                                <select
+                                  className={styles.expandedInput}
+                                  value={editState.serviceType}
+                                  onChange={(event) => setEditState({ ...editState, serviceType: event.target.value })}
+                                >
+                                  <option value="">select...</option>
+                                  {farrierServiceTypes.map((service) => (
+                                    <option key={service} value={service}>{service}</option>
+                                  ))}
+                                </select>
+                              </ExpandedInput>
+                            ) : null}
+                            {editState.type === "other" ? (
+                              <ExpandedInput label="DESCRIBE TYPE">
+                                <input
+                                  className={styles.expandedInput}
+                                  value={editState.customType}
+                                  onChange={(event) => setEditState({ ...editState, customType: event.target.value })}
+                                  placeholder="e.g., Dentist, Chiropractor"
+                                />
+                              </ExpandedInput>
+                            ) : null}
                             <ExpandedInput label="NOTES">
                               <textarea
                                 className={styles.expandedTextarea}
@@ -1024,6 +1063,8 @@ export default function RecordsPage() {
                                 event.stopPropagation();
                                 setEditingRecordId(record._id);
                                   setEditState({
+                                    type: record.type,
+                                    visitType: (record.visitType || "") as "" | VetSubcategory,
                                     providerName: record.providerName || "",
                                     date: toDateInput(record.date),
                                     nextVisitDate: getLinkedUpcomingDateInput(record),

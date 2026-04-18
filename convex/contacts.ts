@@ -229,6 +229,80 @@ export const deleteContact = mutation({
   }
 });
 
+/**
+ * Merge two contacts: point all bills + contactAliases referencing `sourceId`
+ * to `targetId`, then delete `sourceId`. Used to clean up duplicates.
+ */
+export const mergeContacts = mutation({
+  args: {
+    targetId: v.id("contacts"),
+    sourceId: v.id("contacts")
+  },
+  handler: async (ctx, args) => {
+    if (args.targetId === args.sourceId) throw new Error("targetId and sourceId must differ");
+    const target = await ctx.db.get(args.targetId);
+    const source = await ctx.db.get(args.sourceId);
+    if (!target) throw new Error("target contact not found");
+    if (!source) throw new Error("source contact not found");
+
+    // Repoint bills
+    const bills = await ctx.db
+      .query("bills")
+      .withIndex("by_contact", (q) => q.eq("contactId", args.sourceId))
+      .collect();
+    for (const bill of bills) {
+      await ctx.db.patch(bill._id, { contactId: args.targetId });
+    }
+
+    // Repoint contactAliases
+    const aliases = await ctx.db.query("contactAliases").collect();
+    for (const alias of aliases) {
+      if (alias.contactId === args.sourceId) {
+        await ctx.db.patch(alias._id, { contactId: args.targetId });
+      }
+    }
+
+    // Fill in any fields on target that are missing from source
+    const patch: Record<string, unknown> = {};
+    const fillable: (keyof typeof source)[] = [
+      "email", "phone", "address", "website", "accountNumber",
+      "contactName", "primaryContactName", "primaryContactPhone",
+      "location", "role"
+    ];
+    for (const key of fillable) {
+      const targetVal = (target as any)[key];
+      const sourceVal = (source as any)[key];
+      if (!targetVal && sourceVal) patch[key as string] = sourceVal;
+    }
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(args.targetId, patch);
+    }
+
+    await ctx.db.delete(args.sourceId);
+    return { mergedBills: bills.length, keptId: args.targetId, deletedId: args.sourceId };
+  }
+});
+
+/**
+ * Find duplicate contacts by (categoryId, name) and return them grouped.
+ */
+export const findDuplicateContacts = query({
+  args: { name: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const all = await ctx.db.query("contacts").collect();
+    const groups: Record<string, typeof all> = {};
+    for (const c of all) {
+      if (args.name && c.name.toLowerCase() !== args.name.toLowerCase()) continue;
+      const key = `${c.categoryId ?? "_nocat_"}::${c.name.trim().toLowerCase()}`;
+      groups[key] = groups[key] || [];
+      groups[key].push(c);
+    }
+    return Object.entries(groups)
+      .filter(([, v]) => v.length > 1)
+      .map(([key, contacts]) => ({ key, contacts }));
+  }
+});
+
 export const upsertContactFromInvoice = internalMutation({
   args: {
     name: v.string(),

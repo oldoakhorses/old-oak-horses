@@ -18,7 +18,7 @@ type RecordFormState = {
   date: string;
   recordType: RecordType;
   customType: string;
-  visitType: "" | "vaccination" | "treatment";
+  visitType: "" | "vaccination" | "treatment" | "exams_diagnostics" | "other";
   vaccineName: string;
   treatmentDescription: string;
   serviceType: string;
@@ -1404,9 +1404,9 @@ export default function InvoicePreviewPage() {
           customType: recordForm.recordType === "other" ? recordForm.customType || undefined : undefined,
           date: dateTs,
           providerName: recordForm.providerName || undefined,
-          visitType: recordForm.recordType === "veterinary" && recordForm.visitType ? recordForm.visitType as "vaccination" | "treatment" : undefined,
+          visitType: recordForm.recordType === "veterinary" && recordForm.visitType ? recordForm.visitType as "vaccination" | "treatment" | "exams_diagnostics" | "other" : undefined,
           vaccineName: recordForm.recordType === "veterinary" && recordForm.visitType === "vaccination" ? recordForm.vaccineName || undefined : undefined,
-          treatmentDescription: recordForm.recordType === "veterinary" && recordForm.visitType === "treatment" ? recordForm.treatmentDescription || undefined : undefined,
+          treatmentDescription: recordForm.recordType === "veterinary" && (recordForm.visitType === "treatment" || recordForm.visitType === "exams_diagnostics" || recordForm.visitType === "other") ? recordForm.treatmentDescription || undefined : undefined,
           serviceType: recordForm.recordType === "farrier" ? recordForm.serviceType || undefined : undefined,
           isUpcoming: false,
           notes: combinedNotes,
@@ -2017,11 +2017,13 @@ export default function InvoicePreviewPage() {
                     <select
                       className={styles.recordModalSelect}
                       value={recordForm.visitType}
-                      onChange={(e) => setRecordForm((prev) => ({ ...prev, visitType: e.target.value as "" | "vaccination" | "treatment" }))}
+                      onChange={(e) => setRecordForm((prev) => ({ ...prev, visitType: e.target.value as RecordFormState["visitType"] }))}
                     >
                       <option value="">select</option>
                       <option value="vaccination">vaccination</option>
                       <option value="treatment">treatment</option>
+                      <option value="exams_diagnostics">exam</option>
+                      <option value="other">other</option>
                     </select>
                   </div>
                 )}
@@ -2046,6 +2048,20 @@ export default function InvoicePreviewPage() {
                       value={recordForm.treatmentDescription}
                       onChange={(e) => setRecordForm((prev) => ({ ...prev, treatmentDescription: e.target.value }))}
                       placeholder="describe treatment..."
+                    />
+                  </div>
+                )}
+
+                {recordForm.recordType === "veterinary" && (recordForm.visitType === "exams_diagnostics" || recordForm.visitType === "other") && (
+                  <div className={styles.recordModalField}>
+                    <div className={styles.recordModalLabel}>
+                      {recordForm.visitType === "exams_diagnostics" ? "exam details" : "what happened"}
+                    </div>
+                    <input
+                      className={styles.recordModalInput}
+                      value={recordForm.treatmentDescription}
+                      onChange={(e) => setRecordForm((prev) => ({ ...prev, treatmentDescription: e.target.value }))}
+                      placeholder={recordForm.visitType === "exams_diagnostics" ? "e.g. lameness exam, pre-purchase..." : "describe what happened..."}
                     />
                   </div>
                 )}

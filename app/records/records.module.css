@@ -82,7 +82,7 @@
 /* Filters — matches invoices page */
 .filters {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 180px)) minmax(0, 220px);
+  grid-template-columns: repeat(4, minmax(0, 150px)) minmax(0, 200px);
   gap: 10px;
   margin-bottom: 16px;
 }

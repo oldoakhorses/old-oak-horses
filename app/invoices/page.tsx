@@ -101,8 +101,10 @@ export default function InvoicesPage() {
 
   const [tab, setTab] = useState<"pending" | "approved">("pending");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [horseFilter, setHorseFilter] = useState<string>("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const activeHorses = useQuery(api.horses.getActiveHorses) ?? [];
   const [sortColumn, setSortColumn] = useState<SortColumn>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -123,13 +125,15 @@ export default function InvoicesPage() {
       const date = getInvoiceDate(row);
       const tabPass = tab === "approved" ? Boolean(row.isApproved) : !row.isApproved;
       const categoryPass = categoryFilter === "all" || row.categoryName === categoryFilter;
+      const assignedHorseIds = Array.isArray(row.assignedHorses) ? row.assignedHorses.map((entry: any) => String(entry.horseId ?? "")).filter(Boolean) : [];
+      const horsePass = horseFilter === "all" || assignedHorseIds.includes(horseFilter);
       const fromPass = !fromDate || date >= fromDate;
       const toPass = !toDate || date <= toDate;
       const searchPass = !q || abbreviateInvoiceName(row.invoiceName || formatInvoiceName({ providerName: getProvider(row), date })).toLowerCase().includes(q)
         || (row.categoryName ?? "").toLowerCase().includes(q)
         || (getProvider(row)).toLowerCase().includes(q)
         || date.includes(q);
-      return tabPass && categoryPass && fromPass && toPass && searchPass;
+      return tabPass && categoryPass && horsePass && fromPass && toPass && searchPass;
     });
 
     const sorted = [...base];
@@ -155,7 +159,7 @@ export default function InvoicesPage() {
       return sortDirection === "asc" ? aAmount - bAmount : bAmount - aAmount;
     });
     return sorted;
-  }, [rows, tab, categoryFilter, fromDate, toDate, searchQuery, sortColumn, sortDirection]);
+  }, [rows, tab, categoryFilter, horseFilter, fromDate, toDate, searchQuery, sortColumn, sortDirection]);
 
   function handleSort(column: Exclude<SortColumn, null>) {
     if (sortColumn === column) {
@@ -242,6 +246,15 @@ export default function InvoicesPage() {
                 <option key={name} value={name}>
                   {name === "all" ? "All" : name}
                 </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Horse</span>
+            <select value={horseFilter} onChange={(e) => setHorseFilter(e.target.value)}>
+              <option value="all">All</option>
+              {activeHorses.map((horse) => (
+                <option key={horse._id} value={String(horse._id)}>{horse.name}</option>
               ))}
             </select>
           </label>
