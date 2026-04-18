@@ -55,6 +55,11 @@ export default function OwnerDetailPage() {
   const [editPhone, setEditPhone] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editNotes, setEditNotes] = useState("");
+  const [editContactPerson, setEditContactPerson] = useState("");
+  const [editUsef, setEditUsef] = useState("");
+  const [editFei, setEditFei] = useState("");
+  const [editEin, setEditEin] = useState("");
+  const [editVat, setEditVat] = useState("");
 
   const unassignedHorses = useMemo(() => {
     if (!ownerHorses) return allHorses;
@@ -68,6 +73,11 @@ export default function OwnerDetailPage() {
     setEditPhone(owner?.phone ?? "");
     setEditAddress(owner?.address ?? "");
     setEditNotes(owner?.notes ?? "");
+    setEditContactPerson((owner as any)?.contactPerson ?? "");
+    setEditUsef((owner as any)?.usefNumber ?? "");
+    setEditFei((owner as any)?.feiNumber ?? "");
+    setEditEin((owner as any)?.ein ?? "");
+    setEditVat((owner as any)?.vat ?? "");
     setEditInfo(true);
   }
 
@@ -79,6 +89,11 @@ export default function OwnerDetailPage() {
       phone: editPhone.trim() || undefined,
       address: editAddress.trim() || undefined,
       notes: editNotes.trim() || undefined,
+      contactPerson: editContactPerson.trim(),
+      usefNumber: editUsef.trim(),
+      feiNumber: editFei.trim(),
+      ein: editEin.trim(),
+      vat: editVat.trim(),
     });
     setEditInfo(false);
   }
@@ -124,6 +139,18 @@ export default function OwnerDetailPage() {
             <button type="button" className={styles.btnEdit} onClick={startEditInfo}>edit</button>
           </div>
           {owner.address ? <div className={styles.ownerAddress}>{owner.address}</div> : null}
+          {(() => {
+            const extras = [
+              (owner as any).contactPerson && `contact: ${(owner as any).contactPerson}`,
+              (owner as any).usefNumber && `USEF #${(owner as any).usefNumber}`,
+              (owner as any).feiNumber && `FEI #${(owner as any).feiNumber}`,
+              (owner as any).ein && `EIN ${(owner as any).ein}`,
+              (owner as any).vat && `VAT ${(owner as any).vat}`,
+            ].filter(Boolean);
+            return extras.length > 0 ? (
+              <div className={styles.ownerAddress}>{extras.join(" \u00B7 ")}</div>
+            ) : null;
+          })()}
           {owner.notes ? <div className={styles.ownerNotes}>{owner.notes}</div> : null}
         </div>
 
@@ -259,6 +286,26 @@ export default function OwnerDetailPage() {
           <div className={styles.formGroup}>
             <label className={styles.formLabel}>address</label>
             <input className={styles.formInput} value={editAddress} onChange={(e) => setEditAddress(e.target.value)} />
+          </div>
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>contact person</label>
+            <input className={styles.formInput} value={editContactPerson} onChange={(e) => setEditContactPerson(e.target.value)} />
+          </div>
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>USEF #</label>
+            <input className={styles.formInput} value={editUsef} onChange={(e) => setEditUsef(e.target.value)} />
+          </div>
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>FEI #</label>
+            <input className={styles.formInput} value={editFei} onChange={(e) => setEditFei(e.target.value)} />
+          </div>
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>EIN</label>
+            <input className={styles.formInput} value={editEin} onChange={(e) => setEditEin(e.target.value)} />
+          </div>
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>VAT</label>
+            <input className={styles.formInput} value={editVat} onChange={(e) => setEditVat(e.target.value)} />
           </div>
           <div className={styles.formGroup}>
             <label className={styles.formLabel}>notes</label>

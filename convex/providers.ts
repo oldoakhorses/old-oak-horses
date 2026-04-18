@@ -1,6 +1,77 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 
+/**
+ * Merge two providers: repoint all bills, contacts, and providerAliases
+ * referencing `sourceId` to `targetId`, fill missing fields on target,
+ * then delete `sourceId`. Used to clean up duplicate providers.
+ */
+export const mergeProviders = mutation({
+  args: {
+    targetId: v.id("providers"),
+    sourceId: v.id("providers")
+  },
+  handler: async (ctx, args) => {
+    if (args.targetId === args.sourceId) throw new Error("targetId and sourceId must differ");
+    const target = await ctx.db.get(args.targetId);
+    const source = await ctx.db.get(args.sourceId);
+    if (!target) throw new Error("target provider not found");
+    if (!source) throw new Error("source provider not found");
+
+    const bills = await ctx.db.query("bills").collect();
+    let billUpdates = 0;
+    for (const bill of bills) {
+      if (bill.providerId === args.sourceId) {
+        await ctx.db.patch(bill._id, { providerId: args.targetId });
+        billUpdates++;
+      }
+    }
+
+    const contacts = await ctx.db.query("contacts").collect();
+    let contactUpdates = 0;
+    for (const contact of contacts) {
+      if ((contact as any).providerId === args.sourceId) {
+        await ctx.db.patch(contact._id, { providerId: args.targetId });
+        contactUpdates++;
+      }
+    }
+
+    const aliases = await ctx.db.query("providerAliases").collect();
+    let aliasUpdates = 0;
+    for (const alias of aliases) {
+      if (alias.providerId === args.sourceId) {
+        await ctx.db.patch(alias._id, { providerId: args.targetId });
+        aliasUpdates++;
+      }
+    }
+
+    // Fill missing fields on target from source
+    const patch: Record<string, unknown> = {};
+    const fillable = [
+      "email", "phone", "address", "website", "accountNumber",
+      "contactName", "primaryContactName", "primaryContactPhone",
+      "fullName", "subcategorySlug"
+    ];
+    for (const key of fillable) {
+      const tv = (target as any)[key];
+      const sv = (source as any)[key];
+      if (!tv && sv) patch[key] = sv;
+    }
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(args.targetId, patch);
+    }
+
+    await ctx.db.delete(args.sourceId);
+    return {
+      keptId: args.targetId,
+      deletedId: args.sourceId,
+      billsRepointed: billUpdates,
+      contactsRepointed: contactUpdates,
+      aliasesRepointed: aliasUpdates
+    };
+  }
+});
+
 export const getProvidersByCategory = query({
   args: { categoryId: v.id("categories") },
   handler: async (ctx, args) => {
