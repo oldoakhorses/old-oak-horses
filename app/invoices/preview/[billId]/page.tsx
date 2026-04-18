@@ -990,13 +990,19 @@ export default function InvoicePreviewPage() {
 
       let contactId = selectedContactId ?? undefined;
 
-      // If no existing contact selected but we have a name, create a new contact
+      // If no existing contact selected but we have a name, create a new
+      // contact — pull across every auto-extracted field from the invoice so
+      // the new contact starts fully populated.
       if (!contactId && contactForm.providerName?.trim()) {
         const newContactId = await createContact({
           name: contactForm.providerName.trim(),
           category: categorySlug || "other",
+          contactName: contactForm.contactName || undefined,
           phone: contactForm.phone || undefined,
           email: contactForm.email || undefined,
+          address: contactForm.address || undefined,
+          website: contactForm.website || undefined,
+          accountNumber: contactForm.accountNumber || undefined,
         });
         contactId = newContactId;
         setSelectedContactId(newContactId);
