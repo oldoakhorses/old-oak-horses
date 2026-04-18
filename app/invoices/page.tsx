@@ -99,7 +99,7 @@ export default function InvoicesPage() {
   const deleteBill = useMutation(api.bills.deleteBill);
   const updateBillNotes = useMutation(api.bills.updateBillNotes);
 
-  const [tab, setTab] = useState<"pending" | "approved">("pending");
+  const [tab, setTab] = useState<"pending" | "approved">("approved");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [horseFilter, setHorseFilter] = useState<string>("all");
   const [fromDate, setFromDate] = useState("");
