@@ -127,31 +127,36 @@ export const listContacts = query({
 export const createContact = mutation({
   args: {
     name: v.string(),
-    role: v.optional(v.string()),
-    providerId: v.optional(v.id("providers")),
-    providerName: v.optional(v.string()),
+    fullName: v.optional(v.string()),
+    contactName: v.optional(v.string()),
     category: v.string(),
     location: v.optional(locationValue),
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
-    notes: v.optional(v.string()),
-    company: v.optional(v.string())
+    address: v.optional(v.string()),
+    website: v.optional(v.string()),
+    accountNumber: v.optional(v.string()),
+    notes: v.optional(v.string())
   },
   handler: async (ctx, args) => {
-    const providerName = trimOrUndefined(args.providerName) ?? trimOrUndefined(args.company);
+    const fullName = trimOrUndefined(args.fullName);
     const slug = await generateUniqueSlug(ctx, args.name);
     return await ctx.db.insert("contacts", {
       name: args.name.trim(),
       slug,
-      role: trimOrUndefined(args.role),
-      providerId: args.providerId,
-      providerName,
+      fullName,
+      contactName: trimOrUndefined(args.contactName),
       category: normalizeCategory(args.category),
       location: args.location,
       phone: trimOrUndefined(args.phone),
       email: normalizeEmail(args.email),
+      address: trimOrUndefined(args.address),
+      website: trimOrUndefined(args.website),
+      accountNumber: trimOrUndefined(args.accountNumber),
       notes: trimOrUndefined(args.notes),
-      company: providerName,
+      // Keep legacy provider fields populated from fullName for back-compat
+      providerName: fullName,
+      company: fullName,
       createdAt: Date.now()
     });
   }
@@ -293,7 +298,7 @@ export const findDuplicateContacts = query({
     const groups: Record<string, typeof all> = {};
     for (const c of all) {
       if (args.name && c.name.toLowerCase() !== args.name.toLowerCase()) continue;
-      const key = `${c.categoryId ?? "_nocat_"}::${c.name.trim().toLowerCase()}`;
+      const key = `${(c as any).category ?? (c as any).categoryId ?? "_nocat_"}::${c.name.trim().toLowerCase()}`;
       groups[key] = groups[key] || [];
       groups[key].push(c);
     }

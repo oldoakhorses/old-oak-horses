@@ -311,6 +311,7 @@ export default function InvoicePreviewPage() {
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
   const triggerBillParsing = useMutation(api.bills.triggerBillParsing);
+  const attachPdfToBill = useMutation(api.bills.attachPdfToBill);
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [recordForm, setRecordForm] = useState<RecordFormState>({
     horseIds: [], date: "", recordType: "other", customType: "",
@@ -854,6 +855,36 @@ export default function InvoicePreviewPage() {
     } catch (err) {
       setReparsing(false);
       setError(err instanceof Error ? err.message : "Failed to re-parse");
+    }
+  }
+
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+  const pdfUploadRef = useRef<HTMLInputElement>(null);
+
+  async function onPdfSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !bill) return;
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      setError("Please select a PDF file");
+      return;
+    }
+    setError("");
+    setUploadingPdf(true);
+    try {
+      const uploadUrl = await generateUploadUrl();
+      const res = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type || "application/pdf" },
+        body: file,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const { storageId } = await res.json();
+      await attachPdfToBill({ billId, fileId: storageId, fileName: file.name });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload PDF");
+    } finally {
+      setUploadingPdf(false);
     }
   }
 
@@ -1606,6 +1637,22 @@ export default function InvoicePreviewPage() {
                   {bill.originalPdfUrl ? (
                     <a className={styles.pdfButton} href={bill.originalPdfUrl} target="_blank" rel="noreferrer">view original ↗</a>
                   ) : null}
+                  <input
+                    ref={pdfUploadRef}
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    style={{ display: "none" }}
+                    onChange={onPdfSelected}
+                  />
+                  <button
+                    type="button"
+                    className={styles.changeLink}
+                    onClick={() => pdfUploadRef.current?.click()}
+                    disabled={uploadingPdf}
+                    title={bill.originalPdfUrl ? "Replace the attached PDF" : "Attach a PDF to this invoice"}
+                  >
+                    {uploadingPdf ? "uploading..." : bill.originalPdfUrl ? "replace pdf" : "upload pdf"}
+                  </button>
                   <button
                     type="button"
                     className={styles.changeLink}

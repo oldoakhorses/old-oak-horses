@@ -10,18 +10,21 @@ import NavBar from "@/components/NavBar";
 import styles from "./contacts.module.css";
 
 type LocationValue = "all" | "wellington" | "thermal" | "ocala" | "la" | "eu" | "can";
-type SortColumn = "name" | "providerName" | "location" | "category" | null;
+type SortColumn = "name" | "location" | "category" | null;
 type SortDirection = "asc" | "desc";
 
 type ContactFormState = {
   name: string;
-  providerName: string;
-  providerId: string;
+  fullName: string;
+  contactName: string;
   location: LocationValue;
   category: string;
   email: string;
   phone: string;
-  role: string;
+  address: string;
+  website: string;
+  accountNumber: string;
+  notes: string;
 };
 
 const CATEGORY_OPTIONS = [
@@ -75,13 +78,16 @@ const LOCATION_COLORS: Record<Exclude<LocationValue, "all">, { bg: string; color
 
 const EMPTY_FORM: ContactFormState = {
   name: "",
-  providerName: "",
-  providerId: "",
+  fullName: "",
+  contactName: "",
   location: "all",
   category: "veterinary",
   email: "",
   phone: "",
-  role: "",
+  address: "",
+  website: "",
+  accountNumber: "",
+  notes: "",
 };
 
 export default function ContactsPage() {
@@ -123,15 +129,13 @@ export default function ContactsPage() {
     const query = search.trim().toLowerCase();
     if (!query) return tabContacts;
     return tabContacts.filter((contact) => {
-      const provider = contact.providerId ? providerLookup.get(String(contact.providerId)) : null;
-      const providerName = contact.providerName ?? contact.company ?? provider?.name ?? "";
       const location = (contact.location as Exclude<LocationValue, "all"> | undefined) ?? "";
       const locationLabel = location ? LOCATION_LABELS[location] : "";
       const category = categoryLabel(contact.category ?? "");
-      const haystack = [contact.name, providerName, locationLabel, category].join(" ").toLowerCase();
+      const haystack = [contact.name, locationLabel, category].join(" ").toLowerCase();
       return haystack.includes(query);
     });
-  }, [tabContacts, providerLookup, search]);
+  }, [tabContacts, search]);
 
   const sortedContacts = useMemo(() => {
     const rows = [...filteredContacts];
@@ -139,13 +143,13 @@ export default function ContactsPage() {
       return rows.sort((a, b) => a.name.localeCompare(b.name));
     }
     rows.sort((a, b) => {
-      const aVal = getSortValue(a, sortColumn, providerLookup).toLowerCase();
-      const bVal = getSortValue(b, sortColumn, providerLookup).toLowerCase();
+      const aVal = getSortValue(a, sortColumn).toLowerCase();
+      const bVal = getSortValue(b, sortColumn).toLowerCase();
       const cmp = aVal.localeCompare(bVal);
       return sortDirection === "asc" ? cmp : -cmp;
     });
     return rows;
-  }, [filteredContacts, providerLookup, sortColumn, sortDirection]);
+  }, [filteredContacts, sortColumn, sortDirection]);
 
   function handleSort(column: Exclude<SortColumn, null>) {
     if (sortColumn === column) {
@@ -185,17 +189,18 @@ export default function ContactsPage() {
     setSaving(true);
     setError("");
     try {
-      const matchedProvider = providers.find((provider) => provider.name.toLowerCase() === form.providerName.trim().toLowerCase());
-      const providerId = (form.providerId || matchedProvider?._id) ? ((form.providerId || matchedProvider?._id) as Id<"providers">) : undefined;
       const payload = {
         name: form.name,
-        role: form.role || undefined,
-        providerId,
-        providerName: form.providerName || matchedProvider?.name || undefined,
+        fullName: form.fullName || undefined,
+        contactName: form.contactName || undefined,
         category: form.category,
         location: form.location === "all" ? undefined : (form.location as "wellington" | "thermal" | "ocala" | "la" | "eu" | "can"),
         phone: form.phone || undefined,
         email: form.email || undefined,
+        address: form.address || undefined,
+        website: form.website || undefined,
+        accountNumber: form.accountNumber || undefined,
+        notes: form.notes || undefined,
       };
       await createContact(payload);
       closeAdd();
@@ -300,18 +305,35 @@ export default function ContactsPage() {
                 <Field label="NAME">
                   <input className={styles.fieldInput} value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} required />
                 </Field>
-                <Field label="PROVIDER">
-                  <input
-                    className={styles.fieldInput}
-                    value={form.providerName}
-                    onChange={(event) => setForm((prev) => ({ ...prev, providerName: event.target.value }))}
-                    list="providers-list"
-                  />
-                  <datalist id="providers-list">
-                    {providers.map((provider) => (
-                      <option key={provider._id} value={provider.name} />
+                <Field label="FULL NAME">
+                  <input className={styles.fieldInput} value={form.fullName} onChange={(event) => setForm((prev) => ({ ...prev, fullName: event.target.value }))} />
+                </Field>
+                <Field label="CONTACT PERSON">
+                  <input className={styles.fieldInput} value={form.contactName} onChange={(event) => setForm((prev) => ({ ...prev, contactName: event.target.value }))} />
+                </Field>
+                <Field label="PHONE">
+                  <input className={styles.fieldInput} value={form.phone} onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))} />
+                </Field>
+                <Field label="EMAIL">
+                  <input className={styles.fieldInput} value={form.email} onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))} type="email" />
+                </Field>
+                <Field label="ADDRESS">
+                  <input className={styles.fieldInput} value={form.address} onChange={(event) => setForm((prev) => ({ ...prev, address: event.target.value }))} />
+                </Field>
+                <Field label="WEBSITE">
+                  <input className={styles.fieldInput} value={form.website} onChange={(event) => setForm((prev) => ({ ...prev, website: event.target.value }))} />
+                </Field>
+                <Field label="ACCOUNT #">
+                  <input className={styles.fieldInput} value={form.accountNumber} onChange={(event) => setForm((prev) => ({ ...prev, accountNumber: event.target.value }))} />
+                </Field>
+                <Field label="CATEGORY">
+                  <select className={styles.fieldInput} value={form.category} onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}>
+                    {CATEGORY_OPTIONS.map((row) => (
+                      <option key={row.key} value={row.key}>
+                        {row.label}
+                      </option>
                     ))}
-                  </datalist>
+                  </select>
                 </Field>
                 <Field label="LOCATION">
                   <select className={styles.fieldInput} value={form.location} onChange={(event) => setForm((prev) => ({ ...prev, location: event.target.value as LocationValue }))}>
@@ -324,25 +346,15 @@ export default function ContactsPage() {
                     <option value="can">CAN</option>
                   </select>
                 </Field>
-                <Field label="CATEGORY">
-                  <select className={styles.fieldInput} value={form.category} onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}>
-                    {CATEGORY_OPTIONS.map((row) => (
-                      <option key={row.key} value={row.key}>
-                        {row.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="EMAIL">
-                  <input className={styles.fieldInput} value={form.email} onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))} type="email" />
-                </Field>
-                <Field label="PHONE">
-                  <input className={styles.fieldInput} value={form.phone} onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))} />
-                </Field>
-                <Field label="ROLE">
-                  <input className={styles.fieldInput} value={form.role} onChange={(event) => setForm((prev) => ({ ...prev, role: event.target.value }))} />
-                </Field>
               </div>
+              <Field label="NOTES">
+                <textarea
+                  className={styles.fieldInput}
+                  style={{ minHeight: 80, resize: "vertical" }}
+                  value={form.notes}
+                  onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
+                />
+              </Field>
               {error ? <div className={styles.formError}>{error}</div> : null}
               <div className={styles.formActions}>
                 <button type="button" className={styles.cancelButton} onClick={closeAdd}>
@@ -358,9 +370,6 @@ export default function ContactsPage() {
           <div className={styles.contactsHeader}>
             <button type="button" className={headerClass(sortColumn === "name", styles)} onClick={() => handleSort("name")}>
               NAME {sortArrow(sortColumn === "name", sortDirection, styles)}
-            </button>
-            <button type="button" className={headerClass(sortColumn === "providerName", styles)} onClick={() => handleSort("providerName")}>
-              PROVIDER {sortArrow(sortColumn === "providerName", sortDirection, styles)}
             </button>
             <button type="button" className={headerClass(sortColumn === "location", styles)} onClick={() => handleSort("location")}>
               LOCATION {sortArrow(sortColumn === "location", sortDirection, styles)}
@@ -379,8 +388,6 @@ export default function ContactsPage() {
           ) : (
             sortedContacts.map((contact) => {
               const contactId = String(contact._id);
-              const provider = contact.providerId ? providerLookup.get(String(contact.providerId)) : null;
-              const providerName = contact.providerName ?? contact.company ?? provider?.name ?? "—";
               const location = contact.location as Exclude<LocationValue, "all"> | undefined;
               const categoryKey = contact.category?.toLowerCase() ?? "other";
               const categoryColor = CATEGORY_COLORS[categoryKey] ?? { bg: "rgba(107,112,132,0.08)", color: "#6B7084", label: titleCase(categoryKey) };
@@ -395,7 +402,6 @@ export default function ContactsPage() {
                       <div className={styles.contactName}>{contact.name}</div>
                       {contact.email ? <div className={styles.contactEmail}>{contact.email}</div> : null}
                     </div>
-                    <div className={styles.contactProvider}>{providerName}</div>
                     <div>
                       {location ? (
                         <span className={styles.locationBadge} style={{ background: LOCATION_COLORS[location].bg, color: LOCATION_COLORS[location].color }}>
@@ -477,12 +483,8 @@ function sortArrow(active: boolean, direction: SortDirection, css: Record<string
   return <span className={css.sortArrow}>{direction === "asc" ? "↑" : "↓"}</span>;
 }
 
-function getSortValue(contact: any, column: Exclude<SortColumn, null>, providerLookup: Map<string, any>) {
+function getSortValue(contact: any, column: Exclude<SortColumn, null>) {
   if (column === "name") return contact.name ?? "";
-  if (column === "providerName") {
-    const provider = contact.providerId ? providerLookup.get(String(contact.providerId)) : null;
-    return contact.providerName ?? contact.company ?? provider?.name ?? "";
-  }
   if (column === "location") {
     const location = contact.location as Exclude<LocationValue, "all"> | undefined;
     return location ? LOCATION_LABELS[location] : "";

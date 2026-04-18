@@ -97,6 +97,30 @@ export const generateUploadUrl = mutation(async (ctx) => {
   return await ctx.storage.generateUploadUrl();
 });
 
+/**
+ * Attach a PDF storage file to an existing bill.
+ * Used by CC-statement-generated invoices (which lack a source PDF) so the
+ * user can upload the actual invoice after the fact.
+ */
+export const attachPdfToBill = mutation({
+  args: {
+    billId: v.id("bills"),
+    fileId: v.id("_storage"),
+    fileName: v.string()
+  },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+    const url = await ctx.storage.getUrl(args.fileId);
+    await ctx.db.patch(args.billId, {
+      fileId: args.fileId,
+      fileName: args.fileName,
+      originalPdfUrl: url ?? undefined
+    });
+    return { ok: true, url };
+  }
+});
+
 export const createBillRecord = mutation({
   args: {
     providerId: v.optional(v.id("providers")),
