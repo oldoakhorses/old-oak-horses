@@ -289,6 +289,74 @@ export const previewBillingPeriod = query({
 
 // ── mutations ────────────────────────────────────────────────────────────
 /** Generate owner invoices for a billing period */
+/**
+ * Core rule for owner invoices:
+ *
+ *   For each approved, non-credit bill in the date range, for each line item,
+ *   walk through every (horse, amount) pair attributed to that line item, and
+ *   route the charge to that horse's owner.
+ *
+ * A line item can attribute a charge to a horse in one of four ways, checked
+ * in priority order:
+ *
+ *   1. Explicit per-line split       (bill.splitLineItems[i].splits[].{horseId, amount})
+ *   2. Explicit per-line assignment  (bill.horseAssignments where lineItemIndex === i)
+ *   3. Whole-bill assignment         (bill.assignedHorses — applied uniformly to every
+ *                                     line item that is not otherwise assigned)
+ *   4. Parser auto-match             (lineItem.matched_horse_id — the value the parser
+ *                                     wrote when it recognized a horse name in the
+ *                                     description, used only if nothing above assigned
+ *                                     this line item to anyone)
+ *
+ * If a line item ends up with zero horse attributions, it does not appear on
+ * any owner invoice. No business-general split, no "split across all active
+ * horses" fallback — a charge either has a horse, or it doesn't.
+ */
+type LineItemHorseCharge = {
+  horseId: Id<"horses">;
+  amount: number;
+};
+
+function horseChargesForLineItem(args: {
+  lineItem: Record<string, unknown>;
+  lineItemIndex: number;
+  assignedHorses: Array<{ horseId: Id<"horses">; horseName?: string; amount?: number }>;
+  horseAssignments: Array<{ horseId: Id<"horses">; lineItemIndex: number; horseName?: string }>;
+  splitLineItems: Array<{ lineItemIndex: number; splits: Array<{ horseId: Id<"horses">; amount: number }> }>;
+}): LineItemHorseCharge[] {
+  const { lineItem, lineItemIndex, assignedHorses, horseAssignments, splitLineItems } = args;
+  const amount = lineItemAmount(lineItem);
+
+  // 1. Explicit split (highest priority)
+  const split = splitLineItems.find((s) => s.lineItemIndex === lineItemIndex);
+  if (split && Array.isArray(split.splits) && split.splits.length > 0) {
+    return split.splits
+      .filter((s) => s.horseId && typeof s.amount === "number")
+      .map((s) => ({ horseId: s.horseId, amount: round2(s.amount) }));
+  }
+
+  // 2. Explicit per-line assignment (equal-split if multiple horses on this index)
+  const perLine = horseAssignments.filter((h) => h.lineItemIndex === lineItemIndex && h.horseId);
+  if (perLine.length > 0) {
+    const per = round2(amount / perLine.length);
+    return perLine.map((h) => ({ horseId: h.horseId, amount: per }));
+  }
+
+  // 3. Whole-bill assignment — applies to every line item
+  if (assignedHorses.length > 0) {
+    const per = round2(amount / assignedHorses.length);
+    return assignedHorses.filter((a) => a.horseId).map((a) => ({ horseId: a.horseId, amount: per }));
+  }
+
+  // 4. Parser auto-match
+  const matchedHorseId = (lineItem.matched_horse_id ?? (lineItem as any).matchedHorseId) as string | undefined;
+  if (matchedHorseId && amount > 0) {
+    return [{ horseId: matchedHorseId as Id<"horses">, amount: round2(amount) }];
+  }
+
+  return [];
+}
+
 export const generateOwnerInvoices = mutation({
   args: {
     billingPeriod: v.string(),
@@ -296,7 +364,6 @@ export const generateOwnerInvoices = mutation({
     endDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const owners = await ctx.db.query("owners").collect();
     const horses = await ctx.db.query("horses").collect();
     const horseOwner = new Map<string, Id<"owners">>();
     const horseNames = new Map<string, string>();
@@ -314,14 +381,13 @@ export const generateOwnerInvoices = mutation({
       return b.billingPeriod === args.billingPeriod;
     });
 
-    // Check existing — skip bills already billed
+    // Skip bills that have already been placed on an invoice
     const existingItems = await ctx.db.query("ownerInvoiceLineItems").collect();
     const existingBillIds = new Set(existingItems.map((i) => String(i.sourceBillId)));
 
-    // Build line items per owner
     type PendingItem = {
       sourceBillId: Id<"bills">;
-      horseId?: Id<"horses">;
+      horseId: Id<"horses">;
       horseName?: string;
       description: string;
       category?: string;
@@ -329,256 +395,50 @@ export const generateOwnerInvoices = mutation({
       amount: number;
       sourceLineItemIndex?: number;
     };
-
     const ownerItems = new Map<string, PendingItem[]>();
 
     for (const bill of approvedBills) {
       if (existingBillIds.has(String(bill._id))) continue;
-
       const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
-      // Skip credit bills (deposits/money-in) — not charges to bill out
       if (extracted.isCredit === true) continue;
 
       const lineItems = getLineItems(extracted);
-      const assigned = Array.isArray(bill.assignedHorses) ? bill.assignedHorses : [];
-      const ha = Array.isArray(bill.horseAssignments) ? bill.horseAssignments : [];
-      const splits = Array.isArray(bill.splitLineItems) ? bill.splitLineItems : [];
+      const assignedHorses = (Array.isArray(bill.assignedHorses) ? bill.assignedHorses : []) as Array<{
+        horseId: Id<"horses">; horseName?: string; amount?: number
+      }>;
+      const horseAssignments = (Array.isArray(bill.horseAssignments) ? bill.horseAssignments : []) as Array<{
+        horseId: Id<"horses">; lineItemIndex: number; horseName?: string
+      }>;
+      const splitLineItems = (Array.isArray(bill.splitLineItems) ? bill.splitLineItems : []) as Array<{
+        lineItemIndex: number; splits: Array<{ horseId: Id<"horses">; amount: number }>
+      }>;
 
-      // Pre-compute how many horses share each lineItemIndex (for equal-split fallback)
-      const horsesPerIdx = new Map<number, number>();
-      for (const h of ha) {
-        horsesPerIdx.set(h.lineItemIndex, (horsesPerIdx.get(h.lineItemIndex) ?? 0) + 1);
-      }
-
-      if (assigned.length > 0) {
-        // Simple assignment mode — one entry per assigned horse
-        for (const row of assigned) {
-          const hId = row.horseId;
-          const oId = horseOwner.get(String(hId));
-          if (!oId) continue;
-          const key = String(oId);
-          const items = ownerItems.get(key) ?? [];
-
-          // Find line items for this horse to get descriptions
-          const horseLineIdxs = ha.filter((h) => String(h.horseId) === String(hId)).map((h) => h.lineItemIndex);
-          if (horseLineIdxs.length > 0) {
-            for (const idx of horseLineIdxs) {
-              const li = lineItems[idx] as Record<string, unknown> | undefined;
-              const split = splits.find((s) => s.lineItemIndex === idx);
-              const splitAmount = split?.splits.find((sp) => String(sp.horseId) === String(hId))?.amount;
-              // If no explicit split but multiple horses share this line item, divide equally
-              const shareCount = horsesPerIdx.get(idx) ?? 1;
-              const fallbackAmount = shareCount > 1
-                ? lineItemAmount(li ?? {}) / shareCount
-                : lineItemAmount(li ?? {});
-              items.push({
-                sourceBillId: bill._id,
-                horseId: hId,
-                horseName: row.horseName,
-                description: String(li?.description ?? bill.fileName),
-                category: typeof li?.category === "string" ? li.category : undefined,
-                subcategory: typeof li?.subcategory === "string" ? li.subcategory : undefined,
-                amount: round2(splitAmount ?? fallbackAmount),
-                sourceLineItemIndex: idx,
-              });
-            }
-          } else {
-            // Whole-bill assignment
-            items.push({
-              sourceBillId: bill._id,
-              horseId: hId,
-              horseName: row.horseName,
-              description: bill.fileName,
-              category: undefined,
-              amount: round2(typeof row.amount === "number" ? row.amount : 0),
-            });
-          }
-          ownerItems.set(key, items);
-        }
-      } else if (ha.length > 0) {
-        // Line-by-line assignment mode
-        for (const row of ha) {
-          const hId = row.horseId;
-          if (!hId) continue;
-          const oId = horseOwner.get(String(hId));
-          if (!oId) continue;
-          const key = String(oId);
-          const items = ownerItems.get(key) ?? [];
-          const li = lineItems[row.lineItemIndex] as Record<string, unknown> | undefined;
-          const split = splits.find((s) => s.lineItemIndex === row.lineItemIndex);
-          const splitAmount = split?.splits.find((sp) => String(sp.horseId) === String(hId))?.amount;
-          // If no explicit split but multiple horses share this line item, divide equally
-          const shareCount = horsesPerIdx.get(row.lineItemIndex) ?? 1;
-          const fallbackAmount = shareCount > 1
-            ? lineItemAmount(li ?? {}) / shareCount
-            : lineItemAmount(li ?? {});
-          items.push({
-            sourceBillId: bill._id,
-            horseId: hId,
-            horseName: row.horseName ?? horseNames.get(String(hId)),
-            description: String(li?.description ?? bill.fileName),
-            category: typeof li?.category === "string" ? li.category : undefined,
-            subcategory: typeof li?.subcategory === "string" ? li.subcategory : undefined,
-            amount: round2(splitAmount ?? fallbackAmount),
-            sourceLineItemIndex: row.lineItemIndex,
-          });
-          ownerItems.set(key, items);
-        }
-      }
-    }
-
-    // ── Auto-matched line items: bills with no user-confirmed assignment but
-    // the parser auto-detected a horse via matched_horse_id. Respect those
-    // matches BEFORE falling through to "business general". Otherwise a bill
-    // that was approved without the user explicitly confirming the detected
-    // horse gets split evenly across the whole owner's herd, producing bogus
-    // charges on the wrong owner's invoice (e.g. a Gaby de Courcel bodywork
-    // invoice landing on every Old Oak Farm horse instead of Gaby alone).
-    for (const bill of approvedBills) {
-      if (existingBillIds.has(String(bill._id))) continue;
-      const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
-      if (extracted.isCredit === true) continue;
-      if (Array.isArray(bill.assignedHorses) && bill.assignedHorses.length > 0) continue;
-      if (Array.isArray(bill.horseAssignments) && (bill.horseAssignments as any[]).length > 0) continue;
-      if (Array.isArray(bill.assignedPeople) && bill.assignedPeople.length > 0) continue;
-      const lineItems = getLineItems(extracted);
-      const hasAutoMatches = lineItems.some((li) => {
-        const m = (li as any).matched_horse_id ?? (li as any).matchedHorseId;
-        return typeof m === "string" && m.length > 0;
-      });
-      if (!hasAutoMatches) continue;
-      // Emit one pending item per line-item-with-match, routed to the matched
-      // horse's owner. Items without a match on this bill are skipped here
-      // (they will fall into the business-general bucket below only if the
-      // filter still includes this bill — we mark this bill as handled to
-      // prevent double-billing).
       for (let idx = 0; idx < lineItems.length; idx++) {
         const li = lineItems[idx] as Record<string, unknown>;
-        const matchedHorseId = ((li as any).matched_horse_id ?? (li as any).matchedHorseId) as string | undefined;
-        if (!matchedHorseId) continue;
-        const ownerId = horseOwner.get(String(matchedHorseId));
-        if (!ownerId) continue;
-        const amount = lineItemAmount(li);
-        if (amount === 0) continue;
-        const key = String(ownerId);
-        const items = ownerItems.get(key) ?? [];
-        items.push({
-          sourceBillId: bill._id,
-          horseId: matchedHorseId as Id<"horses">,
-          horseName: horseNames.get(String(matchedHorseId)),
-          description: String(li.description ?? bill.fileName),
-          category: typeof li.category === "string" ? li.category : undefined,
-          subcategory: typeof li.subcategory === "string" ? li.subcategory : undefined,
-          amount: round2(amount),
-          sourceLineItemIndex: idx,
+        const charges = horseChargesForLineItem({
+          lineItem: li,
+          lineItemIndex: idx,
+          assignedHorses,
+          horseAssignments,
+          splitLineItems,
         });
-        ownerItems.set(key, items);
-      }
-      // Mark this bill as handled so it doesn't fall into business general.
-      existingBillIds.add(String(bill._id));
-    }
-
-    // ── Business General charges: split evenly across ALL active horses ──
-    // Find bills that are business_general (no horse assignment, assignType not horse/person)
-    // Exclude credit bills (deposits/money-in) — they are not charges to bill out
-    const businessGeneralBills = approvedBills.filter((b) => {
-      if (existingBillIds.has(String(b._id))) return false;
-      // Skip credit bills (money coming in)
-      const ext = (b.extractedData ?? {}) as Record<string, unknown>;
-      if (ext.isCredit === true) return false;
-      // Already processed above as horse-assigned
-      if (Array.isArray(b.assignedHorses) && b.assignedHorses.length > 0) return false;
-      if (Array.isArray(b.horseAssignments) && (b.horseAssignments as any[]).length > 0) return false;
-      // Check if it's a business or business_general bill
-      const lineItems = Array.isArray(ext.line_items) ? ext.line_items as any[] : [];
-      const isBusiness = (b as any).assignType === "business"
-        || (!b.assignedPeople || b.assignedPeople.length === 0)
-          && lineItems.some((li: any) => li.assigneeType === "business_general");
-      // Also include bills with no assignment at all (unassigned approved bills count as business)
-      const hasNoAssignment = !(b as any).assignType
-        && (!b.assignedPeople || b.assignedPeople.length === 0);
-      return isBusiness || hasNoAssignment;
-    });
-
-    if (businessGeneralBills.length > 0) {
-      // Build map: ownerId -> active horse list
-      // A horse counts as "active at bill time" if it is currently active OR
-      // if it became inactive after the bill was uploaded (inactiveSince > bill.uploadedAt).
-      const ownerHorses = new Map<string, Array<{ id: Id<"horses">; name: string }>>();
-      // Collect ALL active horses (across all owners) for the denominator
-      const allActiveHorses: Array<{ id: Id<"horses">; name: string; ownerId: string }> = [];
-      for (const h of horses) {
-        if (!h.ownerId || h.isSold) continue;
-        // Horse is eligible if currently active, or became inactive after
-        // the billing period started (i.e. was still active when bills were uploaded)
-        const isCurrentlyActive = h.status === "active";
-        const wasActiveInPeriod = h.inactiveSince
-          ? h.inactiveSince >= (new Date(args.billingPeriod + "-01").getTime())
-          : false;
-        if (!isCurrentlyActive && !wasActiveInPeriod) continue;
-        const key = String(h.ownerId);
-        const list = ownerHorses.get(key) ?? [];
-        list.push({ id: h._id, name: h.name });
-        ownerHorses.set(key, list);
-        allActiveHorses.push({ id: h._id, name: h.name, ownerId: key });
-      }
-
-      const totalActiveHorses = allActiveHorses.length;
-      if (totalActiveHorses === 0) {
-        // No active horses — skip business general entirely
-      } else {
-        for (const bill of businessGeneralBills) {
-          const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
-          const lineItems = getLineItems(extracted);
-          const providerName = String(extracted.provider_name ?? extracted.providerName ?? bill.fileName ?? "");
-          let categorySlug: string | undefined;
-          if (bill.categoryId) {
-            const cat = await ctx.db.get(bill.categoryId);
-            if (cat) categorySlug = (cat as any).slug;
-          }
-
-          // Split across ALL active horses, grouped back per owner
-          for (const [ownerIdStr, ownerHorseList] of ownerHorses.entries()) {
-            if (ownerHorseList.length === 0) continue;
-            const items = ownerItems.get(ownerIdStr) ?? [];
-
-            if (lineItems.length > 0) {
-              for (let idx = 0; idx < lineItems.length; idx++) {
-                const li = lineItems[idx] as Record<string, unknown>;
-                const liAmount = lineItemAmount(li);
-                if (liAmount === 0) continue;
-                const perHorse = round2(liAmount / totalActiveHorses);
-                for (const horse of ownerHorseList) {
-                  items.push({
-                    sourceBillId: bill._id,
-                    horseId: horse.id,
-                    horseName: horse.name,
-                    description: `${String(li.description ?? providerName)} (shared)`,
-                    category: categorySlug ?? (typeof li.category === "string" ? li.category : undefined),
-                    subcategory: typeof li.subcategory === "string" ? li.subcategory : undefined,
-                    amount: perHorse,
-                    sourceLineItemIndex: idx,
-                  });
-                }
-              }
-            } else {
-              const total = typeof extracted.invoice_total_usd === "number"
-                ? extracted.invoice_total_usd : 0;
-              if (total === 0) continue;
-              const perHorse = round2(total / totalActiveHorses);
-              for (const horse of ownerHorseList) {
-                items.push({
-                  sourceBillId: bill._id,
-                  horseId: horse.id,
-                  horseName: horse.name,
-                  description: `${providerName || bill.fileName} (shared)`,
-                  category: categorySlug,
-                  amount: perHorse,
-                });
-              }
-            }
-            ownerItems.set(ownerIdStr, items);
-          }
+        for (const charge of charges) {
+          const ownerId = horseOwner.get(String(charge.horseId));
+          if (!ownerId) continue;
+          if (charge.amount === 0) continue;
+          const key = String(ownerId);
+          const items = ownerItems.get(key) ?? [];
+          items.push({
+            sourceBillId: bill._id,
+            horseId: charge.horseId,
+            horseName: horseNames.get(String(charge.horseId)),
+            description: String(li.description ?? bill.fileName),
+            category: typeof li.category === "string" ? li.category : undefined,
+            subcategory: typeof li.subcategory === "string" ? li.subcategory : undefined,
+            amount: charge.amount,
+            sourceLineItemIndex: idx,
+          });
+          ownerItems.set(key, items);
         }
       }
     }
@@ -1013,13 +873,15 @@ export async function syncApprovedBillIntoDraftInvoices(
   const pending = new Map<string, PendingItem[]>();
 
   const lineItems = getLineItems(extracted);
-  const assigned = Array.isArray(bill.assignedHorses) ? bill.assignedHorses : [];
-  const ha = Array.isArray(bill.horseAssignments) ? bill.horseAssignments : [];
-  const splits = Array.isArray(bill.splitLineItems) ? bill.splitLineItems : [];
-  const horsesPerIdx = new Map<number, number>();
-  for (const h of ha) {
-    horsesPerIdx.set(h.lineItemIndex, (horsesPerIdx.get(h.lineItemIndex) ?? 0) + 1);
-  }
+  const assignedHorses = (Array.isArray(bill.assignedHorses) ? bill.assignedHorses : []) as Array<{
+    horseId: Id<"horses">; horseName?: string; amount?: number
+  }>;
+  const horseAssignments = (Array.isArray(bill.horseAssignments) ? bill.horseAssignments : []) as Array<{
+    horseId: Id<"horses">; lineItemIndex: number; horseName?: string
+  }>;
+  const splitLineItems = (Array.isArray(bill.splitLineItems) ? bill.splitLineItems : []) as Array<{
+    lineItemIndex: number; splits: Array<{ horseId: Id<"horses">; amount: number }>
+  }>;
 
   let categorySlug: string | undefined;
   if (bill.categoryId) {
@@ -1034,90 +896,28 @@ export async function syncApprovedBillIntoDraftInvoices(
     pending.set(key, arr);
   }
 
-  if (assigned.length > 0) {
-    for (const row of assigned) {
-      const hId = row.horseId;
-      const oId = horseOwner.get(String(hId));
+  for (let idx = 0; idx < lineItems.length; idx++) {
+    const li = lineItems[idx] as Record<string, unknown>;
+    const charges = horseChargesForLineItem({
+      lineItem: li,
+      lineItemIndex: idx,
+      assignedHorses,
+      horseAssignments,
+      splitLineItems,
+    });
+    for (const charge of charges) {
+      const oId = horseOwner.get(String(charge.horseId));
       if (!oId) continue;
-      const horseLineIdxs = ha.filter((h: any) => String(h.horseId) === String(hId)).map((h: any) => h.lineItemIndex);
-      if (horseLineIdxs.length > 0) {
-        for (const idx of horseLineIdxs) {
-          const li = lineItems[idx] as Record<string, unknown> | undefined;
-          const split = splits.find((s: any) => s.lineItemIndex === idx);
-          const splitAmount = split?.splits.find((sp: any) => String(sp.horseId) === String(hId))?.amount;
-          const shareCount = horsesPerIdx.get(idx) ?? 1;
-          const fallbackAmount = shareCount > 1
-            ? lineItemAmount(li ?? {}) / shareCount
-            : lineItemAmount(li ?? {});
-          pushItem(oId, {
-            horseId: hId,
-            horseName: row.horseName,
-            description: String(li?.description ?? bill.fileName),
-            category: categorySlug ?? (typeof li?.category === "string" ? li.category : undefined),
-            subcategory: typeof li?.subcategory === "string" ? li.subcategory : undefined,
-            amount: round2(splitAmount ?? fallbackAmount),
-            sourceLineItemIndex: idx,
-          });
-        }
-      } else {
-        pushItem(oId, {
-          horseId: hId,
-          horseName: row.horseName,
-          description: bill.fileName,
-          category: categorySlug,
-          amount: round2(typeof row.amount === "number" ? row.amount : 0),
-        });
-      }
-    }
-  } else if (ha.length > 0) {
-    for (const row of ha) {
-      const hId = row.horseId;
-      if (!hId) continue;
-      const oId = horseOwner.get(String(hId));
-      if (!oId) continue;
-      const li = lineItems[row.lineItemIndex] as Record<string, unknown> | undefined;
-      const split = splits.find((s: any) => s.lineItemIndex === row.lineItemIndex);
-      const splitAmount = split?.splits.find((sp: any) => String(sp.horseId) === String(hId))?.amount;
-      const shareCount = horsesPerIdx.get(row.lineItemIndex) ?? 1;
-      const fallbackAmount = shareCount > 1
-        ? lineItemAmount(li ?? {}) / shareCount
-        : lineItemAmount(li ?? {});
+      if (charge.amount === 0) continue;
       pushItem(oId, {
-        horseId: hId,
-        horseName: row.horseName ?? horseNames.get(String(hId)),
-        description: String(li?.description ?? bill.fileName),
-        category: categorySlug ?? (typeof li?.category === "string" ? li.category : undefined),
-        subcategory: typeof li?.subcategory === "string" ? li.subcategory : undefined,
-        amount: round2(splitAmount ?? fallbackAmount),
-        sourceLineItemIndex: row.lineItemIndex,
-      });
-    }
-  } else {
-    // No user-confirmed horse assignment. Fall back to per-line-item
-    // matched_horse_id (set by the parser) so auto-detected assignments still
-    // route to the correct owner on approval.
-    let added = 0;
-    for (let idx = 0; idx < lineItems.length; idx++) {
-      const li = lineItems[idx] as Record<string, unknown>;
-      const matchedHorseId = ((li as any).matched_horse_id ?? (li as any).matchedHorseId) as string | undefined;
-      if (!matchedHorseId) continue;
-      const oId = horseOwner.get(String(matchedHorseId));
-      if (!oId) continue;
-      const amount = lineItemAmount(li);
-      if (amount === 0) continue;
-      pushItem(oId, {
-        horseId: matchedHorseId as Id<"horses">,
-        horseName: horseNames.get(String(matchedHorseId)),
+        horseId: charge.horseId,
+        horseName: horseNames.get(String(charge.horseId)),
         description: String(li.description ?? bill.fileName),
         category: categorySlug ?? (typeof li.category === "string" ? li.category : undefined),
         subcategory: typeof li.subcategory === "string" ? li.subcategory : undefined,
-        amount: round2(amount),
+        amount: charge.amount,
         sourceLineItemIndex: idx,
       });
-      added++;
-    }
-    if (added === 0) {
-      return { invoicesUpdated: 0, lineItemsAdded: 0 };
     }
   }
 
