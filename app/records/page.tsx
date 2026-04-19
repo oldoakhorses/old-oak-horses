@@ -176,6 +176,8 @@ export default function RecordsPage() {
   const [pastRange, setPastRange] = useState<PastRange>("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersPopoverRef = useRef<HTMLDivElement | null>(null);
   const [sortColumn, setSortColumn] = useState<SortColumn>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
@@ -241,6 +243,9 @@ export default function RecordsPage() {
       }
       if (invoiceDropdownRef.current && !invoiceDropdownRef.current.contains(event.target as Node)) {
         setInvoiceDropdownOpen(false);
+      }
+      if (filtersPopoverRef.current && !filtersPopoverRef.current.contains(event.target as Node)) {
+        setFiltersOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -601,53 +606,121 @@ export default function RecordsPage() {
           </button>
         </div>
 
-        <section className={styles.filters}>
-          <label>
-            <span>Category</span>
-            <select
-              value={typeFilter}
-              onChange={(event) => setTypeFilter(event.target.value as "all" | RecordType)}
-            >
-              <option value="all">All</option>
-              <option value="veterinary">Veterinary</option>
-              <option value="medication">Medication</option>
-              <option value="farrier">Farrier</option>
-              <option value="bodywork">Bodywork</option>
-              <option value="other">Other</option>
-            </select>
-          </label>
-          <label>
-            <span>Horse</span>
-            <select
-              value={horseFilter}
-              onChange={(event) => setHorseFilter((event.target.value as Id<"horses"> | "all") || "all")}
-            >
-              <option value="all">All</option>
-              {activeHorses.map((horse) => (
-                <option key={horse._id} value={horse._id}>
-                  {horse.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>From</span>
-            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-          </label>
-          <label>
-            <span>To</span>
-            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-          </label>
-          <label>
-            <span>Search</span>
-            <input
-              type="text"
-              placeholder="search records..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </label>
-        </section>
+        {(() => {
+          const categoryLabel =
+            typeFilter === "all" ? null : (
+              typeFilter === "veterinary" ? "Veterinary" :
+              typeFilter === "medication" ? "Medication" :
+              typeFilter === "farrier" ? "Farrier" :
+              typeFilter === "bodywork" ? "Bodywork" : "Other"
+            );
+          const horseLabel = horseFilter === "all"
+            ? null
+            : activeHorses.find((h) => h._id === horseFilter)?.name ?? "Horse";
+          const dateLabel = fromDate || toDate
+            ? `${fromDate || "…"} → ${toDate || "…"}`
+            : null;
+          const activeCount = [categoryLabel, horseLabel, dateLabel].filter(Boolean).length;
+
+          return (
+            <>
+              <section className={styles.toolbar}>
+                <input
+                  type="text"
+                  className={styles.toolbarSearch}
+                  placeholder="search records..."
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+                <div className={styles.toolbarFiltersWrap} ref={filtersPopoverRef}>
+                  <button
+                    type="button"
+                    className={`${styles.toolbarFiltersBtn} ${activeCount > 0 ? styles.toolbarFiltersBtnActive : ""}`}
+                    onClick={() => setFiltersOpen((v) => !v)}
+                    aria-expanded={filtersOpen}
+                  >
+                    <span>filters</span>
+                    {activeCount > 0 ? <span className={styles.toolbarFiltersCount}>{activeCount}</span> : null}
+                    <span className={styles.toolbarFiltersChevron}>▾</span>
+                  </button>
+                  {filtersOpen ? (
+                    <div className={styles.toolbarFiltersPopover} role="dialog">
+                      <label className={styles.popField}>
+                        <span>Category</span>
+                        <select
+                          value={typeFilter}
+                          onChange={(event) => setTypeFilter(event.target.value as "all" | RecordType)}
+                        >
+                          <option value="all">All</option>
+                          <option value="veterinary">Veterinary</option>
+                          <option value="medication">Medication</option>
+                          <option value="farrier">Farrier</option>
+                          <option value="bodywork">Bodywork</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </label>
+                      <label className={styles.popField}>
+                        <span>Horse</span>
+                        <select
+                          value={horseFilter}
+                          onChange={(event) => setHorseFilter((event.target.value as Id<"horses"> | "all") || "all")}
+                        >
+                          <option value="all">All</option>
+                          {activeHorses.map((horse) => (
+                            <option key={horse._id} value={horse._id}>{horse.name}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className={styles.popFieldRow}>
+                        <label className={styles.popField}>
+                          <span>From</span>
+                          <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+                        </label>
+                        <label className={styles.popField}>
+                          <span>To</span>
+                          <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+                        </label>
+                      </div>
+                      {activeCount > 0 ? (
+                        <button
+                          type="button"
+                          className={styles.popClearBtn}
+                          onClick={() => {
+                            setTypeFilter("all");
+                            setHorseFilter("all");
+                            setFromDate("");
+                            setToDate("");
+                          }}
+                        >
+                          clear all
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+              {activeCount > 0 ? (
+                <div className={styles.filterChips}>
+                  {categoryLabel ? (
+                    <button type="button" className={styles.filterChip} onClick={() => setTypeFilter("all")}>
+                      category: {categoryLabel} <span className={styles.filterChipX}>×</span>
+                    </button>
+                  ) : null}
+                  {horseLabel ? (
+                    <button type="button" className={styles.filterChip} onClick={() => setHorseFilter("all")}>
+                      horse: {horseLabel} <span className={styles.filterChipX}>×</span>
+                    </button>
+                  ) : null}
+                  {dateLabel ? (
+                    <button type="button" className={styles.filterChip} onClick={() => { setFromDate(""); setToDate(""); }}>
+                      date: {dateLabel} <span className={styles.filterChipX}>×</span>
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          );
+        })()}
 
         <div className={styles.resultsCount}>
           {filteredCount === totalCount
