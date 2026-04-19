@@ -572,9 +572,73 @@ function normalizeParsedPayload(input: Record<string, unknown>) {
     lineItems = (output.items as unknown[]).map((item) => normalizeLineItem(item));
   }
 
-  const invoiceTotalUsdFromFields = pickNumber(output, ["invoice_total_usd", "invoiceTotalUsd", "total_usd", "total"]);
+  let invoiceTotalUsdFromFields = pickNumber(output, ["invoice_total_usd", "invoiceTotalUsd", "total_usd", "total"]);
+  const subtotalRaw = pickNumber(output, ["subtotal", "sub_total", "subTotal"]);
+  const taxAmount = pickNumber(output, ["tax", "sales_tax", "salesTax", "vat", "tax_amount", "tax_total_usd"]);
+  const shippingFee = pickNumber(output, ["shipping", "shipping_fee", "shippingFee", "delivery_fee", "handling"]);
+  const otherFees = pickNumber(output, ["other_fees", "otherFees", "fees", "processing_fee"]);
   const lineTotalUsd = lineItems.reduce((sum, item) => sum + (typeof item.total_usd === "number" ? item.total_usd : 0), 0);
+
+  // Self-correction: if the LLM returned the subtotal as invoice_total_usd (a common
+  // failure mode on receipts that show both "Sub Total" and "Total"), prefer the
+  // reconstructed grand total (subtotal + tax + fees) or whichever is larger.
+  const reconstructedGrandTotal =
+    (subtotalRaw ?? lineTotalUsd) +
+    (taxAmount ?? 0) +
+    (shippingFee ?? 0) +
+    (otherFees ?? 0);
+  if (
+    typeof invoiceTotalUsdFromFields === "number" &&
+    reconstructedGrandTotal > invoiceTotalUsdFromFields + 0.02 &&
+    (taxAmount || shippingFee || otherFees)
+  ) {
+    console.log(
+      `[billParsing] correcting invoice_total_usd ${invoiceTotalUsdFromFields.toFixed(2)} -> ${reconstructedGrandTotal.toFixed(
+        2
+      )} (tax=${taxAmount ?? 0} ship=${shippingFee ?? 0} fees=${otherFees ?? 0})`
+    );
+    invoiceTotalUsdFromFields = round2(reconstructedGrandTotal);
+  }
+
   const invoiceTotalUsd = invoiceTotalUsdFromFields ?? (lineTotalUsd > 0 ? lineTotalUsd : undefined);
+
+  // Insert tax / shipping / fees as synthetic line items so that
+  // sum(line_items.total_usd) equals the grand total. This makes reconciliation
+  // against CC statements accurate and ensures nothing is "missing" in the UI.
+  function hasChargeLike(label: string): boolean {
+    const needle = label.toLowerCase();
+    return lineItems.some((it) => {
+      const desc = String((it as any).description ?? "").toLowerCase();
+      return desc.includes(needle);
+    });
+  }
+  if (typeof taxAmount === "number" && taxAmount > 0 && !hasChargeLike("tax")) {
+    lineItems.push({
+      description: "Sales Tax",
+      quantity: 1,
+      total_usd: round2(taxAmount),
+      amount_original: round2(taxAmount),
+      is_fee: true,
+    } as any);
+  }
+  if (typeof shippingFee === "number" && shippingFee > 0 && !hasChargeLike("shipping") && !hasChargeLike("delivery")) {
+    lineItems.push({
+      description: "Shipping",
+      quantity: 1,
+      total_usd: round2(shippingFee),
+      amount_original: round2(shippingFee),
+      is_fee: true,
+    } as any);
+  }
+  if (typeof otherFees === "number" && otherFees > 0 && !hasChargeLike("fee")) {
+    lineItems.push({
+      description: "Fees",
+      quantity: 1,
+      total_usd: round2(otherFees),
+      amount_original: round2(otherFees),
+      is_fee: true,
+    } as any);
+  }
 
   if (providerName) {
     output.provider_name = providerName;
@@ -1038,9 +1102,11 @@ For the overall invoice, extract:
 - invoice_number: Invoice or reference number
 - invoice_date: Date on the invoice (MM/DD/YYYY)
 - due_date: Due date if shown
-- invoice_total_usd: Total amount in USD
-- tax: Tax amount if shown
+- invoice_total_usd: The FINAL grand total in USD — the amount actually charged / due / paid. This is the "Total", "Grand Total", "Amount Due", "Balance Due", or "Total Charged" line, AFTER tax, shipping, and any fees. NEVER use the subtotal as invoice_total_usd. If the invoice shows "Sub Total $X" and "Total $Y" where Y > X, use Y.
+- tax: Sales tax / VAT amount if shown (separate from subtotal)
 - subtotal: Subtotal before tax if shown
+- shipping_fee: Shipping / handling charge if shown
+- other_fees: Any other fees (processing, etc.) if shown
 
 For each line item, extract into a "line_items" array:
 - description: What the item/service is
