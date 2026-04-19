@@ -843,14 +843,28 @@ function prettyType(type: RecordType) {
   return capitalize(type);
 }
 
+const VISIT_TYPE_LABELS: Record<string, string> = {
+  vaccination: "Vaccination",
+  vaccinations: "Vaccinations",
+  treatment: "Treatment",
+  medication: "Medication",
+  joint_injections: "Joint Injections",
+  exams_diagnostics: "Exam",
+  shockwave: "Shockwave",
+  sedation: "Sedation",
+  fees: "Fees",
+  lab_work: "Lab Work",
+  other: "Other",
+};
+
 function getUpcomingSubtype(record: {
   type: RecordType;
-  visitType?: "vaccination" | "treatment";
+  visitType?: string;
   serviceType?: string;
   customType?: string;
 }) {
   if (record.type === "veterinary" && record.visitType) {
-    return record.visitType === "vaccination" ? "Vaccination" : "Treatment";
+    return VISIT_TYPE_LABELS[record.visitType] ?? record.visitType;
   }
   if (record.type === "farrier" && record.serviceType) {
     return record.serviceType;
@@ -863,14 +877,14 @@ function getUpcomingSubtype(record: {
 
 function getUpcomingDetail(record: {
   type: RecordType;
-  visitType?: "vaccination" | "treatment";
+  visitType?: string;
   vaccineName?: string;
   treatmentDescription?: string;
   serviceType?: string;
   providerName?: string;
 }) {
   if (record.type === "veterinary" && record.visitType === "vaccination" && record.vaccineName) return record.vaccineName;
-  if (record.type === "veterinary" && record.visitType === "treatment" && record.treatmentDescription) return record.treatmentDescription;
+  if (record.type === "veterinary" && record.treatmentDescription) return record.treatmentDescription;
   if (record.type === "farrier" && record.serviceType) return record.serviceType;
   return "";
 }
