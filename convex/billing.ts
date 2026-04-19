@@ -427,6 +427,57 @@ export const generateOwnerInvoices = mutation({
       }
     }
 
+    // ── Auto-matched line items: bills with no user-confirmed assignment but
+    // the parser auto-detected a horse via matched_horse_id. Respect those
+    // matches BEFORE falling through to "business general". Otherwise a bill
+    // that was approved without the user explicitly confirming the detected
+    // horse gets split evenly across the whole owner's herd, producing bogus
+    // charges on the wrong owner's invoice (e.g. a Gaby de Courcel bodywork
+    // invoice landing on every Old Oak Farm horse instead of Gaby alone).
+    for (const bill of approvedBills) {
+      if (existingBillIds.has(String(bill._id))) continue;
+      const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+      if (extracted.isCredit === true) continue;
+      if (Array.isArray(bill.assignedHorses) && bill.assignedHorses.length > 0) continue;
+      if (Array.isArray(bill.horseAssignments) && (bill.horseAssignments as any[]).length > 0) continue;
+      if (Array.isArray(bill.assignedPeople) && bill.assignedPeople.length > 0) continue;
+      const lineItems = getLineItems(extracted);
+      const hasAutoMatches = lineItems.some((li) => {
+        const m = (li as any).matched_horse_id ?? (li as any).matchedHorseId;
+        return typeof m === "string" && m.length > 0;
+      });
+      if (!hasAutoMatches) continue;
+      // Emit one pending item per line-item-with-match, routed to the matched
+      // horse's owner. Items without a match on this bill are skipped here
+      // (they will fall into the business-general bucket below only if the
+      // filter still includes this bill — we mark this bill as handled to
+      // prevent double-billing).
+      for (let idx = 0; idx < lineItems.length; idx++) {
+        const li = lineItems[idx] as Record<string, unknown>;
+        const matchedHorseId = ((li as any).matched_horse_id ?? (li as any).matchedHorseId) as string | undefined;
+        if (!matchedHorseId) continue;
+        const ownerId = horseOwner.get(String(matchedHorseId));
+        if (!ownerId) continue;
+        const amount = lineItemAmount(li);
+        if (amount === 0) continue;
+        const key = String(ownerId);
+        const items = ownerItems.get(key) ?? [];
+        items.push({
+          sourceBillId: bill._id,
+          horseId: matchedHorseId as Id<"horses">,
+          horseName: horseNames.get(String(matchedHorseId)),
+          description: String(li.description ?? bill.fileName),
+          category: typeof li.category === "string" ? li.category : undefined,
+          subcategory: typeof li.subcategory === "string" ? li.subcategory : undefined,
+          amount: round2(amount),
+          sourceLineItemIndex: idx,
+        });
+        ownerItems.set(key, items);
+      }
+      // Mark this bill as handled so it doesn't fall into business general.
+      existingBillIds.add(String(bill._id));
+    }
+
     // ── Business General charges: split evenly across ALL active horses ──
     // Find bills that are business_general (no horse assignment, assignType not horse/person)
     // Exclude credit bills (deposits/money-in) — they are not charges to bill out
@@ -1042,8 +1093,32 @@ export async function syncApprovedBillIntoDraftInvoices(
       });
     }
   } else {
-    // No horse assignment — nothing to auto-add for this bill
-    return { invoicesUpdated: 0, lineItemsAdded: 0 };
+    // No user-confirmed horse assignment. Fall back to per-line-item
+    // matched_horse_id (set by the parser) so auto-detected assignments still
+    // route to the correct owner on approval.
+    let added = 0;
+    for (let idx = 0; idx < lineItems.length; idx++) {
+      const li = lineItems[idx] as Record<string, unknown>;
+      const matchedHorseId = ((li as any).matched_horse_id ?? (li as any).matchedHorseId) as string | undefined;
+      if (!matchedHorseId) continue;
+      const oId = horseOwner.get(String(matchedHorseId));
+      if (!oId) continue;
+      const amount = lineItemAmount(li);
+      if (amount === 0) continue;
+      pushItem(oId, {
+        horseId: matchedHorseId as Id<"horses">,
+        horseName: horseNames.get(String(matchedHorseId)),
+        description: String(li.description ?? bill.fileName),
+        category: categorySlug ?? (typeof li.category === "string" ? li.category : undefined),
+        subcategory: typeof li.subcategory === "string" ? li.subcategory : undefined,
+        amount: round2(amount),
+        sourceLineItemIndex: idx,
+      });
+      added++;
+    }
+    if (added === 0) {
+      return { invoicesUpdated: 0, lineItemsAdded: 0 };
+    }
   }
 
   if (pending.size === 0) return { invoicesUpdated: 0, lineItemsAdded: 0 };
