@@ -4,10 +4,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { action, internalAction } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { matchHorseName, normalizeAliasKey } from "./matchHorse";
 import { matchPersonName } from "./matchPerson";
-import { matchProvider } from "./providerMatching";
 import { HORSE_ALIASES } from "./horseAliases";
 
 const TRAVEL_SUBCATEGORY_SLUGS = new Set(["flights", "trains", "rental-car", "gas", "meals", "hotels"]);
@@ -53,7 +52,14 @@ export const parseBillPdf = internalAction({
     const bill = await ctx.runQuery(internal.bills.getBill, { billId: args.billId });
     if (!bill) throw new Error("Bill not found");
 
-    const provider = bill.providerId ? await ctx.runQuery(internal.bills.getProvider, { providerId: bill.providerId }) : null;
+    // Contact preselected on the bill (if any). The rest of the parser treats
+    // this as the canonical "provider" for prompt/context purposes.
+    const preselectedContact = bill.contactId
+      ? ((await ctx.runQuery(api.contacts.getAllContacts, {}) as any[]).find((c: any) => String(c._id) === String(bill.contactId)) ?? null)
+      : null;
+    const provider = preselectedContact
+      ? { _id: preselectedContact._id, name: preselectedContact.name, slug: preselectedContact.slug, fullName: preselectedContact.companyName, email: preselectedContact.email, phone: preselectedContact.phone, address: preselectedContact.address, website: preselectedContact.website, accountNumber: preselectedContact.accountNumber, location: preselectedContact.location, extractionPrompt: undefined, expectedFields: [] }
+      : null;
     const category = bill.categoryId
       ? await ctx.runQuery(internal.bills.getCategory, { categoryId: bill.categoryId })
       : null;
@@ -208,22 +214,6 @@ export const parseBillPdf = internalAction({
 
       let resolvedProvider = provider;
       let extractedCustomProviderName = bill.customProviderName;
-      if (categorySlug === "marketing" && !resolvedProvider && !bill.customProviderName && bill.categoryId) {
-        const extractedProviderName = pickString(parsed, ["provider_name", "vendor_name", "supplier_name", "merchant_name"]);
-        if (extractedProviderName) {
-          const existingProvider = await ctx.runQuery(internal.providers.getProviderByNameInCategoryInternal, {
-            categoryId: bill.categoryId!,
-            name: extractedProviderName
-          });
-          const providerId =
-            existingProvider?._id ??
-            (await ctx.runMutation(internal.providers.createProviderOnUploadInternal, {
-              categoryId: bill.categoryId!,
-              name: extractedProviderName
-            }));
-          resolvedProvider = existingProvider ?? (await ctx.runQuery(internal.bills.getProvider, { providerId }));
-        }
-      }
       const extractedProviderName = pickString(parsed, [
         "provider_name",
         "providerName",
@@ -232,48 +222,81 @@ export const parseBillPdf = internalAction({
         "supplier_name",
         "merchant_name"
       ]);
-      if (!resolvedProvider && extractedProviderName) {
-        const targetSubcategory =
-          bill.duesSubcategory ??
-          bill.adminSubcategory ??
-          bill.horseTransportSubcategory ??
-          bill.marketingSubcategory ??
-          bill.travelSubcategory ??
-          bill.housingSubcategory ??
-          bill.groomingSubcategory;
-        const allProviders = await ctx.runQuery(internal.providers.listAllForMatching, {});
-        const categoryProviders = allProviders.filter((candidate: any) => candidate.categorySlug === categorySlug);
-        const subcategoryScopedProviders = targetSubcategory
-          ? categoryProviders.filter((candidate: any) => candidate.subcategorySlug === targetSubcategory)
-          : categoryProviders;
-        const providerCandidates = subcategoryScopedProviders.length > 0 ? subcategoryScopedProviders : categoryProviders;
-        console.log("Checking provider match for text containing:", extractedPdfText.substring(0, 200));
-        console.log("All providers:", providerCandidates.map((candidate: any) => candidate.name));
 
-        if (providerCandidates.length > 0) {
-          const providerMatch = await matchProvider(ctx, extractedProviderName, providerCandidates);
-          console.log("Provider match result:", providerMatch);
-          if (providerMatch.matched && providerMatch.providerId) {
-            resolvedProvider = await ctx.runQuery(internal.bills.getProvider, {
-              providerId: providerMatch.providerId as any,
-            });
-          }
-        }
-      }
-      if (!resolvedProvider && isEqSportsProviderSignal(extractedPdfText)) {
-        const allProviders = await ctx.runQuery(internal.providers.listAllForMatching, {});
-        const eqSportsProvider = allProviders.find(
-          (candidate: any) => normalizeAliasKey(String(candidate.name ?? "")) === "eq sports medicine group"
+      // Contact fuzzy-match by extracted name. We match against the full
+      // contacts list, preferring contacts whose category aligns with the
+      // bill's category when there's a tie.
+      if (!resolvedProvider && extractedProviderName) {
+        const normalizedExtracted = normalizeAliasKey(extractedProviderName);
+        const allContacts = (await ctx.runQuery(api.contacts.getAllContacts, {})) as any[];
+        const categoryMatches = allContacts.filter(
+          (c) => categorySlug && c.category === categorySlug
         );
-        if (eqSportsProvider?._id) {
-          resolvedProvider = await ctx.runQuery(internal.bills.getProvider, { providerId: eqSportsProvider._id });
+        const searchPool = categoryMatches.length > 0 ? [...categoryMatches, ...allContacts] : allContacts;
+        const seen = new Set<string>();
+        const dedupedPool = searchPool.filter((c) => {
+          const k = String(c._id);
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+        const matched = dedupedPool.find((c) => {
+          const name = normalizeAliasKey(c.name ?? "");
+          const company = normalizeAliasKey(c.companyName ?? "");
+          return (name && name === normalizedExtracted) || (company && company === normalizedExtracted);
+        }) ?? dedupedPool.find((c) => {
+          const name = normalizeAliasKey(c.name ?? "");
+          const company = normalizeAliasKey(c.companyName ?? "");
+          return (name && (name.includes(normalizedExtracted) || normalizedExtracted.includes(name))) ||
+                 (company && (company.includes(normalizedExtracted) || normalizedExtracted.includes(company)));
+        });
+        if (matched) {
+          resolvedProvider = {
+            _id: matched._id,
+            name: matched.name,
+            slug: matched.slug,
+            fullName: matched.companyName,
+            email: matched.email,
+            phone: matched.phone,
+            address: matched.address,
+            website: matched.website,
+            accountNumber: matched.accountNumber,
+            location: matched.location,
+            extractionPrompt: undefined,
+            expectedFields: [],
+          } as any;
         }
       }
+
+      // EQ Sports Medicine Group — recognize by invoice body text too
+      if (!resolvedProvider && isEqSportsProviderSignal(extractedPdfText)) {
+        const allContacts = (await ctx.runQuery(api.contacts.getAllContacts, {})) as any[];
+        const eqSports = allContacts.find(
+          (c) => normalizeAliasKey(String(c.name ?? "")) === "eq sports medicine group"
+        );
+        if (eqSports) {
+          resolvedProvider = {
+            _id: eqSports._id,
+            name: eqSports.name,
+            slug: eqSports.slug,
+            fullName: eqSports.companyName,
+            email: eqSports.email,
+            phone: eqSports.phone,
+            address: eqSports.address,
+            website: eqSports.website,
+            accountNumber: eqSports.accountNumber,
+            location: eqSports.location,
+            extractionPrompt: undefined,
+            expectedFields: [],
+          } as any;
+        }
+      }
+
       if (!resolvedProvider && extractedProviderName) {
         extractedCustomProviderName = extractedProviderName;
       }
 
-      const expectedFields = resolvedProvider?.expectedFields ?? [];
+      const expectedFields: string[] = [];
       const isEQSportsFormat =
         Array.isArray((parsed as any).patientSections) ||
         (categorySlug === "veterinary" && (eqSportsSignal || multiPatientInvoice));
@@ -374,7 +397,6 @@ export const parseBillPdf = internalAction({
         lineItemCategories: lineItemCategories.length > 0 ? lineItemCategories : undefined,
         hasUnmatchedHorses: matchHorses ? unmatchedHorseNames.length > 0 : false,
         unmatchedHorseNames: matchHorses ? unmatchedHorseNames : [],
-        providerId: resolvedProvider?._id,
         contactId: resolvedContactId as any,
         customProviderName: extractedCustomProviderName,
         extractedProviderContact,
@@ -397,22 +419,6 @@ export const parseBillPdf = internalAction({
         });
       }
 
-      // Also update provider (legacy, will be removed in Phase 6)
-      if (resolvedProvider && Object.values(providerContactPatch).some((value) => value !== undefined)) {
-        await ctx.runMutation(internal.bills.updateProviderContactInfo, {
-          providerId: resolvedProvider._id,
-          fullName: resolvedProvider.fullName ?? providerContactPatch.fullName,
-          contactName: resolvedProvider.contactName ?? providerContactPatch.contactName,
-          primaryContactName: resolvedProvider.primaryContactName ?? providerContactPatch.primaryContactName,
-          primaryContactPhone: resolvedProvider.primaryContactPhone ?? providerContactPatch.primaryContactPhone,
-          address: resolvedProvider.address ?? providerContactPatch.address,
-          phone: resolvedProvider.phone ?? providerContactPatch.phone,
-          email: resolvedProvider.email ?? providerContactPatch.email,
-          website: resolvedProvider.website ?? providerContactPatch.website,
-          accountNumber: resolvedProvider.accountNumber ?? providerContactPatch.accountNumber
-        });
-      }
-
       const contactCandidateName =
         providerContactPatch.contactName ??
         providerContactPatch.primaryContactName ??
@@ -422,7 +428,6 @@ export const parseBillPdf = internalAction({
       if (!resolvedContactId && contactCandidateName && (resolvedProvider?.name || extractedCustomProviderName)) {
         await ctx.runMutation(internal.contacts.upsertContactFromInvoice, {
           name: contactCandidateName,
-          providerId: resolvedProvider?._id,
           category: categorySlug ?? (lineItemCategories.length > 0 ? lineItemCategories[0] : "other"),
           location: resolvedProvider?.location,
           companyName: providerContactPatch.fullName ?? resolvedProvider?.name ?? extractedCustomProviderName,

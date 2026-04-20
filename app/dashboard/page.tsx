@@ -51,7 +51,7 @@ type InvoiceDetectionState = {
   matched: boolean;
   confidence: DetectionConfidence;
   providerName: string | null;
-  providerId: Id<"providers"> | null;
+  contactId: Id<"contacts"> | null;
   category: string | null;
   subcategory: string | null;
   categoryId: Id<"categories"> | null;
@@ -163,8 +163,11 @@ export default function DashboardPage() {
   const categories = useQuery(api.categories.getAllCategories) ?? [];
   const upcomingRecords = useQuery(api.horseRecords.getUpcoming) ?? [];
   const recordProviderCategory = selectedRecordType ? RECORD_TYPE_TO_CATEGORY[selectedRecordType] : "";
-  const recordProviders =
-    useQuery(api.providers.listByCategory, recordProviderCategory ? { category: recordProviderCategory } : "skip") ?? [];
+  const allContactsForRecord = useQuery(api.contacts.getAllContacts) ?? [];
+  const recordProviders = useMemo(
+    () => allContactsForRecord.filter((c: any) => recordProviderCategory && c.category === recordProviderCategory),
+    [allContactsForRecord, recordProviderCategory]
+  );
 
   const createHorse = useMutation(api.horses.createHorse);
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);

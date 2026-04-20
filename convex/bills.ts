@@ -18,25 +18,17 @@ function formatCategorySlug(slug: string): string {
 }
 
 /**
- * Resolve contact info for a bill using contactId (preferred) or providerId (legacy fallback).
+ * Resolve contact info for a bill.
  * Returns { name, slug, contactId } or null.
  */
 async function resolveContactForBill(
   ctx: any,
-  bill: { contactId?: string; providerId?: string; customProviderName?: string }
+  bill: { contactId?: string; customProviderName?: string }
 ) {
-  // Prefer contactId
   if (bill.contactId) {
     const contact = await ctx.db.get(bill.contactId);
     if (contact) {
       return { name: contact.name, slug: contact.slug ?? slugify(contact.name), contactId: contact._id };
-    }
-  }
-  // Fallback to providerId
-  if (bill.providerId) {
-    const provider = await ctx.db.get(bill.providerId);
-    if (provider) {
-      return { name: provider.name, slug: provider.slug ?? slugify(provider.name), contactId: undefined };
     }
   }
   return null;
@@ -48,19 +40,11 @@ async function resolveContactForBill(
  */
 async function batchResolveContacts(
   ctx: any,
-  bills: Array<{ _id: string; contactId?: string; providerId?: string; customProviderName?: string }>
+  bills: Array<{ _id: string; contactId?: string; customProviderName?: string }>
 ) {
-  // Collect unique IDs
   const contactIds = [...new Set(bills.flatMap((b) => (b.contactId ? [b.contactId] : [])))];
-  const providerIds = [...new Set(bills.flatMap((b) => (b.providerId ? [b.providerId] : [])))];
-
-  const [contactResults, providerResults] = await Promise.all([
-    Promise.all(contactIds.map(async (id) => [id, await ctx.db.get(id)] as const)),
-    Promise.all(providerIds.map(async (id) => [id, await ctx.db.get(id)] as const)),
-  ]);
-
+  const contactResults = await Promise.all(contactIds.map(async (id) => [id, await ctx.db.get(id)] as const));
   const contactMap = new Map(contactResults.map(([id, c]) => [id, c]));
-  const providerMap = new Map(providerResults.map(([id, p]) => [id, p]));
 
   const result = new Map<string, { name: string; slug: string; contactId?: string }>();
   for (const bill of bills) {
@@ -68,14 +52,6 @@ async function batchResolveContacts(
       const contact = contactMap.get(bill.contactId);
       if (contact) {
         result.set(String(bill._id), { name: contact.name, slug: contact.slug ?? slugify(contact.name), contactId: String(contact._id) });
-        continue;
-      }
-    }
-    if (bill.providerId) {
-      const provider = providerMap.get(bill.providerId);
-      if (provider) {
-        result.set(String(bill._id), { name: provider.name, slug: provider.slug ?? slugify(provider.name) });
-        continue;
       }
     }
   }
@@ -123,7 +99,6 @@ export const attachPdfToBill = mutation({
 
 export const createBillRecord = mutation({
   args: {
-    providerId: v.optional(v.id("providers")),
     contactId: v.optional(v.id("contacts")),
     categoryId: v.optional(v.id("categories")),
     fileId: v.id("_storage"),
@@ -133,7 +108,6 @@ export const createBillRecord = mutation({
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("bills", {
-      ...(args.providerId ? { providerId: args.providerId } : {}),
       ...(args.contactId ? { contactId: args.contactId } : {}),
       ...(args.categoryId ? { categoryId: args.categoryId } : {}),
       fileId: args.fileId,
@@ -148,7 +122,6 @@ export const createBillRecord = mutation({
 
 export const createAndParseBill = mutation({
   args: {
-    providerId: v.optional(v.id("providers")),
     contactId: v.optional(v.id("contacts")),
     categoryId: v.optional(v.id("categories")),
     fileId: v.id("_storage"),
@@ -158,7 +131,6 @@ export const createAndParseBill = mutation({
   },
   handler: async (ctx, args) => {
     const billId = await ctx.db.insert("bills", {
-      ...(args.providerId ? { providerId: args.providerId } : {}),
       ...(args.contactId ? { contactId: args.contactId } : {}),
       ...(args.categoryId ? { categoryId: args.categoryId } : {}),
       fileId: args.fileId,
@@ -227,74 +199,6 @@ export const listAll = query(async (ctx) => {
       lineItemCategories: lineItemCats,
     };
   });
-});
-
-export const getBillsByProvider = query({
-  args: {
-    providerId: v.id("providers"),
-    limit: v.optional(v.number()),
-    cursor: v.optional(v.string())
-  },
-  handler: async (ctx, args) => {
-    const bills = await ctx.db.query("bills").withIndex("by_provider", (q) => q.eq("providerId", args.providerId)).collect();
-    const doneBills = bills.filter((bill) => bill.status === "done");
-    const mapped = doneBills
-      .map((bill) => {
-        const extracted = (bill.extractedData ?? {}) as {
-          line_items?: Array<{ horse_name?: string; total_usd?: number }>;
-          invoice_total_usd?: number;
-          invoice_number?: string;
-          invoice_date?: string;
-        };
-        const lineItems = Array.isArray(extracted.line_items) ? extracted.line_items : [];
-        const horses = [...new Set(lineItems.map((item) => item.horse_name?.trim()).filter((name): name is string => Boolean(name)))];
-        const total_usd =
-          typeof extracted.invoice_total_usd === "number"
-            ? extracted.invoice_total_usd
-            : lineItems.reduce((sum, item) => sum + (typeof item.total_usd === "number" ? item.total_usd : 0), 0);
-
-        return {
-          ...bill,
-          horses,
-          total_usd,
-          invoice_number: extracted.invoice_number || bill.fileName,
-          invoice_date: extracted.invoice_date || null,
-          line_item_count: lineItems.length
-        };
-      })
-      .sort((a, b) => {
-        const aInvoice = a.invoice_date ? Date.parse(a.invoice_date) : 0;
-        const bInvoice = b.invoice_date ? Date.parse(b.invoice_date) : 0;
-        if (aInvoice !== bInvoice) return bInvoice - aInvoice;
-        return b.uploadedAt - a.uploadedAt;
-      });
-
-    if (!args.limit || args.limit <= 0) {
-      return mapped;
-    }
-    const offset = args.cursor ? Number(args.cursor) : 0;
-    const start = Number.isFinite(offset) ? Math.max(0, offset) : 0;
-    return mapped.slice(start, start + args.limit);
-  }
-});
-
-export const getBillsByProviderAndDateRange = query({
-  args: {
-    providerId: v.id("providers"),
-    startDate: v.number(),
-    endDate: v.number()
-  },
-  handler: async (ctx, args) => {
-    const bills = await ctx.db.query("bills").withIndex("by_provider", (q) => q.eq("providerId", args.providerId)).collect();
-    return bills
-      .filter((bill) => bill.uploadedAt >= args.startDate && bill.uploadedAt <= args.endDate)
-      .sort((a, b) => {
-        const aDate = getInvoiceDateSortValue(a);
-        const bDate = getInvoiceDateSortValue(b);
-        if (aDate !== bDate) return bDate - aDate;
-        return b.uploadedAt - a.uploadedAt;
-      });
-  }
 });
 
 export const getBillsByCategory = query({
@@ -773,12 +677,11 @@ export const getSalarySpendByPerson = query({
 
 export const getFeedBeddingBills = query({
   args: {
-    categoryId: v.id("categories"),
-    providerId: v.optional(v.id("providers"))
+    categoryId: v.id("categories")
   },
   handler: async (ctx, args) => {
     const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
-    const filtered = bills.filter((bill) => (args.providerId ? bill.providerId === args.providerId : true));
+    const filtered = bills;
     const rows = await Promise.all(
       filtered.map(async (bill) => {
         const resolved = await resolveContactForBill(ctx, bill as any);
@@ -877,17 +780,15 @@ export const updateFeedBeddingLineItemSubcategory = mutation({
 
 export const getStablingBills = query({
   args: {
-    categoryId: v.id("categories"),
-    providerId: v.optional(v.id("providers"))
+    categoryId: v.id("categories")
   },
   handler: async (ctx, args) => {
     const bills = await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect();
-    const filtered = bills.filter((bill) => (args.providerId ? bill.providerId === args.providerId : true));
+    const filtered = bills;
 
     const rows = await Promise.all(
       filtered.map(async (bill) => {
         const resolved = await resolveContactForBill(ctx, bill as any);
-        const provider = bill.providerId ? await ctx.db.get(bill.providerId) : null;
         const horseTotals = new Map<string, { horseName: string; amount: number }>();
 
         for (const row of bill.horseAssignments ?? []) {
@@ -911,7 +812,6 @@ export const getStablingBills = query({
         return {
           ...bill,
           providerName: resolved?.name ?? bill.customProviderName ?? "Unknown",
-          provider,
           horses: [...horseTotals.values()],
           approvalStatus: bill.status === "done" && bill.isApproved ? "approved" : "pending"
         };
@@ -927,24 +827,24 @@ export const getStablingBills = query({
   }
 });
 
-export const getStablingSpendByProvider = query({
+export const getStablingSpendByContact = query({
   args: { categoryId: v.id("categories") },
   handler: async (ctx, args) => {
     const bills = (await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect()).filter(isApprovedBill);
-    const totals = new Map<string, { providerId: string; providerName: string; totalSpend: number; invoiceCount: number }>();
+    const totals = new Map<string, { contactId: string; providerName: string; totalSpend: number; invoiceCount: number }>();
     for (const bill of bills) {
       const resolved = await resolveContactForBill(ctx, bill as any);
       const providerName = resolved?.name ?? bill.customProviderName ?? "Unknown";
-      const providerId = String(bill.providerId ?? providerName);
-      const current = totals.get(providerId) ?? { providerId, providerName, totalSpend: 0, invoiceCount: 0 };
+      const contactId = String(bill.contactId ?? providerName);
+      const current = totals.get(contactId) ?? { contactId, providerName, totalSpend: 0, invoiceCount: 0 };
       current.totalSpend += getInvoiceTotalUsdFromAny(bill.extractedData);
       current.invoiceCount += 1;
-      totals.set(providerId, current);
+      totals.set(contactId, current);
     }
     const grandTotal = [...totals.values()].reduce((sum, row) => sum + row.totalSpend, 0);
     return [...totals.values()]
       .map((row) => ({
-        providerId: row.providerId,
+        contactId: row.contactId,
         providerName: row.providerName,
         totalSpend: row.totalSpend,
         invoiceCount: row.invoiceCount,
@@ -1308,7 +1208,7 @@ export const getBillById = query({
     const bill = await ctx.db.get(args.billId);
     if (!bill) return null;
     const resolved = await resolveContactForBill(ctx, bill as any);
-    const provider = bill.providerId ? await ctx.db.get(bill.providerId) : null;
+    const provider = null;
     const category = bill.categoryId ? await ctx.db.get(bill.categoryId) : null;
     const extracted = ((bill.extractedData ?? {}) as Record<string, unknown>) ?? {};
     const lineItems = Array.isArray(extracted.line_items)
@@ -1326,8 +1226,8 @@ export const getBillById = query({
         resolved?.name ??
         bill.customProviderName ??
         (typeof extracted.provider_name === "string" ? extracted.provider_name : null),
-      providerDetected: bill.providerDetected ?? Boolean(resolved),
-      providerConfirmed: bill.providerConfirmed ?? Boolean(resolved),
+      providerDetected: Boolean(resolved),
+      providerConfirmed: Boolean(resolved),
       categorySlug: category?.slug ?? (lineItemCats.length > 0 ? lineItemCats[0] : null),
       lineItemCategories: lineItemCats,
       invoiceNumber:
@@ -1366,7 +1266,7 @@ export const getById = query({
     const bill = await ctx.db.get(args.billId);
     if (!bill) return null;
     const resolved = await resolveContactForBill(ctx, bill as any);
-    const provider = bill.providerId ? await ctx.db.get(bill.providerId) : null;
+    const provider = null;
     const category = bill.categoryId ? await ctx.db.get(bill.categoryId) : null;
     const extracted = ((bill.extractedData ?? {}) as Record<string, unknown>) ?? {};
     const lineItems = Array.isArray(extracted.line_items)
@@ -1383,8 +1283,8 @@ export const getById = query({
         resolved?.name ??
         bill.customProviderName ??
         (typeof extracted.provider_name === "string" ? extracted.provider_name : null),
-      providerDetected: bill.providerDetected ?? Boolean(resolved),
-      providerConfirmed: bill.providerConfirmed ?? Boolean(resolved),
+      providerDetected: Boolean(resolved),
+      providerConfirmed: Boolean(resolved),
       categorySlug: category?.slug ?? ((bill.lineItemCategories as string[] | undefined)?.[0] ?? null),
       lineItemCategories: (bill.lineItemCategories ?? []) as string[],
       invoiceNumber:
@@ -1413,33 +1313,6 @@ export const getById = query({
         typeof extracted.tax_total_usd === "number" ? extracted.tax_total_usd :
           typeof extracted.tax === "number" ? extracted.tax : null,
       lineItems
-    };
-  }
-});
-
-export const getProviderStats = query({
-  args: { providerId: v.id("providers") },
-  handler: async (ctx, args) => {
-    const bills = await ctx.db
-      .query("bills")
-      .withIndex("by_provider", (q) => q.eq("providerId", args.providerId))
-      .filter((q) => q.and(q.eq(q.field("status"), "done"), q.eq(q.field("isApproved"), true)))
-      .collect();
-
-    const currentYear = new Date().getFullYear();
-    const totalSpend = bills.reduce((sum, bill) => sum + getInvoiceTotalUsdFromAny(bill.extractedData), 0);
-    const ytdBills = bills.filter((bill) => {
-      const extracted = (bill.extractedData ?? {}) as { invoice_date?: unknown };
-      return typeof extracted.invoice_date === "string" && extracted.invoice_date.startsWith(String(currentYear));
-    });
-    const ytdSpend = ytdBills.reduce((sum, bill) => sum + getInvoiceTotalUsdFromAny(bill.extractedData), 0);
-
-    return {
-      totalSpend,
-      totalInvoices: bills.length,
-      ytdSpend,
-      ytdInvoices: ytdBills.length,
-      currentYear
     };
   }
 });
@@ -1534,13 +1407,6 @@ export const getBill = internalQuery({
   }
 });
 
-export const getProvider = internalQuery({
-  args: { providerId: v.id("providers") },
-  handler: async (ctx, args) => {
-    return await ctx.db.get(args.providerId);
-  }
-});
-
 export const getCategory = internalQuery({
   args: { categoryId: v.id("categories") },
   handler: async (ctx, args) => {
@@ -1555,10 +1421,11 @@ export const getCategoryBySlug = internalQuery({
   }
 });
 
-export const getBillFileNamesByProvider = internalQuery({
-  args: { providerId: v.id("providers") },
+export const getBillFileNamesByContact = internalQuery({
+  args: { contactId: v.optional(v.id("contacts")) },
   handler: async (ctx, args) => {
-    const bills = await ctx.db.query("bills").withIndex("by_provider", (q) => q.eq("providerId", args.providerId)).collect();
+    if (!args.contactId) return [];
+    const bills = await ctx.db.query("bills").withIndex("by_contact", (q) => q.eq("contactId", args.contactId)).collect();
     return bills.map((bill) => bill.fileName);
   }
 });
@@ -1659,7 +1526,6 @@ export const upsertPersonAlias = internalMutation({
 
 export const createParsingBill = internalMutation({
   args: {
-    providerId: v.optional(v.id("providers")),
     contactId: v.optional(v.id("contacts")),
     categoryId: v.optional(v.id("categories")),
     fileId: v.id("_storage"),
@@ -1678,7 +1544,6 @@ export const createParsingBill = internalMutation({
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("bills", {
-      ...(args.providerId ? { providerId: args.providerId } : {}),
       ...(args.contactId ? { contactId: args.contactId } : {}),
       ...(args.categoryId ? { categoryId: args.categoryId } : {}),
       fileId: args.fileId,
@@ -1699,12 +1564,11 @@ export const createParsingBill = internalMutation({
   }
 });
 
-export const reassignBillProvider = internalMutation({
+export const reassignBillContact = internalMutation({
   args: {
     billId: v.id("bills"),
     categoryId: v.optional(v.id("categories")),
     contactId: v.optional(v.id("contacts")),
-    providerId: v.optional(v.id("providers")),
     customProviderName: v.optional(v.string()),
     adminSubcategory: v.optional(v.string()),
     duesSubcategory: v.optional(v.string()),
@@ -1720,8 +1584,8 @@ export const reassignBillProvider = internalMutation({
     const hasPdf = Boolean(existing.fileId);
 
     const patch: Record<string, unknown> = {
-      providerId: args.providerId,
-      customProviderName: args.providerId ? undefined : args.customProviderName,
+      contactId: args.contactId,
+      customProviderName: args.contactId ? undefined : args.customProviderName,
       adminSubcategory: args.adminSubcategory,
       duesSubcategory: args.duesSubcategory,
     };
@@ -1730,37 +1594,7 @@ export const reassignBillProvider = internalMutation({
       patch.extractedData = undefined;
     }
     if (args.categoryId) patch.categoryId = args.categoryId;
-    if (args.contactId) patch.contactId = args.contactId;
     await ctx.db.patch(args.billId, patch);
-  }
-});
-
-export const updateProviderContactInfo = internalMutation({
-  args: {
-    providerId: v.id("providers"),
-    fullName: v.optional(v.string()),
-    contactName: v.optional(v.string()),
-    primaryContactName: v.optional(v.string()),
-    primaryContactPhone: v.optional(v.string()),
-    address: v.optional(v.string()),
-    phone: v.optional(v.string()),
-    email: v.optional(v.string()),
-    website: v.optional(v.string()),
-    accountNumber: v.optional(v.string())
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.providerId, {
-      fullName: args.fullName,
-      contactName: args.contactName,
-      primaryContactName: args.primaryContactName,
-      primaryContactPhone: args.primaryContactPhone,
-      address: args.address,
-      phone: args.phone,
-      email: args.email,
-      website: args.website,
-      accountNumber: args.accountNumber,
-      updatedAt: Date.now()
-    });
   }
 });
 
@@ -1776,13 +1610,11 @@ export const markDone = internalMutation({
     adminSubcategory: v.optional(v.string()),
     duesSubcategory: v.optional(v.string()),
     groomingSubcategory: v.optional(v.string()),
-    providerId: v.optional(v.id("providers")),
     contactId: v.optional(v.id("contacts")),
     customProviderName: v.optional(v.string()),
     extractedProviderContact: v.optional(
       v.object({
         providerName: v.optional(v.string()),
-        contactName: v.optional(v.string()),
         address: v.optional(v.string()),
         phone: v.optional(v.string()),
         email: v.optional(v.string()),
@@ -1860,7 +1692,6 @@ export const markDone = internalMutation({
       adminSubcategory: args.adminSubcategory,
       duesSubcategory: args.duesSubcategory,
       groomingSubcategory: args.groomingSubcategory,
-      providerId: args.providerId,
       contactId: args.contactId,
       customProviderName: args.customProviderName,
       extractedProviderContact: args.extractedProviderContact,
@@ -1898,7 +1729,7 @@ export const markDone = internalMutation({
           const isoDate = parsed.toISOString().slice(0, 10);
           // Derive provider display name
           const providerName = args.customProviderName
-            ?? (args.extractedProviderContact?.providerName || args.extractedProviderContact?.contactName)
+            ?? args.extractedProviderContact?.providerName
             ?? null;
           const currentParts = bill.fileName.split(" - ");
           const categoryPart = currentParts[0] ?? "Invoice";
@@ -2658,7 +2489,8 @@ export const approveInvoiceWithReclassification = mutation({
       grouped.set(normalizedTarget, current);
     }
 
-    const sourceProviderName = bill.providerId ? (await ctx.db.get(bill.providerId))?.name : bill.customProviderName;
+    const sourceContact = bill.contactId ? await ctx.db.get(bill.contactId) : null;
+    const sourceProviderName = sourceContact?.name ?? bill.customProviderName;
     const linkedBills: Array<{ targetBillId: Id<"bills">; targetCategory: string; amount: number; itemCount: number }> = [];
 
     for (const [targetCategoryKey, items] of grouped.entries()) {
@@ -2675,7 +2507,6 @@ export const approveInvoiceWithReclassification = mutation({
       };
 
       const targetBillId = await ctx.db.insert("bills", {
-        providerId: undefined,
         categoryId: targetCategory._id,
         fileId: bill.fileId,
         fileName: `${bill.fileName} · ${targetCategory.name}`,
@@ -3148,17 +2979,3 @@ export const fixBillFileName = mutation({
   },
 });
 
-/** Temporary mutation to fix provider name */
-export const fixProviderName = mutation({
-  args: {
-    providerId: v.id("providers"),
-    name: v.string(),
-    slug: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const provider = await ctx.db.get(args.providerId);
-    if (!provider) throw new Error("Provider not found");
-    await ctx.db.patch(args.providerId, { name: args.name, slug: args.slug });
-    return { patched: true, oldName: provider.name };
-  },
-});

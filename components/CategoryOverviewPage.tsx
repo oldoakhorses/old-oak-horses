@@ -33,7 +33,7 @@ type ParsedBill = {
     _id: string;
     uploadedAt: number;
     fileName: string;
-    providerId: string;
+    contactId?: string;
     extractedData?: unknown;
   };
   extracted: ParsedInvoice;
@@ -67,10 +67,13 @@ export default function CategoryOverviewPage({
 }) {
   const [filterMode, setFilterMode] = useState<FilterMode>("month");
 
-  const providers: any[] = useQuery(api.providers.getProvidersByCategory, { categoryId }) ?? [];
+  const contacts: any[] = useQuery(api.contacts.getAllContacts) ?? [];
   const bills: any[] = useQuery(api.bills.getBillsByCategory, { categoryId }) ?? [];
 
-  const providerById = useMemo(() => new Map(providers.map((provider: any) => [provider._id, provider])), [providers]);
+  const contactById = useMemo(
+    () => new Map(contacts.map((c: any) => [String(c._id), c])),
+    [contacts],
+  );
 
   const allParsedBills = useMemo(
     () => bills.map((bill: any) => toParsedBill(bill)).sort((a: ParsedBill, b: ParsedBill) => b.invoiceDateMs - a.invoiceDateMs),
@@ -98,7 +101,7 @@ export default function CategoryOverviewPage({
   }, [allParsedBills, filterMode]);
 
   const summary = useMemo(() => {
-    const providerTotals = new Map<string, number>();
+    const contactTotals = new Map<string, number>();
     const horseTotals = new Map<string, number>();
     const subTotals = new Map<string, number>();
     let totalSpend = 0;
@@ -107,7 +110,8 @@ export default function CategoryOverviewPage({
     for (const row of filteredBills) {
       const invoiceTotal = getInvoiceTotalUsd(row.extracted, row.lineItems);
       totalSpend += invoiceTotal;
-      providerTotals.set(row.bill.providerId, (providerTotals.get(row.bill.providerId) ?? 0) + invoiceTotal);
+      const cId = row.bill.contactId ? String(row.bill.contactId) : "__unknown__";
+      contactTotals.set(cId, (contactTotals.get(cId) ?? 0) + invoiceTotal);
 
       for (const item of row.lineItems) {
         lineItems += 1;
@@ -119,14 +123,19 @@ export default function CategoryOverviewPage({
       }
     }
 
-    const spendByProvider = [...providerTotals.entries()]
-      .map(([providerId, value]) => ({
-        key: providerId,
-        name: providerById.get(providerId)?.name ?? "Unknown",
-        value,
-        percentage: totalSpend > 0 ? (value / totalSpend) * 100 : 0,
-        href: `/${categorySlug}/${providerById.get(providerId)?.slug ?? slugify(providerById.get(providerId)?.name ?? "provider")}`,
-      }))
+    const spendByContact = [...contactTotals.entries()]
+      .map(([cId, value]) => {
+        const c = contactById.get(cId);
+        const name = c?.name ?? "Unknown";
+        const slug = c?.slug ?? (c ? slugify(name) : null);
+        return {
+          key: cId,
+          name,
+          value,
+          percentage: totalSpend > 0 ? (value / totalSpend) * 100 : 0,
+          href: slug ? `/contacts/${slug}` : null,
+        };
+      })
       .sort((a, b) => b.value - a.value);
 
     const spendByHorse = [...horseTotals.entries()]
@@ -148,24 +157,24 @@ export default function CategoryOverviewPage({
       invoiceCount: filteredBills.length,
       lineItemCount: lineItems,
       uniqueHorseCount: spendByHorse.length,
-      activeProviderCount: spendByProvider.length,
-      spendByProvider,
+      activeContactCount: spendByContact.filter((r) => r.key !== "__unknown__").length,
+      spendByContact,
       spendByHorse,
       spendBySubcategory,
     };
-  }, [categorySlug, filteredBills, providerById]);
+  }, [filteredBills, contactById]);
 
   const invoiceList: InvoiceListItem[] = useMemo(() => {
     return allParsedBills.map((row) => {
-      const provider = providerById.get(row.bill.providerId);
-      const providerSlug = provider?.slug ?? slugify(provider?.name ?? "provider");
+      const c = row.bill.contactId ? contactById.get(String(row.bill.contactId)) : null;
+      const providerSlug = c?.slug ?? slugify(c?.name ?? "contact");
       return {
         id: row.bill._id,
-        href: `/${categorySlug}/${providerSlug}/${row.bill._id}`,
+        href: `/invoices/preview/${row.bill._id}`,
         category: categorySlug,
         invoiceNumber: row.extracted.invoice_number ?? row.bill.fileName,
         invoiceDate: row.extracted.invoice_date ?? null,
-        providerName: provider?.name ?? "Unknown",
+        providerName: c?.name ?? "Unknown",
         providerSlug,
         horses: [...new Set(row.lineItems.map((item) => item.horse_name ?? "Unassigned"))],
         lineItemCount: row.lineItems.length,
@@ -173,23 +182,21 @@ export default function CategoryOverviewPage({
         amountUsd: getInvoiceTotalUsd(row.extracted, row.lineItems),
       };
     });
-  }, [allParsedBills, categorySlug, providerById]);
+  }, [allParsedBills, categorySlug, contactById]);
 
-  const providerCards = useMemo(() => {
-    return providers.map((provider: any) => {
-      const providerBills = filteredBills.filter((row) => row.bill.providerId === provider._id);
-      const totalSpend = providerBills.reduce((sum: number, row: ParsedBill) => sum + getInvoiceTotalUsd(row.extracted, row.lineItems), 0);
-      const horses = [...new Set(providerBills.flatMap((row) => row.lineItems.map((item) => item.horse_name ?? "Unassigned")))];
-      const recent = providerBills.length > 0 ? providerBills[0].extracted.invoice_date : null;
-      return {
-        provider,
-        invoiceCount: providerBills.length,
-        totalSpend,
-        horses,
-        recent,
-      };
-    });
-  }, [filteredBills, providers]);
+  // Contacts in this category (by their own category field)
+  const contactCards = useMemo(() => {
+    return contacts
+      .filter((c: any) => c.category === categorySlug)
+      .map((c: any) => {
+        const cId = String(c._id);
+        const cBills = filteredBills.filter((row) => row.bill.contactId && String(row.bill.contactId) === cId);
+        const totalSpend = cBills.reduce((sum: number, row: ParsedBill) => sum + getInvoiceTotalUsd(row.extracted, row.lineItems), 0);
+        const horses = [...new Set(cBills.flatMap((row) => row.lineItems.map((item) => item.horse_name ?? "Unassigned")))];
+        const recent = cBills.length > 0 ? cBills[0].extracted.invoice_date : null;
+        return { contact: c, invoiceCount: cBills.length, totalSpend, horses, recent };
+      });
+  }, [contacts, filteredBills, categorySlug]);
 
   return (
     <div className="page-shell">
@@ -233,18 +240,24 @@ export default function CategoryOverviewPage({
             <div className={styles.totalSub}>{summary.invoiceCount} invoices · {summary.lineItemCount} line items</div>
           </div>
           <div className={styles.deltaPill}>
-            {summary.activeProviderCount} providers · {summary.uniqueHorseCount} horses
+            {summary.activeContactCount} contacts · {summary.uniqueHorseCount} horses
           </div>
         </section>
 
         <section className={styles.twoCol}>
           <article className={styles.card}>
-            <div className={styles.cardHead}>spend_by_provider</div>
-            <div className={styles.list}>{summary.spendByProvider.map((row) => (
-              <Link href={row.href} key={row.key} className={styles.linkRow}>
-                <SpendBar label={row.name} amount={fmtUSD(row.value)} percentage={row.percentage} color="#4A5BDB" />
-              </Link>
-            ))}</div>
+            <div className={styles.cardHead}>spend_by_contact</div>
+            <div className={styles.list}>{summary.spendByContact.map((row) =>
+              row.href ? (
+                <Link href={row.href} key={row.key} className={styles.linkRow}>
+                  <SpendBar label={row.name} amount={fmtUSD(row.value)} percentage={row.percentage} color="#4A5BDB" />
+                </Link>
+              ) : (
+                <div key={row.key}>
+                  <SpendBar label={row.name} amount={fmtUSD(row.value)} percentage={row.percentage} color="#4A5BDB" />
+                </div>
+              ),
+            )}</div>
           </article>
 
           <article className={styles.card}>
@@ -260,9 +273,9 @@ export default function CategoryOverviewPage({
         </section>
 
         <section className={styles.providersGrid}>
-          {providerCards.map(({ provider, invoiceCount, totalSpend, horses, recent }) => (
-            <Link key={provider._id} href={`/${categorySlug}/${provider.slug ?? slugify(provider.name)}`} className={styles.providerCard}>
-              <div className={styles.providerName}>{provider.name}</div>
+          {contactCards.map(({ contact, invoiceCount, totalSpend, horses, recent }) => (
+            <Link key={contact._id} href={`/contacts/${contact.slug ?? slugify(contact.name)}`} className={styles.providerCard}>
+              <div className={styles.providerName}>{contact.name}</div>
               {invoiceCount === 0 ? (
                 <div className={styles.muted}>no invoices in this period</div>
               ) : (

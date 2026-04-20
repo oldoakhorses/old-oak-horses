@@ -158,7 +158,6 @@ export const updateContact = mutation({
     contactId: v.optional(v.id("contacts")),
     id: v.optional(v.id("contacts")),
     name: v.optional(v.string()),
-    providerId: v.optional(v.id("providers")),
     category: v.optional(v.string()),
     location: v.optional(v.string()),
     phone: v.optional(v.string()),
@@ -178,7 +177,6 @@ export const updateContact = mutation({
 
     const fields = {
       name: args.name !== undefined ? args.name.trim() : undefined,
-      providerId: args.providerId,
       category: args.category !== undefined ? normalizeCategory(args.category) : undefined,
       location: args.location !== undefined ? normalizeLocation(args.location) : undefined,
       phone: args.phone !== undefined ? trimOrUndefined(args.phone) : undefined,
@@ -390,6 +388,47 @@ export const cleanupContactsForSchemaSlim = mutation({
 });
 
 /**
+ * One-off migration for the providers-table removal: nullify every
+ * `providerId` reference across bills + contacts, and delete the entire
+ * providerAliases + providers tables' rows. Idempotent.
+ */
+export const stripAllProviderFields = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const contacts = await ctx.db.query("contacts").collect();
+    let contactsCleared = 0;
+    for (const c of contacts) {
+      if ((c as any).providerId !== undefined) {
+        await ctx.db.patch(c._id, { providerId: undefined } as any);
+        contactsCleared++;
+      }
+    }
+
+    const bills = await ctx.db.query("bills").collect();
+    let billsCleared = 0;
+    for (const b of bills) {
+      if ((b as any).providerId !== undefined || (b as any).providerDetected !== undefined || (b as any).providerConfirmed !== undefined) {
+        await ctx.db.patch(b._id, {
+          providerId: undefined,
+          providerDetected: undefined,
+          providerConfirmed: undefined,
+        } as any);
+        billsCleared++;
+      }
+    }
+
+    // providers + providerAliases tables have been dropped from the schema,
+    // so their rows are already gone. Keeping the migration idempotent shape.
+    return {
+      contactsCleared,
+      billsCleared,
+      providerAliasesDeleted: 0,
+      providersDeleted: 0,
+    };
+  },
+});
+
+/**
  * One-off migration: rename `fullName` -> `companyName` on every contact,
  * and clear `contactName` (dropped entirely). Idempotent.
  */
@@ -445,7 +484,6 @@ export const findDuplicateContacts = query({
 export const upsertContactFromInvoice = internalMutation({
   args: {
     name: v.string(),
-    providerId: v.optional(v.id("providers")),
     category: v.string(),
     location: v.optional(v.string()),
     phone: v.optional(v.string()),
@@ -481,7 +519,6 @@ export const upsertContactFromInvoice = internalMutation({
       name: normalizedName,
       slug,
       companyName: trimOrUndefined(args.companyName),
-      providerId: args.providerId,
       category: normalizedCategory,
       location: normalizedLocation,
       address: trimOrUndefined(args.address),
@@ -507,7 +544,6 @@ export const listVendorsForMatching = internalQuery({
       website: contact.website ?? undefined,
       address: contact.address ?? undefined,
       category: contact.category ?? "other",
-      providerId: contact.providerId ?? undefined,
     }));
   },
 });

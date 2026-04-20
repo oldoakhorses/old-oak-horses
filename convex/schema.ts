@@ -23,45 +23,7 @@ export default defineSchema({
     .index("by_name", ["name"])
     .index("by_slug", ["slug"]),
 
-  providers: defineTable({
-    categoryId: v.id("categories"),
-    category: v.optional(v.string()),
-    subcategorySlug: v.optional(v.string()),
-    name: v.string(),
-    slug: v.optional(v.string()),
-    fullName: v.optional(v.string()),
-    contactName: v.optional(v.string()),
-    primaryContactName: v.optional(v.string()),
-    primaryContactPhone: v.optional(v.string()),
-    address: v.optional(v.string()),
-    phone: v.optional(v.string()),
-    email: v.optional(v.string()),
-    website: v.optional(v.string()),
-    accountNumber: v.optional(v.string()),
-    location: v.optional(
-      v.union(
-        v.literal("wellington"),
-        v.literal("thermal"),
-        v.literal("ocala"),
-        v.literal("la"),
-        v.literal("eu"),
-        v.literal("can")
-      )
-    ),
-    extractionPrompt: v.string(),
-    expectedFields: v.array(v.string()),
-    createdAt: v.number(),
-    updatedAt: v.optional(v.number())
-  })
-    .index("by_name", ["name"])
-    .index("by_slug", ["slug"])
-    .index("by_category", ["categoryId"])
-    .index("by_category_name", ["categoryId", "name"])
-    .index("by_category_subcategory", ["categoryId", "subcategorySlug"])
-    .index("by_category_subcategory_name", ["categoryId", "subcategorySlug", "name"]),
-
   bills: defineTable({
-    providerId: v.optional(v.id("providers")),
     contactId: v.optional(v.id("contacts")),
     categoryId: v.optional(v.id("categories")),
     /** Denormalized list of category slugs found across line items */
@@ -72,8 +34,6 @@ export default defineSchema({
     assignType: v.optional(v.union(v.literal("horse"), v.literal("person"))),
     assignMode: v.optional(v.union(v.literal("line"), v.literal("whole"))),
     splitMode: v.optional(v.union(v.literal("even"), v.literal("custom"))),
-    providerDetected: v.optional(v.boolean()),
-    providerConfirmed: v.optional(v.boolean()),
     status: v.union(
       v.literal("uploading"),
       v.literal("parsing"),
@@ -202,7 +162,6 @@ export default defineSchema({
     source: v.optional(v.union(v.literal("upload"), v.literal("cc_transaction"))),
   })
     .index("by_uploadedAt", ["uploadedAt"])
-    .index("by_provider", ["providerId"])
     .index("by_contact", ["contactId"])
     .index("by_category", ["categoryId"])
     .index("by_ccTransaction", ["ccTransactionId"]),
@@ -232,9 +191,6 @@ export default defineSchema({
     name: v.string(),
     slug: v.optional(v.string()),
     companyName: v.optional(v.string()),
-    // NOTE: providerId is kept transiently — dropped together with the
-    // providers table in the providers-removal refactor.
-    providerId: v.optional(v.id("providers")),
     category: v.optional(v.string()),
     address: v.optional(v.string()),
     location: v.optional(
@@ -359,15 +315,6 @@ export default defineSchema({
     alias: v.string(),
     personName: v.string(),
     personId: v.id("people"),
-    createdAt: v.number(),
-    updatedAt: v.optional(v.number())
-  }).index("by_alias", ["alias"]),
-
-  providerAliases: defineTable({
-    alias: v.string(),
-    providerName: v.string(),
-    providerId: v.id("providers"),
-    category: v.string(),
     createdAt: v.number(),
     updatedAt: v.optional(v.number())
   }).index("by_alias", ["alias"]),

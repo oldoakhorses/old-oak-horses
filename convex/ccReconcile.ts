@@ -210,7 +210,6 @@ export const uploadStatement = mutation({
 
     // Load contacts/providers for name matching
     const contacts = await ctx.db.query("contacts").collect();
-    const providers = await ctx.db.query("providers").collect();
 
     // Build matching index: amount -> bills, name keywords -> bills
     type BillRef = {
@@ -234,10 +233,6 @@ export const uploadStatement = mutation({
       if (b.contactId) {
         const c = contacts.find((c) => String(c._id) === String(b.contactId));
         if (c) contactName = c.name;
-      }
-      if (!contactName && b.providerId) {
-        const p = providers.find((p) => String(p._id) === String(b.providerId));
-        if (p) contactName = p.name;
       }
 
       const allNames = [pName, contactName, b.fileName].filter(Boolean).join(" ");
@@ -803,7 +798,6 @@ export const getMatchableBills = query({
   handler: async (ctx) => {
     const bills = await ctx.db.query("bills").collect();
     const contacts = await ctx.db.query("contacts").collect();
-    const providers = await ctx.db.query("providers").collect();
     const categories = await ctx.db.query("categories").collect();
     return bills
       .filter((b) => b.status === "done" && b.isApproved)
@@ -818,10 +812,6 @@ export const getMatchableBills = query({
         if (b.contactId) {
           const c = contacts.find((c) => String(c._id) === String(b.contactId));
           if (c) contactName = c.name;
-        }
-        if (!contactName && b.providerId) {
-          const p = providers.find((p) => String(p._id) === String(b.providerId));
-          if (p) contactName = p.name;
         }
         const invoiceDate = String(extracted.invoice_date ?? extracted.invoiceDate ?? "");
         const category = b.categoryId ? categories.find((c) => String(c._id) === String(b.categoryId)) : null;

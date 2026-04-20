@@ -207,8 +207,11 @@ export default function RecordsPage() {
   const horseDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const recordProviderCategory = selectedRecordType ? RECORD_TYPE_TO_CATEGORY[selectedRecordType] : "";
-  const recordProviders =
-    useQuery(api.providers.listByCategory, recordProviderCategory ? { category: recordProviderCategory } : "skip") ?? [];
+  const allContactsForRecord = useQuery(api.contacts.getAllContacts) ?? [];
+  const recordProviders = useMemo(
+    () => allContactsForRecord.filter((c: any) => recordProviderCategory && c.category === recordProviderCategory),
+    [allContactsForRecord, recordProviderCategory]
+  );
   const allInvoicesForLinking = useQuery(api.bills.listForLinking) ?? [];
 
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);

@@ -228,13 +228,7 @@ export default function InvoicePreviewPage() {
 
   const [providerEdit, setProviderEdit] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<Id<"categories"> | "">("");
-  const [selectedProviderId, setSelectedProviderId] = useState<Id<"providers"> | "" | "__other">("");
   const [customProviderName, setCustomProviderName] = useState("");
-
-  const providerOptions = useQuery(
-    api.providers.getProvidersByCategory,
-    selectedCategoryId ? { categoryId: selectedCategoryId } : "skip"
-  ) ?? [];
 
   const [detailsEdit, setDetailsEdit] = useState(false);
   const [details, setDetails] = useState({
@@ -304,7 +298,6 @@ export default function InvoicePreviewPage() {
   const saveHorseAssignment = useMutation(api.bills.saveHorseAssignment);
   const savePersonAssignment = useMutation(api.bills.savePersonAssignment);
   const saveDuesAssignments = useMutation(api.bills.saveDuesAssignments);
-  const createProviderOnUpload = useMutation(api.providers.createProviderOnUpload);
   const approveBill = useMutation(api.bills.approveBill);
   const deleteBill = useMutation(api.bills.deleteBill);
   const updateBillNotes = useMutation(api.bills.updateBillNotes);
@@ -343,7 +336,6 @@ export default function InvoicePreviewPage() {
     if (!bill) return;
 
     setSelectedCategoryId(bill.categoryId ?? "");
-    setSelectedProviderId((bill.providerId as Id<"providers"> | undefined) ?? "");
     setProviderEdit(false);
 
     setDetails({
@@ -444,7 +436,7 @@ export default function InvoicePreviewPage() {
       setWholeAssignedIds([]);
       setWholeAmounts({});
     }
-  }, [bill?._id, bill?.providerId, bill?.categoryId, bill?.status, bill?.extractedData, requiresPerson, categorySlug]);
+  }, [bill?._id, bill?.contactId, bill?.categoryId, bill?.status, bill?.extractedData, requiresPerson, categorySlug]);
 
   useEffect(() => {
     if (openDropdownId === null) return;
@@ -480,8 +472,8 @@ export default function InvoicePreviewPage() {
     const invoiceDate = String((extracted as any)?.invoice_date ?? (extracted as any)?.invoiceDate ?? "").trim();
     return formatInvoiceName({ providerName: bill?.providerName ?? providerName, date: invoiceDate || bill?.date });
   })();
-  const providerDetected = Boolean(bill?.providerDetected ?? bill?.providerId);
-  const providerConfirmed = Boolean((bill?.providerConfirmed ?? bill?.providerId) && !providerEdit);
+  const providerDetected = Boolean(bill?.providerDetected ?? bill?.contactId);
+  const providerConfirmed = Boolean((bill?.providerConfirmed ?? bill?.contactId) && !providerEdit);
 
   const assignedDirectIds = useMemo(() => {
     if (mode !== "line") return [];
@@ -893,32 +885,6 @@ export default function InvoicePreviewPage() {
     setSavingProvider(true);
     setError("");
     try {
-      let providerId: Id<"providers"> | undefined;
-      let customName: string | undefined;
-
-      if (selectedProviderId === "__other") {
-        if (!customProviderName.trim()) throw new Error("Enter provider name");
-        customName = customProviderName.trim();
-      } else if (selectedProviderId) {
-        providerId = selectedProviderId as Id<"providers">;
-      } else {
-        throw new Error("Select a provider");
-      }
-
-      if (selectedProviderId === "__other" && customName) {
-        const createdId = await createProviderOnUpload({
-          name: customName,
-          categoryId: selectedCategoryId,
-          subcategorySlug:
-            categorySlug === "admin" ? bill.adminSubcategory || undefined :
-            categorySlug === "dues-registrations" ? bill.duesSubcategory || undefined :
-            categorySlug === "horse-transport" ? bill.horseTransportSubcategory || undefined :
-            undefined
-        });
-        providerId = createdId;
-        customName = undefined;
-      }
-
       const selectedCategory = categories.find((c) => c._id === selectedCategoryId);
       const newCategorySlug = selectedCategory?.slug ?? "";
 
@@ -926,8 +892,8 @@ export default function InvoicePreviewPage() {
       await reassignAndReparse({
         billId,
         categoryId: selectedCategoryId,
-        providerId,
-        customProviderName: customName,
+        contactId: selectedContactId ?? undefined,
+        customProviderName: customProviderName.trim() || undefined,
         adminSubcategory: newCategorySlug === "admin" ? bill.adminSubcategory || undefined : undefined,
         duesSubcategory: newCategorySlug === "dues-registrations" ? bill.duesSubcategory || undefined : undefined
       });
@@ -2354,27 +2320,10 @@ function round2(value: number) {
 }
 
 function buildPermanentInvoicePath(bill: any) {
-  const categorySlug = String(bill?.category?.slug ?? "");
-  const providerName = bill?.provider?.name ?? bill?.customProviderName ?? "other";
-  const providerSlug = String(bill?.provider?.slug ?? slugify(providerName));
+  // Invoices no longer have category/provider-scoped routes.
+  // The preview page is the canonical location for every bill.
   const id = String(bill?._id ?? "");
-
-  if (categorySlug === "travel") return `/travel/${bill.travelSubcategory ?? "travel"}/${id}`;
-  if (categorySlug === "housing") return `/housing/${bill.housingSubcategory ?? "housing"}/${id}`;
-  if (categorySlug === "horse-transport") return `/horse-transport/${bill.horseTransportSubcategory ?? "ground-transport"}/${providerSlug}/${id}`;
-  if (categorySlug === "marketing") return `/marketing/${bill.marketingSubcategory ?? "other"}/${id}`;
-  if (categorySlug === "admin") return `/admin/${bill.adminSubcategory ?? "payroll"}/${providerSlug}/${id}`;
-  if (categorySlug === "dues-registrations") return `/dues-registrations/${bill.duesSubcategory ?? "memberships"}/${providerSlug}/${id}`;
-  if (categorySlug === "grooming") return `/grooming/${bill.groomingSubcategory ?? "other"}/${id}`;
-  if (categorySlug === "stabling") return `/stabling/${providerSlug}/${id}`;
-  if (categorySlug === "bodywork") return `/bodywork/${providerSlug}/${id}`;
-  if (categorySlug === "feed-bedding") return `/feed-bedding/${providerSlug}/${id}`;
-  if (categorySlug === "veterinary") return `/veterinary/${providerSlug}/${id}`;
-  if (categorySlug === "farrier") return `/farrier/${providerSlug}/${id}`;
-  if (categorySlug === "supplies") return `/supplies/${providerSlug}/${id}`;
-  // Fallback — guard against empty categorySlug producing a broken path
-  if (!categorySlug) return `/invoices`;
-  return `/${categorySlug}/${providerSlug}/${id}`;
+  return id ? `/invoices/preview/${id}` : `/invoices`;
 }
 
 function slugify(value: string) {

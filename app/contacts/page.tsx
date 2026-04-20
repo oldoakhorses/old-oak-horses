@@ -105,13 +105,10 @@ export default function ContactsPage() {
     useQuery(api.contacts.listContacts, {
       location: locationFilter,
     }) ?? [];
-  const providers = useQuery(api.providers.getAllProvidersWithCategory) ?? [];
 
   const createContact = useMutation(api.contacts.createContact);
   const deleteContact = useMutation(api.contacts.deleteContact);
   const updateContact = useMutation(api.contacts.updateContact);
-
-  const providerLookup = useMemo(() => new Map(providers.map((provider) => [String(provider._id), provider])), [providers]);
 
   const tabContacts = useMemo(() => {
     return contacts.filter((c) => {
