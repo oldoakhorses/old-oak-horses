@@ -964,8 +964,8 @@ export default function InvoicePreviewPage() {
     setShowContactSuggestions(false);
     setContactForm({
       providerName: contact.name,
-      contactName: contact.contactName ?? contact.primaryContactName ?? "",
-      phone: contact.phone ?? contact.primaryContactPhone ?? "",
+      contactName: contact.contactName ?? "",
+      phone: contact.phone ?? "",
       email: contact.email ?? "",
       address: contact.address ?? "",
       website: contact.website ?? "",

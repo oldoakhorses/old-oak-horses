@@ -2523,7 +2523,6 @@ export const approveBill = mutation({
           const newContactId = await ctx.db.insert("contacts", {
             name: provName,
             slug: slugify(provName),
-            type: "vendor",
             category: (category as any)?.slug ?? "other",
             phone: epc.phone ?? undefined,
             email: epc.email ?? undefined,

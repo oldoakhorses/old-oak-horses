@@ -41,13 +41,12 @@ export const migrateProvidersToContacts = internalMutation({
       const existingContact = existingContacts.find(
         (c) =>
           c.name.toLowerCase().trim() === nameKey ||
-          (c.providerName && c.providerName.toLowerCase().trim() === nameKey)
+          (c.fullName && c.fullName.toLowerCase().trim() === nameKey)
       );
 
       if (existingContact) {
         // Update the existing contact with vendor fields if missing
         const updates: Record<string, unknown> = {};
-        if (!existingContact.type) updates.type = "vendor";
         if (!existingContact.slug) {
           let slug = slugify(provider.name);
           if (existingSlugs.has(slug)) {
@@ -59,26 +58,18 @@ export const migrateProvidersToContacts = internalMutation({
         if (!existingContact.providerId) updates.providerId = provider._id;
         if (!existingContact.fullName && provider.fullName)
           updates.fullName = provider.fullName;
-        if (!existingContact.contactName && provider.contactName)
-          updates.contactName = provider.contactName;
-        if (!existingContact.primaryContactName && provider.primaryContactName)
-          updates.primaryContactName = provider.primaryContactName;
-        if (!existingContact.primaryContactPhone && provider.primaryContactPhone)
-          updates.primaryContactPhone = provider.primaryContactPhone;
+        if (!existingContact.contactName && (provider.contactName ?? provider.primaryContactName))
+          updates.contactName = provider.contactName ?? provider.primaryContactName;
         if (!existingContact.address && provider.address)
           updates.address = provider.address;
-        if (!existingContact.phone && provider.phone)
-          updates.phone = provider.phone;
+        if (!existingContact.phone && (provider.phone ?? provider.primaryContactPhone))
+          updates.phone = provider.phone ?? provider.primaryContactPhone;
         if (!existingContact.email && provider.email)
           updates.email = provider.email;
         if (!existingContact.website && provider.website)
           updates.website = provider.website;
         if (!existingContact.accountNumber && provider.accountNumber)
           updates.accountNumber = provider.accountNumber;
-        if (provider.extractionPrompt)
-          updates.extractionPrompt = provider.extractionPrompt;
-        if (provider.expectedFields?.length)
-          updates.expectedFields = provider.expectedFields;
         updates.updatedAt = Date.now();
 
         if (Object.keys(updates).length > 1) {
@@ -104,22 +95,15 @@ export const migrateProvidersToContacts = internalMutation({
         name: provider.name,
         slug,
         fullName: provider.fullName,
-        type: "vendor",
         providerId: provider._id,
-        providerName: provider.name,
         category: categorySlug,
-        contactName: provider.contactName,
-        primaryContactName: provider.primaryContactName,
-        primaryContactPhone: provider.primaryContactPhone,
+        contactName: provider.contactName ?? provider.primaryContactName,
         address: provider.address,
         location: provider.location,
-        phone: provider.phone,
+        phone: provider.phone ?? provider.primaryContactPhone,
         email: provider.email,
         website: provider.website,
         accountNumber: provider.accountNumber,
-        extractionPrompt: provider.extractionPrompt || undefined,
-        expectedFields:
-          provider.expectedFields?.length ? provider.expectedFields : undefined,
         createdAt: provider.createdAt,
         updatedAt: Date.now(),
       });

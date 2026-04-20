@@ -97,8 +97,8 @@ export default function ContactDetailPage() {
     setEditForm({
       name: contact.name ?? "",
       fullName: contact.fullName ?? "",
-      contactName: contact.contactName ?? contact.primaryContactName ?? "",
-      phone: contact.phone ?? contact.primaryContactPhone ?? "",
+      contactName: contact.contactName ?? "",
+      phone: contact.phone ?? "",
       email: contact.email ?? "",
       address: contact.address ?? "",
       website: contact.website ?? "",
@@ -161,7 +161,7 @@ export default function ContactDetailPage() {
         <div>
           <h1 className={styles.contactName}>{contact.name}</h1>
           <div className={styles.contactType}>
-            {contact.type ?? "vendor"} {contact.category ? `/ ${formatCategoryLabel(contact.category)}` : ""}
+            {contact.category ? formatCategoryLabel(contact.category) : "contact"}
           </div>
         </div>
         {!editing && (
@@ -263,11 +263,11 @@ export default function ContactDetailPage() {
             {contact.fullName ? (
               <div><span className={styles.label}>FULL NAME</span><span className={styles.value}>{contact.fullName}</span></div>
             ) : null}
-            {contact.contactName || contact.primaryContactName ? (
-              <div><span className={styles.label}>CONTACT PERSON</span><span className={styles.value}>{contact.contactName ?? contact.primaryContactName}</span></div>
+            {contact.contactName ? (
+              <div><span className={styles.label}>CONTACT PERSON</span><span className={styles.value}>{contact.contactName}</span></div>
             ) : null}
-            {contact.phone || contact.primaryContactPhone ? (
-              <div><span className={styles.label}>PHONE</span><span className={styles.value}>{contact.phone ?? contact.primaryContactPhone}</span></div>
+            {contact.phone ? (
+              <div><span className={styles.label}>PHONE</span><span className={styles.value}>{contact.phone}</span></div>
             ) : null}
             {contact.email ? (
               <div><span className={styles.label}>EMAIL</span><span className={styles.value}>{contact.email}</span></div>

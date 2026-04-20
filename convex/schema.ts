@@ -232,21 +232,11 @@ export default defineSchema({
     name: v.string(),
     slug: v.optional(v.string()),
     fullName: v.optional(v.string()),
-    type: v.optional(
-      v.union(
-        v.literal("vendor"),
-        v.literal("person"),
-        v.literal("company")
-      )
-    ),
-    role: v.optional(v.string()),
+    // NOTE: providerId is kept transiently — dropped together with the
+    // providers table in the providers-removal refactor.
     providerId: v.optional(v.id("providers")),
-    providerName: v.optional(v.string()),
     category: v.optional(v.string()),
-    company: v.optional(v.string()),
     contactName: v.optional(v.string()),
-    primaryContactName: v.optional(v.string()),
-    primaryContactPhone: v.optional(v.string()),
     address: v.optional(v.string()),
     location: v.optional(
       v.union(
@@ -262,8 +252,6 @@ export default defineSchema({
     email: v.optional(v.string()),
     website: v.optional(v.string()),
     accountNumber: v.optional(v.string()),
-    extractionPrompt: v.optional(v.string()),
-    expectedFields: v.optional(v.array(v.string())),
     notes: v.optional(v.string()),
     /** "active" (default) or "invoice_only" — controls which tab the contact appears in */
     contactStatus: v.optional(v.union(v.literal("active"), v.literal("invoice_only"))),
@@ -273,7 +261,6 @@ export default defineSchema({
     .index("by_name", ["name"])
     .index("by_slug", ["slug"])
     .index("by_category", ["category"])
-    .index("by_type", ["type"])
     .index("by_location", ["location"]),
 
   scheduleEvents: defineTable({
