@@ -1065,7 +1065,7 @@ export default function GlobalFab() {
                       </select>
                       {recordForm.selectedProvider === "__other" ? (
                         <div className={styles.providerOtherWrap}>
-                          <label className={styles.recordFieldLabel}>PROVIDER NAME</label>
+                          <label className={styles.recordFieldLabel}>CONTACT NAME</label>
                           <input
                             className={styles.recordInput}
                             value={recordForm.providerName}
@@ -1196,7 +1196,7 @@ function providerLabel(type: RecordType) {
   if (type === "medication") return "ADMINISTERED BY";
   if (type === "farrier") return "FARRIER";
   if (type === "bodywork") return "PRACTITIONER";
-  return "PROVIDER";
+  return "CONTACT";
 }
 
 function providerPlaceholder(type: RecordType) {

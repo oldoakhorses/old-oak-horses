@@ -46,7 +46,7 @@ function vetSubcategoryLabel(value?: string | null) {
   return null;
 }
 type Tab = "upcoming" | "past";
-type SortColumn = "record" | "horse" | "provider" | "category" | "date";
+type SortColumn = "record" | "horse" | "category" | "date";
 type UpcomingRange = "all" | "7d" | "30d" | "3m" | "6m";
 type PastRange = "all" | "7d" | "30d" | "3m" | "6m" | "1y";
 
@@ -321,9 +321,6 @@ export default function RecordsPage() {
           break;
         case "horse":
           cmp = a.base.horseName.localeCompare(b.base.horseName);
-          break;
-        case "provider":
-          cmp = (a.base.providerName || "").localeCompare(b.base.providerName || "");
           break;
         case "category":
           cmp = a.base.type.localeCompare(b.base.type);
@@ -742,10 +739,6 @@ export default function RecordsPage() {
               HORSE
               {sortColumn === "horse" ? <span className={styles.sortArrow}>{sortDirection === "asc" ? "↑" : "↓"}</span> : null}
             </button>
-            <button type="button" className={sortClass(sortColumn, "provider", styles)} onClick={() => handleSort("provider")}>
-              PROVIDER
-              {sortColumn === "provider" ? <span className={styles.sortArrow}>{sortDirection === "asc" ? "↑" : "↓"}</span> : null}
-            </button>
             <button type="button" className={sortClass(sortColumn, "category", styles)} onClick={() => handleSort("category")}>
               CATEGORY
               {sortColumn === "category" ? <span className={styles.sortArrow}>{sortDirection === "asc" ? "↑" : "↓"}</span> : null}
@@ -828,7 +821,6 @@ export default function RecordsPage() {
                     >
                       🐴 {record.horseName}
                     </Link>
-                    <div className={record.providerName ? styles.recordProvider : styles.recordProviderEmpty}>{record.providerName || "—"}</div>
                     <span className={styles.categoryBadge} style={{ background: badgeColors.bg, color: badgeColors.color }}>
                       {prettyType(record.type)}
                     </span>
@@ -901,7 +893,7 @@ export default function RecordsPage() {
                       <div className={styles.expandedFields}>
                         {editing ? (
                           <>
-                            <ExpandedInput label="PROVIDER">
+                            <ExpandedInput label="CONTACT">
                               <input
                                 className={styles.expandedInput}
                                 value={editState.providerName}
@@ -1054,7 +1046,7 @@ export default function RecordsPage() {
                         ) : (
                           <>
                             <ExpandedField label="HORSE" value={record.horseName} />
-                            <ExpandedField label="PROVIDER" value={record.providerName} />
+                            <ExpandedField label="CONTACT" value={record.providerName} />
                             <ExpandedField label="DATE" value={formatDateLong(row.eventDate)} />
                             <ExpandedField label="NOTES" value={record.notes} />
                             {record.billInfo ? (
@@ -1346,7 +1338,7 @@ export default function RecordsPage() {
                       </select>
                       {recordForm.selectedProvider === "__other" ? (
                         <div className={styles.providerOtherWrap}>
-                          <label className={styles.recordFieldLabel}>PROVIDER NAME</label>
+                          <label className={styles.recordFieldLabel}>CONTACT NAME</label>
                           <input
                             className={styles.recordInput}
                             value={recordForm.providerName}
@@ -1608,7 +1600,7 @@ function providerLabel(type: RecordType) {
   if (type === "medication") return "ADMINISTERED BY";
   if (type === "farrier") return "FARRIER";
   if (type === "bodywork") return "PRACTITIONER";
-  return "PROVIDER";
+  return "CONTACT";
 }
 
 function providerPlaceholder(type: RecordType) {
