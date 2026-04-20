@@ -1564,6 +1564,71 @@ export const createParsingBill = internalMutation({
   }
 });
 
+/**
+ * Recompute a bill's derived fields (fileName, categoryId, invoiceName)
+ * to match whichever contact is currently assigned. Writes only the fields
+ * that change, leaves anything else alone. Safe to call from any mutation
+ * that mutates contactId on a bill.
+ */
+async function syncBillDerivedFields(
+  ctx: any,
+  bill: any,
+  args: { contactId?: string | null; fallbackCustomProviderName?: string }
+) {
+  const patch: Record<string, unknown> = {};
+
+  // Resolve the contact (if any) and the effective display name
+  let contact: any = null;
+  if (args.contactId) contact = await ctx.db.get(args.contactId);
+
+  const providerName =
+    contact?.name ??
+    args.fallbackCustomProviderName ??
+    bill.customProviderName ??
+    "Other";
+
+  // Sync categoryId to the contact's own category (slug -> category row)
+  if (contact?.category) {
+    const cat = await ctx.db
+      .query("categories")
+      .withIndex("by_slug", (q: any) => q.eq("slug", contact.category))
+      .first();
+    if (cat && String(cat._id) !== String(bill.categoryId ?? "")) {
+      patch.categoryId = cat._id;
+    }
+  }
+
+  // Look up the current category name (either newly patched or existing)
+  const effectiveCategoryId = patch.categoryId ?? bill.categoryId;
+  const effectiveCategory = effectiveCategoryId ? await ctx.db.get(effectiveCategoryId) : null;
+  const categoryName = (effectiveCategory as any)?.name ?? "Invoice";
+
+  // Compute the ISO date for the filename — prefer the extracted invoice_date,
+  // fall back to uploadedAt.
+  const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+  const invoiceDateRaw =
+    (typeof extracted.invoice_date === "string" ? extracted.invoice_date : null) ??
+    (typeof extracted.invoiceDate === "string" ? extracted.invoiceDate : null);
+  let isoDate = "";
+  if (invoiceDateRaw) {
+    const d = new Date(invoiceDateRaw);
+    if (!Number.isNaN(d.getTime())) isoDate = d.toISOString().slice(0, 10);
+  }
+  if (!isoDate) isoDate = new Date(bill.uploadedAt).toISOString().slice(0, 10);
+
+  const newFileName = `${categoryName} - ${providerName} - ${isoDate}`;
+  if (newFileName !== bill.fileName) patch.fileName = newFileName;
+
+  // Clear invoiceName so the invoice list falls back to formatInvoiceName
+  // with the current contact — this prevents stale names from a previous
+  // contact leaking through when the user re-assigns.
+  if (bill.invoiceName) patch.invoiceName = undefined;
+
+  if (Object.keys(patch).length > 0) {
+    await ctx.db.patch(bill._id, patch);
+  }
+}
+
 export const reassignBillContact = internalMutation({
   args: {
     billId: v.id("bills"),
@@ -1595,6 +1660,15 @@ export const reassignBillContact = internalMutation({
     }
     if (args.categoryId) patch.categoryId = args.categoryId;
     await ctx.db.patch(args.billId, patch);
+
+    // Now sync derived fields (fileName/categoryId/invoiceName) to the new contact
+    const refreshed = await ctx.db.get(args.billId);
+    if (refreshed) {
+      await syncBillDerivedFields(ctx, refreshed, {
+        contactId: args.contactId ? String(args.contactId) : undefined,
+        fallbackCustomProviderName: args.customProviderName,
+      });
+    }
   }
 });
 
@@ -2176,10 +2250,26 @@ export const updateBillContact = mutation({
   handler: async (ctx, args) => {
     const bill = await ctx.db.get(args.billId);
     if (!bill) throw new Error("Bill not found");
+    const contactChanged =
+      args.contactId !== undefined && String(args.contactId ?? "") !== String(bill.contactId ?? "");
     const patch: Record<string, unknown> = {};
     if (args.contactId !== undefined) patch.contactId = args.contactId;
     if (args.extractedProviderContact !== undefined) patch.extractedProviderContact = args.extractedProviderContact;
     await ctx.db.patch(args.billId, patch);
+
+    // If the contact changed, resync derived fields (category, fileName,
+    // invoiceName) so the invoices list, contact page, and preview all
+    // reflect the new contact — not whichever one the parser originally
+    // matched.
+    if (contactChanged) {
+      const refreshed = await ctx.db.get(args.billId);
+      if (refreshed) {
+        await syncBillDerivedFields(ctx, refreshed, {
+          contactId: args.contactId ? String(args.contactId) : undefined,
+        });
+      }
+    }
+
     return args.billId;
   }
 });
