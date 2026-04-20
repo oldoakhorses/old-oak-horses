@@ -454,7 +454,7 @@ export default function InvoicePreviewPage() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [openDropdownId]);
 
-  const providerName = bill?.extractedProviderContact?.providerName || (bill?.provider?.name ?? bill?.customProviderName ?? "Unknown");
+  const providerName = bill?.extractedProviderContact?.providerName || (bill?.providerName ?? bill?.customProviderName ?? "Unknown");
   const previewTitle = formatInvoiceName({ providerName: bill?.providerName ?? providerName, date: bill?.date });
   // Display name for the "INVOICE NAME" field. Priority:
   //   1. Saved bill.invoiceName (user-edited or pre-set, e.g. CC txn description)
@@ -506,7 +506,7 @@ export default function InvoicePreviewPage() {
   const groupedLineItems = useMemo(() => {
     if (categorySlug !== "veterinary") return null;
     const hasEqSportsSignal =
-      String(bill?.providerName ?? bill?.provider?.name ?? providerName).toLowerCase().includes("eq sports") ||
+      String(bill?.providerName ?? providerName).toLowerCase().includes("eq sports") ||
       String(extracted.provider_name ?? extracted.providerName ?? "").toLowerCase().includes("eq sports");
     if (!hasEqSportsSignal) return null;
 
@@ -526,7 +526,7 @@ export default function InvoicePreviewPage() {
       total: round2(rows.reduce((sum, row) => sum + getLineAmount(row.line), 0)),
       rows
     }));
-  }, [categorySlug, bill?.providerName, bill?.provider?.name, extracted.provider_name, extracted.providerName, lineItems, providerName]);
+  }, [categorySlug, bill?.providerName, extracted.provider_name, extracted.providerName, lineItems, providerName]);
 
   const businessGeneralTotal = useMemo(() => {
     if (mode !== "line") return 0;
