@@ -41,7 +41,7 @@ export const migrateProvidersToContacts = internalMutation({
       const existingContact = existingContacts.find(
         (c) =>
           c.name.toLowerCase().trim() === nameKey ||
-          (c.fullName && c.fullName.toLowerCase().trim() === nameKey)
+          (c.companyName && c.companyName.toLowerCase().trim() === nameKey)
       );
 
       if (existingContact) {
@@ -56,10 +56,8 @@ export const migrateProvidersToContacts = internalMutation({
           existingSlugs.add(slug);
         }
         if (!existingContact.providerId) updates.providerId = provider._id;
-        if (!existingContact.fullName && provider.fullName)
-          updates.fullName = provider.fullName;
-        if (!existingContact.contactName && (provider.contactName ?? provider.primaryContactName))
-          updates.contactName = provider.contactName ?? provider.primaryContactName;
+        if (!existingContact.companyName && provider.fullName)
+          updates.companyName = provider.fullName;
         if (!existingContact.address && provider.address)
           updates.address = provider.address;
         if (!existingContact.phone && (provider.phone ?? provider.primaryContactPhone))
@@ -94,10 +92,9 @@ export const migrateProvidersToContacts = internalMutation({
       const contactId = await ctx.db.insert("contacts", {
         name: provider.name,
         slug,
-        fullName: provider.fullName,
+        companyName: provider.fullName,
         providerId: provider._id,
         category: categorySlug,
-        contactName: provider.contactName ?? provider.primaryContactName,
         address: provider.address,
         location: provider.location,
         phone: provider.phone ?? provider.primaryContactPhone,

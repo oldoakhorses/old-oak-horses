@@ -388,8 +388,7 @@ export const parseBillPdf = internalAction({
       if (resolvedContactId && Object.values(providerContactPatch).some((value) => value !== undefined)) {
         await ctx.runMutation(internal.contacts.updateContactFromInvoice, {
           contactId: resolvedContactId as any,
-          fullName: providerContactPatch.fullName,
-          contactName: providerContactPatch.contactName ?? providerContactPatch.primaryContactName,
+          companyName: providerContactPatch.fullName,
           address: providerContactPatch.address,
           phone: providerContactPatch.phone ?? providerContactPatch.primaryContactPhone,
           email: providerContactPatch.email,
@@ -426,8 +425,7 @@ export const parseBillPdf = internalAction({
           providerId: resolvedProvider?._id,
           category: categorySlug ?? (lineItemCategories.length > 0 ? lineItemCategories[0] : "other"),
           location: resolvedProvider?.location,
-          fullName: providerContactPatch.fullName ?? resolvedProvider?.name ?? extractedCustomProviderName,
-          contactName: providerContactPatch.contactName ?? providerContactPatch.primaryContactName,
+          companyName: providerContactPatch.fullName ?? resolvedProvider?.name ?? extractedCustomProviderName,
           address: providerContactPatch.address,
           phone: providerContactPatch.phone ?? providerContactPatch.primaryContactPhone,
           email: providerContactPatch.email,

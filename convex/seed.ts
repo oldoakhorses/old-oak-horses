@@ -1046,7 +1046,7 @@ export const seedDashboardData = mutation({
       await ctx.db.insert("contacts", {
         name: contact.name,
         category: contact.category,
-        fullName: contact.company,
+        companyName: contact.company,
         createdAt: Date.now()
       });
       createdContacts += 1;

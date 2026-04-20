@@ -275,8 +275,8 @@ export default function InvoicePreviewPage() {
   const [showContactSuggestions, setShowContactSuggestions] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<Id<"contacts"> | null>(null);
   const [contactForm, setContactForm] = useState({
-    providerName: "",
-    contactName: "",
+    name: "",
+    companyName: "",
     phone: "",
     email: "",
     address: "",
@@ -290,7 +290,7 @@ export default function InvoicePreviewPage() {
     if (!q) return allContacts.slice(0, 8);
     return allContacts
       .filter((c) => {
-        const haystack = [c.name, c.fullName, c.providerName, c.email, c.phone].filter(Boolean).join(" ").toLowerCase();
+        const haystack = [c.name, c.companyName, c.email, c.phone].filter(Boolean).join(" ").toLowerCase();
         return haystack.includes(q);
       })
       .slice(0, 8);
@@ -944,8 +944,8 @@ export default function InvoicePreviewPage() {
   function openContactEdit() {
     const c = bill?.extractedProviderContact;
     setContactForm({
-      providerName: c?.providerName ?? providerName ?? "",
-      contactName: c?.contactName ?? "",
+      name: c?.providerName ?? providerName ?? "",
+      companyName: (c as any)?.fullName ?? c?.providerName ?? "",
       phone: c?.phone ?? "",
       email: c?.email ?? "",
       address: c?.address ?? "",
@@ -963,8 +963,8 @@ export default function InvoicePreviewPage() {
     setContactSearch(contact.name);
     setShowContactSuggestions(false);
     setContactForm({
-      providerName: contact.name,
-      contactName: contact.contactName ?? "",
+      name: contact.name,
+      companyName: contact.companyName ?? "",
       phone: contact.phone ?? "",
       email: contact.email ?? "",
       address: contact.address ?? "",
@@ -979,8 +979,7 @@ export default function InvoicePreviewPage() {
     setError("");
     try {
       const contactData = {
-        providerName: contactForm.providerName || undefined,
-        contactName: contactForm.contactName || undefined,
+        providerName: contactForm.name || undefined,
         phone: contactForm.phone || undefined,
         email: contactForm.email || undefined,
         address: contactForm.address || undefined,
@@ -993,11 +992,11 @@ export default function InvoicePreviewPage() {
       // If no existing contact selected but we have a name, create a new
       // contact — pull across every auto-extracted field from the invoice so
       // the new contact starts fully populated.
-      if (!contactId && contactForm.providerName?.trim()) {
+      if (!contactId && contactForm.name?.trim()) {
         const newContactId = await createContact({
-          name: contactForm.providerName.trim(),
+          name: contactForm.name.trim(),
           category: categorySlug || "other",
-          contactName: contactForm.contactName || undefined,
+          companyName: contactForm.companyName || undefined,
           phone: contactForm.phone || undefined,
           email: contactForm.email || undefined,
           address: contactForm.address || undefined,
@@ -1563,8 +1562,8 @@ export default function InvoicePreviewPage() {
                     )}
                   </div>
                   <div>
-                    <div className={styles.label}>CONTACT NAME</div>
-                    <input className={styles.inputCompact} value={contactForm.contactName} onChange={(e) => setContactForm((p) => ({ ...p, contactName: e.target.value }))} />
+                    <div className={styles.label}>COMPANY NAME</div>
+                    <input className={styles.inputCompact} value={contactForm.companyName} onChange={(e) => setContactForm((p) => ({ ...p, companyName: e.target.value }))} />
                   </div>
                   <div>
                     <div className={styles.label}>PHONE</div>
@@ -1604,9 +1603,6 @@ export default function InvoicePreviewPage() {
 
                   {bill?.extractedProviderContact ? (
                     <div className={styles.contactDetailsGrid}>
-                      {bill.extractedProviderContact.contactName ? (
-                        <div><span className={styles.label}>CONTACT NAME</span><span className={styles.value}>{bill.extractedProviderContact.contactName}</span></div>
-                      ) : null}
                       {bill.extractedProviderContact.phone ? (
                         <div><span className={styles.label}>PHONE</span><span className={styles.value}>{bill.extractedProviderContact.phone}</span></div>
                       ) : null}

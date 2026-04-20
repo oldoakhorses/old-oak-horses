@@ -14,7 +14,7 @@ type ContactEditModalProps = {
   currentName?: string;
   currentContact?: {
     providerName?: string;
-    contactName?: string;
+    companyName?: string;
     phone?: string;
     email?: string;
     address?: string;
@@ -40,7 +40,7 @@ export default function ContactEditModal({
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     providerName: currentContact?.providerName ?? currentName ?? "",
-    contactName: currentContact?.contactName ?? "",
+    companyName: currentContact?.companyName ?? "",
     phone: currentContact?.phone ?? "",
     email: currentContact?.email ?? "",
     address: currentContact?.address ?? "",
@@ -54,7 +54,7 @@ export default function ContactEditModal({
     if (!q) return allContacts.slice(0, 8);
     return allContacts
       .filter((c) => {
-        const haystack = [c.name, c.fullName, c.providerName, c.email, c.phone]
+        const haystack = [c.name, c.companyName, c.email, c.phone]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -69,7 +69,7 @@ export default function ContactEditModal({
     setShowSuggestions(false);
     setForm({
       providerName: contact.name,
-      contactName: contact.contactName ?? "",
+      companyName: contact.companyName ?? "",
       phone: contact.phone ?? "",
       email: contact.email ?? "",
       address: contact.address ?? "",
@@ -86,7 +86,6 @@ export default function ContactEditModal({
         contactId: selectedContactId ?? undefined,
         extractedProviderContact: {
           providerName: form.providerName || undefined,
-          contactName: form.contactName || undefined,
           phone: form.phone || undefined,
           email: form.email || undefined,
           address: form.address || undefined,
@@ -147,8 +146,8 @@ export default function ContactEditModal({
         </div>
 
         <div>
-          <Label>CONTACT NAME</Label>
-          <input style={inputStyle} value={form.contactName} onChange={(e) => setForm((p) => ({ ...p, contactName: e.target.value }))} />
+          <Label>COMPANY NAME</Label>
+          <input style={inputStyle} value={form.companyName} onChange={(e) => setForm((p) => ({ ...p, companyName: e.target.value }))} />
         </div>
         <div>
           <Label>PHONE</Label>

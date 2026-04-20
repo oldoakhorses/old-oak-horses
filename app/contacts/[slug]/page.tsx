@@ -80,8 +80,7 @@ export default function ContactDetailPage() {
   const [saving, setSaving] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
-    fullName: "",
-    contactName: "",
+    companyName: "",
     phone: "",
     email: "",
     address: "",
@@ -96,8 +95,7 @@ export default function ContactDetailPage() {
     if (!contact) return;
     setEditForm({
       name: contact.name ?? "",
-      fullName: contact.fullName ?? "",
-      contactName: contact.contactName ?? "",
+      companyName: contact.companyName ?? "",
       phone: contact.phone ?? "",
       email: contact.email ?? "",
       address: contact.address ?? "",
@@ -117,8 +115,7 @@ export default function ContactDetailPage() {
       await updateContact({
         contactId: contact._id,
         name: editForm.name || undefined,
-        fullName: editForm.fullName || undefined,
-        contactName: editForm.contactName || undefined,
+        companyName: editForm.companyName || undefined,
         phone: editForm.phone || undefined,
         email: editForm.email || undefined,
         address: editForm.address || undefined,
@@ -178,12 +175,8 @@ export default function ContactDetailPage() {
               <input className={styles.editInput} value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} />
             </div>
             <div className={styles.editField}>
-              <span className={styles.label}>FULL NAME</span>
-              <input className={styles.editInput} value={editForm.fullName} onChange={(e) => setEditForm((p) => ({ ...p, fullName: e.target.value }))} />
-            </div>
-            <div className={styles.editField}>
-              <span className={styles.label}>CONTACT PERSON</span>
-              <input className={styles.editInput} value={editForm.contactName} onChange={(e) => setEditForm((p) => ({ ...p, contactName: e.target.value }))} />
+              <span className={styles.label}>COMPANY NAME</span>
+              <input className={styles.editInput} value={editForm.companyName} onChange={(e) => setEditForm((p) => ({ ...p, companyName: e.target.value }))} />
             </div>
             <div className={styles.editField}>
               <span className={styles.label}>PHONE</span>
@@ -260,11 +253,8 @@ export default function ContactDetailPage() {
           </div>
         ) : (
           <div className={styles.detailsGrid}>
-            {contact.fullName ? (
-              <div><span className={styles.label}>FULL NAME</span><span className={styles.value}>{contact.fullName}</span></div>
-            ) : null}
-            {contact.contactName ? (
-              <div><span className={styles.label}>CONTACT PERSON</span><span className={styles.value}>{contact.contactName}</span></div>
+            {contact.companyName ? (
+              <div><span className={styles.label}>COMPANY NAME</span><span className={styles.value}>{contact.companyName}</span></div>
             ) : null}
             {contact.phone ? (
               <div><span className={styles.label}>PHONE</span><span className={styles.value}>{contact.phone}</span></div>

@@ -231,12 +231,11 @@ export default defineSchema({
   contacts: defineTable({
     name: v.string(),
     slug: v.optional(v.string()),
-    fullName: v.optional(v.string()),
+    companyName: v.optional(v.string()),
     // NOTE: providerId is kept transiently — dropped together with the
     // providers table in the providers-removal refactor.
     providerId: v.optional(v.id("providers")),
     category: v.optional(v.string()),
-    contactName: v.optional(v.string()),
     address: v.optional(v.string()),
     location: v.optional(
       v.union(

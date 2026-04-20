@@ -124,8 +124,7 @@ export const listContacts = query({
 export const createContact = mutation({
   args: {
     name: v.string(),
-    fullName: v.optional(v.string()),
-    contactName: v.optional(v.string()),
+    companyName: v.optional(v.string()),
     category: v.string(),
     location: v.optional(locationValue),
     phone: v.optional(v.string()),
@@ -140,8 +139,7 @@ export const createContact = mutation({
     return await ctx.db.insert("contacts", {
       name: args.name.trim(),
       slug,
-      fullName: trimOrUndefined(args.fullName),
-      contactName: trimOrUndefined(args.contactName),
+      companyName: trimOrUndefined(args.companyName),
       category: normalizeCategory(args.category),
       location: args.location,
       phone: trimOrUndefined(args.phone),
@@ -169,8 +167,7 @@ export const updateContact = mutation({
     address: v.optional(v.string()),
     website: v.optional(v.string()),
     accountNumber: v.optional(v.string()),
-    fullName: v.optional(v.string()),
-    contactName: v.optional(v.string()),
+    companyName: v.optional(v.string()),
     contactStatus: v.optional(v.union(v.literal("active"), v.literal("invoice_only"))),
   },
   handler: async (ctx, args) => {
@@ -190,8 +187,7 @@ export const updateContact = mutation({
       address: args.address !== undefined ? trimOrUndefined(args.address) : undefined,
       website: args.website !== undefined ? trimOrUndefined(args.website) : undefined,
       accountNumber: args.accountNumber !== undefined ? trimOrUndefined(args.accountNumber) : undefined,
-      fullName: args.fullName !== undefined ? trimOrUndefined(args.fullName) : undefined,
-      contactName: args.contactName !== undefined ? trimOrUndefined(args.contactName) : undefined,
+      companyName: args.companyName !== undefined ? trimOrUndefined(args.companyName) : undefined,
       contactStatus: args.contactStatus,
     } as const;
     const updates = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
@@ -257,7 +253,7 @@ export const mergeContacts = mutation({
     const patch: Record<string, unknown> = {};
     const fillable: (keyof typeof source)[] = [
       "email", "phone", "address", "website", "accountNumber",
-      "contactName", "fullName", "location"
+      "companyName", "location"
     ];
     for (const key of fillable) {
       const targetVal = (target as any)[key];
@@ -335,16 +331,19 @@ export const cleanupContactsForSchemaSlim = mutation({
         }
       }
 
-      // 2. Consolidate primaryContactName -> contactName
+      // 2. Consolidate primaryContactName -> contactName (legacy — both fields
+      //    have since been dropped from the schema, but we keep the cleanup
+      //    logic idempotent for any data that still has them around.)
       const primaryContactName = (c as any).primaryContactName;
-      if (primaryContactName && !c.contactName) {
+      if (primaryContactName && !(c as any).contactName) {
         patch.contactName = primaryContactName;
         consolidatedContactName++;
       }
 
-      // 3. Consolidate company -> fullName
+      // 3. Consolidate company -> fullName (also now dropped; still safe to
+      //    run on legacy rows.)
       const company = (c as any).company;
-      if (company && !c.fullName) {
+      if (company && !(c as any).fullName) {
         patch.fullName = company;
         consolidatedFullName++;
       }
@@ -391,6 +390,39 @@ export const cleanupContactsForSchemaSlim = mutation({
 });
 
 /**
+ * One-off migration: rename `fullName` -> `companyName` on every contact,
+ * and clear `contactName` (dropped entirely). Idempotent.
+ */
+export const renameFullNameToCompanyName = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const contacts = await ctx.db.query("contacts").collect();
+    let renamedFullName = 0;
+    let clearedContactName = 0;
+    for (const c of contacts) {
+      const patch: Record<string, unknown> = {};
+      const fullName = (c as any).fullName as string | undefined;
+      const companyName = (c as any).companyName as string | undefined;
+      if (fullName && !companyName) {
+        patch.companyName = fullName;
+        renamedFullName++;
+      }
+      if (fullName !== undefined) {
+        patch.fullName = undefined;
+      }
+      if ((c as any).contactName !== undefined) {
+        patch.contactName = undefined;
+        clearedContactName++;
+      }
+      if (Object.keys(patch).length > 0) {
+        await ctx.db.patch(c._id, patch);
+      }
+    }
+    return { totalContacts: contacts.length, renamedFullName, clearedContactName };
+  },
+});
+
+/**
  * Find duplicate contacts by (categoryId, name) and return them grouped.
  */
 export const findDuplicateContacts = query({
@@ -418,8 +450,7 @@ export const upsertContactFromInvoice = internalMutation({
     location: v.optional(v.string()),
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
-    fullName: v.optional(v.string()),
-    contactName: v.optional(v.string()),
+    companyName: v.optional(v.string()),
     address: v.optional(v.string()),
     website: v.optional(v.string()),
     accountNumber: v.optional(v.string()),
@@ -432,15 +463,15 @@ export const upsertContactFromInvoice = internalMutation({
     const normalizedLocation = normalizeLocation(args.location);
     const normalizedEmail = normalizeEmail(args.email);
     const key = normalizedName.toLowerCase();
-    const normalizedFullName = trimOrUndefined(args.fullName)?.toLowerCase();
+    const normalizedCompanyName = trimOrUndefined(args.companyName)?.toLowerCase();
     const existingContacts = await ctx.db.query("contacts").collect();
     const alreadyExists = existingContacts.some((contact) => {
-      const contactName = contact.name?.toLowerCase();
-      const contactFullName = contact.fullName?.toLowerCase();
-      const contactEmail = contact.email?.toLowerCase();
-      if (contactName === key) return true;
-      if (normalizedFullName && contactFullName === normalizedFullName) return true;
-      if (normalizedEmail && contactEmail === normalizedEmail) return true;
+      const cName = contact.name?.toLowerCase();
+      const cCompanyName = contact.companyName?.toLowerCase();
+      const cEmail = contact.email?.toLowerCase();
+      if (cName === key) return true;
+      if (normalizedCompanyName && cCompanyName === normalizedCompanyName) return true;
+      if (normalizedEmail && cEmail === normalizedEmail) return true;
       return false;
     });
     if (alreadyExists) return null;
@@ -449,9 +480,8 @@ export const upsertContactFromInvoice = internalMutation({
     return await ctx.db.insert("contacts", {
       name: normalizedName,
       slug,
-      fullName: trimOrUndefined(args.fullName),
+      companyName: trimOrUndefined(args.companyName),
       providerId: args.providerId,
-      contactName: trimOrUndefined(args.contactName),
       category: normalizedCategory,
       location: normalizedLocation,
       address: trimOrUndefined(args.address),
@@ -494,8 +524,7 @@ export const getContactByNameInternal = internalQuery({
 export const updateContactFromInvoice = internalMutation({
   args: {
     contactId: v.id("contacts"),
-    fullName: v.optional(v.string()),
-    contactName: v.optional(v.string()),
+    companyName: v.optional(v.string()),
     address: v.optional(v.string()),
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
@@ -507,8 +536,7 @@ export const updateContactFromInvoice = internalMutation({
     if (!contact) return;
 
     const updates: Record<string, unknown> = {};
-    if (args.fullName && !contact.fullName) updates.fullName = args.fullName;
-    if (args.contactName && !contact.contactName) updates.contactName = args.contactName;
+    if (args.companyName && !contact.companyName) updates.companyName = args.companyName;
     if (args.address && !contact.address) updates.address = args.address;
     if (args.phone && !contact.phone) updates.phone = args.phone;
     if (args.email && !contact.email) updates.email = args.email;

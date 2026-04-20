@@ -15,8 +15,7 @@ type SortDirection = "asc" | "desc";
 
 type ContactFormState = {
   name: string;
-  fullName: string;
-  contactName: string;
+  companyName: string;
   location: LocationValue;
   category: string;
   email: string;
@@ -78,8 +77,7 @@ const LOCATION_COLORS: Record<Exclude<LocationValue, "all">, { bg: string; color
 
 const EMPTY_FORM: ContactFormState = {
   name: "",
-  fullName: "",
-  contactName: "",
+  companyName: "",
   location: "all",
   category: "veterinary",
   email: "",
@@ -191,8 +189,7 @@ export default function ContactsPage() {
     try {
       const payload = {
         name: form.name,
-        fullName: form.fullName || undefined,
-        contactName: form.contactName || undefined,
+        companyName: form.companyName || undefined,
         category: form.category,
         location: form.location === "all" ? undefined : (form.location as "wellington" | "thermal" | "ocala" | "la" | "eu" | "can"),
         phone: form.phone || undefined,
@@ -305,11 +302,8 @@ export default function ContactsPage() {
                 <Field label="NAME">
                   <input className={styles.fieldInput} value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} required />
                 </Field>
-                <Field label="FULL NAME">
-                  <input className={styles.fieldInput} value={form.fullName} onChange={(event) => setForm((prev) => ({ ...prev, fullName: event.target.value }))} />
-                </Field>
-                <Field label="CONTACT PERSON">
-                  <input className={styles.fieldInput} value={form.contactName} onChange={(event) => setForm((prev) => ({ ...prev, contactName: event.target.value }))} />
+                <Field label="COMPANY NAME">
+                  <input className={styles.fieldInput} value={form.companyName} onChange={(event) => setForm((prev) => ({ ...prev, companyName: event.target.value }))} />
                 </Field>
                 <Field label="PHONE">
                   <input className={styles.fieldInput} value={form.phone} onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))} />
