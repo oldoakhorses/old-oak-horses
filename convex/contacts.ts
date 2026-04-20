@@ -548,6 +548,22 @@ export const listVendorsForMatching = internalQuery({
   },
 });
 
+/**
+ * Fetch the full contactAliases table for the parser matching flow.
+ * Called once per parseBillPdf run.
+ */
+export const listContactAliasesForMatching = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("contactAliases").collect();
+    return rows.map((r) => ({
+      alias: r.alias,
+      contactId: String(r.contactId),
+      contactName: r.contactName,
+    }));
+  },
+});
+
 export const getContactByNameInternal = internalQuery({
   args: { name: v.string() },
   handler: async (ctx, args) => {

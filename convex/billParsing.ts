@@ -7,6 +7,7 @@ import { action, internalAction } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { matchHorseName, normalizeAliasKey } from "./matchHorse";
 import { matchPersonName } from "./matchPerson";
+import { matchContact } from "./contactMatching";
 import { HORSE_ALIASES } from "./horseAliases";
 
 const TRAVEL_SUBCATEGORY_SLUGS = new Set(["flights", "trains", "rental-car", "gas", "meals", "hotels"]);
@@ -58,7 +59,20 @@ export const parseBillPdf = internalAction({
       ? ((await ctx.runQuery(api.contacts.getAllContacts, {}) as any[]).find((c: any) => String(c._id) === String(bill.contactId)) ?? null)
       : null;
     const provider = preselectedContact
-      ? { _id: preselectedContact._id, name: preselectedContact.name, slug: preselectedContact.slug, fullName: preselectedContact.companyName, email: preselectedContact.email, phone: preselectedContact.phone, address: preselectedContact.address, website: preselectedContact.website, accountNumber: preselectedContact.accountNumber, location: preselectedContact.location, extractionPrompt: undefined, expectedFields: [] }
+      ? {
+          _id: preselectedContact._id,
+          name: preselectedContact.name,
+          slug: preselectedContact.slug,
+          fullName: preselectedContact.companyName,
+          email: preselectedContact.email,
+          phone: preselectedContact.phone,
+          address: preselectedContact.address,
+          website: preselectedContact.website,
+          accountNumber: preselectedContact.accountNumber,
+          location: preselectedContact.location,
+          extractionPrompt: preselectedContact.extractionPrompt,
+          expectedFields: Array.isArray(preselectedContact.expectedFields) ? preselectedContact.expectedFields : [],
+        }
       : null;
     const category = bill.categoryId
       ? await ctx.runQuery(internal.bills.getCategory, { categoryId: bill.categoryId })
@@ -223,48 +237,43 @@ export const parseBillPdf = internalAction({
         "merchant_name"
       ]);
 
-      // Contact fuzzy-match by extracted name. We match against the full
-      // contacts list, preferring contacts whose category aligns with the
-      // bill's category when there's a tie.
+      // Fuzzy contact matching (exact → static alias → dynamic alias → partial → Levenshtein).
+      // Prefers contacts whose own `category` matches the bill's categorySlug,
+      // falls back to the full list.
       if (!resolvedProvider && extractedProviderName) {
-        const normalizedExtracted = normalizeAliasKey(extractedProviderName);
-        const allContacts = (await ctx.runQuery(api.contacts.getAllContacts, {})) as any[];
-        const categoryMatches = allContacts.filter(
-          (c) => categorySlug && c.category === categorySlug
-        );
-        const searchPool = categoryMatches.length > 0 ? [...categoryMatches, ...allContacts] : allContacts;
-        const seen = new Set<string>();
-        const dedupedPool = searchPool.filter((c) => {
-          const k = String(c._id);
-          if (seen.has(k)) return false;
-          seen.add(k);
-          return true;
-        });
-        const matched = dedupedPool.find((c) => {
-          const name = normalizeAliasKey(c.name ?? "");
-          const company = normalizeAliasKey(c.companyName ?? "");
-          return (name && name === normalizedExtracted) || (company && company === normalizedExtracted);
-        }) ?? dedupedPool.find((c) => {
-          const name = normalizeAliasKey(c.name ?? "");
-          const company = normalizeAliasKey(c.companyName ?? "");
-          return (name && (name.includes(normalizedExtracted) || normalizedExtracted.includes(name))) ||
-                 (company && (company.includes(normalizedExtracted) || normalizedExtracted.includes(company)));
-        });
-        if (matched) {
-          resolvedProvider = {
-            _id: matched._id,
-            name: matched.name,
-            slug: matched.slug,
-            fullName: matched.companyName,
-            email: matched.email,
-            phone: matched.phone,
-            address: matched.address,
-            website: matched.website,
-            accountNumber: matched.accountNumber,
-            location: matched.location,
-            extractionPrompt: undefined,
-            expectedFields: [],
-          } as any;
+        const [allContacts, contactAliases] = await Promise.all([
+          ctx.runQuery(api.contacts.getAllContacts, {}),
+          ctx.runQuery(internal.contacts.listContactAliasesForMatching, {}),
+        ]);
+        const allContactRows = (allContacts as any[]).map((c) => ({
+          _id: String(c._id),
+          name: c.name,
+          category: c.category,
+          slug: c.slug,
+        }));
+        const preferred = categorySlug
+          ? allContactRows.filter((c) => c.category === categorySlug)
+          : [];
+        const primary = matchContact(extractedProviderName, preferred, contactAliases as any);
+        const resultMatch = primary.matched ? primary : matchContact(extractedProviderName, allContactRows, contactAliases as any);
+        if (resultMatch.matched && resultMatch.contactId) {
+          const hit = (allContacts as any[]).find((c) => String(c._id) === resultMatch.contactId);
+          if (hit) {
+            resolvedProvider = {
+              _id: hit._id,
+              name: hit.name,
+              slug: hit.slug,
+              fullName: hit.companyName,
+              email: hit.email,
+              phone: hit.phone,
+              address: hit.address,
+              website: hit.website,
+              accountNumber: hit.accountNumber,
+              location: hit.location,
+              extractionPrompt: hit.extractionPrompt,
+              expectedFields: Array.isArray(hit.expectedFields) ? hit.expectedFields : [],
+            } as any;
+          }
         }
       }
 
@@ -286,8 +295,8 @@ export const parseBillPdf = internalAction({
             website: eqSports.website,
             accountNumber: eqSports.accountNumber,
             location: eqSports.location,
-            extractionPrompt: undefined,
-            expectedFields: [],
+            extractionPrompt: eqSports.extractionPrompt,
+            expectedFields: Array.isArray(eqSports.expectedFields) ? eqSports.expectedFields : [],
           } as any;
         }
       }
@@ -296,7 +305,9 @@ export const parseBillPdf = internalAction({
         extractedCustomProviderName = extractedProviderName;
       }
 
-      const expectedFields: string[] = [];
+      const expectedFields: string[] = Array.isArray(resolvedProvider?.expectedFields)
+        ? (resolvedProvider!.expectedFields as string[])
+        : [];
       const isEQSportsFormat =
         Array.isArray((parsed as any).patientSections) ||
         (categorySlug === "veterinary" && (eqSportsSignal || multiPatientInvoice));
@@ -545,8 +556,8 @@ function buildExtractedProviderContact(patch: {
   accountNumber?: string;
 }) {
   const result: Record<string, string> = {};
+  // Only fields the markDone schema allows on bills.extractedProviderContact
   if (patch.fullName) result.providerName = patch.fullName;
-  if (patch.contactName) result.contactName = patch.contactName;
   if (patch.address) result.address = patch.address;
   if (patch.phone) result.phone = patch.phone;
   if (patch.email) result.email = patch.email;

@@ -15,6 +15,8 @@ import type * as billing from "../billing.js";
 import type * as bills from "../bills.js";
 import type * as categories from "../categories.js";
 import type * as ccReconcile from "../ccReconcile.js";
+import type * as contactAliasesStatic from "../contactAliasesStatic.js";
+import type * as contactMatching from "../contactMatching.js";
 import type * as contacts from "../contacts.js";
 import type * as customSubcategories from "../customSubcategories.js";
 import type * as documents from "../documents.js";
@@ -51,6 +53,8 @@ declare const fullApi: ApiFromModules<{
   bills: typeof bills;
   categories: typeof categories;
   ccReconcile: typeof ccReconcile;
+  contactAliasesStatic: typeof contactAliasesStatic;
+  contactMatching: typeof contactMatching;
   contacts: typeof contacts;
   customSubcategories: typeof customSubcategories;
   documents: typeof documents;

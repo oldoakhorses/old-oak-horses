@@ -192,6 +192,17 @@ export default defineSchema({
     slug: v.optional(v.string()),
     companyName: v.optional(v.string()),
     category: v.optional(v.string()),
+    /**
+     * Optional per-contact custom extraction prompt for the bill parser.
+     * When set, it's appended to the base category prompt so tricky invoice
+     * layouts (e.g. multi-patient veterinary invoices) parse correctly.
+     */
+    extractionPrompt: v.optional(v.string()),
+    /**
+     * Expected fields on the parsed JSON, used only for validation / warning
+     * logs. Empty array means "no per-contact expectations".
+     */
+    expectedFields: v.optional(v.array(v.string())),
     address: v.optional(v.string()),
     location: v.optional(
       v.union(
