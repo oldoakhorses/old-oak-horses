@@ -174,7 +174,6 @@ export default function DashboardPage() {
   const updateHorseRecord = useMutation(api.horseRecords.updateHorseRecord);
   const uploadDocument = useMutation(api.documents.upload);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
-  const detectProvider = useAction((api as any).invoiceDetect.detectProvider);
   const parseUploadedInvoice = useAction((api as any).uploads.parseUploadedInvoice);
 
   const shownHorses = activeHorses;
