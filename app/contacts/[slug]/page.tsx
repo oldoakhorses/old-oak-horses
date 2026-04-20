@@ -6,6 +6,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
 import NavBar from "@/components/NavBar";
+import { formatInvoiceName } from "@/lib/formatInvoiceName";
 import styles from "./contact.module.css";
 
 const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
@@ -345,7 +346,13 @@ export default function ContactDetailPage() {
                 <tr key={bill._id}>
                   <td>
                     <Link href={`/invoices/preview/${bill._id}`} className={styles.invoiceLink}>
-                      {bill.fileName}
+                      {formatInvoiceName({
+                        // Always render with the contact's current name — the
+                        // bill's stored fileName/invoiceName may still reflect
+                        // the contact the parser originally matched.
+                        providerName: contact.name,
+                        date: invoiceDate,
+                      })}
                     </Link>
                   </td>
                   <td>{invoiceDate ?? "—"}</td>
