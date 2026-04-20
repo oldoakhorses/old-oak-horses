@@ -2281,7 +2281,6 @@ export const approveBill = mutation({
       assignMode: args.assignMode,
       assignType: args.assignType,
       splitMode: args.splitMode,
-      providerConfirmed: true
     };
     if (args.notes !== undefined) {
       patch.notes = args.notes.trim() || undefined;

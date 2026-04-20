@@ -404,18 +404,10 @@ export const stripAllProviderFields = mutation({
       }
     }
 
-    const bills = await ctx.db.query("bills").collect();
-    let billsCleared = 0;
-    for (const b of bills) {
-      if ((b as any).providerId !== undefined || (b as any).providerDetected !== undefined || (b as any).providerConfirmed !== undefined) {
-        await ctx.db.patch(b._id, {
-          providerId: undefined,
-          providerDetected: undefined,
-          providerConfirmed: undefined,
-        } as any);
-        billsCleared++;
-      }
-    }
+    // providerId/providerDetected/providerConfirmed have been dropped from
+    // the bills schema entirely, so nothing to clear here. Kept as a no-op
+    // so the migration remains idempotent if called again.
+    const billsCleared = 0;
 
     // providers + providerAliases tables have been dropped from the schema,
     // so their rows are already gone. Keeping the migration idempotent shape.

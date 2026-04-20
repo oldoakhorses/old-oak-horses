@@ -603,7 +603,6 @@ async function createBillFromTransaction(
     uploadedAt: Date.now(),
     isApproved: true,
     approvedAt: Date.now(),
-    providerConfirmed: true,
     source: "cc_transaction" as const,
     ccTransactionId: txn._id,
     categoryId,
