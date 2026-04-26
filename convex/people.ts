@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
-const PEOPLE_SEED: Array<{ name: string; role: "rider" | "groom" | "freelance" | "trainer" }> = [
+const PEOPLE_SEED: Array<{ name: string; role: "rider" | "groom" | "freelance" | "trainer" | "admin" }> = [
   { name: "Lucy Davis Kennedy", role: "rider" },
   { name: "Charlotte Oakes", role: "groom" },
   { name: "Leah Knowles", role: "groom" },
@@ -31,7 +31,7 @@ export const list = query(async (ctx) => {
 });
 
 export const getPeopleByRole = query({
-  args: { role: v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer")) },
+  args: { role: v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer"), v.literal("admin")) },
   handler: async (ctx, args) => {
     const rows = await ctx.db.query("people").withIndex("by_role", (q) => q.eq("role", args.role)).collect();
     return rows.filter((row) => row.isActive).sort((a, b) => a.name.localeCompare(b.name));
@@ -48,7 +48,7 @@ export const getPersonById = query({
 export const createPerson = mutation({
   args: {
     name: v.string(),
-    role: v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer"))
+    role: v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer"), v.literal("admin"))
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("people", {
@@ -64,7 +64,7 @@ export const updatePerson = mutation({
   args: {
     id: v.id("people"),
     name: v.optional(v.string()),
-    role: v.optional(v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer")))
+    role: v.optional(v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer"), v.literal("admin")))
   },
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.id);

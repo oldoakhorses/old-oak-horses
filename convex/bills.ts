@@ -1158,7 +1158,7 @@ export const getBizOverview = query({
       .map((row) => ({
         personId: row.personId,
         name: row.name,
-        role: row.role as "rider" | "groom" | "freelance" | "trainer",
+        role: row.role as "rider" | "groom" | "freelance" | "trainer" | "admin",
         totalSpend: row.totalSpend,
         pctOfTotal: peopleTotal > 0 ? (row.totalSpend / peopleTotal) * 100 : 0,
         invoiceCount: row.invoiceIds.size,
@@ -1838,7 +1838,7 @@ export const markDone = internalMutation({
           lineItemIndex: v.number(),
           personId: v.optional(v.id("people")),
           personName: v.optional(v.string()),
-          role: v.optional(v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer")))
+          role: v.optional(v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer"), v.literal("admin")))
         })
       )
     ),
@@ -1850,7 +1850,7 @@ export const markDone = internalMutation({
             v.object({
               personId: v.id("people"),
               personName: v.string(),
-              role: v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer")),
+              role: v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer"), v.literal("admin")),
               amount: v.number()
             })
           )
@@ -2168,7 +2168,7 @@ export const saveSalaryAssignment = mutation({
         lineItemIndex: v.number(),
         personId: v.optional(v.id("people")),
         personName: v.optional(v.string()),
-        role: v.optional(v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer")))
+        role: v.optional(v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer"), v.literal("admin")))
       })
     ),
     splitPersonLineItems: v.array(
@@ -2178,7 +2178,7 @@ export const saveSalaryAssignment = mutation({
           v.object({
             personId: v.id("people"),
             personName: v.string(),
-            role: v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer")),
+            role: v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer"), v.literal("admin")),
             amount: v.number()
           })
         )

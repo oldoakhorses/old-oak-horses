@@ -10,7 +10,7 @@ import NavBar from "@/components/NavBar";
 import Modal from "@/components/Modal";
 import styles from "./profile.module.css";
 
-type PersonRole = "rider" | "groom" | "freelance" | "trainer";
+type PersonRole = "rider" | "groom" | "freelance" | "trainer" | "admin";
 
 type DocumentTag =
   | "coggins"
@@ -28,6 +28,7 @@ const ROLE_LABELS: Record<PersonRole, string> = {
   groom: "Groom",
   trainer: "Trainer",
   freelance: "Freelance",
+  admin: "Admin",
 };
 
 const ROLE_ICONS: Record<PersonRole, string> = {
@@ -35,6 +36,7 @@ const ROLE_ICONS: Record<PersonRole, string> = {
   groom: "🧹",
   trainer: "🎯",
   freelance: "🧑‍💼",
+  admin: "👔",
 };
 
 const TAG_COLORS: Record<DocumentTag, { bg: string; color: string }> = {
@@ -230,6 +232,7 @@ export default function TeamProfilePage() {
                       <option value="groom">Groom</option>
                       <option value="trainer">Trainer</option>
                       <option value="freelance">Freelance</option>
+                      <option value="admin">Admin</option>
                     </select>
                   ) : (
                     <span className={styles.roleBadge}>{ROLE_LABELS[role] ?? role}</span>
