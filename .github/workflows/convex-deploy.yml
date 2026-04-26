@@ -30,20 +30,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Debug key format
-        env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
-        run: |
-          echo "Key length: ${#CONVEX_DEPLOY_KEY}"
-          echo "Key prefix: ${CONVEX_DEPLOY_KEY:0:30}"
-          echo "Key has newline: $(echo "$CONVEX_DEPLOY_KEY" | wc -l)"
-          echo "Key trimmed length: $(echo -n "$CONVEX_DEPLOY_KEY" | tr -d '[:space:]' | wc -c)"
-
       - name: Deploy to Convex
         env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
-          CONVEX_DEPLOYMENT: ${{ secrets.CONVEX_DEPLOYMENT }}
+          CONVEX_DEPLOY_KEY_PREFIX: ${{ secrets.CONVEX_DEPLOY_KEY_PREFIX }}
+          CONVEX_DEPLOY_KEY_TOKEN: ${{ secrets.CONVEX_DEPLOY_KEY_TOKEN }}
         run: |
-          export CONVEX_DEPLOY_KEY="$(echo -n "$CONVEX_DEPLOY_KEY" | tr -d '[:space:]')"
+          export CONVEX_DEPLOY_KEY="${CONVEX_DEPLOY_KEY_PREFIX}|${CONVEX_DEPLOY_KEY_TOKEN}"
           npx convex deploy
-
