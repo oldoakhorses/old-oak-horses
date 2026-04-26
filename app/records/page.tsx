@@ -896,7 +896,7 @@ export default function RecordsPage() {
                       <div className={styles.expandedFields}>
                         {editing ? (
                           <>
-                            <ExpandedInput label="CONTACT">
+                            <ExpandedInput label={providerLabel(editState.type)}>
                               <input
                                 className={styles.expandedInput}
                                 value={editState.providerName}
@@ -1075,7 +1075,7 @@ export default function RecordsPage() {
                         ) : (
                           <>
                             <ExpandedField label="HORSE" value={record.horseName} />
-                            <ExpandedField label="CONTACT" value={record.providerName} />
+                            <ExpandedField label={providerLabel(record.type)} value={record.providerName} />
                             <ExpandedField label="DATE" value={formatDateLong(row.eventDate)} />
                             <ExpandedField label="NOTES" value={record.notes} />
                             {record.billInfo ? (

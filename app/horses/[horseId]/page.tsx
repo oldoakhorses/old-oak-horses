@@ -668,7 +668,7 @@ export default function HorseProfilePage() {
                       <div className={styles.recordExpandedFields}>
                         {isEditingRecord ? (
                           <>
-                            <ExpandedInput label="PROVIDER">
+                            <ExpandedInput label={providerLabel(record.type)}>
                               <input
                                 className={styles.expandedInput}
                                 value={recordEdit.providerName}
@@ -740,7 +740,7 @@ export default function HorseProfilePage() {
                           </>
                         ) : (
                           <>
-                            <ExpandedField label="PROVIDER" value={record.providerName} />
+                            <ExpandedField label={providerLabel(record.type)} value={record.providerName} />
                             <ExpandedField label="DATE" value={formatDateLong(record.date)} />
                             <ExpandedField label="NOTES" value={record.notes} />
                           </>
@@ -1033,6 +1033,14 @@ function formatUsd(value: number) {
 
 function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function providerLabel(type: RecordType) {
+  if (type === "veterinary") return "VETERINARIAN";
+  if (type === "medication") return "ADMINISTERED BY";
+  if (type === "farrier") return "FARRIER";
+  if (type === "bodywork") return "PRACTITIONER";
+  return "CONTACT";
 }
 
 function formatDateLong(timestamp: number) {
