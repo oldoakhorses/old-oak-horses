@@ -1224,12 +1224,24 @@ export default function GlobalFab() {
             ) : null}
 
             <RecordField label="NEXT VISIT">
-              <input
-                className={styles.recordInput}
-                type="date"
-                value={recordForm.nextVisitDate}
-                onChange={(e) => setRecordForm((prev) => ({ ...prev, nextVisitDate: e.target.value }))}
-              />
+              <div style={{ position: "relative" }}>
+                <input
+                  className={styles.recordInput}
+                  type="date"
+                  value={recordForm.nextVisitDate}
+                  onChange={(e) => setRecordForm((prev) => ({ ...prev, nextVisitDate: e.target.value }))}
+                />
+                {recordForm.nextVisitDate ? (
+                  <button
+                    type="button"
+                    className={styles.clearDateBtn}
+                    onClick={() => setRecordForm((prev) => ({ ...prev, nextVisitDate: "" }))}
+                    aria-label="Clear next visit date"
+                  >
+                    ✕
+                  </button>
+                ) : null}
+              </div>
             </RecordField>
 
             <RecordField label="NOTES">

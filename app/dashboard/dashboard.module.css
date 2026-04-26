@@ -768,6 +768,30 @@
   appearance: none;
 }
 
+.clearDateBtn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: #e8eaf0;
+  color: #6b7084;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.clearDateBtn:hover {
+  background: #d0d2d8;
+  color: #1a1a2e;
+}
+
 .recordInput:where(select) {
   appearance: none;
   cursor: pointer;
