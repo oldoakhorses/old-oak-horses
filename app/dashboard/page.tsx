@@ -496,10 +496,10 @@ export default function DashboardPage() {
     setRecordSubmitting(true);
     try {
       const providerName = recordForm.providerName.trim() || undefined;
-      let providerId: Id<"contacts"> | undefined;
+      let resolvedContactId: Id<"contacts"> | undefined;
       if (providerName && recordProviderCategory) {
-        const contactId = await findOrCreateContact({ name: providerName, category: recordProviderCategory });
-        if (contactId) providerId = contactId;
+        const cid = await findOrCreateContact({ name: providerName, category: recordProviderCategory });
+        if (cid) resolvedContactId = cid;
       }
 
       const attachmentStorageId = await uploadAttachmentIfPresent();
@@ -510,7 +510,7 @@ export default function DashboardPage() {
           customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
           date: new Date(`${recordForm.date}T00:00:00`).getTime(),
           providerName,
-          providerId,
+          contactId: resolvedContactId,
           visitType: selectedRecordType === "veterinary" ? recordForm.visitType || undefined : undefined,
           vaccineName:
             selectedRecordType === "veterinary" && recordForm.visitType === "vaccination"
@@ -532,7 +532,7 @@ export default function DashboardPage() {
             customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
             date: new Date(`${recordForm.nextVisitDate}T00:00:00`).getTime(),
             providerName,
-            providerId,
+            contactId: resolvedContactId,
             visitType: selectedRecordType === "veterinary" ? recordForm.visitType || undefined : undefined,
             vaccineName:
               selectedRecordType === "veterinary" && recordForm.visitType === "vaccination"

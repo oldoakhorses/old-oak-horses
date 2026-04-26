@@ -294,12 +294,12 @@ export default function HorseProfilePage() {
     if (!editingRecordId || !recordEdit) return;
     const nextVisitTimestamp = recordEdit.nextVisitDate ? new Date(`${recordEdit.nextVisitDate}T00:00:00`).getTime() : undefined;
     const editProviderName = recordEdit.providerName?.trim() || undefined;
-    let editProviderId: Id<"contacts"> | undefined;
+    let editContactId: Id<"contacts"> | undefined;
     if (editProviderName) {
       const catMap: Record<string, string> = { veterinary: "veterinary", medication: "veterinary", farrier: "farrier", bodywork: "bodywork" };
       const category = catMap[recordEdit.type] || "other";
       const contactId = await findOrCreateContact({ name: editProviderName, category });
-      if (contactId) editProviderId = contactId;
+      if (contactId) editContactId = contactId;
     }
 
     let attachmentStorageId: string | undefined;
@@ -321,7 +321,7 @@ export default function HorseProfilePage() {
       recordId: editingRecordId,
       updates: {
         providerName: editProviderName,
-        providerId: editProviderId,
+        contactId: editContactId,
         date: recordEdit.date ? new Date(`${recordEdit.date}T00:00:00`).getTime() : undefined,
         notes: recordEdit.notes || undefined,
         serviceType: recordEdit.serviceType || undefined,

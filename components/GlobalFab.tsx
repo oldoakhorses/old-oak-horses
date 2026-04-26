@@ -714,10 +714,10 @@ export default function GlobalFab() {
     setRecordSubmitting(true);
     try {
       const providerName = recordForm.providerName.trim() || undefined;
-      let providerId: Id<"contacts"> | undefined;
+      let resolvedContactId: Id<"contacts"> | undefined;
       if (providerName && recordProviderCategory) {
-        const contactId = await findOrCreateContact({ name: providerName, category: recordProviderCategory });
-        if (contactId) providerId = contactId;
+        const cid = await findOrCreateContact({ name: providerName, category: recordProviderCategory });
+        if (cid) resolvedContactId = cid;
       }
 
       const attachmentStorageId = await uploadAttachmentIfPresent();
@@ -731,7 +731,7 @@ export default function GlobalFab() {
           customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
           date: new Date(`${recordForm.date}T00:00:00`).getTime(),
           providerName,
-          providerId,
+          contactId: resolvedContactId,
           visitType: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes[0] as VetSubcategory : undefined,
           visitTypes: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes : undefined,
           vetOtherDescription: selectedRecordType === "veterinary" && recordForm.visitTypes.includes("other") ? recordForm.vetOtherDescription.trim() || undefined : undefined,
@@ -757,7 +757,7 @@ export default function GlobalFab() {
             customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
             date: new Date(`${recordForm.nextVisitDate}T00:00:00`).getTime(),
             providerName,
-            providerId,
+            contactId: resolvedContactId,
             visitType: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes[0] as VetSubcategory : undefined,
             visitTypes: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes : undefined,
             vetOtherDescription: selectedRecordType === "veterinary" && recordForm.visitTypes.includes("other") ? recordForm.vetOtherDescription.trim() || undefined : undefined,
