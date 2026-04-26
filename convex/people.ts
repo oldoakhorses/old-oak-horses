@@ -87,6 +87,23 @@ export const deactivatePerson = mutation({
   }
 });
 
+export const deletePerson = mutation({
+  args: { id: v.id("people") },
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.id);
+    if (!row) throw new Error("Person not found");
+    const aliases = await ctx.db
+      .query("personAliases")
+      .filter((q) => q.eq(q.field("personId"), args.id))
+      .collect();
+    for (const alias of aliases) {
+      await ctx.db.delete(alias._id);
+    }
+    await ctx.db.delete(args.id);
+    return args.id;
+  }
+});
+
 export const setPersonActive = mutation({
   args: { id: v.id("people"), isActive: v.boolean() },
   handler: async (ctx, args) => {

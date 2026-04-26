@@ -41,14 +41,19 @@ const ROLE_ICONS: Record<PersonRole, string> = {
 export default function TeamPage() {
   const people = useQuery(api.people.listAll) ?? [];
   const createPerson = useMutation(api.people.createPerson);
+  const updatePerson = useMutation(api.people.updatePerson);
   const setPersonActive = useMutation(api.people.setPersonActive);
+  const deletePerson = useMutation(api.people.deletePerson);
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [openMenuPersonId, setOpenMenuPersonId] = useState<string>("");
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [editingPersonId, setEditingPersonId] = useState<Id<"people"> | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [form, setForm] = useState<PersonFormState>(EMPTY_FORM);
+  const [personToDelete, setPersonToDelete] = useState<{ id: Id<"people">; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const filtered = useMemo(() => {
     return people
@@ -68,6 +73,28 @@ export default function TeamPage() {
     setOpenMenuPersonId("");
   }
 
+  function openAdd() {
+    setEditingPersonId(null);
+    setForm(EMPTY_FORM);
+    setFormError("");
+    setShowFormModal(true);
+  }
+
+  function openEdit(person: { _id: Id<"people">; name: string; role: string }) {
+    setEditingPersonId(person._id);
+    setForm({ name: person.name, role: person.role as PersonRole });
+    setFormError("");
+    setShowFormModal(true);
+    setOpenMenuPersonId("");
+  }
+
+  function closeFormModal() {
+    setShowFormModal(false);
+    setEditingPersonId(null);
+    setForm(EMPTY_FORM);
+    setFormError("");
+  }
+
   async function onSubmitPerson(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!form.name.trim()) {
@@ -82,16 +109,34 @@ export default function TeamPage() {
     setFormError("");
     setIsSubmitting(true);
     try {
-      await createPerson({
-        name: form.name.trim(),
-        role: form.role as PersonRole,
-      });
-      setForm(EMPTY_FORM);
-      setShowAddModal(false);
+      if (editingPersonId) {
+        await updatePerson({
+          id: editingPersonId,
+          name: form.name.trim(),
+          role: form.role as PersonRole,
+        });
+      } else {
+        await createPerson({
+          name: form.name.trim(),
+          role: form.role as PersonRole,
+        });
+      }
+      closeFormModal();
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "failed to add team member");
+      setFormError(error instanceof Error ? error.message : "failed to save team member");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function confirmDeletePerson() {
+    if (!personToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deletePerson({ id: personToDelete.id });
+      setPersonToDelete(null);
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -117,7 +162,7 @@ export default function TeamPage() {
             <div className="ui-label">// TEAM</div>
             <h1 className={styles.title}>team</h1>
           </div>
-          <button type="button" className={styles.addButton} onClick={() => setShowAddModal(true)}>
+          <button type="button" className={styles.addButton} onClick={openAdd}>
             + add team member
           </button>
         </section>
@@ -185,6 +230,9 @@ export default function TeamPage() {
                       <Link href={`/team/${person._id}`} className={styles.menuItem}>
                         View
                       </Link>
+                      <button type="button" className={styles.menuItem} onClick={() => openEdit(person)}>
+                        Edit
+                      </button>
                       {person.isActive ? (
                         <button type="button" className={styles.menuItem} onClick={() => toggleActive(person._id, false)}>
                           Deactivate
@@ -194,6 +242,16 @@ export default function TeamPage() {
                           Activate
                         </button>
                       )}
+                      <button
+                        type="button"
+                        className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                        onClick={() => {
+                          setPersonToDelete({ id: person._id, name: person.name });
+                          setOpenMenuPersonId("");
+                        }}
+                      >
+                        Delete
+                      </button>
                     </div>
                   ) : null}
                 </div>
@@ -206,7 +264,11 @@ export default function TeamPage() {
         <div className="ui-footer">OLD_OAK_HORSES // TEAM</div>
       </main>
 
-      <Modal open={showAddModal} title="add team member" onClose={() => setShowAddModal(false)}>
+      <Modal
+        open={showFormModal}
+        title={editingPersonId ? "edit team member" : "add team member"}
+        onClose={closeFormModal}
+      >
         <form className={styles.form} onSubmit={onSubmitPerson}>
           <label className={styles.field}>
             <span className={styles.fieldLabel}>NAME *</span>
@@ -234,14 +296,34 @@ export default function TeamPage() {
           </label>
           {formError ? <p className={styles.error}>{formError}</p> : null}
           <div className={styles.modalActions}>
-            <button type="button" className="ui-button-outlined" onClick={() => setShowAddModal(false)}>
+            <button type="button" className="ui-button-outlined" onClick={closeFormModal}>
               cancel
             </button>
             <button type="submit" className="ui-button-filled" disabled={isSubmitting}>
-              {isSubmitting ? "saving..." : "add team member"}
+              {isSubmitting ? "saving..." : editingPersonId ? "save" : "add team member"}
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={personToDelete !== null}
+        title="delete team member"
+        onClose={() => setPersonToDelete(null)}
+      >
+        <p className={styles.deleteText}>
+          Are you sure you want to delete <strong>{personToDelete?.name}</strong>? This cannot be
+          undone. Any invoices already assigned to them will keep their record but the team member
+          will no longer appear anywhere.
+        </p>
+        <div className={styles.modalActions}>
+          <button type="button" className="ui-button-outlined" onClick={() => setPersonToDelete(null)}>
+            cancel
+          </button>
+          <button type="button" className={styles.btnDelete} onClick={confirmDeletePerson} disabled={isDeleting}>
+            {isDeleting ? "deleting..." : "delete"}
+          </button>
+        </div>
       </Modal>
     </div>
   );

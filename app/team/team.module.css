@@ -239,6 +239,34 @@
   margin-top: 8px;
 }
 
+.deleteText {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: #1a1a2e;
+  line-height: 1.5;
+}
+
+.btnDelete {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: none;
+  background: #e5484d;
+  color: #fff;
+  cursor: pointer;
+  text-transform: lowercase;
+}
+
+.btnDelete:hover {
+  background: #c93a3f;
+}
+
+.btnDelete:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @media (max-width: 640px) {
   .title {
     font-size: 24px;

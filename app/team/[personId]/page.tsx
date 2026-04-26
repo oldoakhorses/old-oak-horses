@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -81,6 +81,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 export default function TeamProfilePage() {
   const params = useParams<{ personId: string }>();
+  const router = useRouter();
   const personId = params?.personId as Id<"people">;
 
   const person = useQuery(api.people.getPersonById, personId ? { id: personId } : "skip");
@@ -89,6 +90,7 @@ export default function TeamProfilePage() {
 
   const setPersonActive = useMutation(api.people.setPersonActive);
   const updatePerson = useMutation(api.people.updatePerson);
+  const deletePerson = useMutation(api.people.deletePerson);
   const deleteDocument = useMutation(api.documents.deleteDocument);
 
   const [isEditing, setIsEditing] = useState(false);
@@ -98,6 +100,8 @@ export default function TeamProfilePage() {
   const [openDocumentMenu, setOpenDocumentMenu] = useState<Id<"documents"> | null>(null);
   const [documentToDelete, setDocumentToDelete] = useState<{ id: Id<"documents">; name: string } | null>(null);
   const [isDeletingDocument, setIsDeletingDocument] = useState(false);
+  const [showDeletePersonModal, setShowDeletePersonModal] = useState(false);
+  const [isDeletingPerson, setIsDeletingPerson] = useState(false);
 
   const displayInvoices = useMemo(() => {
     const rows = spendSummary?.invoices ?? [];
@@ -137,6 +141,17 @@ export default function TeamProfilePage() {
   async function toggleActive() {
     if (!person) return;
     await setPersonActive({ id: person._id, isActive: !person.isActive });
+  }
+
+  async function confirmDeletePerson() {
+    if (!person) return;
+    setIsDeletingPerson(true);
+    try {
+      await deletePerson({ id: person._id });
+      router.push("/team");
+    } finally {
+      setIsDeletingPerson(false);
+    }
   }
 
   async function confirmDeleteDocument() {
@@ -257,6 +272,9 @@ export default function TeamProfilePage() {
                 </>
               ) : (
                 <>
+                  <button type="button" className={styles.btnDelete} onClick={() => setShowDeletePersonModal(true)}>
+                    delete
+                  </button>
                   <button type="button" className={styles.btnOutlined} onClick={toggleActive}>
                     {person.isActive ? "deactivate" : "activate"}
                   </button>
@@ -456,6 +474,31 @@ export default function TeamProfilePage() {
 
         <div className="ui-footer">OLD_OAK_HORSES // TEAM // {person.name.toUpperCase()}</div>
       </main>
+
+      <Modal
+        open={showDeletePersonModal}
+        title="delete team member"
+        onClose={() => setShowDeletePersonModal(false)}
+      >
+        <p className={styles.deleteText}>
+          Are you sure you want to delete <strong>{person.name}</strong>? This cannot be undone. Any
+          invoices already assigned to them will keep their record but the team member will no longer
+          appear anywhere.
+        </p>
+        <div className={styles.deleteActions}>
+          <button type="button" className="ui-button-outlined" onClick={() => setShowDeletePersonModal(false)}>
+            cancel
+          </button>
+          <button
+            type="button"
+            className={styles.btnDelete}
+            onClick={confirmDeletePerson}
+            disabled={isDeletingPerson}
+          >
+            {isDeletingPerson ? "deleting..." : "delete"}
+          </button>
+        </div>
+      </Modal>
 
       <Modal
         open={documentToDelete !== null}
