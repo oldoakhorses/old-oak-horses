@@ -10,7 +10,7 @@ import NavBar from "@/components/NavBar";
 import styles from "./team.module.css";
 
 type StatusFilter = "active" | "inactive" | "all";
-type PersonRole = "rider" | "groom" | "freelance" | "trainer";
+type PersonRole = "rider" | "groom" | "freelance" | "trainer" | "admin";
 
 type PersonFormState = {
   name: string;
@@ -27,6 +27,7 @@ const ROLE_LABELS: Record<PersonRole, string> = {
   groom: "Groom",
   trainer: "Trainer",
   freelance: "Freelance",
+  admin: "Admin",
 };
 
 const ROLE_ICONS: Record<PersonRole, string> = {
@@ -34,6 +35,7 @@ const ROLE_ICONS: Record<PersonRole, string> = {
   groom: "🧹",
   trainer: "🎯",
   freelance: "🧑‍💼",
+  admin: "👔",
 };
 
 export default function TeamPage() {
@@ -227,6 +229,7 @@ export default function TeamPage() {
               <option value="groom">Groom</option>
               <option value="trainer">Trainer</option>
               <option value="freelance">Freelance</option>
+              <option value="admin">Admin</option>
             </select>
           </label>
           {formError ? <p className={styles.error}>{formError}</p> : null}

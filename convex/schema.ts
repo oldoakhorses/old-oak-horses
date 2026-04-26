@@ -111,7 +111,7 @@ export default defineSchema({
           lineItemIndex: v.number(),
           personId: v.optional(v.id("people")),
           personName: v.optional(v.string()),
-          role: v.optional(v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer")))
+          role: v.optional(v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer"), v.literal("admin")))
         })
       )
     ),
@@ -123,7 +123,7 @@ export default defineSchema({
             v.object({
               personId: v.id("people"),
               personName: v.string(),
-              role: v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer")),
+              role: v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer"), v.literal("admin")),
               amount: v.number()
             })
           )
@@ -318,7 +318,7 @@ export default defineSchema({
 
   people: defineTable({
     name: v.string(),
-    role: v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer")),
+    role: v.union(v.literal("rider"), v.literal("groom"), v.literal("freelance"), v.literal("trainer"), v.literal("admin")),
     isActive: v.boolean(),
     createdAt: v.number()
   })
