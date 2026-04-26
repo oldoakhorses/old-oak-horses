@@ -1298,6 +1298,53 @@
 
 @media (max-width: 900px) {
   .recordPanel {
-    width: min(420px, 100vw);
+    width: 100vw;
+  }
+
+  .recordPanelHeader {
+    padding: 16px 18px;
+  }
+
+  .recordPanelTitle {
+    font-size: 16px;
+  }
+
+  .recordPanelBody {
+    padding: 16px 18px 100px;
+  }
+
+  .recordField {
+    margin-bottom: 12px;
+    gap: 4px;
+  }
+
+  .recordFieldLabel {
+    font-size: 9px;
+  }
+
+  .recordInput {
+    padding: 10px 12px;
+    font-size: 16px;
+  }
+
+  .recordBlock {
+    margin-bottom: 18px;
+  }
+
+  .recordPanelFooter {
+    padding: 14px 18px;
+  }
+
+  .multiSelectInput {
+    min-height: 38px;
+    padding: 6px 12px;
+  }
+
+  .multiSelectDropdown {
+    max-height: 200px;
+  }
+
+  .recordTypeOption {
+    padding: 10px 12px;
   }
 }
