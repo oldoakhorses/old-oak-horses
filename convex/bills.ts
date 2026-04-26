@@ -1330,10 +1330,15 @@ export const getBillById = query({
         ? extracted.lineItems
         : [];
     const lineItemCats = (bill.lineItemCategories ?? []) as string[];
+    const evc = bill.extractedVendorContact ?? (bill as any).extractedProviderContact;
     return {
       ...bill,
       vendor,
       category,
+      extractedVendorContact: evc ? {
+        ...evc,
+        vendorName: evc.vendorName ?? evc.providerName,
+      } : undefined,
       pdfStorageId: bill.fileId,
       contactName:
         resolved?.name ??
@@ -1387,10 +1392,15 @@ export const getById = query({
       : Array.isArray(extracted.lineItems)
         ? extracted.lineItems
         : [];
+    const evc2 = bill.extractedVendorContact ?? (bill as any).extractedProviderContact;
     return {
       ...bill,
       vendor,
       category,
+      extractedVendorContact: evc2 ? {
+        ...evc2,
+        vendorName: evc2.vendorName ?? evc2.providerName,
+      } : undefined,
       pdfStorageId: bill.fileId,
       contactName:
         resolved?.name ??
@@ -2542,8 +2552,9 @@ export const approveBill = mutation({
 
     // Auto-resolve contactId from extractedVendorContact if missing
     const latestBill = await ctx.db.get(args.billId);
-    if (latestBill && !latestBill.contactId && latestBill.extractedVendorContact) {
-      const provName = (latestBill.extractedVendorContact as any).vendorName;
+    const vendorContact = latestBill?.extractedVendorContact ?? (latestBill as any)?.extractedProviderContact;
+    if (latestBill && !latestBill.contactId && vendorContact) {
+      const provName = vendorContact.vendorName ?? vendorContact.providerName;
       if (provName) {
         const allContacts = await ctx.db.query("contacts").collect();
         const match = allContacts.find((c) => c.name?.toLowerCase() === provName.toLowerCase());
@@ -2551,7 +2562,7 @@ export const approveBill = mutation({
           await ctx.db.patch(args.billId, { contactId: match._id });
         } else {
           // Create a new contact from the extracted info
-          const epc = latestBill.extractedVendorContact as any;
+          const epc = vendorContact as any;
           const category = latestBill.categoryId ? await ctx.db.get(latestBill.categoryId) : null;
           const newContactId = await ctx.db.insert("contacts", {
             name: provName,

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 
 export const getUpcomingEvents = query({
   args: {},
@@ -14,16 +15,20 @@ export const getUpcomingEvents = query({
 
     const horses = await Promise.all(events.map(async (event) => [event.horseId, await ctx.db.get(event.horseId)] as const));
     const horseById = new Map(horses.map(([horseId, horse]) => [horseId, horse]));
-    const contactIds = [...new Set(events.map((event) => event.contactId).filter((id) => id !== undefined))];
+    const contactIds = [...new Set(events.map((event) => event.contactId ?? (event as any).providerId).filter((id): id is Id<"contacts"> => id !== undefined))];
     const contacts = await Promise.all(contactIds.map(async (contactId) => [contactId, await ctx.db.get(contactId)] as const));
     const contactById = new Map(contacts);
 
     return events
-      .map((event) => ({
-        ...event,
-        horseName: horseById.get(event.horseId)?.name ?? "Unknown horse",
-        contactName: event.contactName ?? (event.contactId ? (contactById.get(event.contactId)?.name ?? undefined) : undefined)
-      }))
+      .map((event) => {
+        const cId = event.contactId ?? (event as any).providerId;
+        return {
+          ...event,
+          horseName: horseById.get(event.horseId)?.name ?? "Unknown horse",
+          contactName: event.contactName ?? (event as any).providerName ?? (cId ? (contactById.get(cId)?.name ?? undefined) : undefined),
+          contactId: cId,
+        };
+      })
       .sort((a, b) => a.date.localeCompare(b.date));
   }
 });
@@ -44,16 +49,20 @@ export const getPastEvents = query({
 
     const horses = await Promise.all(events.map(async (event) => [event.horseId, await ctx.db.get(event.horseId)] as const));
     const horseById = new Map(horses.map(([horseId, horse]) => [horseId, horse]));
-    const contactIds = [...new Set(events.map((event) => event.contactId).filter((id) => id !== undefined))];
+    const contactIds = [...new Set(events.map((event) => event.contactId ?? (event as any).providerId).filter((id): id is Id<"contacts"> => id !== undefined))];
     const contacts = await Promise.all(contactIds.map(async (contactId) => [contactId, await ctx.db.get(contactId)] as const));
     const contactById = new Map(contacts);
 
     return events
-      .map((event) => ({
-        ...event,
-        horseName: horseById.get(event.horseId)?.name ?? "Unknown horse",
-        contactName: event.contactName ?? (event.contactId ? (contactById.get(event.contactId)?.name ?? undefined) : undefined)
-      }))
+      .map((event) => {
+        const cId = event.contactId ?? (event as any).providerId;
+        return {
+          ...event,
+          horseName: horseById.get(event.horseId)?.name ?? "Unknown horse",
+          contactName: event.contactName ?? (event as any).providerName ?? (cId ? (contactById.get(cId)?.name ?? undefined) : undefined),
+          contactId: cId,
+        };
+      })
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, limit);
   }

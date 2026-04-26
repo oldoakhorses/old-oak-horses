@@ -155,6 +155,18 @@ export default defineSchema({
         accountNumber: v.optional(v.string())
       })
     ),
+    // Deprecated: kept for backwards compatibility with existing data until migration runs
+    extractedProviderContact: v.optional(
+      v.object({
+        providerName: v.optional(v.string()),
+        contactName: v.optional(v.string()),
+        address: v.optional(v.string()),
+        phone: v.optional(v.string()),
+        email: v.optional(v.string()),
+        website: v.optional(v.string()),
+        accountNumber: v.optional(v.string())
+      })
+    ),
     dropboxPath: v.optional(v.string()),
     /** CC transaction that generated this bill (for non-invoice charges) */
     ccTransactionId: v.optional(v.id("ccTransactions")),
@@ -235,6 +247,9 @@ export default defineSchema({
     date: v.string(),
     contactId: v.optional(v.id("contacts")),
     contactName: v.optional(v.string()),
+    // Deprecated: kept for backwards compat until migration runs
+    providerId: v.optional(v.id("contacts")),
+    providerName: v.optional(v.string()),
     note: v.optional(v.string()),
     createdAt: v.number()
   })
@@ -256,6 +271,8 @@ export default defineSchema({
     nextVisitDate: v.optional(v.number()),
     contactName: v.optional(v.string()),
     contactId: v.optional(v.id("contacts")),
+    // Deprecated: kept for backwards compat until migration runs
+    providerName: v.optional(v.string()),
     visitType: v.optional(v.union(
       v.literal("vaccination"),
       v.literal("treatment"),

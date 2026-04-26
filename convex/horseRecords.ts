@@ -104,6 +104,7 @@ export const getRecentByHorse = query({
     return await Promise.all(
       limited.map(async (row) => ({
         ...row,
+        contactName: row.contactName ?? (row as any).providerName,
         attachmentUrl: row.attachmentStorageId ? await ctx.storage.getUrl(withStorageId(row.attachmentStorageId)!) : null,
       }))
     );
@@ -141,6 +142,7 @@ export const getAllByHorse = query({
         }
         return {
           ...row,
+          contactName: row.contactName ?? (row as any).providerName,
           attachmentUrl: row.attachmentStorageId ? await ctx.storage.getUrl(withStorageId(row.attachmentStorageId)!) : null,
           billInfo,
         };
@@ -206,6 +208,7 @@ export const getAll = query({
         }
         return {
           ...record,
+          contactName: record.contactName ?? (record as any).providerName,
           horseName: horse?.name || "Unknown",
           horse: horse
             ? {
