@@ -184,6 +184,9 @@ export const parseBillPdf = internalAction({
       if (categorySlug === "horse-transport" && isBrookLedgeProviderSignal(provider?.name, pickString(parsed, ["provider_name", "providerName"]))) {
         parsed = normalizeBrookLedgeHorseTransportParse(parsed);
       }
+      if (isAirbnbProviderSignal(provider?.name, pickString(parsed, ["provider_name", "providerName"]), extractedPdfText)) {
+        parsed = normalizeAirbnbReceiptParse(parsed, extractedPdfText);
+      }
       const eqSportsSignal = isEqSportsProviderSignal(
         provider?.name,
         pickString(parsed, ["provider_name", "providerName"]),
@@ -1653,6 +1656,12 @@ function isBrookLedgeProviderSignal(...values: Array<string | undefined>) {
   return joined.includes("brook ledge") || joined.includes("brookledge");
 }
 
+function isAirbnbProviderSignal(...values: Array<string | undefined>) {
+  const joined = values.filter(Boolean).join(" ").toLowerCase();
+  if (!joined) return false;
+  return joined.includes("airbnb");
+}
+
 function isEqSportsProviderSignal(...values: Array<string | undefined>) {
   const joined = values.filter(Boolean).join(" ").toLowerCase();
   if (!joined) return false;
@@ -1852,6 +1861,67 @@ function normalizeBrookLedgeHorseTransportParse(parsed: Record<string, unknown>)
 
   normalized.line_items = transformed;
   normalized.lineItems = transformed;
+  return normalized;
+}
+
+function normalizeAirbnbReceiptParse(parsed: Record<string, unknown>, extractedText: string) {
+  const normalized = { ...parsed };
+
+  const amountPaidMatch = extractedText.match(/Amount paid\s*\(?USD\)?\s*\$?\s*([\d,]+\.\d{2})/i);
+  const paymentMatch = extractedText.match(/Payment\s+\d+\s+of\s+\d+\s*\(?USD\)?\s*\$?\s*([\d,]+\.\d{2})/i);
+  const rawAmount = amountPaidMatch?.[1] ?? paymentMatch?.[1];
+  const amountPaid = rawAmount ? Number.parseFloat(rawAmount.replace(/,/g, "")) : undefined;
+
+  if (typeof amountPaid !== "number" || !Number.isFinite(amountPaid) || amountPaid <= 0) {
+    console.log("[billParsing] Airbnb: could not extract amount paid, leaving totals as-is");
+    normalized.provider_name = "Airbnb";
+    normalized.providerName = "Airbnb";
+    return normalized;
+  }
+
+  const destMatch = extractedText.match(/(\d+)\s+nights?\s+in\s+([^\n]+?)\s*(?:\n|Wed|Mon|Tue|Thu|Fri|Sat|Sun|$)/i);
+  const destination = destMatch?.[2]?.trim();
+  const nights = destMatch?.[1];
+  const paymentNumberMatch = extractedText.match(/Payment\s+(\d+)\s+of\s+(\d+)\s*\(?USD\)?/i);
+  const paymentSuffix = paymentNumberMatch
+    ? ` (payment ${paymentNumberMatch[1]} of ${paymentNumberMatch[2]})`
+    : "";
+
+  let description: string;
+  if (destination && nights) {
+    description = `Airbnb stay — ${destination} (${nights} nights)${paymentSuffix}`;
+  } else if (destination) {
+    description = `Airbnb stay — ${destination}${paymentSuffix}`;
+  } else {
+    description = `Airbnb stay${paymentSuffix}`;
+  }
+
+  const rounded = round2(amountPaid);
+  const lineItem: Record<string, unknown> = {
+    description,
+    quantity: 1,
+    total_usd: rounded,
+    amount: rounded,
+    amount_original: rounded,
+  };
+
+  normalized.provider_name = "Airbnb";
+  normalized.providerName = "Airbnb";
+  normalized.invoice_total_usd = rounded;
+  normalized.invoiceTotalUsd = rounded;
+  normalized.total = rounded;
+  normalized.original_total = rounded;
+  normalized.originalTotal = rounded;
+  normalized.original_currency = "USD";
+  normalized.originalCurrency = "USD";
+  normalized.exchange_rate = 1;
+  normalized.exchangeRate = 1;
+  normalized.line_items = [lineItem];
+  normalized.lineItems = [lineItem];
+
+  console.log(
+    `[billParsing] Airbnb: overrode total to ${rounded.toFixed(2)} (from "Amount paid" line); description="${description}"`
+  );
   return normalized;
 }
 
