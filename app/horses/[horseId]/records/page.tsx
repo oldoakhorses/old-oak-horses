@@ -435,66 +435,6 @@ export default function HorseRecordsPage() {
 
                     <div className={styles.recordDateCol}>{formatDateLong(record.date)}</div>
 
-                    <div className={styles.menuWrap}>
-                      <button
-                        type="button"
-                        className={styles.menuButton}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setMenuOpenId((prev) => (prev === record._id ? null : record._id));
-                        }}
-                      >
-                        ⋮
-                      </button>
-                      {menuOpenId === record._id ? (
-                        <div className={styles.menuDropdown} onClick={(event) => event.stopPropagation()}>
-                          <button
-                            type="button"
-                            className={styles.menuItem}
-                            onClick={() => {
-                              setExpandedId(record._id);
-                              setMenuOpenId(null);
-                            }}
-                          >
-                            View Details
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.menuItem}
-                            onClick={() => {
-                              setExpandedId(record._id);
-                              setEditingRecordId(record._id);
-                              setEditState({
-                                providerName: record.providerName || "",
-                                date: toDateInput(record.date),
-                                nextVisitDate: getLinkedUpcomingDateInput(record),
-                                notes: record.notes || "",
-                                serviceType: record.serviceType || "",
-                                customType: record.customType || "",
-                                vaccineName: record.vaccineName || "",
-                                treatmentDescription: record.treatmentDescription || "",
-                                billId: record.billId ? String(record.billId) : "",
-                              });
-                              setEditAttachment(null);
-                              setMenuOpenId(null);
-                            }}
-                          >
-                            Edit Record
-                          </button>
-                          <div className={styles.menuDivider} />
-                          <button
-                            type="button"
-                            className={`${styles.menuItem} ${styles.menuItemDanger}`}
-                            onClick={() => {
-                              setRecordToDelete({ id: record._id, name: getRecordLabel(record) });
-                              setMenuOpenId(null);
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
                   </div>
 
                   {expanded ? (
@@ -744,6 +684,16 @@ export default function HorseRecordsPage() {
                               }}
                             >
                               edit
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.expandedDeleteBtn}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setRecordToDelete({ id: record._id, name: getRecordLabel(record) });
+                              }}
+                            >
+                              delete
                             </button>
                             <button
                               type="button"
