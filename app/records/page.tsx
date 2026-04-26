@@ -22,17 +22,21 @@ type VetSubcategory =
   | "sedation"
   | "fees"
   | "lab_work"
+  | "exam"
+  | "imaging"
   | "other";
 
 const VET_SUBCATEGORY_OPTIONS: Array<{ value: VetSubcategory; label: string }> = [
+  { value: "exam", label: "Exam" },
+  { value: "vaccinations", label: "Vaccinations" },
   { value: "medication", label: "Medication" },
   { value: "joint_injections", label: "Joint Injections" },
-  { value: "exams_diagnostics", label: "Exams & Diagnostics" },
-  { value: "vaccinations", label: "Vaccinations" },
+  { value: "imaging", label: "Imaging" },
+  { value: "lab_work", label: "Lab Work" },
   { value: "shockwave", label: "Shockwave" },
   { value: "sedation", label: "Sedation" },
+  { value: "exams_diagnostics", label: "Exams & Diagnostics" },
   { value: "fees", label: "Fees" },
-  { value: "lab_work", label: "Lab Work" },
   { value: "other", label: "Other" },
 ];
 
@@ -40,10 +44,17 @@ function vetSubcategoryLabel(value?: string | null) {
   if (!value) return null;
   const found = VET_SUBCATEGORY_OPTIONS.find((o) => o.value === value);
   if (found) return found.label;
-  // Legacy values
   if (value === "vaccination") return "Vaccinations";
   if (value === "treatment") return "Treatment";
-  return null;
+  return value.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function getVetVisitTypeLabels(record: { visitType?: string; visitTypes?: string[]; vetOtherDescription?: string }): string[] {
+  const types = record.visitTypes?.length ? record.visitTypes : record.visitType ? [record.visitType] : [];
+  return types.map((t) => {
+    if (t === "other" && record.vetOtherDescription) return record.vetOtherDescription;
+    return vetSubcategoryLabel(t) || t;
+  });
 }
 type Tab = "upcoming" | "past";
 type SortColumn = "record" | "horse" | "category" | "date";
@@ -60,6 +71,8 @@ type GlobalRecord = {
   date: number;
   providerName?: string;
   visitType?: VetSubcategory;
+  visitTypes?: string[];
+  vetOtherDescription?: string;
   vaccineName?: string;
   treatmentDescription?: string;
   serviceType?: string;
@@ -82,6 +95,8 @@ type DisplayRecord = {
 type EditState = {
   type: RecordType;
   visitType: "" | VetSubcategory;
+  visitTypes: VetSubcategory[];
+  vetOtherDescription: string;
   providerName: string;
   date: string;
   nextVisitDate: string;
@@ -100,6 +115,8 @@ type RecordFormState = {
   providerName: string;
   customType: string;
   visitType: "" | VetSubcategory;
+  visitTypes: VetSubcategory[];
+  vetOtherDescription: string;
   vaccineName: string;
   treatmentDescription: string;
   serviceType: string;
@@ -162,6 +179,8 @@ function createInitialRecordForm(): RecordFormState {
     providerName: "",
     customType: "",
     visitType: "",
+    visitTypes: [],
+    vetOtherDescription: "",
     vaccineName: "",
     treatmentDescription: "",
     serviceType: "",
@@ -390,6 +409,8 @@ export default function RecordsPage() {
         providerName: "",
         customType: "",
         visitType: "",
+        visitTypes: [],
+        vetOtherDescription: "",
         vaccineName: "",
         treatmentDescription: "",
         serviceType: "",
@@ -406,6 +427,8 @@ export default function RecordsPage() {
       providerName: "",
       customType: nextType === "other" ? prev.customType : "",
       visitType: "",
+      visitTypes: [],
+      vetOtherDescription: "",
       vaccineName: "",
       treatmentDescription: "",
       serviceType: "",
@@ -438,6 +461,14 @@ export default function RecordsPage() {
       setRecordError("At least one horse is required.");
       return;
     }
+    if (selectedRecordType === "veterinary" && recordForm.visitTypes.length === 0) {
+      setRecordError("Select at least one visit type.");
+      return;
+    }
+    if (selectedRecordType === "veterinary" && recordForm.visitTypes.includes("other") && !recordForm.vetOtherDescription.trim()) {
+      setRecordError("Describe the 'other' visit type.");
+      return;
+    }
 
     setRecordError("");
     setRecordSubmitting(true);
@@ -461,9 +492,11 @@ export default function RecordsPage() {
           customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
           date: new Date(`${recordForm.date}T00:00:00`).getTime(),
           providerName,
-          visitType: selectedRecordType === "veterinary" ? recordForm.visitType || undefined : undefined,
-          vaccineName: selectedRecordType === "veterinary" && recordForm.visitType === "vaccination" ? recordForm.vaccineName.trim() || undefined : undefined,
-          treatmentDescription: selectedRecordType === "veterinary" && recordForm.visitType === "treatment" ? recordForm.treatmentDescription.trim() || undefined : undefined,
+          visitType: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes[0] as VetSubcategory : undefined,
+          visitTypes: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes : undefined,
+          vetOtherDescription: selectedRecordType === "veterinary" && recordForm.visitTypes.includes("other") ? recordForm.vetOtherDescription.trim() || undefined : undefined,
+          vaccineName: selectedRecordType === "veterinary" && recordForm.visitTypes.includes("vaccinations") ? recordForm.vaccineName.trim() || undefined : undefined,
+          treatmentDescription: selectedRecordType === "veterinary" && recordForm.visitTypes.includes("treatment") ? recordForm.treatmentDescription.trim() || undefined : undefined,
           serviceType: selectedRecordType === "farrier" ? recordForm.serviceType || undefined : undefined,
           medications: selectedRecordType === "medication" && recordForm.medications.length > 0 ? recordForm.medications : undefined,
           isUpcoming: false,
@@ -479,9 +512,11 @@ export default function RecordsPage() {
             customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
             date: new Date(`${recordForm.nextVisitDate}T00:00:00`).getTime(),
             providerName,
-            visitType: selectedRecordType === "veterinary" ? recordForm.visitType || undefined : undefined,
-            vaccineName: selectedRecordType === "veterinary" && recordForm.visitType === "vaccination" ? recordForm.vaccineName.trim() || undefined : undefined,
-            treatmentDescription: selectedRecordType === "veterinary" && recordForm.visitType === "treatment" ? recordForm.treatmentDescription.trim() || undefined : undefined,
+            visitType: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes[0] as VetSubcategory : undefined,
+            visitTypes: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes : undefined,
+            vetOtherDescription: selectedRecordType === "veterinary" && recordForm.visitTypes.includes("other") ? recordForm.vetOtherDescription.trim() || undefined : undefined,
+            vaccineName: selectedRecordType === "veterinary" && recordForm.visitTypes.includes("vaccinations") ? recordForm.vaccineName.trim() || undefined : undefined,
+            treatmentDescription: selectedRecordType === "veterinary" && recordForm.visitTypes.includes("treatment") ? recordForm.treatmentDescription.trim() || undefined : undefined,
             serviceType: selectedRecordType === "farrier" ? recordForm.serviceType || undefined : undefined,
             medications: selectedRecordType === "medication" && recordForm.medications.length > 0 ? recordForm.medications : undefined,
             isUpcoming: true,
@@ -544,7 +579,9 @@ export default function RecordsPage() {
       recordId: editingRecordId,
       updates: {
         type: editState.type,
-        visitType: editState.type === "veterinary" && editState.visitType ? editState.visitType : undefined,
+        visitType: editState.type === "veterinary" && editState.visitTypes.length > 0 ? editState.visitTypes[0] : undefined,
+        visitTypes: editState.type === "veterinary" && editState.visitTypes.length > 0 ? editState.visitTypes : undefined,
+        vetOtherDescription: editState.type === "veterinary" && editState.visitTypes.includes("other") ? editState.vetOtherDescription || undefined : undefined,
         providerName: editState.providerName || undefined,
         date: editState.date ? new Date(`${editState.date}T00:00:00`).getTime() : undefined,
         notes: editState.notes || undefined,
@@ -802,21 +839,36 @@ export default function RecordsPage() {
                         <div className={styles.recordIcon}>{recordIcon(record.type)}</div>
                         <div className={styles.recordLabel}>{getRecordLabel(record)}</div>
                         {activeTab === "upcoming" && row.isFollowup ? <span className={styles.followupBadge}>follow-up</span> : null}
-                        <Link
-                          href={record.horseId ? `/horses/${record.horseId}` : "/horses"}
-                          className={styles.recordHorse}
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          🐴 {record.horseName}
-                        </Link>
                       </div>
-                      {detail ? <div className={styles.recordSublabel}>{detail}</div> : null}
-                      <div className={styles.recordBottomLine}>
-                        <span className={styles.categoryBadge} style={{ background: badgeColors.bg, color: badgeColors.color }}>
-                          {prettyType(record.type)}
-                        </span>
-                        <span className={`${styles.recordDate} ${dateSoon ? styles.recordDateSoon : ""}`}>{formatDateLong(row.eventDate)}</span>
-                      </div>
+                      {record.type === "veterinary" ? (
+                        <>
+                          {record.providerName ? <div className={styles.recordSublabel}><span className={styles.recordDetailPrimary}>{record.providerName}</span></div> : null}
+                          <div className={styles.recordSublabel}>
+                            <Link
+                              href={record.horseId ? `/horses/${record.horseId}` : "/horses"}
+                              className={styles.recordHorseLink}
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              {record.horseName}
+                            </Link>
+                            <span className={styles.recordDateInline}>{formatDateLong(row.eventDate)}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {detail ? <div className={styles.recordSublabel}>{detail}</div> : null}
+                          <div className={styles.recordBottomLine}>
+                            <Link
+                              href={record.horseId ? `/horses/${record.horseId}` : "/horses"}
+                              className={styles.recordHorseLink}
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              {record.horseName}
+                            </Link>
+                            <span className={`${styles.recordDate} ${dateSoon ? styles.recordDateSoon : ""}`}>{formatDateLong(row.eventDate)}</span>
+                          </div>
+                        </>
+                      )}
                       {record.linkedRecordId ? (
                         <button
                           type="button"
@@ -833,17 +885,21 @@ export default function RecordsPage() {
                         </button>
                       ) : null}
                     </div>
-                    <div className={styles.menuWrap}>
-                      <button
-                        type="button"
-                        className={styles.menuButton}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setMenuOpenId((prev) => (prev === record._id ? null : record._id));
-                        }}
-                      >
-                        ⋮
-                      </button>
+                    <div className={styles.recordRightCol}>
+                      <span className={styles.categoryBadge} style={{ background: badgeColors.bg, color: badgeColors.color }}>
+                        {prettyType(record.type)}
+                      </span>
+                      <div className={styles.menuWrap}>
+                        <button
+                          type="button"
+                          className={styles.menuButton}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setMenuOpenId((prev) => (prev === record._id ? null : record._id));
+                          }}
+                        >
+                          ⋮
+                        </button>
                       {menuOpenId === record._id ? (
                         <div className={styles.menuDropdown} onClick={(event) => event.stopPropagation()}>
                           <button
@@ -865,6 +921,8 @@ export default function RecordsPage() {
                               setEditState({
                                 type: record.type,
                                 visitType: (record.visitType || "") as "" | VetSubcategory,
+                                visitTypes: (record.visitTypes?.length ? record.visitTypes : record.visitType ? [record.visitType] : []) as VetSubcategory[],
+                                vetOtherDescription: record.vetOtherDescription || "",
                                 providerName: record.providerName || "",
                                 date: toDateInput(record.date),
                                 nextVisitDate: getLinkedUpcomingDateInput(record),
@@ -893,6 +951,7 @@ export default function RecordsPage() {
                           </button>
                         </div>
                       ) : null}
+                      </div>
                     </div>
                   </div>
 
@@ -930,18 +989,44 @@ export default function RecordsPage() {
                               </select>
                             </ExpandedInput>
                             {editState.type === "veterinary" ? (
-                              <ExpandedInput label="VISIT TYPE">
-                                <select
-                                  className={styles.expandedInput}
-                                  value={editState.visitType}
-                                  onChange={(event) => setEditState({ ...editState, visitType: event.target.value as "" | VetSubcategory })}
-                                >
-                                  <option value="">select...</option>
-                                  {VET_SUBCATEGORY_OPTIONS.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                  ))}
-                                </select>
-                              </ExpandedInput>
+                              <>
+                                <ExpandedInput label="VISIT TYPE">
+                                  <div className={styles.chipRow}>
+                                    {VET_SUBCATEGORY_OPTIONS.map((opt) => {
+                                      const active = editState.visitTypes.includes(opt.value);
+                                      return (
+                                        <button
+                                          type="button"
+                                          key={opt.value}
+                                          className={`${styles.serviceChip} ${active ? styles.serviceChipActive : ""}`}
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            setEditState({
+                                              ...editState,
+                                              visitTypes: active
+                                                ? editState.visitTypes.filter((v) => v !== opt.value)
+                                                : [...editState.visitTypes, opt.value],
+                                            });
+                                          }}
+                                        >
+                                          {opt.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </ExpandedInput>
+                                {editState.visitTypes.includes("other") ? (
+                                  <ExpandedInput label="DESCRIBE OTHER">
+                                    <input
+                                      className={styles.expandedInput}
+                                      value={editState.vetOtherDescription}
+                                      onClick={(event) => event.stopPropagation()}
+                                      onChange={(event) => setEditState({ ...editState, vetOtherDescription: event.target.value })}
+                                      placeholder="e.g., Dental, Chiropractic"
+                                    />
+                                  </ExpandedInput>
+                                ) : null}
+                              </>
                             ) : null}
                             {editState.type === "farrier" ? (
                               <ExpandedInput label="SERVICE TYPE">
@@ -1141,6 +1226,8 @@ export default function RecordsPage() {
                                   setEditState({
                                     type: record.type,
                                     visitType: (record.visitType || "") as "" | VetSubcategory,
+                                    visitTypes: (record.visitTypes?.length ? record.visitTypes : record.visitType ? [record.visitType] : []) as VetSubcategory[],
+                                    vetOtherDescription: record.vetOtherDescription || "",
                                     providerName: record.providerName || "",
                                     date: toDateInput(record.date),
                                     nextVisitDate: getLinkedUpcomingDateInput(record),
@@ -1281,20 +1368,42 @@ export default function RecordsPage() {
             {selectedRecordType ? (
               <>
                 {selectedRecordType === "veterinary" ? (
-                  <RecordField label="SUBCATEGORY">
-                    <select
-                      className={styles.recordInput}
-                      value={recordForm.visitType}
-                      onChange={(event) => setRecordForm((prev) => ({ ...prev, visitType: event.target.value as RecordFormState["visitType"] }))}
-                    >
-                      <option value="">select...</option>
-                      {VET_SUBCATEGORY_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </RecordField>
+                  <>
+                    <RecordField label="VISIT TYPE" required>
+                      <div className={styles.chipRow}>
+                        {VET_SUBCATEGORY_OPTIONS.map((opt) => {
+                          const active = recordForm.visitTypes.includes(opt.value);
+                          return (
+                            <button
+                              type="button"
+                              key={opt.value}
+                              className={`${styles.serviceChip} ${active ? styles.serviceChipActive : ""}`}
+                              onClick={() =>
+                                setRecordForm((prev) => ({
+                                  ...prev,
+                                  visitTypes: active
+                                    ? prev.visitTypes.filter((v) => v !== opt.value)
+                                    : [...prev.visitTypes, opt.value],
+                                }))
+                              }
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </RecordField>
+                    {recordForm.visitTypes.includes("other") ? (
+                      <RecordField label="DESCRIBE OTHER" required>
+                        <input
+                          className={styles.recordInput}
+                          value={recordForm.vetOtherDescription}
+                          onChange={(event) => setRecordForm((prev) => ({ ...prev, vetOtherDescription: event.target.value }))}
+                          placeholder="e.g., Dental, Chiropractic"
+                        />
+                      </RecordField>
+                    ) : null}
+                  </>
                 ) : null}
 
                 {selectedRecordType === "other" ? (
@@ -1588,8 +1697,9 @@ function filterByDate(timestamp: number, range: UpcomingRange | PastRange, tab: 
 }
 
 function getRecordSubtype(record: GlobalRecord) {
-  if (record.type === "veterinary" && record.visitType) {
-    return vetSubcategoryLabel(record.visitType);
+  if (record.type === "veterinary") {
+    const labels = getVetVisitTypeLabels(record);
+    if (labels.length > 0) return labels.join(", ");
   }
   if (record.type === "farrier" && record.serviceType) {
     return record.serviceType;
@@ -1601,6 +1711,11 @@ function getRecordSubtype(record: GlobalRecord) {
 }
 
 function getRecordLabel(record: GlobalRecord) {
+  if (record.type === "veterinary") {
+    const labels = getVetVisitTypeLabels(record);
+    if (labels.length > 0) return labels.join(", ");
+    return "Veterinary";
+  }
   const subtype = getRecordSubtype(record);
   if (subtype) return subtype;
   return prettyType(record.type);
@@ -1616,8 +1731,13 @@ function getRecordDetail(record: GlobalRecord): React.ReactNode {
       </>
     );
   }
-  if (record.type === "veterinary" && record.visitType === "vaccination" && record.vaccineName) return record.vaccineName;
-  if (record.type === "veterinary" && record.visitType === "treatment" && record.treatmentDescription) return record.treatmentDescription;
+  if (record.type === "veterinary") {
+    return (
+      <>
+        {record.providerName ? <span className={styles.recordDetailPrimary}>{record.providerName}</span> : null}
+      </>
+    );
+  }
   return "";
 }
 

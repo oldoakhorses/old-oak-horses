@@ -63,7 +63,9 @@ type HorseRecord = {
   customType?: string;
   date: number;
   providerName?: string;
-  visitType?: "vaccination" | "treatment";
+  visitType?: string;
+  visitTypes?: string[];
+  vetOtherDescription?: string;
   vaccineName?: string;
   treatmentDescription?: string;
   serviceType?: string;
@@ -395,7 +397,7 @@ export default function HorseRecordsPage() {
                   >
                     <div className={styles.recordIcon}>{RECORD_ICONS[record.type]}</div>
 
-                    <div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <div className={styles.recordLabel}>{getRecordLabel(record)}</div>
                       {detail ? <div className={styles.recordSublabel}>{detail}</div> : null}
                       {record.linkedRecordId ? (
@@ -804,9 +806,30 @@ function ExpandedInput({ label, children }: { label: string; children: React.Rea
   );
 }
 
+function vetSubcategoryLabel(value?: string | null) {
+  if (!value) return null;
+  const labelMap: Record<string, string> = {
+    exam: "Exam", vaccinations: "Vaccinations", vaccination: "Vaccinations",
+    medication: "Medication", joint_injections: "Joint Injections",
+    imaging: "Imaging", lab_work: "Lab Work", shockwave: "Shockwave",
+    sedation: "Sedation", exams_diagnostics: "Exams & Diagnostics",
+    fees: "Fees", treatment: "Treatment", other: "Other",
+  };
+  return labelMap[value] || value.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function getVetVisitTypeLabels(record: { visitType?: string; visitTypes?: string[]; vetOtherDescription?: string }): string[] {
+  const types = record.visitTypes?.length ? record.visitTypes : record.visitType ? [record.visitType] : [];
+  return types.map((t) => {
+    if (t === "other" && record.vetOtherDescription) return record.vetOtherDescription;
+    return vetSubcategoryLabel(t) || t;
+  });
+}
+
 function getRecordSubtype(record: HorseRecord) {
-  if (record.type === "veterinary" && record.visitType) {
-    return record.visitType === "vaccination" ? "Vaccination" : "Treatment";
+  if (record.type === "veterinary") {
+    const labels = getVetVisitTypeLabels(record);
+    if (labels.length > 0) return labels.join(", ");
   }
   if (record.type === "farrier" && record.serviceType) {
     return record.serviceType;
@@ -818,6 +841,11 @@ function getRecordSubtype(record: HorseRecord) {
 }
 
 function getRecordLabel(record: HorseRecord) {
+  if (record.type === "veterinary") {
+    const labels = getVetVisitTypeLabels(record);
+    if (labels.length > 0) return labels.join(", ");
+    return "Veterinary";
+  }
   const subtype = getRecordSubtype(record);
   if (subtype) return `${pretty(record.type)} — ${subtype}`;
   return pretty(record.type);
@@ -834,18 +862,16 @@ function getRecordDetail(record: HorseRecord): React.ReactNode {
     );
   }
 
-  const detail =
-    record.type === "veterinary"
-      ? record.visitType === "vaccination"
-        ? record.vaccineName
-        : record.visitType === "treatment"
-          ? record.treatmentDescription
-          : undefined
-      : undefined;
+  if (record.type === "veterinary") {
+    return (
+      <>
+        {record.providerName ? <span className={styles.recordDetailPrimary}>{record.providerName}</span> : null}
+        {record.notes ? <span className={styles.recordDetailSecondary}>{record.notes}</span> : null}
+      </>
+    );
+  }
 
-  if (record.providerName && detail) return `${record.providerName} · ${detail}`;
   if (record.providerName) return record.providerName;
-  if (detail) return detail;
   return "";
 }
 

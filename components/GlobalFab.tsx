@@ -21,13 +21,44 @@ type DocumentTag =
   | "other";
 type DocumentSubject = "horse" | "person";
 
+type VetSubcategory =
+  | "vaccination"
+  | "treatment"
+  | "medication"
+  | "joint_injections"
+  | "exams_diagnostics"
+  | "vaccinations"
+  | "shockwave"
+  | "sedation"
+  | "fees"
+  | "lab_work"
+  | "exam"
+  | "imaging"
+  | "other";
+
+const VET_VISIT_TYPE_OPTIONS: Array<{ value: VetSubcategory; label: string }> = [
+  { value: "exam", label: "Exam" },
+  { value: "vaccinations", label: "Vaccinations" },
+  { value: "medication", label: "Medication" },
+  { value: "joint_injections", label: "Joint Injections" },
+  { value: "imaging", label: "Imaging" },
+  { value: "lab_work", label: "Lab Work" },
+  { value: "shockwave", label: "Shockwave" },
+  { value: "sedation", label: "Sedation" },
+  { value: "exams_diagnostics", label: "Exams & Diagnostics" },
+  { value: "fees", label: "Fees" },
+  { value: "other", label: "Other" },
+];
+
 type RecordFormState = {
   horseIds: Id<"horses">[];
   date: string;
   selectedProvider: string;
   providerName: string;
   customType: string;
-  visitType: "" | "vaccination" | "treatment";
+  visitType: "" | VetSubcategory;
+  visitTypes: VetSubcategory[];
+  vetOtherDescription: string;
   vaccineName: string;
   treatmentDescription: string;
   serviceType: string;
@@ -136,6 +167,8 @@ function createInitialRecordForm(): RecordFormState {
     providerName: "",
     customType: "",
     visitType: "",
+    visitTypes: [],
+    vetOtherDescription: "",
     vaccineName: "",
     treatmentDescription: "",
     serviceType: "",
@@ -377,6 +410,8 @@ export default function GlobalFab() {
         providerName: "",
         customType: "",
         visitType: "",
+        visitTypes: [],
+        vetOtherDescription: "",
         vaccineName: "",
         treatmentDescription: "",
         serviceType: "",
@@ -393,6 +428,8 @@ export default function GlobalFab() {
       providerName: "",
       customType: nextType === "other" ? prev.customType : "",
       visitType: "",
+      visitTypes: [],
+      vetOtherDescription: "",
       vaccineName: "",
       treatmentDescription: "",
       serviceType: "",
@@ -644,6 +681,14 @@ export default function GlobalFab() {
       setRecordError("At least one horse is required.");
       return;
     }
+    if (selectedRecordType === "veterinary" && recordForm.visitTypes.length === 0) {
+      setRecordError("Select at least one visit type.");
+      return;
+    }
+    if (selectedRecordType === "veterinary" && recordForm.visitTypes.includes("other") && !recordForm.vetOtherDescription.trim()) {
+      setRecordError("Describe the 'other' visit type.");
+      return;
+    }
 
     setRecordError("");
     setRecordSubmitting(true);
@@ -658,7 +703,6 @@ export default function GlobalFab() {
       const attachmentStorageId = await uploadAttachmentIfPresent();
       const perHorseNotes = recordReportDetection.perHorseNotes;
       for (const horseId of recordForm.horseIds) {
-        // Use per-horse notes from detection if available, otherwise use the general notes field
         const horseSpecificNotes = perHorseNotes?.find((p) => p.horseId === horseId)?.notes;
         const notesForHorse = horseSpecificNotes ?? recordForm.notes.trim();
         const mainRecordId = await createHorseRecord({
@@ -667,13 +711,15 @@ export default function GlobalFab() {
           customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
           date: new Date(`${recordForm.date}T00:00:00`).getTime(),
           providerName,
-          visitType: selectedRecordType === "veterinary" ? recordForm.visitType || undefined : undefined,
+          visitType: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes[0] as VetSubcategory : undefined,
+          visitTypes: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes : undefined,
+          vetOtherDescription: selectedRecordType === "veterinary" && recordForm.visitTypes.includes("other") ? recordForm.vetOtherDescription.trim() || undefined : undefined,
           vaccineName:
-            selectedRecordType === "veterinary" && recordForm.visitType === "vaccination"
+            selectedRecordType === "veterinary" && recordForm.visitTypes.includes("vaccinations")
               ? recordForm.vaccineName.trim() || undefined
               : undefined,
           treatmentDescription:
-            selectedRecordType === "veterinary" && recordForm.visitType === "treatment"
+            selectedRecordType === "veterinary" && recordForm.visitTypes.includes("treatment")
               ? recordForm.treatmentDescription.trim() || undefined
               : undefined,
           serviceType: selectedRecordType === "farrier" ? recordForm.serviceType || undefined : undefined,
@@ -689,13 +735,15 @@ export default function GlobalFab() {
             customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
             date: new Date(`${recordForm.nextVisitDate}T00:00:00`).getTime(),
             providerName,
-            visitType: selectedRecordType === "veterinary" ? recordForm.visitType || undefined : undefined,
+            visitType: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes[0] as VetSubcategory : undefined,
+            visitTypes: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes : undefined,
+            vetOtherDescription: selectedRecordType === "veterinary" && recordForm.visitTypes.includes("other") ? recordForm.vetOtherDescription.trim() || undefined : undefined,
             vaccineName:
-              selectedRecordType === "veterinary" && recordForm.visitType === "vaccination"
+              selectedRecordType === "veterinary" && recordForm.visitTypes.includes("vaccinations")
                 ? recordForm.vaccineName.trim() || undefined
                 : undefined,
             treatmentDescription:
-              selectedRecordType === "veterinary" && recordForm.visitType === "treatment"
+              selectedRecordType === "veterinary" && recordForm.visitTypes.includes("treatment")
                 ? recordForm.treatmentDescription.trim() || undefined
                 : undefined,
             serviceType: selectedRecordType === "farrier" ? recordForm.serviceType || undefined : undefined,
@@ -1104,39 +1152,42 @@ export default function GlobalFab() {
             {selectedRecordType ? (
               <>
                 {selectedRecordType === "veterinary" ? (
-                  <RecordField label="VISIT TYPE">
-                    <select
-                      className={styles.recordInput}
-                      value={recordForm.visitType}
-                      onChange={(e) => setRecordForm((prev) => ({ ...prev, visitType: e.target.value as "" | "vaccination" | "treatment" }))}
-                    >
-                      <option value="">select...</option>
-                      <option value="vaccination">Vaccination</option>
-                      <option value="treatment">Treatment</option>
-                    </select>
-                  </RecordField>
-                ) : null}
-
-                {selectedRecordType === "veterinary" && recordForm.visitType === "vaccination" ? (
-                  <RecordField label="VACCINE NAME">
-                    <input
-                      className={styles.recordInput}
-                      value={recordForm.vaccineName}
-                      onChange={(e) => setRecordForm((prev) => ({ ...prev, vaccineName: e.target.value }))}
-                      placeholder="e.g., Flu/Rhino, Coggins, West Nile"
-                    />
-                  </RecordField>
-                ) : null}
-
-                {selectedRecordType === "veterinary" && recordForm.visitType === "treatment" ? (
-                  <RecordField label="TREATMENT DESCRIPTION">
-                    <input
-                      className={styles.recordInput}
-                      value={recordForm.treatmentDescription}
-                      onChange={(e) => setRecordForm((prev) => ({ ...prev, treatmentDescription: e.target.value }))}
-                      placeholder="e.g., Laceration repair, Lameness exam"
-                    />
-                  </RecordField>
+                  <>
+                    <RecordField label="VISIT TYPE" required>
+                      <div className={styles.chipRow} style={{ flexWrap: "wrap" }}>
+                        {VET_VISIT_TYPE_OPTIONS.map((opt) => {
+                          const active = recordForm.visitTypes.includes(opt.value);
+                          return (
+                            <button
+                              type="button"
+                              key={opt.value}
+                              className={`${styles.serviceChip} ${active ? styles.serviceChipActive : ""}`}
+                              onClick={() =>
+                                setRecordForm((prev) => ({
+                                  ...prev,
+                                  visitTypes: active
+                                    ? prev.visitTypes.filter((v) => v !== opt.value)
+                                    : [...prev.visitTypes, opt.value],
+                                }))
+                              }
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </RecordField>
+                    {recordForm.visitTypes.includes("other") ? (
+                      <RecordField label="DESCRIBE OTHER" required>
+                        <input
+                          className={styles.recordInput}
+                          value={recordForm.vetOtherDescription}
+                          onChange={(e) => setRecordForm((prev) => ({ ...prev, vetOtherDescription: e.target.value }))}
+                          placeholder="e.g., Dental, Chiropractic"
+                        />
+                      </RecordField>
+                    ) : null}
+                  </>
                 ) : null}
 
                 {selectedRecordType === "medication" ? (

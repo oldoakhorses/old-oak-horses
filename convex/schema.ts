@@ -266,8 +266,12 @@ export default defineSchema({
       v.literal("sedation"),
       v.literal("fees"),
       v.literal("lab_work"),
+      v.literal("exam"),
+      v.literal("imaging"),
       v.literal("other")
     )),
+    visitTypes: v.optional(v.array(v.string())),
+    vetOtherDescription: v.optional(v.string()),
     vaccineName: v.optional(v.string()),
     treatmentDescription: v.optional(v.string()),
     serviceType: v.optional(v.string()),

@@ -427,6 +427,32 @@
   color: #4a5bdb;
 }
 
+.recordHorseLink {
+  font-size: 11px;
+  color: #6b7084;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.recordHorseLink:hover {
+  color: #4a5bdb;
+  text-decoration: underline;
+}
+
+.recordDateInline {
+  font-size: 10px;
+  color: #9ea2b0;
+  font-variant-numeric: tabular-nums;
+}
+
+.recordRightCol {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .recordProvider,
 .recordProviderEmpty {
   font-size: 12px;
