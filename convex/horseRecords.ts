@@ -20,6 +20,7 @@ export const createHorseRecord = mutation({
     customType: v.optional(v.string()),
     date: v.number(),
     providerName: v.optional(v.string()),
+    providerId: v.optional(v.id("contacts")),
     visitType: v.optional(v.union(
       v.literal("vaccination"),
       v.literal("treatment"),
@@ -57,6 +58,7 @@ export const createHorseRecord = mutation({
         customType: args.customType?.trim() || undefined,
         date: args.date,
         providerName: args.providerName?.trim() || undefined,
+        providerId: args.providerId,
         visitType: args.visitType,
         visitTypes: args.visitTypes && args.visitTypes.length > 0 ? args.visitTypes : undefined,
         vetOtherDescription: args.vetOtherDescription?.trim() || undefined,
@@ -233,6 +235,7 @@ export const updateHorseRecord = mutation({
     customType: v.optional(v.string()),
     date: v.optional(v.number()),
     providerName: v.optional(v.string()),
+    providerId: v.optional(v.id("contacts")),
     visitType: v.optional(v.union(
       v.literal("vaccination"),
       v.literal("treatment"),
@@ -294,6 +297,7 @@ export const updateRecordWithNextVisit = mutation({
       customType: v.optional(v.string()),
       date: v.optional(v.number()),
       providerName: v.optional(v.string()),
+      providerId: v.optional(v.id("contacts")),
       serviceType: v.optional(v.string()),
       visitType: v.optional(v.union(
       v.literal("vaccination"),
@@ -362,6 +366,7 @@ export const updateRecordWithNextVisit = mutation({
         await ctx.db.patch(record.linkedRecordId, {
           date: nextVisitTimestamp,
           providerName: cleanedUpdates.providerName ?? record.providerName,
+          providerId: cleanedUpdates.providerId ?? record.providerId,
           type: cleanedUpdates.type ?? record.type,
           customType: cleanedUpdates.customType ?? record.customType,
           serviceType: cleanedUpdates.serviceType ?? record.serviceType,
@@ -378,6 +383,7 @@ export const updateRecordWithNextVisit = mutation({
           customType: cleanedUpdates.customType ?? record.customType,
           date: nextVisitTimestamp,
           providerName: cleanedUpdates.providerName ?? record.providerName,
+          providerId: cleanedUpdates.providerId ?? record.providerId,
           serviceType: cleanedUpdates.serviceType ?? record.serviceType,
           visitType: cleanedUpdates.visitType ?? record.visitType,
           visitTypes: cleanedUpdates.visitTypes ?? record.visitTypes,

@@ -255,6 +255,7 @@ export default defineSchema({
     date: v.number(),
     nextVisitDate: v.optional(v.number()),
     providerName: v.optional(v.string()),
+    providerId: v.optional(v.id("contacts")),
     visitType: v.optional(v.union(
       v.literal("vaccination"),
       v.literal("treatment"),

@@ -111,7 +111,6 @@ type EditState = {
 type RecordFormState = {
   horseIds: Id<"horses">[];
   date: string;
-  selectedProvider: string;
   providerName: string;
   customType: string;
   visitType: "" | VetSubcategory;
@@ -175,7 +174,6 @@ function createInitialRecordForm(): RecordFormState {
   return {
     horseIds: [],
     date: getTodayDate(),
-    selectedProvider: "",
     providerName: "",
     customType: "",
     visitType: "",
@@ -223,6 +221,10 @@ export default function RecordsPage() {
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [invoiceDropdownOpen, setInvoiceDropdownOpen] = useState(false);
   const invoiceDropdownRef = useRef<HTMLDivElement | null>(null);
+  const [providerDropdownOpen, setProviderDropdownOpen] = useState(false);
+  const providerDropdownRef = useRef<HTMLDivElement | null>(null);
+  const [editProviderDropdownOpen, setEditProviderDropdownOpen] = useState(false);
+  const editProviderDropdownRef = useRef<HTMLDivElement | null>(null);
   const [recordAttachment, setRecordAttachment] = useState<File | null>(null);
   const [recordSubmitting, setRecordSubmitting] = useState(false);
   const [recordSuccess, setRecordSuccess] = useState(false);
@@ -246,6 +248,7 @@ export default function RecordsPage() {
   const updateHorseRecord = useMutation(api.horseRecords.updateHorseRecord);
   const deleteHorseRecord = useMutation(api.horseRecords.deleteHorseRecord);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
+  const findOrCreateContact = useMutation(api.contacts.findOrCreateContact);
 
   useEffect(() => {
     setSortColumn("date");
@@ -273,6 +276,12 @@ export default function RecordsPage() {
       }
       if (invoiceDropdownRef.current && !invoiceDropdownRef.current.contains(event.target as Node)) {
         setInvoiceDropdownOpen(false);
+      }
+      if (providerDropdownRef.current && !providerDropdownRef.current.contains(event.target as Node)) {
+        setProviderDropdownOpen(false);
+      }
+      if (editProviderDropdownRef.current && !editProviderDropdownRef.current.contains(event.target as Node)) {
+        setEditProviderDropdownOpen(false);
       }
       if (filtersPopoverRef.current && !filtersPopoverRef.current.contains(event.target as Node)) {
         setFiltersOpen(false);
@@ -405,7 +414,6 @@ export default function RecordsPage() {
       setSelectedRecordType(null);
       setRecordForm((prev) => ({
         ...prev,
-        selectedProvider: "",
         providerName: "",
         customType: "",
         visitType: "",
@@ -423,7 +431,6 @@ export default function RecordsPage() {
     setSelectedRecordType(nextType);
     setRecordForm((prev) => ({
       ...prev,
-      selectedProvider: "",
       providerName: "",
       customType: nextType === "other" ? prev.customType : "",
       visitType: "",
@@ -473,12 +480,12 @@ export default function RecordsPage() {
     setRecordError("");
     setRecordSubmitting(true);
     try {
-      const providerName =
-        recordProviderCategory
-          ? recordForm.selectedProvider === "__other"
-            ? recordForm.providerName.trim() || undefined
-            : recordForm.selectedProvider || undefined
-          : recordForm.providerName.trim() || undefined;
+      const providerName = recordForm.providerName.trim() || undefined;
+      let providerId: Id<"contacts"> | undefined;
+      if (providerName && recordProviderCategory) {
+        const contactId = await findOrCreateContact({ name: providerName, category: recordProviderCategory });
+        if (contactId) providerId = contactId;
+      }
 
       const attachmentStorageId = await uploadAttachmentIfPresent();
       for (const horseId of recordForm.horseIds) {
@@ -492,6 +499,7 @@ export default function RecordsPage() {
           customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
           date: new Date(`${recordForm.date}T00:00:00`).getTime(),
           providerName,
+          providerId,
           visitType: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes[0] as VetSubcategory : undefined,
           visitTypes: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes : undefined,
           vetOtherDescription: selectedRecordType === "veterinary" && recordForm.visitTypes.includes("other") ? recordForm.vetOtherDescription.trim() || undefined : undefined,
@@ -512,6 +520,7 @@ export default function RecordsPage() {
             customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
             date: new Date(`${recordForm.nextVisitDate}T00:00:00`).getTime(),
             providerName,
+            providerId,
             visitType: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes[0] as VetSubcategory : undefined,
             visitTypes: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes : undefined,
             vetOtherDescription: selectedRecordType === "veterinary" && recordForm.visitTypes.includes("other") ? recordForm.vetOtherDescription.trim() || undefined : undefined,
@@ -574,6 +583,13 @@ export default function RecordsPage() {
 
   async function saveEdit() {
     if (!editingRecordId || !editState) return;
+    const editProviderName = editState.providerName?.trim() || undefined;
+    let editProviderId: Id<"contacts"> | undefined;
+    if (editProviderName) {
+      const category = RECORD_TYPE_TO_CATEGORY[editState.type] || "other";
+      const contactId = await findOrCreateContact({ name: editProviderName, category });
+      if (contactId) editProviderId = contactId;
+    }
     const nextVisitTimestamp = editState.nextVisitDate ? new Date(`${editState.nextVisitDate}T00:00:00`).getTime() : undefined;
     await updateRecordWithNextVisit({
       recordId: editingRecordId,
@@ -582,7 +598,8 @@ export default function RecordsPage() {
         visitType: editState.type === "veterinary" && editState.visitTypes.length > 0 ? editState.visitTypes[0] : undefined,
         visitTypes: editState.type === "veterinary" && editState.visitTypes.length > 0 ? editState.visitTypes : undefined,
         vetOtherDescription: editState.type === "veterinary" && editState.visitTypes.includes("other") ? editState.vetOtherDescription || undefined : undefined,
-        providerName: editState.providerName || undefined,
+        providerName: editProviderName,
+        providerId: editProviderId,
         date: editState.date ? new Date(`${editState.date}T00:00:00`).getTime() : undefined,
         notes: editState.notes || undefined,
         serviceType: editState.type === "farrier" ? editState.serviceType || undefined : undefined,
@@ -897,11 +914,39 @@ export default function RecordsPage() {
                         {editing ? (
                           <>
                             <ExpandedInput label={providerLabel(editState.type)}>
-                              <input
-                                className={styles.expandedInput}
-                                value={editState.providerName}
-                                onChange={(event) => setEditState({ ...editState, providerName: event.target.value })}
-                              />
+                              <div className={styles.providerSearchWrap} ref={editProviderDropdownRef}>
+                                <input
+                                  className={styles.expandedInput}
+                                  value={editState.providerName}
+                                  onChange={(event) => {
+                                    setEditState({ ...editState, providerName: event.target.value });
+                                    setEditProviderDropdownOpen(true);
+                                  }}
+                                  onFocus={() => setEditProviderDropdownOpen(true)}
+                                />
+                                {editProviderDropdownOpen && editState.providerName.trim() && (() => {
+                                  const term = editState.providerName.trim().toLowerCase();
+                                  const matches = allContactsForRecord.filter((c) => c.name.toLowerCase().includes(term));
+                                  if (matches.length === 0) return null;
+                                  return (
+                                    <div className={styles.providerDropdown}>
+                                      {matches.slice(0, 8).map((c) => (
+                                        <button
+                                          type="button"
+                                          key={c._id}
+                                          className={styles.providerDropdownItem}
+                                          onClick={() => {
+                                            setEditState({ ...editState, providerName: c.name });
+                                            setEditProviderDropdownOpen(false);
+                                          }}
+                                        >
+                                          {c.name}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
                             </ExpandedInput>
                             <ExpandedInput label="DATE">
                               <input
@@ -1411,41 +1456,40 @@ export default function RecordsPage() {
                 ) : null}
 
                 <RecordField label={providerLabel(selectedRecordType)}>
-                  {RECORD_TYPE_TO_CATEGORY[selectedRecordType] ? (
-                    <>
-                      <select
-                        className={styles.recordInput}
-                        value={recordForm.selectedProvider}
-                        onChange={(event) => setRecordForm((prev) => ({ ...prev, selectedProvider: event.target.value, providerName: "" }))}
-                      >
-                        <option value="">select...</option>
-                        {recordProviders.map((provider) => (
-                          <option key={provider._id} value={provider.name}>
-                            {provider.name}
-                          </option>
-                        ))}
-                        <option value="__other">+ Other...</option>
-                      </select>
-                      {recordForm.selectedProvider === "__other" ? (
-                        <div className={styles.providerOtherWrap}>
-                          <label className={styles.recordFieldLabel}>CONTACT NAME</label>
-                          <input
-                            className={styles.recordInput}
-                            value={recordForm.providerName}
-                            onChange={(event) => setRecordForm((prev) => ({ ...prev, providerName: event.target.value }))}
-                            placeholder={providerPlaceholder(selectedRecordType)}
-                          />
-                        </div>
-                      ) : null}
-                    </>
-                  ) : (
+                  <div className={styles.providerSearchWrap} ref={providerDropdownRef}>
                     <input
                       className={styles.recordInput}
                       value={recordForm.providerName}
-                      onChange={(event) => setRecordForm((prev) => ({ ...prev, providerName: event.target.value }))}
+                      onChange={(event) => {
+                        setRecordForm((prev) => ({ ...prev, providerName: event.target.value }));
+                        setProviderDropdownOpen(true);
+                      }}
+                      onFocus={() => setProviderDropdownOpen(true)}
                       placeholder={providerPlaceholder(selectedRecordType)}
                     />
-                  )}
+                    {providerDropdownOpen && recordForm.providerName.trim() && (() => {
+                      const term = recordForm.providerName.trim().toLowerCase();
+                      const matches = allContactsForRecord.filter((c) => c.name.toLowerCase().includes(term));
+                      if (matches.length === 0) return null;
+                      return (
+                        <div className={styles.providerDropdown}>
+                          {matches.slice(0, 8).map((c) => (
+                            <button
+                              type="button"
+                              key={c._id}
+                              className={styles.providerDropdownItem}
+                              onClick={() => {
+                                setRecordForm((prev) => ({ ...prev, providerName: c.name }));
+                                setProviderDropdownOpen(false);
+                              }}
+                            >
+                              {c.name}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </RecordField>
               </>
             ) : null}

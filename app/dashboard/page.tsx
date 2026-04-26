@@ -25,7 +25,6 @@ type HorseFormState = {
 type RecordFormState = {
   horseIds: Id<"horses">[];
   date: string;
-  selectedProvider: string;
   providerName: string;
   customType: string;
   visitType: "" | "vaccination" | "treatment";
@@ -84,7 +83,6 @@ function createInitialRecordForm(): RecordFormState {
   return {
     horseIds: [],
     date: getTodayDate(),
-    selectedProvider: "",
     providerName: "",
     customType: "",
     visitType: "",
@@ -172,6 +170,7 @@ export default function DashboardPage() {
   const createHorse = useMutation(api.horses.createHorse);
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);
   const updateHorseRecord = useMutation(api.horseRecords.updateHorseRecord);
+  const findOrCreateContact = useMutation(api.contacts.findOrCreateContact);
   const uploadDocument = useMutation(api.documents.upload);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
   const parseUploadedInvoice = useAction((api as any).uploads.parseUploadedInvoice);
@@ -341,7 +340,6 @@ export default function DashboardPage() {
       setSelectedRecordType(null);
       setRecordForm((prev) => ({
         ...prev,
-        selectedProvider: "",
         providerName: "",
         customType: "",
         visitType: "",
@@ -356,7 +354,6 @@ export default function DashboardPage() {
     setSelectedRecordType(nextType);
     setRecordForm((prev) => ({
       ...prev,
-      selectedProvider: "",
       providerName: "",
       customType: nextType === "other" ? prev.customType : "",
       visitType: "",
@@ -498,12 +495,12 @@ export default function DashboardPage() {
     setRecordError("");
     setRecordSubmitting(true);
     try {
-      const providerName =
-        recordProviderCategory
-          ? recordForm.selectedProvider === "__other"
-            ? recordForm.providerName.trim() || undefined
-            : recordForm.selectedProvider || undefined
-          : recordForm.providerName.trim() || undefined;
+      const providerName = recordForm.providerName.trim() || undefined;
+      let providerId: Id<"contacts"> | undefined;
+      if (providerName && recordProviderCategory) {
+        const contactId = await findOrCreateContact({ name: providerName, category: recordProviderCategory });
+        if (contactId) providerId = contactId;
+      }
 
       const attachmentStorageId = await uploadAttachmentIfPresent();
       for (const horseId of recordForm.horseIds) {
@@ -513,6 +510,7 @@ export default function DashboardPage() {
           customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
           date: new Date(`${recordForm.date}T00:00:00`).getTime(),
           providerName,
+          providerId,
           visitType: selectedRecordType === "veterinary" ? recordForm.visitType || undefined : undefined,
           vaccineName:
             selectedRecordType === "veterinary" && recordForm.visitType === "vaccination"
@@ -534,6 +532,7 @@ export default function DashboardPage() {
             customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
             date: new Date(`${recordForm.nextVisitDate}T00:00:00`).getTime(),
             providerName,
+            providerId,
             visitType: selectedRecordType === "veterinary" ? recordForm.visitType || undefined : undefined,
             vaccineName:
               selectedRecordType === "veterinary" && recordForm.visitType === "vaccination"

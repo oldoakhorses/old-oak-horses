@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -80,6 +80,7 @@ type HorseRecord = {
 };
 
 type EditState = {
+  type: RecordType;
   providerName: string;
   date: string;
   nextVisitDate: string;
@@ -115,9 +116,11 @@ export default function HorseRecordsPage() {
   const allRecords = (useQuery(api.horseRecords.getAllByHorse, horseId ? { horseId } : "skip") as HorseRecord[] | undefined) ?? [];
 
   const allInvoicesForLinking = useQuery(api.bills.listForLinking) ?? [];
+  const allContactsForRecord = useQuery(api.contacts.getAllContacts) ?? [];
   const updateRecordWithNextVisit = useMutation(api.horseRecords.updateRecordWithNextVisit);
   const deleteHorseRecord = useMutation(api.horseRecords.deleteHorseRecord);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
+  const findOrCreateContact = useMutation(api.contacts.findOrCreateContact);
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | RecordType>("all");
@@ -133,8 +136,20 @@ export default function HorseRecordsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [editAttachment, setEditAttachment] = useState<File | null>(null);
   const editFileRef = useRef<HTMLInputElement>(null);
+  const [editProviderDropdownOpen, setEditProviderDropdownOpen] = useState(false);
+  const editProviderDropdownRef = useRef<HTMLDivElement | null>(null);
   const [editInvoiceSearch, setEditInvoiceSearch] = useState("");
   const [editInvoiceDropdownOpen, setEditInvoiceDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (editProviderDropdownRef.current && !editProviderDropdownRef.current.contains(event.target as Node)) {
+        setEditProviderDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const filteredRecords = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -213,6 +228,14 @@ export default function HorseRecordsPage() {
 
   async function saveEdit() {
     if (!editingRecordId || !editState) return;
+    const editProviderName = editState.providerName?.trim() || undefined;
+    let editProviderId: Id<"contacts"> | undefined;
+    if (editProviderName) {
+      const catMap: Record<string, string> = { veterinary: "veterinary", medication: "veterinary", farrier: "farrier", bodywork: "bodywork" };
+      const category = catMap[editState.type] || "other";
+      const contactId = await findOrCreateContact({ name: editProviderName, category });
+      if (contactId) editProviderId = contactId;
+    }
     const nextVisitTimestamp = editState.nextVisitDate ? new Date(`${editState.nextVisitDate}T00:00:00`).getTime() : undefined;
 
     let attachmentStorageId: string | undefined;
@@ -233,7 +256,8 @@ export default function HorseRecordsPage() {
     await updateRecordWithNextVisit({
       recordId: editingRecordId,
       updates: {
-        providerName: editState.providerName || undefined,
+        providerName: editProviderName,
+        providerId: editProviderId,
         date: editState.date ? new Date(`${editState.date}T00:00:00`).getTime() : undefined,
         notes: editState.notes || undefined,
         serviceType: editState.serviceType || undefined,
@@ -443,11 +467,39 @@ export default function HorseRecordsPage() {
                         {editing ? (
                           <>
                             <ExpandedInput label={providerLabel(record.type)}>
-                              <input
-                                className={styles.expandedInput}
-                                value={editState.providerName}
-                                onChange={(event) => setEditState({ ...editState, providerName: event.target.value })}
-                              />
+                              <div className={styles.providerSearchWrap} ref={editProviderDropdownRef}>
+                                <input
+                                  className={styles.expandedInput}
+                                  value={editState.providerName}
+                                  onChange={(event) => {
+                                    setEditState({ ...editState, providerName: event.target.value });
+                                    setEditProviderDropdownOpen(true);
+                                  }}
+                                  onFocus={() => setEditProviderDropdownOpen(true)}
+                                />
+                                {editProviderDropdownOpen && editState.providerName.trim() && (() => {
+                                  const term = editState.providerName.trim().toLowerCase();
+                                  const matches = allContactsForRecord.filter((c: any) => c.name.toLowerCase().includes(term));
+                                  if (matches.length === 0) return null;
+                                  return (
+                                    <div className={styles.providerDropdown}>
+                                      {matches.slice(0, 8).map((c: any) => (
+                                        <button
+                                          type="button"
+                                          key={c._id}
+                                          className={styles.providerDropdownItem}
+                                          onClick={() => {
+                                            setEditState({ ...editState, providerName: c.name });
+                                            setEditProviderDropdownOpen(false);
+                                          }}
+                                        >
+                                          {c.name}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
                             </ExpandedInput>
                             <ExpandedInput label="DATE">
                               <input
@@ -671,6 +723,7 @@ export default function HorseRecordsPage() {
                                 event.stopPropagation();
                                 setEditingRecordId(record._id);
                                 setEditState({
+                                  type: record.type as RecordType,
                                   providerName: record.providerName || "",
                                   date: toDateInput(record.date),
                                   nextVisitDate: getLinkedUpcomingDateInput(record),

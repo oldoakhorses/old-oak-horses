@@ -54,7 +54,6 @@ const VET_VISIT_TYPE_OPTIONS: Array<{ value: VetSubcategory; label: string }> = 
 type RecordFormState = {
   horseIds: Id<"horses">[];
   date: string;
-  selectedProvider: string;
   providerName: string;
   customType: string;
   visitType: "" | VetSubcategory;
@@ -165,7 +164,6 @@ function createInitialRecordForm(): RecordFormState {
   return {
     horseIds: [],
     date: getTodayDate(),
-    selectedProvider: "",
     providerName: "",
     customType: "",
     visitType: "",
@@ -230,6 +228,8 @@ export default function GlobalFab() {
   const [recordInvoiceSearch, setRecordInvoiceSearch] = useState("");
   const [recordInvoiceDropdownOpen, setRecordInvoiceDropdownOpen] = useState(false);
   const recordInvoiceDropdownRef = useRef<HTMLDivElement | null>(null);
+  const [providerDropdownOpen, setProviderDropdownOpen] = useState(false);
+  const providerDropdownRef = useRef<HTMLDivElement | null>(null);
   const [invoiceDragOver, setInvoiceDragOver] = useState(false);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [invoiceStage, setInvoiceStage] = useState<"idle" | "uploading" | "detecting" | "parsing" | "redirecting">("idle");
@@ -261,6 +261,7 @@ export default function GlobalFab() {
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
   const detectRecordReport = useAction((api as any).reportDetect.detectReportFromPdf);
   const parseUploadedInvoice = useAction((api as any).uploads.parseUploadedInvoice);
+  const findOrCreateContact = useMutation(api.contacts.findOrCreateContact);
 
   useEffect(() => {
     const onEsc = (event: KeyboardEvent) => {
@@ -291,6 +292,9 @@ export default function GlobalFab() {
     const handleClickOutside = (event: MouseEvent) => {
       if (recordInvoiceDropdownRef.current && !recordInvoiceDropdownRef.current.contains(event.target as Node)) {
         setRecordInvoiceDropdownOpen(false);
+      }
+      if (providerDropdownRef.current && !providerDropdownRef.current.contains(event.target as Node)) {
+        setProviderDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -425,7 +429,6 @@ export default function GlobalFab() {
       setSelectedRecordType(null);
       setRecordForm((prev) => ({
         ...prev,
-        selectedProvider: "",
         providerName: "",
         customType: "",
         visitType: "",
@@ -443,7 +446,6 @@ export default function GlobalFab() {
     setSelectedRecordType(nextType);
     setRecordForm((prev) => ({
       ...prev,
-      selectedProvider: "",
       providerName: "",
       customType: nextType === "other" ? prev.customType : "",
       visitType: "",
@@ -552,7 +554,6 @@ export default function GlobalFab() {
         ...prev,
         horseIds: matchedHorseIds.length > 0 ? matchedHorseIds : prev.horseIds,
         date: detection.reportDate || prev.date,
-        selectedProvider: "__other",
         providerName: detection.providerName || "Fred Michelon",
         notes: combinedNotes || detection.treatmentNotes?.trim() || prev.notes
       }));
@@ -712,12 +713,12 @@ export default function GlobalFab() {
     setRecordError("");
     setRecordSubmitting(true);
     try {
-      const providerName =
-        recordProviderCategory
-          ? recordForm.selectedProvider === "__other"
-            ? recordForm.providerName.trim() || undefined
-            : recordForm.selectedProvider || undefined
-          : recordForm.providerName.trim() || undefined;
+      const providerName = recordForm.providerName.trim() || undefined;
+      let providerId: Id<"contacts"> | undefined;
+      if (providerName && recordProviderCategory) {
+        const contactId = await findOrCreateContact({ name: providerName, category: recordProviderCategory });
+        if (contactId) providerId = contactId;
+      }
 
       const attachmentStorageId = await uploadAttachmentIfPresent();
       const perHorseNotes = recordReportDetection.perHorseNotes;
@@ -730,6 +731,7 @@ export default function GlobalFab() {
           customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
           date: new Date(`${recordForm.date}T00:00:00`).getTime(),
           providerName,
+          providerId,
           visitType: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes[0] as VetSubcategory : undefined,
           visitTypes: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes : undefined,
           vetOtherDescription: selectedRecordType === "veterinary" && recordForm.visitTypes.includes("other") ? recordForm.vetOtherDescription.trim() || undefined : undefined,
@@ -755,6 +757,7 @@ export default function GlobalFab() {
             customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
             date: new Date(`${recordForm.nextVisitDate}T00:00:00`).getTime(),
             providerName,
+            providerId,
             visitType: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes[0] as VetSubcategory : undefined,
             visitTypes: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes : undefined,
             vetOtherDescription: selectedRecordType === "veterinary" && recordForm.visitTypes.includes("other") ? recordForm.vetOtherDescription.trim() || undefined : undefined,
@@ -803,13 +806,13 @@ export default function GlobalFab() {
   useEffect(() => {
     if (!recordReportDetection.detected) return;
     if (selectedRecordType !== "bodywork") return;
-    const fred = recordProviders.find((provider) => provider.name === "Fred Michelon");
+    const fred = allContactsForRecord.find((c) => c.name === "Fred Michelon");
     if (!fred) return;
     setRecordForm((prev) => {
-      if (prev.selectedProvider === "Fred Michelon" && !prev.providerName) return prev;
-      return { ...prev, selectedProvider: "Fred Michelon", providerName: "" };
+      if (prev.providerName === "Fred Michelon") return prev;
+      return { ...prev, providerName: "Fred Michelon" };
     });
-  }, [recordProviders, recordReportDetection.detected, selectedRecordType]);
+  }, [allContactsForRecord, recordReportDetection.detected, selectedRecordType]);
 
   function toggleHorse(horseId: Id<"horses">) {
     setRecordForm((prev) => ({
@@ -1269,41 +1272,40 @@ export default function GlobalFab() {
                 ) : null}
 
                 <RecordField label={providerLabel(selectedRecordType)}>
-                  {RECORD_TYPE_TO_CATEGORY[selectedRecordType] ? (
-                    <>
-                      <select
-                        className={styles.recordInput}
-                        value={recordForm.selectedProvider}
-                        onChange={(e) => setRecordForm((prev) => ({ ...prev, selectedProvider: e.target.value, providerName: "" }))}
-                      >
-                        <option value="">select...</option>
-                        {recordProviders.map((provider) => (
-                          <option key={provider._id} value={provider.name}>
-                            {provider.name}
-                          </option>
-                        ))}
-                        <option value="__other">+ Other...</option>
-                      </select>
-                      {recordForm.selectedProvider === "__other" ? (
-                        <div className={styles.providerOtherWrap}>
-                          <label className={styles.recordFieldLabel}>CONTACT NAME</label>
-                          <input
-                            className={styles.recordInput}
-                            value={recordForm.providerName}
-                            onChange={(e) => setRecordForm((prev) => ({ ...prev, providerName: e.target.value }))}
-                            placeholder={providerPlaceholder(selectedRecordType)}
-                          />
-                        </div>
-                      ) : null}
-                    </>
-                  ) : (
+                  <div className={styles.providerSearchWrap} ref={providerDropdownRef}>
                     <input
                       className={styles.recordInput}
                       value={recordForm.providerName}
-                      onChange={(e) => setRecordForm((prev) => ({ ...prev, providerName: e.target.value }))}
+                      onChange={(e) => {
+                        setRecordForm((prev) => ({ ...prev, providerName: e.target.value }));
+                        setProviderDropdownOpen(true);
+                      }}
+                      onFocus={() => setProviderDropdownOpen(true)}
                       placeholder={providerPlaceholder(selectedRecordType)}
                     />
-                  )}
+                    {providerDropdownOpen && recordForm.providerName.trim() && (() => {
+                      const term = recordForm.providerName.trim().toLowerCase();
+                      const matches = allContactsForRecord.filter((c) => c.name.toLowerCase().includes(term));
+                      if (matches.length === 0) return null;
+                      return (
+                        <div className={styles.providerDropdown}>
+                          {matches.slice(0, 8).map((c) => (
+                            <button
+                              type="button"
+                              key={c._id}
+                              className={styles.providerDropdownItem}
+                              onClick={() => {
+                                setRecordForm((prev) => ({ ...prev, providerName: c.name }));
+                                setProviderDropdownOpen(false);
+                              }}
+                            >
+                              {c.name}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </RecordField>
               </>
             ) : null}
