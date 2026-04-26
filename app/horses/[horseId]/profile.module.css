@@ -982,6 +982,19 @@
   color: #9ea2b0;
   margin-top: 3px;
   padding-left: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recordDetailPrimary {
+  color: #6b7084;
+  font-weight: 500;
+}
+
+.recordDetailSecondary {
+  color: #b0b4c0;
+  font-size: 9px;
 }
 
 .recordDate {

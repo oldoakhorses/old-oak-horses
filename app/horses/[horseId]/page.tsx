@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -35,6 +35,7 @@ type HorseRecord = {
   serviceType?: string;
   isUpcoming?: boolean;
   linkedRecordId?: Id<"horseRecords">;
+  medications?: string[];
   notes?: string;
   attachmentStorageId?: string;
   attachmentUrl?: string | null;
@@ -1053,7 +1054,17 @@ function getRecordSubtype(record: HorseRecord) {
   return null;
 }
 
-function getRecordDetail(record: HorseRecord) {
+function getRecordDetail(record: HorseRecord): React.ReactNode {
+  if (record.type === "medication") {
+    const meds = record.medications?.length ? record.medications.join(", ") : null;
+    return (
+      <>
+        {meds ? <span className={styles.recordDetailPrimary}>{meds}</span> : null}
+        {record.providerName ? <span className={styles.recordDetailSecondary}>{record.providerName}{record.notes ? ` · ${record.notes}` : ""}</span> : record.notes ? <span className={styles.recordDetailSecondary}>{record.notes}</span> : null}
+      </>
+    );
+  }
+
   const detail =
     record.type === "veterinary"
       ? record.visitType === "vaccination"
@@ -1061,9 +1072,7 @@ function getRecordDetail(record: HorseRecord) {
         : record.visitType === "treatment"
           ? record.treatmentDescription
           : undefined
-      : record.type === "medication"
-        ? record.notes
-        : undefined;
+      : undefined;
 
   if (record.providerName && detail) return `${record.providerName} · ${detail}`;
   if (record.providerName) return record.providerName;

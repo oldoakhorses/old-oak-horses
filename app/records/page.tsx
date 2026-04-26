@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import React, { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -65,6 +65,7 @@ type GlobalRecord = {
   serviceType?: string;
   isUpcoming?: boolean;
   linkedRecordId?: Id<"horseRecords">;
+  medications?: string[];
   notes?: string;
   attachmentStorageId?: string;
   attachmentUrl?: string | null;
@@ -1559,10 +1560,18 @@ function getRecordLabel(record: GlobalRecord) {
   return prettyType(record.type);
 }
 
-function getRecordDetail(record: GlobalRecord) {
+function getRecordDetail(record: GlobalRecord): React.ReactNode {
+  if (record.type === "medication") {
+    const meds = record.medications?.length ? record.medications.join(", ") : null;
+    return (
+      <>
+        {meds ? <span className={styles.recordDetailPrimary}>{meds}</span> : null}
+        {record.providerName ? <span className={styles.recordDetailSecondary}>{record.providerName}{record.notes ? ` · ${record.notes}` : ""}</span> : record.notes ? <span className={styles.recordDetailSecondary}>{record.notes}</span> : null}
+      </>
+    );
+  }
   if (record.type === "veterinary" && record.visitType === "vaccination" && record.vaccineName) return record.vaccineName;
   if (record.type === "veterinary" && record.visitType === "treatment" && record.treatmentDescription) return record.treatmentDescription;
-  if (record.type === "medication" && record.notes) return record.notes;
   return "";
 }
 
