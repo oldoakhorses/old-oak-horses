@@ -31,6 +31,7 @@ type RecordFormState = {
   vaccineName: string;
   treatmentDescription: string;
   serviceType: string;
+  medications: string[];
   nextVisitDate: string;
   notes: string;
 };
@@ -71,6 +72,22 @@ type RecordReportDetectionState = {
   message: string;
   perHorseNotes?: DetectedHorseNotes[];
 };
+
+const MEDICATION_OPTIONS = [
+  "Adequan",
+  "Aspirin",
+  "Banamine",
+  "Bute",
+  "Dexamethasone",
+  "Gastroguard",
+  "Gentamicin",
+  "Legend",
+  "Marquis",
+  "Metacam",
+  "Pentosan",
+  "Traumeel",
+  "Other",
+];
 
 const farrierServiceTypes = ["Full Set", "Reset", "Trim", "Front Only", "Other"];
 const HIDDEN_PATHS = new Set(["/", "/login", "/investor", "/investor/dashboard"]);
@@ -135,6 +152,7 @@ function createInitialRecordForm(): RecordFormState {
     vaccineName: "",
     treatmentDescription: "",
     serviceType: "",
+    medications: [],
     nextVisitDate: "",
     notes: "",
   };
@@ -373,6 +391,7 @@ export default function GlobalFab() {
         vaccineName: "",
         treatmentDescription: "",
         serviceType: "",
+        medications: [],
       }));
       return;
     }
@@ -388,6 +407,7 @@ export default function GlobalFab() {
       vaccineName: "",
       treatmentDescription: "",
       serviceType: "",
+      medications: nextType === "medication" ? prev.medications : [],
     }));
   }
 
@@ -692,6 +712,7 @@ export default function GlobalFab() {
               ? recordForm.treatmentDescription.trim() || undefined
               : undefined,
           serviceType: selectedRecordType === "farrier" ? recordForm.serviceType || undefined : undefined,
+          medications: selectedRecordType === "medication" && recordForm.medications.length > 0 ? recordForm.medications : undefined,
           isUpcoming: false,
           notes: notesForHorse || undefined,
           attachmentStorageId,
@@ -713,6 +734,7 @@ export default function GlobalFab() {
                 ? recordForm.treatmentDescription.trim() || undefined
                 : undefined,
             serviceType: selectedRecordType === "farrier" ? recordForm.serviceType || undefined : undefined,
+            medications: selectedRecordType === "medication" && recordForm.medications.length > 0 ? recordForm.medications : undefined,
             isUpcoming: true,
             linkedRecordId: mainRecordId,
             notes: undefined,
@@ -1149,6 +1171,33 @@ export default function GlobalFab() {
                       onChange={(e) => setRecordForm((prev) => ({ ...prev, treatmentDescription: e.target.value }))}
                       placeholder="e.g., Laceration repair, Lameness exam"
                     />
+                  </RecordField>
+                ) : null}
+
+                {selectedRecordType === "medication" ? (
+                  <RecordField label="MEDICATION(S)">
+                    <div className={styles.chipRow} style={{ flexWrap: "wrap" }}>
+                      {MEDICATION_OPTIONS.map((med) => {
+                        const active = recordForm.medications.includes(med);
+                        return (
+                          <button
+                            type="button"
+                            key={med}
+                            className={`${styles.serviceChip} ${active ? styles.serviceChipActive : ""}`}
+                            onClick={() =>
+                              setRecordForm((prev) => ({
+                                ...prev,
+                                medications: active
+                                  ? prev.medications.filter((m) => m !== med)
+                                  : [...prev.medications, med],
+                              }))
+                            }
+                          >
+                            {med}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </RecordField>
                 ) : null}
 

@@ -301,6 +301,7 @@ export default defineSchema({
     vaccineName: v.optional(v.string()),
     treatmentDescription: v.optional(v.string()),
     serviceType: v.optional(v.string()),
+    medications: v.optional(v.array(v.string())),
     isUpcoming: v.optional(v.boolean()),
     linkedRecordId: v.optional(v.id("horseRecords")),
     notes: v.optional(v.string()),
