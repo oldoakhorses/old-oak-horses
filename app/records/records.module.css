@@ -12,24 +12,6 @@
   color: #1a1a2e;
 }
 
-.btnLogRecord {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 10px 16px;
-  border-radius: 6px;
-  border: none;
-  background: #1a1a2e;
-  color: #fff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.btnLogRecord:hover {
-  background: #2a2a4e;
-}
-
 /* Tabs — matches invoices page */
 .tabs {
   display: flex;
@@ -305,34 +287,32 @@
   border-radius: 12px;
 }
 
-.recordsHeader {
-  display: grid;
-  grid-template-columns: 36px 1fr 140px 120px 100px 40px;
-  padding: 12px 26px;
-  font-size: 9px;
-  color: #9ea2b0;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  border-bottom: 1px solid #e8eaf0;
-  user-select: none;
+.listMeta {
+  display: flex;
   align-items: center;
+  justify-content: flex-end;
+  padding: 10px 18px;
+  border-bottom: 1px solid #e8eaf0;
+}
+
+.sortButtons {
+  display: flex;
+  gap: 12px;
 }
 
 .sortHeader,
 .sortHeaderActive {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   cursor: pointer;
-  transition: color 0.15s;
   border: none;
   background: transparent;
-  text-align: left;
-  font-size: 9px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.03em;
   color: #9ea2b0;
   padding: 0;
+  font-family: inherit;
 }
 
 .sortHeader:hover {
@@ -349,10 +329,10 @@
 }
 
 .recordRow {
-  display: grid;
-  grid-template-columns: 36px 1fr 140px 120px 100px 40px;
-  padding: 14px 26px;
+  display: flex;
   align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
   border-bottom: 1px solid #f0f1f5;
   cursor: pointer;
   transition: background 0.1s;
@@ -366,27 +346,42 @@
   border-bottom: none;
 }
 
-.recordIcon {
-  font-size: 15px;
-  text-align: center;
+.recordMain {
+  flex: 1;
+  min-width: 0;
 }
 
-.recordLabelWrap {
+.recordTopLine {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
+}
+
+.recordIcon {
+  font-size: 15px;
+  flex-shrink: 0;
 }
 
 .recordLabel {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: #1a1a2e;
+}
+
+.recordBottomLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding-left: 21px;
 }
 
 .recordSublabel {
   font-size: 10px;
   color: #9ea2b0;
   margin-top: 2px;
+  padding-left: 21px;
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -404,22 +399,28 @@
 
 .recordLinkedNote {
   margin-top: 3px;
+  padding-left: 21px;
   border: none;
   background: transparent;
-  padding: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-right: 0;
   font-size: 9px;
   color: #4a5bdb;
   cursor: pointer;
+  font-family: inherit;
+  text-align: left;
 }
 
 .recordHorse {
-  font-size: 12px;
-  color: #1a1a2e;
-  font-weight: 700;
+  font-size: 11px;
+  color: #6b7084;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   text-decoration: none;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .recordHorse:hover {
@@ -448,7 +449,7 @@
 
 .recordDate {
   font-size: 11px;
-  color: #6b7084;
+  color: #9ea2b0;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1198,25 +1199,40 @@
   color: #9ea2b0;
 }
 
-@media (max-width: 1040px) {
-  .recordsHeader,
-  .recordRow {
-    grid-template-columns: 36px 1fr 120px 120px 100px 90px 40px;
+@media (max-width: 900px) {
+  .recordPanel {
+    width: min(420px, 100vw);
   }
 }
 
-@media (max-width: 900px) {
-  .headerRow {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
+@media (max-width: 640px) {
+  .title {
+    font-size: 28px;
   }
 
-  .filters {
-    grid-template-columns: 1fr;
+  .recordExpanded {
+    padding: 14px 18px;
   }
 
-  .recordPanel {
-    width: min(420px, 100vw);
+  .expandedFields {
+    gap: 16px;
+  }
+
+  .toolbarFiltersPopover {
+    width: min(320px, calc(100vw - 40px));
+  }
+}
+
+@media (min-width: 768px) {
+  .recordRow {
+    padding: 14px 26px;
+  }
+
+  .recordExpanded {
+    padding: 16px 26px;
+  }
+
+  .listMeta {
+    padding: 10px 26px;
   }
 }

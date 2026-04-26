@@ -581,9 +581,6 @@ export default function RecordsPage() {
             <div className="ui-label">// RECORDS</div>
             <h1 className={styles.title}>records</h1>
           </div>
-          <button type="button" className={styles.btnLogRecord} onClick={openRecordPanel}>
-            + log record
-          </button>
         </section>
 
         <div className={styles.tabs} role="tablist">
@@ -730,25 +727,18 @@ export default function RecordsPage() {
         </div>
 
         <section className={styles.recordsCard}>
-          <div className={styles.recordsHeader}>
-            <span />
-            <button type="button" className={sortClass(sortColumn, "record", styles)} onClick={() => handleSort("record")}>
-              RECORD
-              {sortColumn === "record" ? <span className={styles.sortArrow}>{sortDirection === "asc" ? "↑" : "↓"}</span> : null}
-            </button>
-            <button type="button" className={sortClass(sortColumn, "horse", styles)} onClick={() => handleSort("horse")}>
-              HORSE
-              {sortColumn === "horse" ? <span className={styles.sortArrow}>{sortDirection === "asc" ? "↑" : "↓"}</span> : null}
-            </button>
-            <button type="button" className={sortClass(sortColumn, "category", styles)} onClick={() => handleSort("category")}>
-              CATEGORY
-              {sortColumn === "category" ? <span className={styles.sortArrow}>{sortDirection === "asc" ? "↑" : "↓"}</span> : null}
-            </button>
-            <button type="button" className={sortClass(sortColumn, "date", styles)} onClick={() => handleSort("date")}>
-              DATE
-              {sortColumn === "date" ? <span className={styles.sortArrow}>{sortDirection === "asc" ? "↑" : "↓"}</span> : null}
-            </button>
-            <span />
+          <div className={styles.listMeta}>
+            <div className={styles.sortButtons}>
+              <button type="button" className={sortClass(sortColumn, "date", styles)} onClick={() => handleSort("date")}>
+                date {sortColumn === "date" ? <span className={styles.sortArrow}>{sortDirection === "asc" ? "↑" : "↓"}</span> : null}
+              </button>
+              <button type="button" className={sortClass(sortColumn, "horse", styles)} onClick={() => handleSort("horse")}>
+                horse {sortColumn === "horse" ? <span className={styles.sortArrow}>{sortDirection === "asc" ? "↑" : "↓"}</span> : null}
+              </button>
+              <button type="button" className={sortClass(sortColumn, "category", styles)} onClick={() => handleSort("category")}>
+                type {sortColumn === "category" ? <span className={styles.sortArrow}>{sortDirection === "asc" ? "↑" : "↓"}</span> : null}
+              </button>
+            </div>
           </div>
 
           {sortedRecords.length === 0 ? (
@@ -792,13 +782,26 @@ export default function RecordsPage() {
                       setEditState(null);
                     }}
                   >
-                    <div className={styles.recordIcon}>{recordIcon(record.type)}</div>
-                    <div>
-                      <div className={styles.recordLabelWrap}>
+                    <div className={styles.recordMain}>
+                      <div className={styles.recordTopLine}>
+                        <div className={styles.recordIcon}>{recordIcon(record.type)}</div>
                         <div className={styles.recordLabel}>{getRecordLabel(record)}</div>
                         {activeTab === "upcoming" && row.isFollowup ? <span className={styles.followupBadge}>follow-up</span> : null}
+                        <Link
+                          href={record.horseId ? `/horses/${record.horseId}` : "/horses"}
+                          className={styles.recordHorse}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          🐴 {record.horseName}
+                        </Link>
                       </div>
                       {detail ? <div className={styles.recordSublabel}>{detail}</div> : null}
+                      <div className={styles.recordBottomLine}>
+                        <span className={styles.categoryBadge} style={{ background: badgeColors.bg, color: badgeColors.color }}>
+                          {prettyType(record.type)}
+                        </span>
+                        <span className={`${styles.recordDate} ${dateSoon ? styles.recordDateSoon : ""}`}>{formatDateLong(row.eventDate)}</span>
+                      </div>
                       {record.linkedRecordId ? (
                         <button
                           type="button"
@@ -815,17 +818,6 @@ export default function RecordsPage() {
                         </button>
                       ) : null}
                     </div>
-                    <Link
-                      href={record.horseId ? `/horses/${record.horseId}` : "/horses"}
-                      className={styles.recordHorse}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      🐴 {record.horseName}
-                    </Link>
-                    <span className={styles.categoryBadge} style={{ background: badgeColors.bg, color: badgeColors.color }}>
-                      {prettyType(record.type)}
-                    </span>
-                    <div className={`${styles.recordDate} ${dateSoon ? styles.recordDateSoon : ""}`}>{formatDateLong(row.eventDate)}</div>
                     <div className={styles.menuWrap}>
                       <button
                         type="button"
