@@ -36,4 +36,5 @@ jobs:
           CONVEX_DEPLOY_KEY_TOKEN: ${{ secrets.CONVEX_DEPLOY_KEY_TOKEN }}
         run: |
           export CONVEX_DEPLOY_KEY="${CONVEX_DEPLOY_KEY_PREFIX}|${CONVEX_DEPLOY_KEY_TOKEN}"
+          echo "Prefix present: ${#CONVEX_DEPLOY_KEY_PREFIX} chars"
           npx convex deploy --yes
