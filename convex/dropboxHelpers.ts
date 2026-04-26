@@ -17,13 +17,13 @@ export const getBillForDropbox = internalQuery({
     const category = bill.categoryId ? await ctx.db.get(bill.categoryId) : null;
 
     // Resolve contact name
-    let providerName: string | undefined;
+    let contactName: string | undefined;
     if (bill.contactId) {
       const contact = await ctx.db.get(bill.contactId);
-      providerName = contact?.name;
+      contactName = contact?.name;
     }
-    if (!providerName) {
-      providerName = bill.customProviderName ?? undefined;
+    if (!contactName) {
+      contactName = bill.customProviderName ?? undefined;
     }
 
     return {
@@ -32,7 +32,7 @@ export const getBillForDropbox = internalQuery({
       uploadedAt: bill.uploadedAt,
       extractedData: bill.extractedData,
       categoryName: category?.name,
-      providerName
+      contactName
     };
   }
 });

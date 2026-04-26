@@ -25,7 +25,7 @@ type HorseFormState = {
 type RecordFormState = {
   horseIds: Id<"horses">[];
   date: string;
-  providerName: string;
+  contactName: string;
   customType: string;
   visitType: "" | "vaccination" | "treatment";
   vaccineName: string;
@@ -49,7 +49,7 @@ type InvoiceDetectionState = {
   extractedText?: string;
   matched: boolean;
   confidence: DetectionConfidence;
-  providerName: string | null;
+  contactName: string | null;
   contactId: Id<"contacts"> | null;
   category: string | null;
   subcategory: string | null;
@@ -83,7 +83,7 @@ function createInitialRecordForm(): RecordFormState {
   return {
     horseIds: [],
     date: getTodayDate(),
-    providerName: "",
+    contactName: "",
     customType: "",
     visitType: "",
     vaccineName: "",
@@ -340,7 +340,7 @@ export default function DashboardPage() {
       setSelectedRecordType(null);
       setRecordForm((prev) => ({
         ...prev,
-        providerName: "",
+        contactName: "",
         customType: "",
         visitType: "",
         vaccineName: "",
@@ -354,7 +354,7 @@ export default function DashboardPage() {
     setSelectedRecordType(nextType);
     setRecordForm((prev) => ({
       ...prev,
-      providerName: "",
+      contactName: "",
       customType: nextType === "other" ? prev.customType : "",
       visitType: "",
       vaccineName: "",
@@ -495,10 +495,10 @@ export default function DashboardPage() {
     setRecordError("");
     setRecordSubmitting(true);
     try {
-      const providerName = recordForm.providerName.trim() || undefined;
+      const contactName = recordForm.contactName.trim() || undefined;
       let resolvedContactId: Id<"contacts"> | undefined;
-      if (providerName && recordProviderCategory) {
-        const cid = await findOrCreateContact({ name: providerName, category: recordProviderCategory });
+      if (contactName && recordProviderCategory) {
+        const cid = await findOrCreateContact({ name: contactName, category: recordProviderCategory });
         if (cid) resolvedContactId = cid;
       }
 
@@ -509,7 +509,7 @@ export default function DashboardPage() {
           type: selectedRecordType,
           customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
           date: new Date(`${recordForm.date}T00:00:00`).getTime(),
-          providerName,
+          contactName,
           contactId: resolvedContactId,
           visitType: selectedRecordType === "veterinary" ? recordForm.visitType || undefined : undefined,
           vaccineName:
@@ -531,7 +531,7 @@ export default function DashboardPage() {
             type: selectedRecordType,
             customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
             date: new Date(`${recordForm.nextVisitDate}T00:00:00`).getTime(),
-            providerName,
+            contactName,
             contactId: resolvedContactId,
             visitType: selectedRecordType === "veterinary" ? recordForm.visitType || undefined : undefined,
             vaccineName:
@@ -622,7 +622,7 @@ export default function DashboardPage() {
               const icon = recordTypeIcon(item.record.type);
               const subtype = getUpcomingSubtype(item.record);
               const isFollowup = item.type === "followup";
-              const provider = item.record.providerName?.trim();
+              const provider = item.record.contactName?.trim();
               const detail = getUpcomingDetail(item.record);
               const daysAway = daysUntil(item.eventDate);
               const isToday = daysAway === 0;
@@ -738,7 +738,7 @@ function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function providerLabel(type: RecordType) {
+function contactLabel(type: RecordType) {
   if (type === "veterinary") return "VETERINARIAN";
   if (type === "medication") return "ADMINISTERED BY";
   if (type === "farrier") return "FARRIER";
@@ -746,7 +746,7 @@ function providerLabel(type: RecordType) {
   return "PROVIDER";
 }
 
-function providerPlaceholder(type: RecordType) {
+function contactPlaceholder(type: RecordType) {
   if (type === "veterinary") return "Dr. Sarah Buthe";
   if (type === "medication") return "optional";
   if (type === "farrier") return "Steve Lorenzo";
@@ -882,7 +882,7 @@ function getUpcomingDetail(record: {
   vaccineName?: string;
   treatmentDescription?: string;
   serviceType?: string;
-  providerName?: string;
+  contactName?: string;
 }) {
   if (record.type === "veterinary" && record.visitType === "vaccination" && record.vaccineName) return record.vaccineName;
   if (record.type === "veterinary" && record.treatmentDescription) return record.treatmentDescription;

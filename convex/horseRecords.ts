@@ -19,7 +19,7 @@ export const createHorseRecord = mutation({
     ),
     customType: v.optional(v.string()),
     date: v.number(),
-    providerName: v.optional(v.string()),
+    contactName: v.optional(v.string()),
     contactId: v.optional(v.id("contacts")),
     visitType: v.optional(v.union(
       v.literal("vaccination"),
@@ -57,7 +57,7 @@ export const createHorseRecord = mutation({
         type: args.type,
         customType: args.customType?.trim() || undefined,
         date: args.date,
-        providerName: args.providerName?.trim() || undefined,
+        contactName: args.contactName?.trim() || undefined,
         contactId: args.contactId,
         visitType: args.visitType,
         visitTypes: args.visitTypes && args.visitTypes.length > 0 ? args.visitTypes : undefined,
@@ -126,15 +126,15 @@ export const getAllByHorse = query({
         if (row.billId) {
           const bill = await ctx.db.get(row.billId);
           if (bill) {
-            let providerName = (bill as any).customProviderName ?? "Unknown";
+            let contactName = (bill as any).customProviderName ?? "Unknown";
             if ((bill as any).contactId) {
               const contact = await ctx.db.get((bill as any).contactId);
-              if (contact) providerName = (contact as any).name ?? providerName;
+              if (contact) contactName = (contact as any).name ?? contactName;
             }
             const extracted = ((bill as any).extractedData ?? {}) as Record<string, unknown>;
             billInfo = {
               billId: bill._id,
-              providerName,
+              contactName,
               invoiceDate: String(extracted.invoice_date ?? extracted.invoiceDate ?? ""),
             };
           }
@@ -191,15 +191,15 @@ export const getAll = query({
         if (record.billId) {
           const bill = await ctx.db.get(record.billId);
           if (bill) {
-            let providerName = (bill as any).customProviderName ?? "Unknown";
+            let contactName = (bill as any).customProviderName ?? "Unknown";
             if ((bill as any).contactId) {
               const contact = await ctx.db.get((bill as any).contactId);
-              if (contact) providerName = (contact as any).name ?? providerName;
+              if (contact) contactName = (contact as any).name ?? contactName;
             }
             const extracted = ((bill as any).extractedData ?? {}) as Record<string, unknown>;
             billInfo = {
               billId: bill._id,
-              providerName,
+              contactName,
               invoiceDate: String(extracted.invoice_date ?? extracted.invoiceDate ?? ""),
             };
           }
@@ -234,7 +234,7 @@ export const updateHorseRecord = mutation({
     )),
     customType: v.optional(v.string()),
     date: v.optional(v.number()),
-    providerName: v.optional(v.string()),
+    contactName: v.optional(v.string()),
     contactId: v.optional(v.id("contacts")),
     visitType: v.optional(v.union(
       v.literal("vaccination"),
@@ -271,7 +271,7 @@ export const updateHorseRecord = mutation({
     await ctx.db.patch(recordId, {
       ...rest,
       customType: rest.customType?.trim() || undefined,
-      providerName: rest.providerName?.trim() || undefined,
+      contactName: rest.contactName?.trim() || undefined,
       vetOtherDescription: rest.vetOtherDescription?.trim() || undefined,
       vaccineName: rest.vaccineName?.trim() || undefined,
       treatmentDescription: rest.treatmentDescription?.trim() || undefined,
@@ -296,7 +296,7 @@ export const updateRecordWithNextVisit = mutation({
       )),
       customType: v.optional(v.string()),
       date: v.optional(v.number()),
-      providerName: v.optional(v.string()),
+      contactName: v.optional(v.string()),
       contactId: v.optional(v.id("contacts")),
       serviceType: v.optional(v.string()),
       visitType: v.optional(v.union(
@@ -332,7 +332,7 @@ export const updateRecordWithNextVisit = mutation({
     const cleanedUpdates = {
       ...args.updates,
       customType: args.updates.customType?.trim() || undefined,
-      providerName: args.updates.providerName?.trim() || undefined,
+      contactName: args.updates.contactName?.trim() || undefined,
       serviceType: args.updates.serviceType?.trim() || undefined,
       vaccineName: args.updates.vaccineName?.trim() || undefined,
       treatmentDescription: args.updates.treatmentDescription?.trim() || undefined,
@@ -365,7 +365,7 @@ export const updateRecordWithNextVisit = mutation({
       if (hasExistingUpcoming && record.linkedRecordId) {
         await ctx.db.patch(record.linkedRecordId, {
           date: nextVisitTimestamp,
-          providerName: cleanedUpdates.providerName ?? record.providerName,
+          contactName: cleanedUpdates.contactName ?? record.contactName,
           contactId: cleanedUpdates.contactId ?? record.contactId,
           type: cleanedUpdates.type ?? record.type,
           customType: cleanedUpdates.customType ?? record.customType,
@@ -382,7 +382,7 @@ export const updateRecordWithNextVisit = mutation({
           type: cleanedUpdates.type ?? record.type,
           customType: cleanedUpdates.customType ?? record.customType,
           date: nextVisitTimestamp,
-          providerName: cleanedUpdates.providerName ?? record.providerName,
+          contactName: cleanedUpdates.contactName ?? record.contactName,
           contactId: cleanedUpdates.contactId ?? record.contactId,
           serviceType: cleanedUpdates.serviceType ?? record.serviceType,
           visitType: cleanedUpdates.visitType ?? record.visitType,
@@ -437,7 +437,7 @@ export const migrateNextVisitToUpcomingRecords = mutation({
         type: row.type,
         customType: row.customType,
         date: legacyNextVisitDate,
-        providerName: row.providerName,
+        contactName: row.contactName,
         visitType: row.visitType,
         vaccineName: row.vaccineName,
         treatmentDescription: row.treatmentDescription,

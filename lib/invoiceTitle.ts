@@ -1,6 +1,6 @@
 type InvoiceTitleInput = {
   category: string;
-  providerName?: string | null;
+  contactName?: string | null;
   subcategory?: string | null;
   date: string;
 };
@@ -73,7 +73,7 @@ export function toIsoDateString(value: string) {
 
 export function formatInvoiceTitle(input: InvoiceTitleInput) {
   return _formatInvoiceName({
-    providerName: input.providerName ?? (formatSubcategoryName(input.subcategory) || undefined),
+    contactName: input.contactName ?? (formatSubcategoryName(input.subcategory) || undefined),
     date: input.date
   });
 }

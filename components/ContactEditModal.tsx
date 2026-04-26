@@ -13,7 +13,7 @@ type ContactEditModalProps = {
   currentContactId?: Id<"contacts"> | null;
   currentName?: string;
   currentContact?: {
-    providerName?: string;
+    contactName?: string;
     companyName?: string;
     phone?: string;
     email?: string;
@@ -34,12 +34,12 @@ export default function ContactEditModal({
   const allContacts = useQuery(api.contacts.getAllContacts) ?? [];
   const updateBillContact = useMutation(api.bills.updateBillContact);
 
-  const [search, setSearch] = useState(currentName ?? currentContact?.providerName ?? "");
+  const [search, setSearch] = useState(currentName ?? currentContact?.contactName ?? "");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<Id<"contacts"> | null>(currentContactId ?? null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    providerName: currentContact?.providerName ?? currentName ?? "",
+    contactName: currentContact?.contactName ?? currentName ?? "",
     companyName: currentContact?.companyName ?? "",
     phone: currentContact?.phone ?? "",
     email: currentContact?.email ?? "",
@@ -68,7 +68,7 @@ export default function ContactEditModal({
     setSearch(contact.name);
     setShowSuggestions(false);
     setForm({
-      providerName: contact.name,
+      contactName: contact.name,
       companyName: contact.companyName ?? "",
       phone: contact.phone ?? "",
       email: contact.email ?? "",
@@ -84,8 +84,8 @@ export default function ContactEditModal({
       await updateBillContact({
         billId,
         contactId: selectedContactId ?? undefined,
-        extractedProviderContact: {
-          providerName: form.providerName || undefined,
+        extractedVendorContact: {
+          contactName: form.contactName || undefined,
           phone: form.phone || undefined,
           email: form.email || undefined,
           address: form.address || undefined,
@@ -111,7 +111,7 @@ export default function ContactEditModal({
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
-              setForm((p) => ({ ...p, providerName: e.target.value }));
+              setForm((p) => ({ ...p, contactName: e.target.value }));
               setSelectedContactId(null);
               setShowSuggestions(true);
             }}

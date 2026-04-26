@@ -1,7 +1,7 @@
 export type InvoiceNameInput = {
   /** User-saved/canonical name. If present, takes precedence over computed. */
   invoiceName?: string | null;
-  providerName?: string | null;
+  contactName?: string | null;
   provider?: string | null;
   date?: string | number | Date | null;
   invoiceDate?: string | number | Date | null;
@@ -29,7 +29,7 @@ export function formatInvoiceName(input: InvoiceNameInput) {
   if (saved) return saved;
 
   const provider =
-    input.providerName?.trim() ||
+    input.contactName?.trim() ||
     input.provider?.trim() ||
     "Unassigned Invoice";
 
@@ -41,10 +41,10 @@ export function formatInvoiceName(input: InvoiceNameInput) {
 
 export function formatInvoiceFileName(input: InvoiceNameInput) {
   const provider =
-    input.providerName?.trim() ||
+    input.contactName?.trim() ||
     input.provider?.trim() ||
     "unassigned-invoice";
-  const slug = slugifyProvider(provider);
+  const slug = slugifyContact(provider);
 
   const dateValue = input.date ?? input.invoiceDate ?? input.invoice_date;
   const date = dateValue instanceof Date ? dateValue : new Date(dateValue ?? "");
@@ -52,7 +52,7 @@ export function formatInvoiceFileName(input: InvoiceNameInput) {
   return `${slug}-${iso}.pdf`;
 }
 
-function slugifyProvider(value: string) {
+function slugifyContact(value: string) {
   return value
     .toLowerCase()
     .normalize("NFKD")

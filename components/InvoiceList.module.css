@@ -86,7 +86,7 @@
   color: var(--color-text);
 }
 
-.providerTag {
+.contactTag {
   background: var(--color-tag-bg);
   color: var(--color-tag-text);
   border-radius: 4px;

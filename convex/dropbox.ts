@@ -62,14 +62,14 @@ function buildFolderPath(dateMs: number): string {
  */
 function buildInvoiceFileName(
   categoryName: string,
-  providerName: string | undefined,
+  contactName: string | undefined,
   dateMs: number,
   originalFileName: string
 ): string {
   const d = new Date(dateMs);
   const dateStr = d.toISOString().slice(0, 10);
   const cat = slugify(categoryName);
-  const provider = providerName ? slugify(providerName) : "unknown";
+  const provider = contactName ? slugify(contactName) : "unknown";
   const ext = getExtension(originalFileName);
   return `${cat}-${provider}-${dateStr}${ext}`;
 }
@@ -221,7 +221,7 @@ export const uploadInvoiceToDropbox = internalAction({
       const folder = buildFolderPath(invoiceDateMs);
       const fileName = buildInvoiceFileName(
         bill.categoryName ?? "uncategorized",
-        bill.providerName,
+        bill.contactName,
         invoiceDateMs,
         bill.fileName
       );

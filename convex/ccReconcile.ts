@@ -216,7 +216,7 @@ export const uploadStatement = mutation({
       id: Id<"bills">;
       fileName: string;
       amount: number;
-      providerName: string;
+      contactName: string;
       providerKeywords: string[];
     };
 
@@ -226,7 +226,7 @@ export const uploadStatement = mutation({
         : typeof extracted.invoice_total_usd === "number" ? Math.abs(extracted.invoice_total_usd)
         : typeof extracted.invoiceTotalUsd === "number" ? Math.abs(extracted.invoiceTotalUsd)
         : 0;
-      const pName = String(extracted.provider_name ?? extracted.providerName ?? b.fileName ?? "");
+      const pName = String(extracted.contact_name ?? extracted.contactName ?? b.fileName ?? "");
 
       // Also get contact/provider name
       let contactName = "";
@@ -240,7 +240,7 @@ export const uploadStatement = mutation({
         id: b._id,
         fileName: b.fileName,
         amount: round2(total),
-        providerName: pName || contactName,
+        contactName: pName || contactName,
         providerKeywords: extractKeywords(allNames),
       };
     });
@@ -611,7 +611,7 @@ async function createBillFromTransaction(
     extractedData: {
       invoice_total_usd: absAmount,
       invoice_date: txn.postingDate,
-      provider_name: displayName,
+      contact_name: displayName,
       line_items: [lineItem],
       isCredit,
     },
@@ -806,7 +806,7 @@ export const getMatchableBills = query({
           : typeof extracted.invoice_total_usd === "number" ? extracted.invoice_total_usd
           : typeof extracted.invoiceTotalUsd === "number" ? extracted.invoiceTotalUsd
           : 0;
-        const pName = String(extracted.provider_name ?? extracted.providerName ?? "");
+        const pName = String(extracted.contact_name ?? extracted.contactName ?? "");
         let contactName = "";
         if (b.contactId) {
           const c = contacts.find((c) => String(c._id) === String(b.contactId));
@@ -818,7 +818,7 @@ export const getMatchableBills = query({
           _id: b._id,
           fileName: b.fileName,
           amount: round2(Math.abs(total)),
-          providerName: pName || contactName,
+          contactName: pName || contactName,
           providerKeywords: extractKeywords([pName, contactName, b.fileName].filter(Boolean).join(" ")),
           billingPeriod: b.billingPeriod,
           invoiceDate,
@@ -908,7 +908,7 @@ export const restoreCcReconcileExtractedData = mutation({
         ...extracted,
         invoice_total_usd: absAmount,
         invoice_date: extracted.invoice_date ?? txn.postingDate,
-        provider_name: extracted.provider_name ?? txn.description,
+        contact_name: extracted.contact_name ?? txn.description,
         line_items: [lineItem],
         isCredit: txn.amount > 0,
       };
@@ -960,7 +960,7 @@ export const cleanCcBillNames = mutation({
       if (!rawDescription) {
         const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
         rawDescription =
-          (typeof extracted.provider_name === "string" ? extracted.provider_name : undefined) ??
+          (typeof extracted.contact_name === "string" ? extracted.contact_name : undefined) ??
           bill.fileName ??
           bill.invoiceName;
       }
@@ -988,7 +988,7 @@ export const cleanCcBillNames = mutation({
         fileName: displayName,
         invoiceName: displayName,
         customProviderName: displayName,
-        extractedData: { ...extracted, provider_name: displayName },
+        extractedData: { ...extracted, contact_name: displayName },
       };
       if (matchedContactId && !bill.contactId) {
         updates.contactId = matchedContactId;

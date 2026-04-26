@@ -299,7 +299,7 @@
 }
 
 .catTag,
-.providerTag {
+.contactTag {
   font-size: 9px;
   border-radius: 5px;
   padding: 2px 8px;
@@ -308,12 +308,12 @@
   white-space: nowrap;
 }
 
-.providerTagCustom {
+.contactTagCustom {
   background: rgba(245,158,11,0.08);
   color: #F59E0B;
 }
 
-.providerText,
+.contactText,
 .invoiceDate {
   font-size: 11px;
   color: var(--color-text-secondary);
@@ -446,7 +446,7 @@
   }
 
   .invoiceDate,
-  .providerText,
+  .contactText,
   .entities,
   .statusDot {
     display: none;

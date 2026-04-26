@@ -14,7 +14,7 @@ export const getUpcomingEvents = query({
 
     const horses = await Promise.all(events.map(async (event) => [event.horseId, await ctx.db.get(event.horseId)] as const));
     const horseById = new Map(horses.map(([horseId, horse]) => [horseId, horse]));
-    const contactIds = [...new Set(events.map((event) => event.providerId).filter((id) => id !== undefined))];
+    const contactIds = [...new Set(events.map((event) => event.contactId).filter((id) => id !== undefined))];
     const contacts = await Promise.all(contactIds.map(async (contactId) => [contactId, await ctx.db.get(contactId)] as const));
     const contactById = new Map(contacts);
 
@@ -22,7 +22,7 @@ export const getUpcomingEvents = query({
       .map((event) => ({
         ...event,
         horseName: horseById.get(event.horseId)?.name ?? "Unknown horse",
-        providerName: event.providerName ?? (event.providerId ? (contactById.get(event.providerId)?.name ?? undefined) : undefined)
+        contactName: event.contactName ?? (event.contactId ? (contactById.get(event.contactId)?.name ?? undefined) : undefined)
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
   }
@@ -44,7 +44,7 @@ export const getPastEvents = query({
 
     const horses = await Promise.all(events.map(async (event) => [event.horseId, await ctx.db.get(event.horseId)] as const));
     const horseById = new Map(horses.map(([horseId, horse]) => [horseId, horse]));
-    const contactIds = [...new Set(events.map((event) => event.providerId).filter((id) => id !== undefined))];
+    const contactIds = [...new Set(events.map((event) => event.contactId).filter((id) => id !== undefined))];
     const contacts = await Promise.all(contactIds.map(async (contactId) => [contactId, await ctx.db.get(contactId)] as const));
     const contactById = new Map(contacts);
 
@@ -52,7 +52,7 @@ export const getPastEvents = query({
       .map((event) => ({
         ...event,
         horseName: horseById.get(event.horseId)?.name ?? "Unknown horse",
-        providerName: event.providerName ?? (event.providerId ? (contactById.get(event.providerId)?.name ?? undefined) : undefined)
+        contactName: event.contactName ?? (event.contactId ? (contactById.get(event.contactId)?.name ?? undefined) : undefined)
       }))
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, limit);
@@ -76,8 +76,8 @@ export const createEvent = mutation({
     type: v.string(),
     horseId: v.id("horses"),
     date: v.string(),
-    providerId: v.optional(v.id("contacts")),
-    providerName: v.optional(v.string()),
+    contactId: v.optional(v.id("contacts")),
+    contactName: v.optional(v.string()),
     note: v.optional(v.string())
   },
   handler: async (ctx, args) => {
@@ -85,8 +85,8 @@ export const createEvent = mutation({
       type: args.type.trim(),
       horseId: args.horseId,
       date: args.date,
-      providerId: args.providerId,
-      providerName: args.providerName?.trim() || undefined,
+      contactId: args.contactId,
+      contactName: args.contactName?.trim() || undefined,
       note: args.note?.trim() || undefined,
       createdAt: Date.now()
     });
@@ -99,8 +99,8 @@ export const updateEvent = mutation({
     type: v.optional(v.string()),
     horseId: v.optional(v.id("horses")),
     date: v.optional(v.string()),
-    providerId: v.optional(v.id("contacts")),
-    providerName: v.optional(v.string()),
+    contactId: v.optional(v.id("contacts")),
+    contactName: v.optional(v.string()),
     note: v.optional(v.string())
   },
   handler: async (ctx, args) => {
@@ -113,8 +113,8 @@ export const updateEvent = mutation({
       type: args.type?.trim(),
       horseId: args.horseId,
       date: args.date,
-      providerId: args.providerId,
-      providerName: args.providerName?.trim() || undefined,
+      contactId: args.contactId,
+      contactName: args.contactName?.trim() || undefined,
       note: args.note?.trim() || undefined
     });
 

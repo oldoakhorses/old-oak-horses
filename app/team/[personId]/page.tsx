@@ -332,7 +332,7 @@ export default function TeamProfilePage() {
                 <div className={styles.invoiceLeft}>
                   <span className={styles.dotApproved} />
                   <div className={styles.invoiceLabelBlock}>
-                    <span className={styles.invoiceLabel}>{row.providerName}</span>
+                    <span className={styles.invoiceLabel}>{row.contactName}</span>
                     <span className={styles.invoiceMeta}>
                       {row.categorySlug ? pretty(row.categorySlug) : "Uncategorized"}
                       {row.invoiceDate ? ` • ${formatDateLong(row.invoiceDate)}` : ""}

@@ -31,7 +31,7 @@ export default function BizOverviewPage() {
     const q = search.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((row) =>
-      [row.invoiceNumber, row.provider, row.date, row.category, ...row.entities].join(" ").toLowerCase().includes(q)
+      [row.invoiceNumber, row.vendor, row.date, row.category, ...row.entities].join(" ").toLowerCase().includes(q)
     );
   }, [data?.recentInvoices, search]);
 
@@ -256,7 +256,7 @@ export default function BizOverviewPage() {
               {data.businessGeneral.items.map((item: any, idx: number) => (
                 <Link
                   key={`${item.billId}-${idx}`}
-                  href={buildInvoiceHref(item.categorySlug, slugify(item.providerName), item.billId)}
+                  href={buildInvoiceHref(item.categorySlug, slugify(item.contactName), item.billId)}
                   className={styles.tableRow}
                 >
                   <div className={styles.catName}>{item.invoiceName}</div>
@@ -289,20 +289,20 @@ export default function BizOverviewPage() {
           </div>
 
           {pagedInvoices.map((row) => {
-            const href = buildInvoiceHref(row.categorySlug, row.providerSlug, String(row._id));
+            const href = buildInvoiceHref(row.categorySlug, row.contactSlug, String(row._id));
             return (
               <Link key={String(row._id)} href={href} className={styles.invoiceRow}>
                 <div className={styles.invoiceNumber}>
                   {formatInvoiceName({
                     category: row.categorySlug,
-                    providerName: row.provider,
+                    contactName: row.vendor,
                     date: row.date,
                   })}
                 </div>
                 <span className={styles.catTag} style={{ background: `${row.categoryColor}1A`, color: row.categoryColor }}>
                   {shortCategory(row.categorySlug)}
                 </span>
-                <div className={row.providerSlug === "other" ? `${styles.providerText} ${styles.providerTagCustom}` : styles.providerText}>{row.provider}</div>
+                <div className={row.contactSlug === "other" ? `${styles.contactText} ${styles.contactTagCustom}` : styles.contactText}>{row.vendor}</div>
                 <div className={styles.invoiceDate}>#{row.invoiceNumber} · {toIsoDateString(row.date)}</div>
                 <div className={styles.entities}>
                   {row.entities.slice(0, 3).map((entity) => (
@@ -345,11 +345,11 @@ function slugify(value: string) {
   return value.toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-");
 }
 
-function buildInvoiceHref(categorySlug: string, providerSlug: string, billId: string) {
-  if (categorySlug === "travel") return `/travel/${providerSlug}/${billId}`;
-  if (categorySlug === "housing") return `/housing/${providerSlug}/${billId}`;
-  if (categorySlug === "stabling") return `/stabling/${providerSlug}/${billId}`;
-  return `/${categorySlug}/${providerSlug}/${billId}`;
+function buildInvoiceHref(categorySlug: string, contactSlug: string, billId: string) {
+  if (categorySlug === "travel") return `/travel/${contactSlug}/${billId}`;
+  if (categorySlug === "housing") return `/housing/${contactSlug}/${billId}`;
+  if (categorySlug === "stabling") return `/stabling/${contactSlug}/${billId}`;
+  return `/${categorySlug}/${contactSlug}/${billId}`;
 }
 
 function shortCategory(slug: string) {

@@ -164,8 +164,8 @@ export const getHorseSpendSummary = query({
     const invoiceRows: Array<{
       billId: string;
       categorySlug: string;
-      providerSlug: string;
-      providerName: string;
+      contactSlug: string;
+      contactName: string;
       invoiceNumber: string;
       invoiceDate: string | null;
       total: number;
@@ -191,8 +191,8 @@ export const getHorseSpendSummary = query({
       invoiceRows.push({
         billId: String(bill._id),
         categorySlug: category.slug,
-        providerSlug: contact?.slug ?? slugify(contact?.name ?? bill.customProviderName ?? "invoice"),
-        providerName: contact?.name ?? bill.customProviderName ?? "Unknown",
+        contactSlug: contact?.slug ?? slugify(contact?.name ?? bill.customProviderName ?? "invoice"),
+        contactName: contact?.name ?? bill.customProviderName ?? "Unknown",
         invoiceNumber: String(extracted.invoice_number ?? bill.fileName),
         invoiceDate: typeof extracted.invoice_date === "string" ? extracted.invoice_date : null,
         total: round2(matchedAmount)
@@ -453,8 +453,8 @@ async function collectHorseInvoices(ctx: any, horseId: any) {
     _id: string;
     category: string;
     categoryName: string;
-    providerName: string;
-    providerSlug: string;
+    contactName: string;
+    contactSlug: string;
     invoiceName: string | null;
     invoiceNumber: string;
     date: string | null;
@@ -479,15 +479,15 @@ async function collectHorseInvoices(ctx: any, horseId: any) {
     const contact = bill.contactId ? await ctx.db.get(bill.contactId) : null;
     const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
     const invoiceDate = typeof extracted.invoice_date === "string" ? extracted.invoice_date : null;
-    const providerName = contact?.name ?? bill.customProviderName ?? "Unknown";
-    const providerSlug = contact?.slug ?? slugify(providerName);
+    const contactName = contact?.name ?? bill.customProviderName ?? "Unknown";
+    const contactSlug = contact?.slug ?? slugify(contactName);
 
     rows.push({
       _id: String(bill._id),
       category: categorySlug,
       categoryName: categoryName,
-      providerName,
-      providerSlug,
+      contactName,
+      contactSlug,
       invoiceName: typeof bill.invoiceName === "string" && bill.invoiceName.trim().length > 0 ? bill.invoiceName : null,
       invoiceNumber: String(extracted.invoice_number ?? bill.fileName ?? ""),
       date: invoiceDate,

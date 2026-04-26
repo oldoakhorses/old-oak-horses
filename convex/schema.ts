@@ -144,9 +144,9 @@ export default defineSchema({
     ,
     hasUnmatchedHorses: v.optional(v.boolean()),
     unmatchedHorseNames: v.optional(v.array(v.string())),
-    extractedProviderContact: v.optional(
+    extractedVendorContact: v.optional(
       v.object({
-        providerName: v.optional(v.string()),
+        vendorName: v.optional(v.string()),
         contactName: v.optional(v.string()),
         address: v.optional(v.string()),
         phone: v.optional(v.string()),
@@ -233,8 +233,8 @@ export default defineSchema({
     type: v.string(),
     horseId: v.id("horses"),
     date: v.string(),
-    providerId: v.optional(v.id("contacts")),
-    providerName: v.optional(v.string()),
+    contactId: v.optional(v.id("contacts")),
+    contactName: v.optional(v.string()),
     note: v.optional(v.string()),
     createdAt: v.number()
   })
@@ -254,7 +254,7 @@ export default defineSchema({
     customType: v.optional(v.string()),
     date: v.number(),
     nextVisitDate: v.optional(v.number()),
-    providerName: v.optional(v.string()),
+    contactName: v.optional(v.string()),
     contactId: v.optional(v.id("contacts")),
     visitType: v.optional(v.union(
       v.literal("vaccination"),

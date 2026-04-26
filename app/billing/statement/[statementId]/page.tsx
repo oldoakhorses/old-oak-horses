@@ -216,7 +216,7 @@ export default function StatementReconcilePage() {
   const filteredBills = billSearch
     ? scoredBills.filter((b) =>
         b.fileName.toLowerCase().includes(billSearch.toLowerCase()) ||
-        b.providerName.toLowerCase().includes(billSearch.toLowerCase())
+        b.contactName.toLowerCase().includes(billSearch.toLowerCase())
       )
     : scoredBills;
 
@@ -568,7 +568,7 @@ export default function StatementReconcilePage() {
                     <div className={styles.billOptionInfo}>
                       <div className={styles.billOptionName}>{bill.fileName}</div>
                       <div className={styles.billOptionMeta}>
-                        {bill.providerName}{bill.invoiceDate ? ` · ${bill.invoiceDate}` : ""}{bill.categorySlug ? ` · ${bill.categorySlug}` : ""}
+                        {bill.contactName}{bill.invoiceDate ? ` · ${bill.invoiceDate}` : ""}{bill.categorySlug ? ` · ${bill.categorySlug}` : ""}
                       </div>
                       {(bill.hasHorseAssignments || bill.hasPersonAssignments) && (
                         <div className={styles.billOptionAssigned}>
@@ -601,7 +601,7 @@ export default function StatementReconcilePage() {
                 <div className={styles.billOptionInfo}>
                   <div className={styles.billOptionName}>{bill.fileName}</div>
                   <div className={styles.billOptionMeta}>
-                    {bill.providerName}{bill.invoiceDate ? ` · ${bill.invoiceDate}` : ""} &middot; {bill.billingPeriod}
+                    {bill.contactName}{bill.invoiceDate ? ` · ${bill.invoiceDate}` : ""} &middot; {bill.billingPeriod}
                   </div>
                 </div>
                 <div className={styles.billOptionAmount}>{fmtUSD(bill.amount)}</div>

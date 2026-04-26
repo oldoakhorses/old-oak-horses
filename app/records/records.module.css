@@ -494,13 +494,13 @@
   flex-shrink: 0;
 }
 
-.recordProvider,
-.recordProviderEmpty {
+.recordContact,
+.recordContactEmpty {
   font-size: 12px;
   color: #6b7084;
 }
 
-.recordProviderEmpty {
+.recordContactEmpty {
   color: #c4c7d0;
 }
 
@@ -919,15 +919,15 @@
   line-height: 1;
 }
 
-.providerOtherWrap {
+.contactOtherWrap {
   margin-top: 10px;
 }
 
-.providerSearchWrap {
+.contactSearchWrap {
   position: relative;
 }
 
-.providerDropdown {
+.contactDropdown {
   position: absolute;
   top: 100%;
   left: 0;
@@ -942,7 +942,7 @@
   z-index: 20;
 }
 
-.providerDropdownItem {
+.contactDropdownItem {
   display: block;
   width: 100%;
   padding: 8px 12px;
@@ -957,7 +957,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.providerDropdownItem:hover {
+.contactDropdownItem:hover {
   background: #f2f3f7;
 }
 

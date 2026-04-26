@@ -1147,11 +1147,11 @@
   min-width: 120px;
 }
 
-.providerSearchWrap {
+.contactSearchWrap {
   position: relative;
 }
 
-.providerDropdown {
+.contactDropdown {
   position: absolute;
   top: 100%;
   left: 0;
@@ -1166,7 +1166,7 @@
   z-index: 20;
 }
 
-.providerDropdownItem {
+.contactDropdownItem {
   display: block;
   width: 100%;
   padding: 8px 12px;
@@ -1181,6 +1181,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.providerDropdownItem:hover {
+.contactDropdownItem:hover {
   background: #f2f3f7;
 }
