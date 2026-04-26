@@ -32,9 +32,7 @@ jobs:
 
       - name: Deploy to Convex
         env:
-          CONVEX_DEPLOY_KEY_PREFIX: ${{ secrets.CONVEX_DEPLOY_KEY_PREFIX }}
           CONVEX_DEPLOY_KEY_TOKEN: ${{ secrets.CONVEX_DEPLOY_KEY_TOKEN }}
         run: |
-          export CONVEX_DEPLOY_KEY="${CONVEX_DEPLOY_KEY_PREFIX}|${CONVEX_DEPLOY_KEY_TOKEN}"
-          echo "Prefix present: ${#CONVEX_DEPLOY_KEY_PREFIX} chars"
+          export CONVEX_DEPLOY_KEY="prod:fabulous-mastiff-759|${CONVEX_DEPLOY_KEY_TOKEN}"
           npx convex deploy --yes
