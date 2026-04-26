@@ -112,6 +112,8 @@ export default function InvoicesPage() {
   const [editingNotesFor, setEditingNotesFor] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const hasActiveFilters = categoryFilter !== "all" || horseFilter !== "all" || fromDate || toDate;
 
   const categories = useMemo(() => ["all", ...new Set(rows.map((row) => row.categoryName))], [rows]);
 
@@ -212,55 +214,82 @@ export default function InvoicesPage() {
           <h1 className={styles.title}>Invoices</h1>
         </div>
 
-        <section className={styles.filters}>
-          <label>
-            <span>Category</span>
-            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-              {categories.map((name) => (
-                <option key={name} value={name}>
-                  {name === "all" ? "All" : name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>Horse</span>
-            <select value={horseFilter} onChange={(e) => setHorseFilter(e.target.value)}>
-              <option value="all">All</option>
-              {activeHorses.map((horse) => (
-                <option key={horse._id} value={String(horse._id)}>{horse.name}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>From</span>
-            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-          </label>
-          <label>
-            <span>To</span>
-            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-          </label>
-          <label>
-            <span>Search</span>
-            <input type="text" placeholder="search invoices..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-          </label>
+        <section className={styles.filterBar}>
+          <div className={styles.searchRow}>
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="search invoices..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <button
+              type="button"
+              className={`${styles.filterToggle} ${hasActiveFilters ? styles.filterToggleActive : ""}`}
+              onClick={() => setFiltersOpen((prev) => !prev)}
+            >
+              {filtersOpen ? "hide filters" : "filters"}{hasActiveFilters ? ` •` : ""}
+            </button>
+          </div>
+
+          {filtersOpen && (
+            <div className={styles.filterGrid}>
+              <label>
+                <span>Category</span>
+                <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                  {categories.map((name) => (
+                    <option key={name} value={name}>
+                      {name === "all" ? "All" : name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Horse</span>
+                <select value={horseFilter} onChange={(e) => setHorseFilter(e.target.value)}>
+                  <option value="all">All</option>
+                  {activeHorses.map((horse) => (
+                    <option key={horse._id} value={String(horse._id)}>{horse.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>From</span>
+                <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+              </label>
+              <label>
+                <span>To</span>
+                <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+              </label>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  className={styles.clearFiltersBtn}
+                  onClick={() => {
+                    setCategoryFilter("all");
+                    setHorseFilter("all");
+                    setFromDate("");
+                    setToDate("");
+                  }}
+                >
+                  clear all
+                </button>
+              )}
+            </div>
+          )}
         </section>
 
         <section className={styles.listCard}>
-          <div className={styles.invoicesHeader}>
-            <button type="button" className={headerClass(sortColumn === "invoice", styles)} onClick={() => handleSort("invoice")}>
-              Invoice {sortArrow(sortColumn === "invoice", sortDirection, styles)}
-            </button>
-            <button type="button" className={headerClass(sortColumn === "category", styles)} onClick={() => handleSort("category")}>
-              Category {sortArrow(sortColumn === "category", sortDirection, styles)}
-            </button>
-            <button type="button" className={headerClass(sortColumn === "date", styles)} onClick={() => handleSort("date")}>
-              Date {sortArrow(sortColumn === "date", sortDirection, styles)}
-            </button>
-            <button type="button" className={headerClass(sortColumn === "amount", styles)} onClick={() => handleSort("amount")}>
-              Amount {sortArrow(sortColumn === "amount", sortDirection, styles)}
-            </button>
-            <div />
+          <div className={styles.listMeta}>
+            <span>{filtered.length} invoice{filtered.length !== 1 ? "s" : ""}</span>
+            <div className={styles.sortButtons}>
+              <button type="button" className={headerClass(sortColumn === "date", styles)} onClick={() => handleSort("date")}>
+                date {sortArrow(sortColumn === "date", sortDirection, styles)}
+              </button>
+              <button type="button" className={headerClass(sortColumn === "amount", styles)} onClick={() => handleSort("amount")}>
+                amount {sortArrow(sortColumn === "amount", sortDirection, styles)}
+              </button>
+            </div>
           </div>
 
           {filtered.map((row) => {
@@ -289,30 +318,29 @@ export default function InvoicesPage() {
                     setOpenMenuId(null);
                   }}
                 >
-                  <div className={styles.invoiceCol}>
-                    <span className={styles.expandChevron}>{isExpanded ? "▾" : "▸"}</span>
-                    <a
-                      className={styles.invoiceNameLink}
-                      href={url}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        router.push(url);
-                      }}
-                    >
-                      {abbreviateInvoiceName(row.invoiceName || formatInvoiceName({ providerName: getProvider(row), date }))}
-                    </a>
-                    {row.source === "cc_transaction" && (
-                      <span className={styles.ccBadge}>CC</span>
-                    )}
+                  <div className={styles.invoiceMain}>
+                    <div className={styles.invoiceTopLine}>
+                      <a
+                        className={styles.invoiceNameLink}
+                        href={url}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          router.push(url);
+                        }}
+                      >
+                        {abbreviateInvoiceName(row.invoiceName || formatInvoiceName({ providerName: getProvider(row), date }))}
+                      </a>
+                      <span className={styles.amountCol} style={total >= 0 ? { color: "#16A34A" } : undefined}>{formatUsd(total)}</span>
+                    </div>
+                    <div className={styles.invoiceBottomLine}>
+                      <span className={styles.categoryBadge} style={{ background: categoryColor.bg, color: categoryColor.color }}>
+                        {categoryColor.label}
+                      </span>
+                      {row.source === "cc_transaction" && <span className={styles.ccBadge}>CC</span>}
+                      <span className={styles.dateCol}>{date}</span>
+                    </div>
                   </div>
-                  <div>
-                    <span className={styles.categoryBadge} style={{ background: categoryColor.bg, color: categoryColor.color }}>
-                      {categoryColor.label}
-                    </span>
-                  </div>
-                  <div className={styles.dateCol}>{date}</div>
-                  <div className={styles.amountCol} style={total >= 0 ? { color: "#16A34A" } : undefined}>{formatUsd(total)}</div>
                   <div className={styles.menuWrap} onClick={(e) => e.stopPropagation()}>
                     <button type="button" className={styles.invoiceMenuBtn} onClick={(e) => { e.stopPropagation(); setOpenMenuId((prev) => (prev === rowId ? null : rowId)); }}>
                       ⋮
