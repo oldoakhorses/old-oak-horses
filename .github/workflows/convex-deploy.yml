@@ -36,4 +36,4 @@ jobs:
           CONVEX_DEPLOY_KEY_TOKEN: ${{ secrets.CONVEX_DEPLOY_KEY_TOKEN }}
         run: |
           export CONVEX_DEPLOY_KEY="${CONVEX_DEPLOY_KEY_PREFIX}|${CONVEX_DEPLOY_KEY_TOKEN}"
-          npx convex deploy
+          npx convex deploy --yes
