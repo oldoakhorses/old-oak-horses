@@ -46,19 +46,6 @@ type DocumentFormState = {
   notes: string;
 };
 
-type DetectionConfidence = "exact" | "partial" | "none";
-
-type InvoiceDetectionState = {
-  extractedName: string;
-  extractedText?: string;
-  matched: boolean;
-  confidence: DetectionConfidence;
-  providerName: string | null;
-  providerId: Id<"providers"> | null;
-  category: string | null;
-  subcategory: string | null;
-  categoryId: Id<"categories"> | null;
-};
 
 type DetectedHorseNotes = {
   horseId: Id<"horses">;
@@ -222,14 +209,16 @@ export default function GlobalFab() {
   const activePeople = useQuery(api.people.getAllPeople) ?? [];
   const categories = useQuery(api.categories.getAllCategories) ?? [];
   const recordProviderCategory = selectedRecordType ? RECORD_TYPE_TO_CATEGORY[selectedRecordType] : "";
-  const recordProviders =
-    useQuery(api.providers.listByCategory, recordProviderCategory ? { category: recordProviderCategory } : "skip") ?? [];
+  const allContactsForRecord = useQuery(api.contacts.getAllContacts) ?? [];
+  const recordProviders = useMemo(
+    () => allContactsForRecord.filter((c: any) => recordProviderCategory && c.category === recordProviderCategory),
+    [allContactsForRecord, recordProviderCategory]
+  );
 
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);
   const updateHorseRecord = useMutation(api.horseRecords.updateHorseRecord);
   const uploadDocument = useMutation(api.documents.upload);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
-  const detectProvider = useAction((api as any).invoiceDetect.detectProvider);
   const detectRecordReport = useAction((api as any).reportDetect.detectReportFromPdf);
   const parseUploadedInvoice = useAction((api as any).uploads.parseUploadedInvoice);
 
@@ -626,36 +615,12 @@ export default function GlobalFab() {
       const uploadPayload = await uploadResponse.json();
       const storageId = uploadPayload.storageId as Id<"_storage">;
 
-      setInvoiceStatusMessage("detecting provider...");
-      setInvoiceStage("detecting");
-      const detection = (await detectProvider({ fileStorageId: storageId })) as InvoiceDetectionState;
-
-      if (!detection.matched || !detection.providerId || !detection.categoryId) {
-        // Don't default to "admin" — let AI auto-detect category from line items
-        setInvoiceStatusMessage("doing things...");
-        setInvoiceStage("parsing");
-        const fallback = await parseUploadedInvoice({
-          fileStorageId: storageId,
-          customProviderName:
-            detection.extractedName && detection.extractedName.toUpperCase() !== "UNKNOWN"
-              ? detection.extractedName
-              : "Unknown Provider"
-        });
-        setInvoiceStatusMessage("redirecting...");
-        setInvoiceStage("redirecting");
-        closePanel();
-        router.push(`/invoices/preview/${fallback.billId}`);
-        return;
-      }
-
-      setInvoiceStatusMessage("doing things...");
+      // Skip upfront detection — parseBillPdf will extract provider info
+      // and the user picks a contact on the preview page.
+      setInvoiceStatusMessage("starting parse...");
       setInvoiceStage("parsing");
       const result = await parseUploadedInvoice({
         fileStorageId: storageId,
-        categoryId: detection.categoryId,
-        providerId: detection.providerId,
-        adminSubcategory: detection.category === "admin" ? detection.subcategory || undefined : undefined,
-        duesSubcategory: detection.category === "dues-registrations" ? detection.subcategory || undefined : undefined
       });
 
       setInvoiceStatusMessage("redirecting...");
@@ -1250,7 +1215,7 @@ export default function GlobalFab() {
                       </select>
                       {recordForm.selectedProvider === "__other" ? (
                         <div className={styles.providerOtherWrap}>
-                          <label className={styles.recordFieldLabel}>PROVIDER NAME</label>
+                          <label className={styles.recordFieldLabel}>CONTACT NAME</label>
                           <input
                             className={styles.recordInput}
                             value={recordForm.providerName}
@@ -1399,7 +1364,7 @@ function providerLabel(type: RecordType) {
   if (type === "medication") return "ADMINISTERED BY";
   if (type === "farrier") return "FARRIER";
   if (type === "bodywork") return "PRACTITIONER";
-  return "PROVIDER";
+  return "CONTACT";
 }
 
 function providerPlaceholder(type: RecordType) {

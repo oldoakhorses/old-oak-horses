@@ -115,6 +115,7 @@ export const setHorseStatus = mutation({
       status: "active" | "inactive";
       isSold?: boolean;
       soldDate?: number | undefined;
+      inactiveSince?: number | undefined;
     } = { status: args.status };
 
     if (args.isSold) {
@@ -124,6 +125,13 @@ export const setHorseStatus = mutation({
     if (args.status === "active") {
       updates.isSold = false;
       updates.soldDate = undefined;
+      updates.inactiveSince = undefined;
+    } else {
+      // Mark when horse became inactive
+      const horse = await ctx.db.get(args.horseId);
+      if (horse && !horse.inactiveSince) {
+        updates.inactiveSince = Date.now();
+      }
     }
 
     await ctx.db.patch(args.horseId, updates);
@@ -178,14 +186,13 @@ export const getHorseSpendSummary = query({
       current.invoiceCount += 1;
       byCategory.set(category.slug, current);
 
-      const provider =
-        bill.providerId ? await ctx.db.get(bill.providerId) : null;
+      const contact = bill.contactId ? await ctx.db.get(bill.contactId) : null;
       const extracted = bill.extractedData as Record<string, unknown>;
       invoiceRows.push({
         billId: String(bill._id),
         categorySlug: category.slug,
-        providerSlug: provider?.slug ?? slugify(provider?.name ?? bill.customProviderName ?? "invoice"),
-        providerName: provider?.name ?? bill.customProviderName ?? "Unknown",
+        providerSlug: contact?.slug ?? slugify(contact?.name ?? bill.customProviderName ?? "invoice"),
+        providerName: contact?.name ?? bill.customProviderName ?? "Unknown",
         invoiceNumber: String(extracted.invoice_number ?? bill.fileName),
         invoiceDate: typeof extracted.invoice_date === "string" ? extracted.invoice_date : null,
         total: round2(matchedAmount)
@@ -448,6 +455,7 @@ async function collectHorseInvoices(ctx: any, horseId: any) {
     categoryName: string;
     providerName: string;
     providerSlug: string;
+    invoiceName: string | null;
     invoiceNumber: string;
     date: string | null;
     uploadedAt: number;
@@ -468,11 +476,11 @@ async function collectHorseInvoices(ctx: any, horseId: any) {
     const amount = amountForHorseInBill(horseNamesToMatch, bill, activeHorseCount);
     if (amount <= 0) continue;
 
-    const provider = bill.providerId ? await ctx.db.get(bill.providerId) : null;
+    const contact = bill.contactId ? await ctx.db.get(bill.contactId) : null;
     const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
     const invoiceDate = typeof extracted.invoice_date === "string" ? extracted.invoice_date : null;
-    const providerName = provider?.name ?? bill.customProviderName ?? "Unknown";
-    const providerSlug = provider?.slug ?? slugify(providerName);
+    const providerName = contact?.name ?? bill.customProviderName ?? "Unknown";
+    const providerSlug = contact?.slug ?? slugify(providerName);
 
     rows.push({
       _id: String(bill._id),
@@ -480,12 +488,13 @@ async function collectHorseInvoices(ctx: any, horseId: any) {
       categoryName: categoryName,
       providerName,
       providerSlug,
+      invoiceName: typeof bill.invoiceName === "string" && bill.invoiceName.trim().length > 0 ? bill.invoiceName : null,
       invoiceNumber: String(extracted.invoice_number ?? bill.fileName ?? ""),
       date: invoiceDate,
       uploadedAt: bill.uploadedAt,
       amount: round2(amount),
       status: bill.status === "done" && bill.isApproved ? "approved" : "pending",
-      href: buildInvoiceHref(categorySlug, providerSlug, String(bill._id), bill),
+      href: `/invoices/preview/${String(bill._id)}`,
     });
   }
 
@@ -495,32 +504,4 @@ async function collectHorseInvoices(ctx: any, horseId: any) {
     if (aDate !== bDate) return bDate - aDate;
     return b.amount - a.amount;
   });
-}
-
-function buildInvoiceHref(categorySlug: string, providerSlug: string, billId: string, bill: any) {
-  if (categorySlug === "admin") {
-    const sub = bill.adminSubcategory ?? "legal";
-    return `/admin/${sub}/${providerSlug}/${billId}`;
-  }
-  if (categorySlug === "dues-registrations") {
-    const sub = bill.duesSubcategory ?? "memberships";
-    return `/dues-registrations/${sub}/${providerSlug}/${billId}`;
-  }
-  if (categorySlug === "horse-transport") {
-    const sub = bill.horseTransportSubcategory ?? "ground-transport";
-    return `/horse-transport/${sub}/${providerSlug}/${billId}`;
-  }
-  if (categorySlug === "travel") {
-    const sub = bill.travelSubcategory ?? "rental-car";
-    return `/travel/${sub}/${billId}`;
-  }
-  if (categorySlug === "housing") {
-    const sub = bill.housingSubcategory ?? "rider-housing";
-    return `/housing/${sub}/${billId}`;
-  }
-  if (categorySlug === "marketing") {
-    const sub = bill.marketingSubcategory ?? providerSlug;
-    return `/marketing/${sub}/${billId}`;
-  }
-  return `/${categorySlug}/${providerSlug}/${billId}`;
 }

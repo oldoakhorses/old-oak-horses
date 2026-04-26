@@ -35,6 +35,30 @@
   font-weight: 700;
   color: #1a1a2e;
   margin: 0 0 6px;
+  cursor: text;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin-left: -4px;
+}
+
+.stmtTitle:hover {
+  background: rgba(74, 91, 219, 0.06);
+}
+
+.stmtTitleInput {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 6px;
+  padding: 2px 4px;
+  margin-left: -4px;
+  border: 1px solid #4a5bdb;
+  border-radius: 4px;
+  background: #fff;
+  font-family: inherit;
+  width: 100%;
+  max-width: 720px;
+  outline: none;
 }
 
 .headerMeta {

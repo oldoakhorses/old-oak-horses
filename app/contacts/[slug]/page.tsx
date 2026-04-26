@@ -6,6 +6,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
 import NavBar from "@/components/NavBar";
+import { formatInvoiceName } from "@/lib/formatInvoiceName";
 import styles from "./contact.module.css";
 
 const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
@@ -80,28 +81,30 @@ export default function ContactDetailPage() {
   const [saving, setSaving] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
-    fullName: "",
-    contactName: "",
+    companyName: "",
     phone: "",
     email: "",
     address: "",
     website: "",
     accountNumber: "",
     category: "",
+    location: "",
+    notes: "",
   });
 
   function startEdit() {
     if (!contact) return;
     setEditForm({
       name: contact.name ?? "",
-      fullName: contact.fullName ?? "",
-      contactName: contact.contactName ?? contact.primaryContactName ?? "",
-      phone: contact.phone ?? contact.primaryContactPhone ?? "",
+      companyName: contact.companyName ?? "",
+      phone: contact.phone ?? "",
       email: contact.email ?? "",
       address: contact.address ?? "",
       website: contact.website ?? "",
       accountNumber: contact.accountNumber ?? "",
       category: contact.category ?? "",
+      location: contact.location ?? "",
+      notes: contact.notes ?? "",
     });
     setEditing(true);
   }
@@ -113,14 +116,15 @@ export default function ContactDetailPage() {
       await updateContact({
         contactId: contact._id,
         name: editForm.name || undefined,
-        fullName: editForm.fullName || undefined,
-        contactName: editForm.contactName || undefined,
+        companyName: editForm.companyName || undefined,
         phone: editForm.phone || undefined,
         email: editForm.email || undefined,
         address: editForm.address || undefined,
         website: editForm.website || undefined,
         accountNumber: editForm.accountNumber || undefined,
         category: editForm.category || undefined,
+        location: editForm.location || undefined,
+        notes: editForm.notes || undefined,
       });
       setEditing(false);
     } catch {
@@ -155,7 +159,7 @@ export default function ContactDetailPage() {
         <div>
           <h1 className={styles.contactName}>{contact.name}</h1>
           <div className={styles.contactType}>
-            {contact.type ?? "vendor"} {contact.category ? `/ ${formatCategoryLabel(contact.category)}` : ""}
+            {contact.category ? formatCategoryLabel(contact.category) : "contact"}
           </div>
         </div>
         {!editing && (
@@ -172,12 +176,8 @@ export default function ContactDetailPage() {
               <input className={styles.editInput} value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} />
             </div>
             <div className={styles.editField}>
-              <span className={styles.label}>FULL NAME</span>
-              <input className={styles.editInput} value={editForm.fullName} onChange={(e) => setEditForm((p) => ({ ...p, fullName: e.target.value }))} />
-            </div>
-            <div className={styles.editField}>
-              <span className={styles.label}>CONTACT PERSON</span>
-              <input className={styles.editInput} value={editForm.contactName} onChange={(e) => setEditForm((p) => ({ ...p, contactName: e.target.value }))} />
+              <span className={styles.label}>COMPANY NAME</span>
+              <input className={styles.editInput} value={editForm.companyName} onChange={(e) => setEditForm((p) => ({ ...p, companyName: e.target.value }))} />
             </div>
             <div className={styles.editField}>
               <span className={styles.label}>PHONE</span>
@@ -223,6 +223,28 @@ export default function ContactDetailPage() {
                 <option value="equity">Equity</option>
               </select>
             </div>
+            <div className={styles.editField}>
+              <span className={styles.label}>LOCATION</span>
+              <select className={styles.editInput} value={editForm.location} onChange={(e) => setEditForm((p) => ({ ...p, location: e.target.value }))}>
+                <option value="">— select location —</option>
+                <option value="wellington">Wellington</option>
+                <option value="thermal">Thermal</option>
+                <option value="ocala">Ocala</option>
+                <option value="la">LA</option>
+                <option value="eu">EU</option>
+                <option value="can">Canada</option>
+              </select>
+            </div>
+            <div className={styles.editField} style={{ gridColumn: "1 / -1" }}>
+              <span className={styles.label}>NOTES</span>
+              <textarea
+                className={styles.editInput}
+                value={editForm.notes}
+                onChange={(e) => setEditForm((p) => ({ ...p, notes: e.target.value }))}
+                rows={3}
+                style={{ resize: "vertical", minHeight: 60, fontFamily: "inherit" }}
+              />
+            </div>
             <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, marginTop: 8 }}>
               <button type="button" className={styles.cancelBtn} onClick={() => setEditing(false)}>cancel</button>
               <button type="button" className={styles.saveBtn} disabled={saving} onClick={() => void handleSave()}>
@@ -232,14 +254,11 @@ export default function ContactDetailPage() {
           </div>
         ) : (
           <div className={styles.detailsGrid}>
-            {contact.fullName ? (
-              <div><span className={styles.label}>FULL NAME</span><span className={styles.value}>{contact.fullName}</span></div>
+            {contact.companyName ? (
+              <div><span className={styles.label}>COMPANY NAME</span><span className={styles.value}>{contact.companyName}</span></div>
             ) : null}
-            {contact.contactName || contact.primaryContactName ? (
-              <div><span className={styles.label}>CONTACT PERSON</span><span className={styles.value}>{contact.contactName ?? contact.primaryContactName}</span></div>
-            ) : null}
-            {contact.phone || contact.primaryContactPhone ? (
-              <div><span className={styles.label}>PHONE</span><span className={styles.value}>{contact.phone ?? contact.primaryContactPhone}</span></div>
+            {contact.phone ? (
+              <div><span className={styles.label}>PHONE</span><span className={styles.value}>{contact.phone}</span></div>
             ) : null}
             {contact.email ? (
               <div><span className={styles.label}>EMAIL</span><span className={styles.value}>{contact.email}</span></div>
@@ -255,6 +274,9 @@ export default function ContactDetailPage() {
             ) : null}
             {contact.location ? (
               <div><span className={styles.label}>LOCATION</span><span className={styles.value}>{contact.location}</span></div>
+            ) : null}
+            {contact.notes ? (
+              <div style={{ gridColumn: "1 / -1" }}><span className={styles.label}>NOTES</span><span className={styles.value} style={{ whiteSpace: "pre-wrap" }}>{contact.notes}</span></div>
             ) : null}
           </div>
         )}
@@ -324,7 +346,13 @@ export default function ContactDetailPage() {
                 <tr key={bill._id}>
                   <td>
                     <Link href={`/invoices/preview/${bill._id}`} className={styles.invoiceLink}>
-                      {bill.fileName}
+                      {formatInvoiceName({
+                        // Always render with the contact's current name — the
+                        // bill's stored fileName/invoiceName may still reflect
+                        // the contact the parser originally matched.
+                        providerName: contact.name,
+                        date: invoiceDate,
+                      })}
                     </Link>
                   </td>
                   <td>{invoiceDate ?? "—"}</td>

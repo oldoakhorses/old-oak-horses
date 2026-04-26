@@ -501,6 +501,7 @@ export default function HorseProfilePage() {
                   <span className={row.status === "approved" ? styles.dotApproved : styles.dotPending} />
                   <span className={styles.invoiceLabel}>
                     {formatInvoiceName({
+                      invoiceName: row.invoiceName,
                       category: row.category,
                       providerName: row.providerName,
                       date: toIsoDateString(row.date || ""),

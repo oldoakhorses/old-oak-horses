@@ -132,6 +132,10 @@ export default function StatementReconcilePage() {
   const approveAllAssigned = useMutation(api.ccReconcile.approveAllAssigned);
   const approveStatement = useMutation(api.ccReconcile.approveStatement);
   const deleteStatement = useMutation(api.ccReconcile.deleteStatement);
+  const renameStatement = useMutation(api.ccReconcile.renameStatement);
+
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
 
   const [tab, setTab] = useState<Tab>("all");
   const [expandedTxn, setExpandedTxn] = useState<string | null>(null);
@@ -305,7 +309,37 @@ export default function StatementReconcilePage() {
         <div className={styles.headerCard}>
           <div className={styles.headerLeft}>
             <div className={styles.headerLabel}>// CC STATEMENT RECONCILIATION</div>
-            <h1 className={styles.stmtTitle}>{stmt.fileName}</h1>
+            {editingTitle ? (
+              <input
+                className={styles.stmtTitleInput}
+                value={titleDraft}
+                autoFocus
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={async () => {
+                  await renameStatement({ statementId, displayName: titleDraft });
+                  setEditingTitle(false);
+                }}
+                onKeyDown={async (e) => {
+                  if (e.key === "Enter") {
+                    await renameStatement({ statementId, displayName: titleDraft });
+                    setEditingTitle(false);
+                  } else if (e.key === "Escape") {
+                    setEditingTitle(false);
+                  }
+                }}
+              />
+            ) : (
+              <h1
+                className={styles.stmtTitle}
+                title="click to rename"
+                onClick={() => {
+                  setTitleDraft((stmt.displayName ?? stmt.fileName) || "");
+                  setEditingTitle(true);
+                }}
+              >
+                {stmt.displayName ?? stmt.fileName}
+              </h1>
+            )}
             <div className={styles.headerMeta}>
               {stmt.transactionCount} transactions &middot; {fmtUSD(stmt.totalDebits)} debits &middot; {fmtUSD(stmt.totalCredits)} credits
             </div>

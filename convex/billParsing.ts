@@ -4,10 +4,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { action, internalAction } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { matchHorseName, normalizeAliasKey } from "./matchHorse";
 import { matchPersonName } from "./matchPerson";
-import { matchProvider } from "./providerMatching";
+import { matchContact } from "./contactMatching";
+import { HORSE_ALIASES } from "./horseAliases";
 
 const TRAVEL_SUBCATEGORY_SLUGS = new Set(["flights", "trains", "rental-car", "gas", "meals", "hotels"]);
 const HOUSING_SUBCATEGORY_SLUGS = new Set(["rider-housing", "groom-housing"]);
@@ -52,7 +53,27 @@ export const parseBillPdf = internalAction({
     const bill = await ctx.runQuery(internal.bills.getBill, { billId: args.billId });
     if (!bill) throw new Error("Bill not found");
 
-    const provider = bill.providerId ? await ctx.runQuery(internal.bills.getProvider, { providerId: bill.providerId }) : null;
+    // Contact preselected on the bill (if any). The rest of the parser treats
+    // this as the canonical "provider" for prompt/context purposes.
+    const preselectedContact = bill.contactId
+      ? ((await ctx.runQuery(api.contacts.getAllContacts, {}) as any[]).find((c: any) => String(c._id) === String(bill.contactId)) ?? null)
+      : null;
+    const provider = preselectedContact
+      ? {
+          _id: preselectedContact._id,
+          name: preselectedContact.name,
+          slug: preselectedContact.slug,
+          fullName: preselectedContact.companyName,
+          email: preselectedContact.email,
+          phone: preselectedContact.phone,
+          address: preselectedContact.address,
+          website: preselectedContact.website,
+          accountNumber: preselectedContact.accountNumber,
+          location: preselectedContact.location,
+          extractionPrompt: preselectedContact.extractionPrompt,
+          expectedFields: Array.isArray(preselectedContact.expectedFields) ? preselectedContact.expectedFields : [],
+        }
+      : null;
     const category = bill.categoryId
       ? await ctx.runQuery(internal.bills.getCategory, { categoryId: bill.categoryId })
       : null;
@@ -179,16 +200,19 @@ export const parseBillPdf = internalAction({
       if (categorySlug === "feed-bedding") {
         parsed = enforceFeedBeddingClassification(parsed);
       }
-      if (categorySlug === "bodywork") {
-        parsed = splitBodyworkEmbeddedHorseItems(parsed);
-        parsed = preferBrandedProviderName(parsed);
-      }
+      // Fetch registered horses/people/aliases up-front so bodywork splitting
+      // (which needs to detect horse names embedded in descriptions) can use
+      // real DB data instead of a hardcoded list.
       const [registeredHorses, registeredPeople, dynamicHorseAliases, dynamicPersonAliases] = await Promise.all([
         ctx.runQuery(internal.bills.getAllHorsesForMatching, {}),
         ctx.runQuery(internal.bills.getAllPeopleForMatching, {}),
         ctx.runQuery(internal.bills.getHorseAliasesForMatching, {}),
         ctx.runQuery(internal.bills.getPersonAliasesForMatching, {})
       ]);
+      if (categorySlug === "bodywork") {
+        parsed = splitBodyworkEmbeddedHorseItems(parsed, registeredHorses, dynamicHorseAliases);
+        parsed = preferBrandedProviderName(parsed);
+      }
       // When no bill-level category, match both horses and people (per-line-item categories will guide usage)
       const matchHorses = categorySlug ? HORSE_BASED_CATEGORIES.has(categorySlug) : true;
       const matchPeople = categorySlug ? PERSON_BASED_CATEGORIES.has(categorySlug) : true;
@@ -204,22 +228,6 @@ export const parseBillPdf = internalAction({
 
       let resolvedProvider = provider;
       let extractedCustomProviderName = bill.customProviderName;
-      if (categorySlug === "marketing" && !resolvedProvider && !bill.customProviderName && bill.categoryId) {
-        const extractedProviderName = pickString(parsed, ["provider_name", "vendor_name", "supplier_name", "merchant_name"]);
-        if (extractedProviderName) {
-          const existingProvider = await ctx.runQuery(internal.providers.getProviderByNameInCategoryInternal, {
-            categoryId: bill.categoryId!,
-            name: extractedProviderName
-          });
-          const providerId =
-            existingProvider?._id ??
-            (await ctx.runMutation(internal.providers.createProviderOnUploadInternal, {
-              categoryId: bill.categoryId!,
-              name: extractedProviderName
-            }));
-          resolvedProvider = existingProvider ?? (await ctx.runQuery(internal.bills.getProvider, { providerId }));
-        }
-      }
       const extractedProviderName = pickString(parsed, [
         "provider_name",
         "providerName",
@@ -228,48 +236,78 @@ export const parseBillPdf = internalAction({
         "supplier_name",
         "merchant_name"
       ]);
-      if (!resolvedProvider && extractedProviderName) {
-        const targetSubcategory =
-          bill.duesSubcategory ??
-          bill.adminSubcategory ??
-          bill.horseTransportSubcategory ??
-          bill.marketingSubcategory ??
-          bill.travelSubcategory ??
-          bill.housingSubcategory ??
-          bill.groomingSubcategory;
-        const allProviders = await ctx.runQuery(internal.providers.listAllForMatching, {});
-        const categoryProviders = allProviders.filter((candidate: any) => candidate.categorySlug === categorySlug);
-        const subcategoryScopedProviders = targetSubcategory
-          ? categoryProviders.filter((candidate: any) => candidate.subcategorySlug === targetSubcategory)
-          : categoryProviders;
-        const providerCandidates = subcategoryScopedProviders.length > 0 ? subcategoryScopedProviders : categoryProviders;
-        console.log("Checking provider match for text containing:", extractedPdfText.substring(0, 200));
-        console.log("All providers:", providerCandidates.map((candidate: any) => candidate.name));
 
-        if (providerCandidates.length > 0) {
-          const providerMatch = await matchProvider(ctx, extractedProviderName, providerCandidates);
-          console.log("Provider match result:", providerMatch);
-          if (providerMatch.matched && providerMatch.providerId) {
-            resolvedProvider = await ctx.runQuery(internal.bills.getProvider, {
-              providerId: providerMatch.providerId as any,
-            });
+      // Fuzzy contact matching (exact → static alias → dynamic alias → partial → Levenshtein).
+      // Prefers contacts whose own `category` matches the bill's categorySlug,
+      // falls back to the full list.
+      if (!resolvedProvider && extractedProviderName) {
+        const [allContacts, contactAliases] = await Promise.all([
+          ctx.runQuery(api.contacts.getAllContacts, {}),
+          ctx.runQuery(internal.contacts.listContactAliasesForMatching, {}),
+        ]);
+        const allContactRows = (allContacts as any[]).map((c) => ({
+          _id: String(c._id),
+          name: c.name,
+          category: c.category,
+          slug: c.slug,
+        }));
+        const preferred = categorySlug
+          ? allContactRows.filter((c) => c.category === categorySlug)
+          : [];
+        const primary = matchContact(extractedProviderName, preferred, contactAliases as any);
+        const resultMatch = primary.matched ? primary : matchContact(extractedProviderName, allContactRows, contactAliases as any);
+        if (resultMatch.matched && resultMatch.contactId) {
+          const hit = (allContacts as any[]).find((c) => String(c._id) === resultMatch.contactId);
+          if (hit) {
+            resolvedProvider = {
+              _id: hit._id,
+              name: hit.name,
+              slug: hit.slug,
+              fullName: hit.companyName,
+              email: hit.email,
+              phone: hit.phone,
+              address: hit.address,
+              website: hit.website,
+              accountNumber: hit.accountNumber,
+              location: hit.location,
+              extractionPrompt: hit.extractionPrompt,
+              expectedFields: Array.isArray(hit.expectedFields) ? hit.expectedFields : [],
+            } as any;
           }
         }
       }
+
+      // EQ Sports Medicine Group — recognize by invoice body text too
       if (!resolvedProvider && isEqSportsProviderSignal(extractedPdfText)) {
-        const allProviders = await ctx.runQuery(internal.providers.listAllForMatching, {});
-        const eqSportsProvider = allProviders.find(
-          (candidate: any) => normalizeAliasKey(String(candidate.name ?? "")) === "eq sports medicine group"
+        const allContacts = (await ctx.runQuery(api.contacts.getAllContacts, {})) as any[];
+        const eqSports = allContacts.find(
+          (c) => normalizeAliasKey(String(c.name ?? "")) === "eq sports medicine group"
         );
-        if (eqSportsProvider?._id) {
-          resolvedProvider = await ctx.runQuery(internal.bills.getProvider, { providerId: eqSportsProvider._id });
+        if (eqSports) {
+          resolvedProvider = {
+            _id: eqSports._id,
+            name: eqSports.name,
+            slug: eqSports.slug,
+            fullName: eqSports.companyName,
+            email: eqSports.email,
+            phone: eqSports.phone,
+            address: eqSports.address,
+            website: eqSports.website,
+            accountNumber: eqSports.accountNumber,
+            location: eqSports.location,
+            extractionPrompt: eqSports.extractionPrompt,
+            expectedFields: Array.isArray(eqSports.expectedFields) ? eqSports.expectedFields : [],
+          } as any;
         }
       }
+
       if (!resolvedProvider && extractedProviderName) {
         extractedCustomProviderName = extractedProviderName;
       }
 
-      const expectedFields = resolvedProvider?.expectedFields ?? [];
+      const expectedFields: string[] = Array.isArray(resolvedProvider?.expectedFields)
+        ? (resolvedProvider!.expectedFields as string[])
+        : [];
       const isEQSportsFormat =
         Array.isArray((parsed as any).patientSections) ||
         (categorySlug === "veterinary" && (eqSportsSignal || multiPatientInvoice));
@@ -370,7 +408,6 @@ export const parseBillPdf = internalAction({
         lineItemCategories: lineItemCategories.length > 0 ? lineItemCategories : undefined,
         hasUnmatchedHorses: matchHorses ? unmatchedHorseNames.length > 0 : false,
         unmatchedHorseNames: matchHorses ? unmatchedHorseNames : [],
-        providerId: resolvedProvider?._id,
         contactId: resolvedContactId as any,
         customProviderName: extractedCustomProviderName,
         extractedProviderContact,
@@ -384,31 +421,12 @@ export const parseBillPdf = internalAction({
       if (resolvedContactId && Object.values(providerContactPatch).some((value) => value !== undefined)) {
         await ctx.runMutation(internal.contacts.updateContactFromInvoice, {
           contactId: resolvedContactId as any,
-          fullName: providerContactPatch.fullName,
-          contactName: providerContactPatch.contactName,
-          primaryContactName: providerContactPatch.primaryContactName,
-          primaryContactPhone: providerContactPatch.primaryContactPhone,
+          companyName: providerContactPatch.fullName,
           address: providerContactPatch.address,
-          phone: providerContactPatch.phone,
+          phone: providerContactPatch.phone ?? providerContactPatch.primaryContactPhone,
           email: providerContactPatch.email,
           website: providerContactPatch.website,
           accountNumber: providerContactPatch.accountNumber
-        });
-      }
-
-      // Also update provider (legacy, will be removed in Phase 6)
-      if (resolvedProvider && Object.values(providerContactPatch).some((value) => value !== undefined)) {
-        await ctx.runMutation(internal.bills.updateProviderContactInfo, {
-          providerId: resolvedProvider._id,
-          fullName: resolvedProvider.fullName ?? providerContactPatch.fullName,
-          contactName: resolvedProvider.contactName ?? providerContactPatch.contactName,
-          primaryContactName: resolvedProvider.primaryContactName ?? providerContactPatch.primaryContactName,
-          primaryContactPhone: resolvedProvider.primaryContactPhone ?? providerContactPatch.primaryContactPhone,
-          address: resolvedProvider.address ?? providerContactPatch.address,
-          phone: resolvedProvider.phone ?? providerContactPatch.phone,
-          email: resolvedProvider.email ?? providerContactPatch.email,
-          website: resolvedProvider.website ?? providerContactPatch.website,
-          accountNumber: resolvedProvider.accountNumber ?? providerContactPatch.accountNumber
         });
       }
 
@@ -421,14 +439,9 @@ export const parseBillPdf = internalAction({
       if (!resolvedContactId && contactCandidateName && (resolvedProvider?.name || extractedCustomProviderName)) {
         await ctx.runMutation(internal.contacts.upsertContactFromInvoice, {
           name: contactCandidateName,
-          providerId: resolvedProvider?._id,
-          providerName: resolvedProvider?.name ?? extractedCustomProviderName ?? providerContactPatch.fullName,
           category: categorySlug ?? (lineItemCategories.length > 0 ? lineItemCategories[0] : "other"),
           location: resolvedProvider?.location,
-          fullName: providerContactPatch.fullName,
-          contactName: providerContactPatch.contactName,
-          primaryContactName: providerContactPatch.primaryContactName,
-          primaryContactPhone: providerContactPatch.primaryContactPhone,
+          companyName: providerContactPatch.fullName ?? resolvedProvider?.name ?? extractedCustomProviderName,
           address: providerContactPatch.address,
           phone: providerContactPatch.phone ?? providerContactPatch.primaryContactPhone,
           email: providerContactPatch.email,
@@ -543,8 +556,8 @@ function buildExtractedProviderContact(patch: {
   accountNumber?: string;
 }) {
   const result: Record<string, string> = {};
+  // Only fields the markDone schema allows on bills.extractedProviderContact
   if (patch.fullName) result.providerName = patch.fullName;
-  if (patch.contactName) result.contactName = patch.contactName;
   if (patch.address) result.address = patch.address;
   if (patch.phone) result.phone = patch.phone;
   if (patch.email) result.email = patch.email;
@@ -568,9 +581,73 @@ function normalizeParsedPayload(input: Record<string, unknown>) {
     lineItems = (output.items as unknown[]).map((item) => normalizeLineItem(item));
   }
 
-  const invoiceTotalUsdFromFields = pickNumber(output, ["invoice_total_usd", "invoiceTotalUsd", "total_usd", "total"]);
+  let invoiceTotalUsdFromFields = pickNumber(output, ["invoice_total_usd", "invoiceTotalUsd", "total_usd", "total"]);
+  const subtotalRaw = pickNumber(output, ["subtotal", "sub_total", "subTotal"]);
+  const taxAmount = pickNumber(output, ["tax", "sales_tax", "salesTax", "vat", "tax_amount", "tax_total_usd"]);
+  const shippingFee = pickNumber(output, ["shipping", "shipping_fee", "shippingFee", "delivery_fee", "handling"]);
+  const otherFees = pickNumber(output, ["other_fees", "otherFees", "fees", "processing_fee"]);
   const lineTotalUsd = lineItems.reduce((sum, item) => sum + (typeof item.total_usd === "number" ? item.total_usd : 0), 0);
+
+  // Self-correction: if the LLM returned the subtotal as invoice_total_usd (a common
+  // failure mode on receipts that show both "Sub Total" and "Total"), prefer the
+  // reconstructed grand total (subtotal + tax + fees) or whichever is larger.
+  const reconstructedGrandTotal =
+    (subtotalRaw ?? lineTotalUsd) +
+    (taxAmount ?? 0) +
+    (shippingFee ?? 0) +
+    (otherFees ?? 0);
+  if (
+    typeof invoiceTotalUsdFromFields === "number" &&
+    reconstructedGrandTotal > invoiceTotalUsdFromFields + 0.02 &&
+    (taxAmount || shippingFee || otherFees)
+  ) {
+    console.log(
+      `[billParsing] correcting invoice_total_usd ${invoiceTotalUsdFromFields.toFixed(2)} -> ${reconstructedGrandTotal.toFixed(
+        2
+      )} (tax=${taxAmount ?? 0} ship=${shippingFee ?? 0} fees=${otherFees ?? 0})`
+    );
+    invoiceTotalUsdFromFields = round2(reconstructedGrandTotal);
+  }
+
   const invoiceTotalUsd = invoiceTotalUsdFromFields ?? (lineTotalUsd > 0 ? lineTotalUsd : undefined);
+
+  // Insert tax / shipping / fees as synthetic line items so that
+  // sum(line_items.total_usd) equals the grand total. This makes reconciliation
+  // against CC statements accurate and ensures nothing is "missing" in the UI.
+  function hasChargeLike(label: string): boolean {
+    const needle = label.toLowerCase();
+    return lineItems.some((it) => {
+      const desc = String((it as any).description ?? "").toLowerCase();
+      return desc.includes(needle);
+    });
+  }
+  if (typeof taxAmount === "number" && taxAmount > 0 && !hasChargeLike("tax")) {
+    lineItems.push({
+      description: "Sales Tax",
+      quantity: 1,
+      total_usd: round2(taxAmount),
+      amount_original: round2(taxAmount),
+      is_fee: true,
+    } as any);
+  }
+  if (typeof shippingFee === "number" && shippingFee > 0 && !hasChargeLike("shipping") && !hasChargeLike("delivery")) {
+    lineItems.push({
+      description: "Shipping",
+      quantity: 1,
+      total_usd: round2(shippingFee),
+      amount_original: round2(shippingFee),
+      is_fee: true,
+    } as any);
+  }
+  if (typeof otherFees === "number" && otherFees > 0 && !hasChargeLike("fee")) {
+    lineItems.push({
+      description: "Fees",
+      quantity: 1,
+      total_usd: round2(otherFees),
+      amount_original: round2(otherFees),
+      is_fee: true,
+    } as any);
+  }
 
   if (providerName) {
     output.provider_name = providerName;
@@ -1034,9 +1111,11 @@ For the overall invoice, extract:
 - invoice_number: Invoice or reference number
 - invoice_date: Date on the invoice (MM/DD/YYYY)
 - due_date: Due date if shown
-- invoice_total_usd: Total amount in USD
-- tax: Tax amount if shown
+- invoice_total_usd: The FINAL grand total in USD — the amount actually charged / due / paid. This is the "Total", "Grand Total", "Amount Due", "Balance Due", or "Total Charged" line, AFTER tax, shipping, and any fees. NEVER use the subtotal as invoice_total_usd. If the invoice shows "Sub Total $X" and "Total $Y" where Y > X, use Y.
+- tax: Sales tax / VAT amount if shown (separate from subtotal)
 - subtotal: Subtotal before tax if shown
+- shipping_fee: Shipping / handling charge if shown
+- other_fees: Any other fees (processing, etc.) if shown
 
 For each line item, extract into a "line_items" array:
 - description: What the item/service is
@@ -2296,20 +2375,27 @@ function round2(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-function splitBodyworkEmbeddedHorseItems(parsed: Record<string, unknown>) {
+function splitBodyworkEmbeddedHorseItems(
+  parsed: Record<string, unknown>,
+  registeredHorses: Array<{ _id: string; name: string }>,
+  dynamicHorseAliases: Array<{ alias: string; horseName: string }>
+) {
   const normalized = { ...parsed };
   const lineItems = getLineItems(normalized).map((item) => ({ ...(item as Record<string, unknown>) }));
   const splitItems: Array<Record<string, unknown>> = [];
+  const patterns = buildHorseDetectionPatterns(registeredHorses, dynamicHorseAliases);
 
   for (const row of lineItems) {
     const baseDescription = pickString(row, ["description"]) ?? "Line item";
     const horseField = pickString(row, ["horse_name", "horseName", "activity", "notes", "detail", "details"]) ?? "";
-    const combined = `${baseDescription} ${horseField}`.toLowerCase();
-    const detected = detectBodyworkHorseNames(combined);
+    const combined = `${baseDescription} ${horseField}`;
+    const detected = detectBodyworkHorseNames(combined, patterns);
     const amount = pickNumber(row, ["total_usd", "amount_usd", "amount", "total", "amount_original", "originalAmount"]) ?? 0;
     const quantity = pickNumber(row, ["quantity", "qty"]) ?? undefined;
-    const extras = stripHorseNamesFromText(horseField);
-    const description = extras ? `${baseDescription} ${extras}`.replace(/\s+/g, " ").trim() : baseDescription;
+    // Clean both the description and the horseField, then rebuild a clean description.
+    const cleanedBase = stripHorseNamesFromText(baseDescription, patterns) || baseDescription;
+    const extras = stripHorseNamesFromText(horseField, patterns);
+    const description = extras ? `${cleanedBase} ${extras}`.replace(/\s+/g, " ").trim() : cleanedBase;
 
     if (detected.length > 1 && amount > 0) {
       const perHorse = round2(amount / detected.length);
@@ -2347,37 +2433,83 @@ function splitBodyworkEmbeddedHorseItems(parsed: Record<string, unknown>) {
   return normalized;
 }
 
-function detectBodyworkHorseNames(text: string) {
-  const horses = ["ben", "carlin", "gigi", "valentina", "gaby", "gaby de courcel", "numero valentina z", "chino 29"];
+/**
+ * Build a list of (regex, canonicalName) pairs for detecting horse names in
+ * free text. Sources: registered horse names, static HORSE_ALIASES, and
+ * dynamic aliases from the DB. Longest aliases are tried first so that
+ * multi-word names ("Gaby de Courcel") take precedence over prefixes ("Gaby").
+ */
+function buildHorseDetectionPatterns(
+  registeredHorses: Array<{ _id: string; name: string }>,
+  dynamicHorseAliases: Array<{ alias: string; horseName: string }>
+): Array<{ regex: RegExp; canonical: string }> {
+  const registeredNames = new Set(registeredHorses.map((h) => h.name));
+  const pairs: Array<{ alias: string; canonical: string }> = [];
+
+  // Registered horse full names
+  for (const h of registeredHorses) {
+    pairs.push({ alias: h.name, canonical: h.name });
+  }
+  // Static aliases (ignore __split_all__ sentinel; only include aliases that
+  // map to a horse that actually exists in the DB)
+  for (const [alias, canonical] of Object.entries(HORSE_ALIASES)) {
+    if (canonical === "__split_all__") continue;
+    if (!registeredNames.has(canonical)) continue;
+    pairs.push({ alias, canonical });
+  }
+  // Dynamic aliases
+  for (const row of dynamicHorseAliases) {
+    if (row.horseName === "__split_all__") continue;
+    if (!registeredNames.has(row.horseName)) continue;
+    pairs.push({ alias: row.alias, canonical: row.horseName });
+  }
+
+  // Dedupe by normalized alias, keeping the first occurrence
+  const seen = new Set<string>();
+  const unique: Array<{ alias: string; canonical: string }> = [];
+  for (const p of pairs) {
+    const key = p.alias.trim().toLowerCase();
+    if (!key) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(p);
+  }
+
+  // Sort longest-first so "Gaby de Courcel" wins over "Gaby"
+  unique.sort((a, b) => b.alias.length - a.alias.length);
+
+  return unique.map((p) => ({
+    regex: new RegExp(`\\b${escapeRegex(p.alias)}\\b`, "i"),
+    canonical: p.canonical,
+  }));
+}
+
+function detectBodyworkHorseNames(
+  text: string,
+  patterns: Array<{ regex: RegExp; canonical: string }>
+): string[] {
   const found: string[] = [];
-  for (const horse of horses) {
-    const pattern = new RegExp(`\\b${escapeRegex(horse)}\\b`, "i");
-    if (!pattern.test(text)) continue;
-    if (horse === "valentina") {
-      found.push("Numero Valentina Z");
-      continue;
-    }
-    if (horse === "gaby de courcel") {
-      if (!found.includes("Gaby")) found.push("Gaby");
-      continue;
-    }
-    const label = horse
-      .split(" ")
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(" ");
-    if (!found.includes(label)) found.push(label);
+  // Walk patterns longest-first and strip matches as we go, so a long alias
+  // ("Gaby de Courcel") doesn't leave behind "Gaby" to be re-detected.
+  let remaining = text;
+  for (const { regex, canonical } of patterns) {
+    if (!regex.test(remaining)) continue;
+    if (!found.includes(canonical)) found.push(canonical);
+    remaining = remaining.replace(new RegExp(regex.source, "ig"), " ");
   }
   return found;
 }
 
-function stripHorseNamesFromText(text: string) {
+function stripHorseNamesFromText(
+  text: string,
+  patterns: Array<{ regex: RegExp; canonical: string }>
+): string {
   if (!text) return "";
   let cleaned = text;
-  const horsePatterns = ["ben", "carlin", "gigi", "valentina", "gaby", "gaby de courcel", "numero valentina z", "chino 29"];
-  for (const horse of horsePatterns) {
-    cleaned = cleaned.replace(new RegExp(`\\b${escapeRegex(horse)}\\b`, "ig"), "");
+  for (const { regex } of patterns) {
+    cleaned = cleaned.replace(new RegExp(regex.source, "ig"), " ");
   }
-  cleaned = cleaned.replace(/^[,\s+/-]+|[,\s+/-]+$/g, "");
+  cleaned = cleaned.replace(/\s+/g, " ").replace(/^[,\s+/-]+|[,\s+/-]+$/g, "").trim();
   return cleaned.length > 0 ? cleaned : "";
 }
 

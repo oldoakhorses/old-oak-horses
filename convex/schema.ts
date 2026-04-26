@@ -23,45 +23,7 @@ export default defineSchema({
     .index("by_name", ["name"])
     .index("by_slug", ["slug"]),
 
-  providers: defineTable({
-    categoryId: v.id("categories"),
-    category: v.optional(v.string()),
-    subcategorySlug: v.optional(v.string()),
-    name: v.string(),
-    slug: v.optional(v.string()),
-    fullName: v.optional(v.string()),
-    contactName: v.optional(v.string()),
-    primaryContactName: v.optional(v.string()),
-    primaryContactPhone: v.optional(v.string()),
-    address: v.optional(v.string()),
-    phone: v.optional(v.string()),
-    email: v.optional(v.string()),
-    website: v.optional(v.string()),
-    accountNumber: v.optional(v.string()),
-    location: v.optional(
-      v.union(
-        v.literal("wellington"),
-        v.literal("thermal"),
-        v.literal("ocala"),
-        v.literal("la"),
-        v.literal("eu"),
-        v.literal("can")
-      )
-    ),
-    extractionPrompt: v.string(),
-    expectedFields: v.array(v.string()),
-    createdAt: v.number(),
-    updatedAt: v.optional(v.number())
-  })
-    .index("by_name", ["name"])
-    .index("by_slug", ["slug"])
-    .index("by_category", ["categoryId"])
-    .index("by_category_name", ["categoryId", "name"])
-    .index("by_category_subcategory", ["categoryId", "subcategorySlug"])
-    .index("by_category_subcategory_name", ["categoryId", "subcategorySlug", "name"]),
-
   bills: defineTable({
-    providerId: v.optional(v.id("providers")),
     contactId: v.optional(v.id("contacts")),
     categoryId: v.optional(v.id("categories")),
     /** Denormalized list of category slugs found across line items */
@@ -72,8 +34,6 @@ export default defineSchema({
     assignType: v.optional(v.union(v.literal("horse"), v.literal("person"))),
     assignMode: v.optional(v.union(v.literal("line"), v.literal("whole"))),
     splitMode: v.optional(v.union(v.literal("even"), v.literal("custom"))),
-    providerDetected: v.optional(v.boolean()),
-    providerConfirmed: v.optional(v.boolean()),
     status: v.union(
       v.literal("uploading"),
       v.literal("parsing"),
@@ -202,7 +162,6 @@ export default defineSchema({
     source: v.optional(v.union(v.literal("upload"), v.literal("cc_transaction"))),
   })
     .index("by_uploadedAt", ["uploadedAt"])
-    .index("by_provider", ["providerId"])
     .index("by_contact", ["contactId"])
     .index("by_category", ["categoryId"])
     .index("by_ccTransaction", ["ccTransactionId"]),
@@ -219,6 +178,9 @@ export default defineSchema({
     status: v.union(v.literal("active"), v.literal("inactive"), v.literal("past")),
     isSold: v.optional(v.boolean()),
     soldDate: v.optional(v.number()),
+    /** Timestamp when horse became inactive/past. Used to determine if
+     *  a horse was active at the time a bill was uploaded. */
+    inactiveSince: v.optional(v.number()),
     createdAt: v.number()
   })
     .index("by_name", ["name"])
@@ -228,22 +190,19 @@ export default defineSchema({
   contacts: defineTable({
     name: v.string(),
     slug: v.optional(v.string()),
-    fullName: v.optional(v.string()),
-    type: v.optional(
-      v.union(
-        v.literal("vendor"),
-        v.literal("person"),
-        v.literal("company")
-      )
-    ),
-    role: v.optional(v.string()),
-    providerId: v.optional(v.id("providers")),
-    providerName: v.optional(v.string()),
+    companyName: v.optional(v.string()),
     category: v.optional(v.string()),
-    company: v.optional(v.string()),
-    contactName: v.optional(v.string()),
-    primaryContactName: v.optional(v.string()),
-    primaryContactPhone: v.optional(v.string()),
+    /**
+     * Optional per-contact custom extraction prompt for the bill parser.
+     * When set, it's appended to the base category prompt so tricky invoice
+     * layouts (e.g. multi-patient veterinary invoices) parse correctly.
+     */
+    extractionPrompt: v.optional(v.string()),
+    /**
+     * Expected fields on the parsed JSON, used only for validation / warning
+     * logs. Empty array means "no per-contact expectations".
+     */
+    expectedFields: v.optional(v.array(v.string())),
     address: v.optional(v.string()),
     location: v.optional(
       v.union(
@@ -259,16 +218,15 @@ export default defineSchema({
     email: v.optional(v.string()),
     website: v.optional(v.string()),
     accountNumber: v.optional(v.string()),
-    extractionPrompt: v.optional(v.string()),
-    expectedFields: v.optional(v.array(v.string())),
     notes: v.optional(v.string()),
+    /** "active" (default) or "invoice_only" — controls which tab the contact appears in */
+    contactStatus: v.optional(v.union(v.literal("active"), v.literal("invoice_only"))),
     createdAt: v.number(),
     updatedAt: v.optional(v.number())
   })
     .index("by_name", ["name"])
     .index("by_slug", ["slug"])
     .index("by_category", ["category"])
-    .index("by_type", ["type"])
     .index("by_location", ["location"]),
 
   scheduleEvents: defineTable({
@@ -297,7 +255,19 @@ export default defineSchema({
     date: v.number(),
     nextVisitDate: v.optional(v.number()),
     providerName: v.optional(v.string()),
-    visitType: v.optional(v.union(v.literal("vaccination"), v.literal("treatment"))),
+    visitType: v.optional(v.union(
+      v.literal("vaccination"),
+      v.literal("treatment"),
+      v.literal("medication"),
+      v.literal("joint_injections"),
+      v.literal("exams_diagnostics"),
+      v.literal("vaccinations"),
+      v.literal("shockwave"),
+      v.literal("sedation"),
+      v.literal("fees"),
+      v.literal("lab_work"),
+      v.literal("other")
+    )),
     vaccineName: v.optional(v.string()),
     treatmentDescription: v.optional(v.string()),
     serviceType: v.optional(v.string()),
@@ -367,15 +337,6 @@ export default defineSchema({
     updatedAt: v.optional(v.number())
   }).index("by_alias", ["alias"]),
 
-  providerAliases: defineTable({
-    alias: v.string(),
-    providerName: v.string(),
-    providerId: v.id("providers"),
-    category: v.string(),
-    createdAt: v.number(),
-    updatedAt: v.optional(v.number())
-  }).index("by_alias", ["alias"]),
-
   contactAliases: defineTable({
     alias: v.string(),
     contactName: v.string(),
@@ -438,6 +399,11 @@ export default defineSchema({
     phone: v.optional(v.string()),
     address: v.optional(v.string()),
     notes: v.optional(v.string()),
+    usefNumber: v.optional(v.string()),
+    feiNumber: v.optional(v.string()),
+    contactPerson: v.optional(v.string()),
+    ein: v.optional(v.string()),
+    vat: v.optional(v.string()),
     isActive: v.boolean(),
     createdAt: v.number(),
   }).index("by_name", ["name"]),
@@ -478,6 +444,8 @@ export default defineSchema({
 
   ccStatements: defineTable({
     fileName: v.string(),
+    /** Optional user-edited display name; falls back to fileName when absent. */
+    displayName: v.optional(v.string()),
     accountLast4: v.optional(v.string()),
     uploadedAt: v.number(),
     transactionCount: v.number(),

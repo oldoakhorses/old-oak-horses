@@ -18,7 +18,7 @@ type RecordFormState = {
   date: string;
   recordType: RecordType;
   customType: string;
-  visitType: "" | "vaccination" | "treatment";
+  visitType: "" | "vaccination" | "treatment" | "exams_diagnostics" | "other";
   vaccineName: string;
   treatmentDescription: string;
   serviceType: string;
@@ -228,13 +228,7 @@ export default function InvoicePreviewPage() {
 
   const [providerEdit, setProviderEdit] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<Id<"categories"> | "">("");
-  const [selectedProviderId, setSelectedProviderId] = useState<Id<"providers"> | "" | "__other">("");
   const [customProviderName, setCustomProviderName] = useState("");
-
-  const providerOptions = useQuery(
-    api.providers.getProvidersByCategory,
-    selectedCategoryId ? { categoryId: selectedCategoryId } : "skip"
-  ) ?? [];
 
   const [detailsEdit, setDetailsEdit] = useState(false);
   const [details, setDetails] = useState({
@@ -275,8 +269,8 @@ export default function InvoicePreviewPage() {
   const [showContactSuggestions, setShowContactSuggestions] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<Id<"contacts"> | null>(null);
   const [contactForm, setContactForm] = useState({
-    providerName: "",
-    contactName: "",
+    name: "",
+    companyName: "",
     phone: "",
     email: "",
     address: "",
@@ -290,7 +284,7 @@ export default function InvoicePreviewPage() {
     if (!q) return allContacts.slice(0, 8);
     return allContacts
       .filter((c) => {
-        const haystack = [c.name, c.fullName, c.providerName, c.email, c.phone].filter(Boolean).join(" ").toLowerCase();
+        const haystack = [c.name, c.companyName, c.email, c.phone].filter(Boolean).join(" ").toLowerCase();
         return haystack.includes(q);
       })
       .slice(0, 8);
@@ -304,12 +298,13 @@ export default function InvoicePreviewPage() {
   const saveHorseAssignment = useMutation(api.bills.saveHorseAssignment);
   const savePersonAssignment = useMutation(api.bills.savePersonAssignment);
   const saveDuesAssignments = useMutation(api.bills.saveDuesAssignments);
-  const createProviderOnUpload = useMutation(api.providers.createProviderOnUpload);
   const approveBill = useMutation(api.bills.approveBill);
   const deleteBill = useMutation(api.bills.deleteBill);
   const updateBillNotes = useMutation(api.bills.updateBillNotes);
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
+  const triggerBillParsing = useMutation(api.bills.triggerBillParsing);
+  const attachPdfToBill = useMutation(api.bills.attachPdfToBill);
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [recordForm, setRecordForm] = useState<RecordFormState>({
     horseIds: [], date: "", recordType: "other", customType: "",
@@ -341,7 +336,6 @@ export default function InvoicePreviewPage() {
     if (!bill) return;
 
     setSelectedCategoryId(bill.categoryId ?? "");
-    setSelectedProviderId((bill.providerId as Id<"providers"> | undefined) ?? "");
     setProviderEdit(false);
 
     setDetails({
@@ -389,7 +383,9 @@ export default function InvoicePreviewPage() {
 
       nextLineStates[index] = {
         assignees,
-        confirmed: (isSplitAll || splitAllByParsedHorse) ? true : (assignees.length > 0 || Boolean(row.confirmed)),
+        // Default: all line items start CHECKED. Users can uncheck to exclude.
+        // Only honor an explicit `false` from a previously saved state.
+        confirmed: row.confirmed !== false,
         category: normalizeCategory(String(row.category ?? ""), categorySlug),
         subcategory: String(row.subcategory ?? ""),
         subcategoryAutoDetected: Boolean(row.subcategoryAutoDetected),
@@ -440,7 +436,7 @@ export default function InvoicePreviewPage() {
       setWholeAssignedIds([]);
       setWholeAmounts({});
     }
-  }, [bill?._id, bill?.providerId, bill?.categoryId, bill?.status, bill?.extractedData, requiresPerson, categorySlug]);
+  }, [bill?._id, bill?.contactId, bill?.categoryId, bill?.status, bill?.extractedData, requiresPerson, categorySlug]);
 
   useEffect(() => {
     if (openDropdownId === null) return;
@@ -458,10 +454,26 @@ export default function InvoicePreviewPage() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [openDropdownId]);
 
-  const providerName = bill?.extractedProviderContact?.providerName || (bill?.provider?.name ?? bill?.customProviderName ?? "Unknown");
+  const providerName = bill?.extractedProviderContact?.providerName || (bill?.providerName ?? bill?.customProviderName ?? "Unknown");
   const previewTitle = formatInvoiceName({ providerName: bill?.providerName ?? providerName, date: bill?.date });
-  const providerDetected = Boolean(bill?.providerDetected ?? bill?.providerId);
-  const providerConfirmed = Boolean((bill?.providerConfirmed ?? bill?.providerId) && !providerEdit);
+  // Display name for the "INVOICE NAME" field. Priority:
+  //   1. Saved bill.invoiceName (user-edited or pre-set, e.g. CC txn description)
+  //   2. For uploaded bills: "{contact/provider} — {invoice date}"
+  //   3. For CC bills (no PDF): the CC line-item / txn description
+  const displayInvoiceName = (() => {
+    const saved = String(bill?.invoiceName ?? "").trim();
+    if (saved) return saved;
+    const isCc = bill?.source === "cc_transaction" || !bill?.fileId;
+    if (isCc) {
+      const lineDesc = String((Array.isArray((extracted as any)?.line_items) ? (extracted as any).line_items[0]?.description : "") ?? "").trim();
+      const fromExtracted = String((extracted as any)?.provider_name ?? "").trim();
+      return lineDesc || fromExtracted || previewTitle;
+    }
+    const invoiceDate = String((extracted as any)?.invoice_date ?? (extracted as any)?.invoiceDate ?? "").trim();
+    return formatInvoiceName({ providerName: bill?.providerName ?? providerName, date: invoiceDate || bill?.date });
+  })();
+  const providerDetected = Boolean(bill?.providerDetected ?? bill?.contactId);
+  const providerConfirmed = Boolean((bill?.providerConfirmed ?? bill?.contactId) && !providerEdit);
 
   const assignedDirectIds = useMemo(() => {
     if (mode !== "line") return [];
@@ -494,7 +506,7 @@ export default function InvoicePreviewPage() {
   const groupedLineItems = useMemo(() => {
     if (categorySlug !== "veterinary") return null;
     const hasEqSportsSignal =
-      String(bill?.providerName ?? bill?.provider?.name ?? providerName).toLowerCase().includes("eq sports") ||
+      String(bill?.providerName ?? providerName).toLowerCase().includes("eq sports") ||
       String(extracted.provider_name ?? extracted.providerName ?? "").toLowerCase().includes("eq sports");
     if (!hasEqSportsSignal) return null;
 
@@ -514,7 +526,7 @@ export default function InvoicePreviewPage() {
       total: round2(rows.reduce((sum, row) => sum + getLineAmount(row.line), 0)),
       rows
     }));
-  }, [categorySlug, bill?.providerName, bill?.provider?.name, extracted.provider_name, extracted.providerName, lineItems, providerName]);
+  }, [categorySlug, bill?.providerName, extracted.provider_name, extracted.providerName, lineItems, providerName]);
 
   const businessGeneralTotal = useMemo(() => {
     if (mode !== "line") return 0;
@@ -825,37 +837,54 @@ export default function InvoicePreviewPage() {
     );
   }
 
+  async function onReparseBill() {
+    if (!bill) return;
+    if (!confirm("Re-parse this invoice from scratch? Any manual edits to extracted line items will be overwritten.")) return;
+    setError("");
+    try {
+      setReparsing(true);
+      await triggerBillParsing({ billId });
+    } catch (err) {
+      setReparsing(false);
+      setError(err instanceof Error ? err.message : "Failed to re-parse");
+    }
+  }
+
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+  const pdfUploadRef = useRef<HTMLInputElement>(null);
+
+  async function onPdfSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !bill) return;
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      setError("Please select a PDF file");
+      return;
+    }
+    setError("");
+    setUploadingPdf(true);
+    try {
+      const uploadUrl = await generateUploadUrl();
+      const res = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type || "application/pdf" },
+        body: file,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const { storageId } = await res.json();
+      await attachPdfToBill({ billId, fileId: storageId, fileName: file.name });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload PDF");
+    } finally {
+      setUploadingPdf(false);
+    }
+  }
+
   async function onConfirmProvider() {
     if (!bill || !selectedCategoryId) return;
     setSavingProvider(true);
     setError("");
     try {
-      let providerId: Id<"providers"> | undefined;
-      let customName: string | undefined;
-
-      if (selectedProviderId === "__other") {
-        if (!customProviderName.trim()) throw new Error("Enter provider name");
-        customName = customProviderName.trim();
-      } else if (selectedProviderId) {
-        providerId = selectedProviderId as Id<"providers">;
-      } else {
-        throw new Error("Select a provider");
-      }
-
-      if (selectedProviderId === "__other" && customName) {
-        const createdId = await createProviderOnUpload({
-          name: customName,
-          categoryId: selectedCategoryId,
-          subcategorySlug:
-            categorySlug === "admin" ? bill.adminSubcategory || undefined :
-            categorySlug === "dues-registrations" ? bill.duesSubcategory || undefined :
-            categorySlug === "horse-transport" ? bill.horseTransportSubcategory || undefined :
-            undefined
-        });
-        providerId = createdId;
-        customName = undefined;
-      }
-
       const selectedCategory = categories.find((c) => c._id === selectedCategoryId);
       const newCategorySlug = selectedCategory?.slug ?? "";
 
@@ -863,8 +892,8 @@ export default function InvoicePreviewPage() {
       await reassignAndReparse({
         billId,
         categoryId: selectedCategoryId,
-        providerId,
-        customProviderName: customName,
+        contactId: selectedContactId ?? undefined,
+        customProviderName: customProviderName.trim() || undefined,
         adminSubcategory: newCategorySlug === "admin" ? bill.adminSubcategory || undefined : undefined,
         duesSubcategory: newCategorySlug === "dues-registrations" ? bill.duesSubcategory || undefined : undefined
       });
@@ -881,8 +910,8 @@ export default function InvoicePreviewPage() {
   function openContactEdit() {
     const c = bill?.extractedProviderContact;
     setContactForm({
-      providerName: c?.providerName ?? providerName ?? "",
-      contactName: c?.contactName ?? "",
+      name: c?.providerName ?? providerName ?? "",
+      companyName: (c as any)?.fullName ?? c?.providerName ?? "",
       phone: c?.phone ?? "",
       email: c?.email ?? "",
       address: c?.address ?? "",
@@ -900,9 +929,9 @@ export default function InvoicePreviewPage() {
     setContactSearch(contact.name);
     setShowContactSuggestions(false);
     setContactForm({
-      providerName: contact.name,
-      contactName: contact.contactName ?? contact.primaryContactName ?? "",
-      phone: contact.phone ?? contact.primaryContactPhone ?? "",
+      name: contact.name,
+      companyName: contact.companyName ?? "",
+      phone: contact.phone ?? "",
       email: contact.email ?? "",
       address: contact.address ?? "",
       website: contact.website ?? "",
@@ -916,8 +945,7 @@ export default function InvoicePreviewPage() {
     setError("");
     try {
       const contactData = {
-        providerName: contactForm.providerName || undefined,
-        contactName: contactForm.contactName || undefined,
+        providerName: contactForm.name || undefined,
         phone: contactForm.phone || undefined,
         email: contactForm.email || undefined,
         address: contactForm.address || undefined,
@@ -927,13 +955,19 @@ export default function InvoicePreviewPage() {
 
       let contactId = selectedContactId ?? undefined;
 
-      // If no existing contact selected but we have a name, create a new contact
-      if (!contactId && contactForm.providerName?.trim()) {
+      // If no existing contact selected but we have a name, create a new
+      // contact — pull across every auto-extracted field from the invoice so
+      // the new contact starts fully populated.
+      if (!contactId && contactForm.name?.trim()) {
         const newContactId = await createContact({
-          name: contactForm.providerName.trim(),
+          name: contactForm.name.trim(),
           category: categorySlug || "other",
+          companyName: contactForm.companyName || undefined,
           phone: contactForm.phone || undefined,
           email: contactForm.email || undefined,
+          address: contactForm.address || undefined,
+          website: contactForm.website || undefined,
+          accountNumber: contactForm.accountNumber || undefined,
         });
         contactId = newContactId;
         setSelectedContactId(newContactId);
@@ -1372,9 +1406,9 @@ export default function InvoicePreviewPage() {
           customType: recordForm.recordType === "other" ? recordForm.customType || undefined : undefined,
           date: dateTs,
           providerName: recordForm.providerName || undefined,
-          visitType: recordForm.recordType === "veterinary" && recordForm.visitType ? recordForm.visitType as "vaccination" | "treatment" : undefined,
+          visitType: recordForm.recordType === "veterinary" && recordForm.visitType ? recordForm.visitType as "vaccination" | "treatment" | "exams_diagnostics" | "other" : undefined,
           vaccineName: recordForm.recordType === "veterinary" && recordForm.visitType === "vaccination" ? recordForm.vaccineName || undefined : undefined,
-          treatmentDescription: recordForm.recordType === "veterinary" && recordForm.visitType === "treatment" ? recordForm.treatmentDescription || undefined : undefined,
+          treatmentDescription: recordForm.recordType === "veterinary" && (recordForm.visitType === "treatment" || recordForm.visitType === "exams_diagnostics" || recordForm.visitType === "other") ? recordForm.treatmentDescription || undefined : undefined,
           serviceType: recordForm.recordType === "farrier" ? recordForm.serviceType || undefined : undefined,
           isUpcoming: false,
           notes: combinedNotes,
@@ -1494,8 +1528,8 @@ export default function InvoicePreviewPage() {
                     )}
                   </div>
                   <div>
-                    <div className={styles.label}>CONTACT NAME</div>
-                    <input className={styles.inputCompact} value={contactForm.contactName} onChange={(e) => setContactForm((p) => ({ ...p, contactName: e.target.value }))} />
+                    <div className={styles.label}>COMPANY NAME</div>
+                    <input className={styles.inputCompact} value={contactForm.companyName} onChange={(e) => setContactForm((p) => ({ ...p, companyName: e.target.value }))} />
                   </div>
                   <div>
                     <div className={styles.label}>PHONE</div>
@@ -1535,9 +1569,6 @@ export default function InvoicePreviewPage() {
 
                   {bill?.extractedProviderContact ? (
                     <div className={styles.contactDetailsGrid}>
-                      {bill.extractedProviderContact.contactName ? (
-                        <div><span className={styles.label}>CONTACT NAME</span><span className={styles.value}>{bill.extractedProviderContact.contactName}</span></div>
-                      ) : null}
                       {bill.extractedProviderContact.phone ? (
                         <div><span className={styles.label}>PHONE</span><span className={styles.value}>{bill.extractedProviderContact.phone}</span></div>
                       ) : null}
@@ -1574,14 +1605,55 @@ export default function InvoicePreviewPage() {
                   {bill.originalPdfUrl ? (
                     <a className={styles.pdfButton} href={bill.originalPdfUrl} target="_blank" rel="noreferrer">view original ↗</a>
                   ) : null}
-                  {!detailsEdit ? <button type="button" className={styles.changeLink} onClick={() => setDetailsEdit(true)}>edit</button> : null}
+                  <input
+                    ref={pdfUploadRef}
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    style={{ display: "none" }}
+                    onChange={onPdfSelected}
+                  />
+                  <button
+                    type="button"
+                    className={styles.changeLink}
+                    onClick={() => pdfUploadRef.current?.click()}
+                    disabled={uploadingPdf}
+                    title={bill.originalPdfUrl ? "Replace the attached PDF" : "Attach a PDF to this invoice"}
+                  >
+                    {uploadingPdf ? "uploading..." : bill.originalPdfUrl ? "replace pdf" : "upload pdf"}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.changeLink}
+                    onClick={onReparseBill}
+                    disabled={reparsing || !!isParsing}
+                    title="Re-run the bill parser on this invoice"
+                  >
+                    {reparsing || isParsing ? "re-parsing..." : "re-parse"}
+                  </button>
+                  {!detailsEdit ? (
+                    <button
+                      type="button"
+                      className={styles.changeLink}
+                      onClick={() => {
+                        // Seed invoiceName with the currently displayed value so a
+                        // bare "save" persists the visible name (not blank).
+                        setDetails((prev) => ({
+                          ...prev,
+                          invoiceName: prev.invoiceName || displayInvoiceName,
+                        }));
+                        setDetailsEdit(true);
+                      }}
+                    >
+                      edit
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
               {detailsEdit ? (
                 <>
                   <div className={styles.detailsGrid}>
-                    <InputField label="INVOICE NAME" value={details.invoiceName || previewTitle} onChange={(value) => setDetails((prev) => ({ ...prev, invoiceName: value }))} />
+                    <InputField label="INVOICE NAME" value={details.invoiceName || displayInvoiceName} onChange={(value) => setDetails((prev) => ({ ...prev, invoiceName: value }))} />
                     <InputField label="INVOICE #" value={details.invoiceNumber} onChange={(value) => setDetails((prev) => ({ ...prev, invoiceNumber: value }))} />
                     <InputField label="DATE" value={details.invoiceDate} onChange={(value) => setDetails((prev) => ({ ...prev, invoiceDate: value }))} />
                     <InputField label="DUE DATE" value={details.dueDate} onChange={(value) => setDetails((prev) => ({ ...prev, dueDate: value }))} />
@@ -1607,7 +1679,7 @@ export default function InvoicePreviewPage() {
               ) : (
                 <>
                   <div className={styles.detailsRow}>
-                    {details.invoiceName ? <DisplayField label="INVOICE NAME" value={details.invoiceName} /> : null}
+                    <DisplayField label="INVOICE NAME" value={details.invoiceName || displayInvoiceName} />
                     <DisplayField label="INVOICE #" value={details.invoiceNumber || "—"} />
                     <DisplayField label="DATE" value={formatDate(details.invoiceDate)} />
                     {details.dueDate ? <DisplayField label="DUE DATE" value={formatDate(details.dueDate)} /> : null}
@@ -1960,11 +2032,13 @@ export default function InvoicePreviewPage() {
                     <select
                       className={styles.recordModalSelect}
                       value={recordForm.visitType}
-                      onChange={(e) => setRecordForm((prev) => ({ ...prev, visitType: e.target.value as "" | "vaccination" | "treatment" }))}
+                      onChange={(e) => setRecordForm((prev) => ({ ...prev, visitType: e.target.value as RecordFormState["visitType"] }))}
                     >
                       <option value="">select</option>
                       <option value="vaccination">vaccination</option>
                       <option value="treatment">treatment</option>
+                      <option value="exams_diagnostics">exam</option>
+                      <option value="other">other</option>
                     </select>
                   </div>
                 )}
@@ -1989,6 +2063,20 @@ export default function InvoicePreviewPage() {
                       value={recordForm.treatmentDescription}
                       onChange={(e) => setRecordForm((prev) => ({ ...prev, treatmentDescription: e.target.value }))}
                       placeholder="describe treatment..."
+                    />
+                  </div>
+                )}
+
+                {recordForm.recordType === "veterinary" && (recordForm.visitType === "exams_diagnostics" || recordForm.visitType === "other") && (
+                  <div className={styles.recordModalField}>
+                    <div className={styles.recordModalLabel}>
+                      {recordForm.visitType === "exams_diagnostics" ? "exam details" : "what happened"}
+                    </div>
+                    <input
+                      className={styles.recordModalInput}
+                      value={recordForm.treatmentDescription}
+                      onChange={(e) => setRecordForm((prev) => ({ ...prev, treatmentDescription: e.target.value }))}
+                      placeholder={recordForm.visitType === "exams_diagnostics" ? "e.g. lameness exam, pre-purchase..." : "describe what happened..."}
                     />
                   </div>
                 )}
@@ -2232,27 +2320,10 @@ function round2(value: number) {
 }
 
 function buildPermanentInvoicePath(bill: any) {
-  const categorySlug = String(bill?.category?.slug ?? "");
-  const providerName = bill?.provider?.name ?? bill?.customProviderName ?? "other";
-  const providerSlug = String(bill?.provider?.slug ?? slugify(providerName));
+  // Invoices no longer have category/provider-scoped routes.
+  // The preview page is the canonical location for every bill.
   const id = String(bill?._id ?? "");
-
-  if (categorySlug === "travel") return `/travel/${bill.travelSubcategory ?? "travel"}/${id}`;
-  if (categorySlug === "housing") return `/housing/${bill.housingSubcategory ?? "housing"}/${id}`;
-  if (categorySlug === "horse-transport") return `/horse-transport/${bill.horseTransportSubcategory ?? "ground-transport"}/${providerSlug}/${id}`;
-  if (categorySlug === "marketing") return `/marketing/${bill.marketingSubcategory ?? "other"}/${id}`;
-  if (categorySlug === "admin") return `/admin/${bill.adminSubcategory ?? "payroll"}/${providerSlug}/${id}`;
-  if (categorySlug === "dues-registrations") return `/dues-registrations/${bill.duesSubcategory ?? "memberships"}/${providerSlug}/${id}`;
-  if (categorySlug === "grooming") return `/grooming/${bill.groomingSubcategory ?? "other"}/${id}`;
-  if (categorySlug === "stabling") return `/stabling/${providerSlug}/${id}`;
-  if (categorySlug === "bodywork") return `/bodywork/${providerSlug}/${id}`;
-  if (categorySlug === "feed-bedding") return `/feed-bedding/${providerSlug}/${id}`;
-  if (categorySlug === "veterinary") return `/veterinary/${providerSlug}/${id}`;
-  if (categorySlug === "farrier") return `/farrier/${providerSlug}/${id}`;
-  if (categorySlug === "supplies") return `/supplies/${providerSlug}/${id}`;
-  // Fallback — guard against empty categorySlug producing a broken path
-  if (!categorySlug) return `/invoices`;
-  return `/${categorySlug}/${providerSlug}/${id}`;
+  return id ? `/invoices/preview/${id}` : `/invoices`;
 }
 
 function slugify(value: string) {

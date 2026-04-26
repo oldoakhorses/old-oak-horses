@@ -512,6 +512,75 @@
 }
 .btnDeleteItem:hover { background: rgba(239, 68, 68, 0.15); }
 
+/* Three-dot menu on line items */
+.lineItemMenuWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.btnMenuDots {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #6b7084;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.btnMenuDots:hover {
+  background: rgba(74, 91, 219, 0.08);
+  color: #1a1a2e;
+}
+
+.menuBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: transparent;
+}
+
+.menuDropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  min-width: 180px;
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  padding: 4px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+
+.menuItem {
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #1a1a2e;
+  cursor: pointer;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.menuItem:hover {
+  background: #f5f6fa;
+}
+.menuItemDanger {
+  color: #e5484d;
+}
+.menuItemDanger:hover {
+  background: rgba(229, 72, 77, 0.08);
+}
+
 .lineItemDescEditable {
   cursor: text;
   border-bottom: 1px dashed #d1d5db;
@@ -827,6 +896,10 @@
   .invoiceLink,
   .expandArrow,
   .btnDeleteItem,
+  .btnMenuDots,
+  .lineItemMenuWrap,
+  .menuBackdrop,
+  .menuDropdown,
   .modalOverlay,
   .statusBadge,
   .headerLabel,

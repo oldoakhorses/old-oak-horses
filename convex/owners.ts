@@ -165,12 +165,18 @@ export const update = mutation({
     phone: v.optional(v.string()),
     address: v.optional(v.string()),
     notes: v.optional(v.string()),
+    usefNumber: v.optional(v.string()),
+    feiNumber: v.optional(v.string()),
+    contactPerson: v.optional(v.string()),
+    ein: v.optional(v.string()),
+    vat: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { ownerId, ...fields } = args;
     const patch: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(fields)) {
-      if (value !== undefined) patch[key] = value;
+      // Allow empty string to clear the field
+      patch[key] = value === "" ? undefined : value;
     }
     if (Object.keys(patch).length > 0) {
       await ctx.db.patch(ownerId, patch);

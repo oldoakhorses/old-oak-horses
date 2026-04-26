@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import NavBar from "@/components/NavBar";
 import styles from "./billing.module.css";
 
@@ -40,34 +42,21 @@ function fmtDate(ts: number) {
 function parseCSV(text: string): Array<{ details: string; postingDate: string; description: string; amount: number; type: string; balance?: number }> {
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   if (lines.length < 2) return [];
-
-  // Skip header
   const rows: Array<{ details: string; postingDate: string; description: string; amount: number; type: string; balance?: number }> = [];
-
   for (let i = 1; i < lines.length; i++) {
-    // Parse CSV properly handling quoted fields
     const fields: string[] = [];
     let current = "";
     let inQuotes = false;
     for (const char of lines[i]) {
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === "," && !inQuotes) {
-        fields.push(current.trim());
-        current = "";
-      } else {
-        current += char;
-      }
+      if (char === '"') inQuotes = !inQuotes;
+      else if (char === "," && !inQuotes) { fields.push(current.trim()); current = ""; }
+      else current += char;
     }
     fields.push(current.trim());
-
     if (fields.length < 5) continue;
-
     const amount = parseFloat(fields[3]);
     if (isNaN(amount)) continue;
-
     const balance = fields[5] ? parseFloat(fields[5]) : undefined;
-
     rows.push({
       details: fields[0],
       postingDate: fields[1],
@@ -77,13 +66,12 @@ function parseCSV(text: string): Array<{ details: string; postingDate: string; d
       balance: balance && !isNaN(balance) ? balance : undefined,
     });
   }
-
   return rows;
 }
 
 function defaultStartDate() {
   const d = new Date();
-  d.setDate(1); // first of current month
+  d.setDate(1);
   return d.toISOString().slice(0, 10);
 }
 function defaultEndDate() {
@@ -94,33 +82,16 @@ function dateToPeriod(dateStr: string) {
 }
 
 export default function BillingPage() {
-  const [startDate, setStartDate] = useState(defaultStartDate);
-  const [endDate, setEndDate] = useState(defaultEndDate);
-  const activePeriod = dateToPeriod(startDate);
+  const router = useRouter();
 
-  const invoices = useQuery(api.billing.listOwnerInvoices, activePeriod ? { billingPeriod: activePeriod } : {}) ?? [];
-  const preview = useQuery(
-    api.billing.previewBillingPeriod,
-    startDate && endDate ? { startDate, endDate } : "skip"
-  );
-  const generateInvoices = useMutation(api.billing.generateOwnerInvoices);
-  const [generating, setGenerating] = useState(false);
-
-  // CC Statements
+  // ── Section 1: CC statements ────────────────────────────────────────
   const statements = useQuery(api.ccReconcile.listStatements) ?? [];
   const uploadStatement = useMutation(api.ccReconcile.uploadStatement);
+  const deleteStatement = useMutation(api.ccReconcile.deleteStatement);
+  const cleanCcBillNames = useMutation(api.ccReconcile.cleanCcBillNames);
+  const [cleaningNames, setCleaningNames] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-
-  async function handleGenerate() {
-    if (!activePeriod) return;
-    setGenerating(true);
-    try {
-      await generateInvoices({ billingPeriod: activePeriod, startDate, endDate });
-    } finally {
-      setGenerating(false);
-    }
-  }
 
   async function handleCSVUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -143,7 +114,81 @@ export default function BillingPage() {
     }
   }
 
-  const hasUnbilledItems = preview?.some((p) => !p.alreadyBilled && p.lineItemCount > 0);
+  async function handleCleanCcBillNames() {
+    if (cleaningNames) return;
+    if (!confirm("Clean up invoice names for all CC-statement bills? This will match against existing contacts and rename.")) return;
+    setCleaningNames(true);
+    try {
+      const result = await cleanCcBillNames();
+      alert(`Renamed ${result.updated} of ${result.totalCcBills} CC bills (${result.matched} linked to contacts).`);
+    } catch {
+      alert("Failed to clean CC bill names");
+    } finally {
+      setCleaningNames(false);
+    }
+  }
+
+  async function handleDeleteStatement(e: React.MouseEvent, statementId: Id<"ccStatements">, name: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm(`Delete statement "${name}" and all its transactions? This cannot be undone.`)) return;
+    await deleteStatement({ statementId });
+  }
+
+  // ── Section 2: Create new invoice ───────────────────────────────────
+  const owners = useQuery(api.owners.list) ?? [];
+  const createInvoice = useMutation(api.billing.createOwnerInvoiceForOwner);
+  const [startDate, setStartDate] = useState(defaultStartDate);
+  const [endDate, setEndDate] = useState(defaultEndDate);
+  const [selectedOwnerId, setSelectedOwnerId] = useState<string>("");
+  const [creating, setCreating] = useState(false);
+
+  async function handleCreate(mode: "autofill" | "blank") {
+    if (!selectedOwnerId || !startDate) return;
+    setCreating(true);
+    try {
+      const billingPeriod = dateToPeriod(startDate);
+      const newId = await createInvoice({
+        ownerId: selectedOwnerId as Id<"owners">,
+        billingPeriod,
+        startDate,
+        endDate: endDate || startDate,
+        mode,
+      });
+      router.push(`/billing/${newId}`);
+    } catch (err) {
+      console.error("Create invoice error:", err);
+      alert("Failed to create invoice");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  // ── Section 3: Manage invoices ──────────────────────────────────────
+  const allInvoices = useQuery(api.billing.listOwnerInvoices, {}) ?? [];
+  const updateStatus = useMutation(api.billing.updateOwnerInvoiceStatus);
+  const deleteInvoice = useMutation(api.billing.deleteOwnerInvoice);
+  const [manageFilter, setManageFilter] = useState<"all" | "draft" | "sent">("all");
+
+  const filteredInvoices = allInvoices.filter((inv) => {
+    if (manageFilter === "all") return true;
+    if (manageFilter === "draft") return inv.status === "draft" || inv.status === "finalized";
+    if (manageFilter === "sent") return inv.status === "sent" || inv.status === "paid";
+    return true;
+  });
+
+  async function handleMarkSent(e: React.MouseEvent, invoiceId: Id<"ownerInvoices">) {
+    e.preventDefault();
+    e.stopPropagation();
+    await updateStatus({ ownerInvoiceId: invoiceId, status: "sent" });
+  }
+
+  async function handleDeleteInvoice(e: React.MouseEvent, invoiceId: Id<"ownerInvoices">, name: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm(`Delete invoice "${name}"? This cannot be undone.`)) return;
+    await deleteInvoice({ ownerInvoiceId: invoiceId });
+  }
 
   return (
     <div className="page-shell">
@@ -153,40 +198,49 @@ export default function BillingPage() {
           <h1 className={styles.title}>billing</h1>
         </div>
 
-        {/* CC Statement Upload Section */}
+        {/* ── 1. Upload CC statements ─────────────────────────────────── */}
         <div className={styles.sectionCard}>
           <div className={styles.sectionHeader}>
             <div>
-              <div className={styles.sectionTitle}>credit card statements</div>
-              <div className={styles.sectionSub}>upload a CSV bank statement to reconcile charges with invoices</div>
+              <div className={styles.sectionTitle}>1. credit card statements</div>
+              <div className={styles.sectionSub}>upload, review, and approve line items from CSV bank statements</div>
             </div>
-            <label className={styles.btnUpload}>
-              {uploading ? "uploading..." : "upload CSV"}
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".csv"
-                style={{ display: "none" }}
-                onChange={handleCSVUpload}
-                disabled={uploading}
-              />
-            </label>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button
+                type="button"
+                className={styles.rowActionLink}
+                onClick={() => void handleCleanCcBillNames()}
+                disabled={cleaningNames}
+              >
+                {cleaningNames ? "cleaning..." : "clean names"}
+              </button>
+              <label className={styles.btnUpload}>
+                {uploading ? "uploading..." : "upload CSV"}
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".csv"
+                  style={{ display: "none" }}
+                  onChange={handleCSVUpload}
+                  disabled={uploading}
+                />
+              </label>
+            </div>
           </div>
 
           {statements.length > 0 ? (
             <div className={styles.stmtList}>
               {statements.map((stmt) => {
                 const si = STMT_STATUS[stmt.status] ?? STMT_STATUS.uploaded;
+                const displayName = stmt.displayName ?? (stmt.accountLast4 ? `•••• ${stmt.accountLast4}` : stmt.fileName);
                 return (
-                  <Link key={stmt._id} href={`/billing/statement/${stmt._id}`} className={styles.stmtRow}>
-                    <div className={styles.stmtInfo}>
-                      <div className={styles.stmtName}>
-                        {stmt.accountLast4 ? `•••• ${stmt.accountLast4}` : stmt.fileName}
-                      </div>
+                  <div key={stmt._id} className={styles.stmtRow}>
+                    <Link href={`/billing/statement/${stmt._id}`} className={styles.stmtInfo}>
+                      <div className={styles.stmtName}>{displayName}</div>
                       <div className={styles.stmtMeta}>
                         {stmt.transactionCount} transactions &middot; uploaded {fmtDate(stmt.uploadedAt)}
                       </div>
-                    </div>
+                    </Link>
                     <div className={styles.stmtStats}>
                       <span className={styles.stmtMatched}>{stmt.matchedCount} matched</span>
                       <span className={styles.stmtUnmatched}>{stmt.unmatchedCount} unmatched</span>
@@ -195,7 +249,17 @@ export default function BillingPage() {
                     <span className={styles.statusBadge} style={{ color: si.color, background: si.bg }}>
                       {si.label}
                     </span>
-                  </Link>
+                    <Link href={`/billing/statement/${stmt._id}`} className={styles.rowActionLink}>
+                      manage
+                    </Link>
+                    <button
+                      type="button"
+                      className={styles.rowActionDelete}
+                      onClick={(e) => handleDeleteStatement(e, stmt._id, displayName)}
+                    >
+                      delete
+                    </button>
+                  </div>
                 );
               })}
             </div>
@@ -204,103 +268,137 @@ export default function BillingPage() {
           )}
         </div>
 
-        {/* Divider */}
-        <div className={styles.divider} />
-
-        {/* Owner invoices section */}
+        {/* ── 2. Create new invoice ──────────────────────────────────── */}
         <div className={styles.sectionCard}>
           <div className={styles.sectionHeader}>
             <div>
-              <div className={styles.sectionTitle}>owner invoices</div>
-              <div className={styles.sectionSub}>batch approved invoice line items by owner</div>
+              <div className={styles.sectionTitle}>2. create new invoice</div>
+              <div className={styles.sectionSub}>pick a date range and an owner, then choose autofill or start blank</div>
             </div>
           </div>
-        </div>
 
-        {/* Period selector */}
-        <div className={styles.periodRow}>
-          <label className={styles.periodLabel}>BILLING PERIOD</label>
-          <div className={styles.dateRange}>
-            <label className={styles.dateField}>
+          <div className={styles.createForm}>
+            <div className={styles.createField}>
               <span className={styles.dateLabel}>FROM</span>
               <input type="date" className={styles.dateInput} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-            </label>
-            <span className={styles.dateSep}>→</span>
-            <label className={styles.dateField}>
+            </div>
+            <div className={styles.createField}>
               <span className={styles.dateLabel}>TO</span>
               <input type="date" className={styles.dateInput} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-            </label>
+            </div>
+            <div className={styles.createField}>
+              <span className={styles.dateLabel}>OWNER</span>
+              <select
+                className={styles.ownerSelect}
+                value={selectedOwnerId}
+                onChange={(e) => setSelectedOwnerId(e.target.value)}
+              >
+                <option value="">select owner…</option>
+                {owners.map((o) => (
+                  <option key={o._id} value={o._id}>{o.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.createActions}>
+              <button
+                type="button"
+                className={styles.btnAutofill}
+                onClick={() => handleCreate("autofill")}
+                disabled={!selectedOwnerId || !startDate || creating}
+              >
+                {creating ? "creating…" : "autofill"}
+              </button>
+              <button
+                type="button"
+                className={styles.btnBlank}
+                onClick={() => handleCreate("blank")}
+                disabled={!selectedOwnerId || !startDate || creating}
+              >
+                start blank
+              </button>
+            </div>
           </div>
-          {hasUnbilledItems ? (
-            <button
-              type="button"
-              className={styles.btnGenerate}
-              onClick={handleGenerate}
-              disabled={generating}
-            >
-              {generating ? "generating..." : "generate owner invoices"}
-            </button>
-          ) : null}
+          <div className={styles.createHint}>
+            <strong>autofill</strong> pulls every approved bill assigned to this owner&apos;s horses in the date range. <strong>start blank</strong> creates an empty invoice. you can add manual line items either way.
+          </div>
         </div>
 
-        {/* Preview of what would be generated */}
-        {preview && preview.length > 0 && invoices.length === 0 ? (
-          <div className={styles.previewCard}>
-            <div className={styles.previewTitle}>preview for {startDate} → {endDate}</div>
-            <div className={styles.previewSub}>
-              These are the approved invoices ready to be batched into owner invoices.
+        {/* ── 3. Manage invoices ─────────────────────────────────────── */}
+        <div className={styles.sectionCard}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <div className={styles.sectionTitle}>3. manage invoices</div>
+              <div className={styles.sectionSub}>edit drafts, mark sent, or delete</div>
             </div>
-            {preview.map((row) => (
-              <div key={row.ownerId} className={styles.previewRow}>
-                <div className={styles.previewOwner}>{row.ownerName}</div>
-                <div className={styles.previewMeta}>
-                  {row.horseCount} horse{row.horseCount !== 1 ? "s" : ""} &middot; {row.lineItemCount} line item{row.lineItemCount !== 1 ? "s" : ""}
-                </div>
-                <div className={styles.previewAmount}>{fmtUSD(row.total)}</div>
-              </div>
-            ))}
+            <div className={styles.tabRow}>
+              {(["all", "draft", "sent"] as const).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`${styles.tabBtn} ${manageFilter === key ? styles.tabBtnActive : ""}`}
+                  onClick={() => setManageFilter(key)}
+                >
+                  {key}
+                </button>
+              ))}
+            </div>
           </div>
-        ) : null}
 
-        {/* Existing owner invoices */}
-        {invoices.length > 0 ? (
-          <div className={styles.invoicesList}>
-            <div className={styles.listHeader}>
-              <div>OWNER</div>
-              <div>PERIOD</div>
-              <div>LINE ITEMS</div>
-              <div>APPROVED</div>
-              <div>TOTAL</div>
-              <div>STATUS</div>
-            </div>
-            {invoices.map((inv) => {
-              const statusInfo = STATUS_LABELS[inv.status] ?? STATUS_LABELS.draft;
-              return (
-                <Link key={inv._id} href={`/billing/${inv._id}`} className={styles.invoiceRow}>
-                  <div className={styles.invoiceOwner}>{inv.ownerName}</div>
-                  <div className={styles.invoicePeriod}>{fmtPeriod(inv.billingPeriod)}</div>
-                  <div className={styles.invoiceMeta}>{inv.lineItemCount}</div>
-                  <div className={styles.invoiceMeta}>
-                    {inv.approvedLineItemCount}/{inv.lineItemCount}
+          {filteredInvoices.length > 0 ? (
+            <div className={styles.invoicesList}>
+              <div className={styles.listHeader}>
+                <div>OWNER</div>
+                <div>PERIOD</div>
+                <div>ITEMS</div>
+                <div>TOTAL</div>
+                <div>STATUS</div>
+                <div>ACTIONS</div>
+              </div>
+              {filteredInvoices.map((inv) => {
+                const statusInfo = STATUS_LABELS[inv.status] ?? STATUS_LABELS.draft;
+                const isSent = inv.status === "sent" || inv.status === "paid";
+                return (
+                  <div key={inv._id} className={styles.invoiceRow}>
+                    <Link href={`/billing/${inv._id}`} className={styles.invoiceOwner}>
+                      {inv.ownerName}
+                    </Link>
+                    <div className={styles.invoicePeriod}>{fmtPeriod(inv.billingPeriod)}</div>
+                    <div className={styles.invoiceMeta}>{inv.lineItemCount}</div>
+                    <div className={styles.invoiceTotal}>{fmtUSD(inv.totalAmount)}</div>
+                    <div>
+                      <span className={styles.statusBadge} style={{ color: statusInfo.color, background: statusInfo.bg }}>
+                        {statusInfo.label}
+                      </span>
+                    </div>
+                    <div className={styles.rowActions}>
+                      <Link href={`/billing/${inv._id}`} className={styles.rowActionLink}>
+                        {isSent ? "view" : "edit"}
+                      </Link>
+                      {!isSent ? (
+                        <button
+                          type="button"
+                          className={styles.rowActionSent}
+                          onClick={(e) => handleMarkSent(e, inv._id)}
+                        >
+                          mark sent
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className={styles.rowActionDelete}
+                        onClick={(e) => handleDeleteInvoice(e, inv._id, inv.ownerName)}
+                      >
+                        delete
+                      </button>
+                    </div>
                   </div>
-                  <div className={styles.invoiceTotal}>{fmtUSD(inv.totalAmount)}</div>
-                  <div>
-                    <span className={styles.statusBadge} style={{ color: statusInfo.color, background: statusInfo.bg }}>
-                      {statusInfo.label}
-                    </span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        ) : activePeriod && (!preview || preview.length === 0) ? (
-          <div className={styles.emptyState}>
-            <div className={styles.emptyTitle}>no billing data for {startDate} → {endDate}</div>
-            <div className={styles.emptySub}>
-              approve invoices for this period first, then generate owner invoices
+                );
+              })}
             </div>
-          </div>
-        ) : null}
+          ) : (
+            <div className={styles.stmtEmpty}>no invoices in this view</div>
+          )}
+        </div>
       </main>
     </div>
   );

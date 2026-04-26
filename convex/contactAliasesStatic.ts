@@ -1,7 +1,11 @@
-import { v } from "convex/values";
-import { internalQuery, mutation } from "./_generated/server";
-
-export const PROVIDER_ALIASES: Record<string, string> = {
+/**
+ * Static (code-level) aliases mapping normalized names from invoice text to
+ * the canonical contact `name`. Complemented by rows in the `contactAliases`
+ * DB table, which stores per-contact alias strings added at runtime.
+ *
+ * Keys must be lowercase + whitespace-collapsed (see normalizeContactName).
+ */
+export const CONTACT_ALIASES: Record<string, string> = {
   buthe: "Buthe Veterinary",
   "buthe vet": "Buthe Veterinary",
   "buthe veterinary": "Buthe Veterinary",
@@ -48,44 +52,3 @@ export const PROVIDER_ALIASES: Record<string, string> = {
   "sports medicine group": "EQ Sports Medicine Group",
   "idexx neo": "EQ Sports Medicine Group",
 };
-
-export const saveAlias = mutation({
-  args: {
-    alias: v.string(),
-    providerName: v.string(),
-    providerId: v.id("providers"),
-    category: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const normalizedAlias = args.alias.toLowerCase().trim();
-    const existing = await ctx.db
-      .query("providerAliases")
-      .withIndex("by_alias", (q) => q.eq("alias", normalizedAlias))
-      .first();
-
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        providerName: args.providerName,
-        providerId: args.providerId,
-        category: args.category,
-        updatedAt: Date.now(),
-      });
-      return existing._id;
-    }
-
-    return await ctx.db.insert("providerAliases", {
-      alias: normalizedAlias,
-      providerName: args.providerName,
-      providerId: args.providerId,
-      category: args.category,
-      createdAt: Date.now(),
-    });
-  },
-});
-
-export const listAllAliasesInternal = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db.query("providerAliases").collect();
-  },
-});

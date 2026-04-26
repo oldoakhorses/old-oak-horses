@@ -11,7 +11,6 @@ import styles from "./invoices.module.css";
 
 type SortColumn = "invoice" | "category" | "date" | "amount" | null;
 type SortDirection = "asc" | "desc";
-type InvoiceTab = "pending" | "approved";
 
 /** Clean up raw CC descriptions and ALL-CAPS names into readable abbreviated titles */
 function abbreviateInvoiceName(name: string, maxLen = 50): string {
@@ -66,6 +65,14 @@ function abbreviateInvoiceName(name: string, maxLen = 50): string {
 /** Categories where money comes IN (income) — amounts shown as positive */
 const INCOME_CATEGORIES = new Set(["prize-money", "prize_money", "income"]);
 
+/** A row represents money coming IN if its category is income OR if a CC
+ *  transaction was a credit (positive amount on the statement). */
+function isIncomeRow(row: any) {
+  const key = (row.categorySlug ?? "").toString().toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
+  if (INCOME_CATEGORIES.has(key)) return true;
+  return row?.extractedData?.isCredit === true;
+}
+
 const CATEGORY_COLORS: Record<string, { bg: string; color: string; label: string }> = {
   veterinary: { bg: "rgba(74,91,219,0.08)", color: "#4A5BDB", label: "Veterinary" },
   farrier: { bg: "rgba(20,184,166,0.08)", color: "#14B8A6", label: "Farrier" },
@@ -92,10 +99,11 @@ export default function InvoicesPage() {
   const deleteBill = useMutation(api.bills.deleteBill);
   const updateBillNotes = useMutation(api.bills.updateBillNotes);
 
-  const [activeTab, setActiveTab] = useState<InvoiceTab>("pending");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [horseFilter, setHorseFilter] = useState<string>("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const activeHorses = useQuery(api.horses.getActiveHorses) ?? [];
   const [sortColumn, setSortColumn] = useState<SortColumn>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -107,22 +115,20 @@ export default function InvoicesPage() {
 
   const categories = useMemo(() => ["all", ...new Set(rows.map((row) => row.categoryName))], [rows]);
 
-  const approvedRows = useMemo(() => rows.filter((row) => row.isApproved === true), [rows]);
-  const pendingRows = useMemo(() => rows.filter((row) => row.isApproved !== true), [rows]);
-
   const filtered = useMemo(() => {
-    const tabRows = activeTab === "approved" ? approvedRows : pendingRows;
     const q = searchQuery.toLowerCase().trim();
-    const base = tabRows.filter((row) => {
+    const base = rows.filter((row) => {
       const date = getInvoiceDate(row);
       const categoryPass = categoryFilter === "all" || row.categoryName === categoryFilter;
+      const assignedHorseIds = Array.isArray(row.assignedHorses) ? row.assignedHorses.map((entry: any) => String(entry.horseId ?? "")).filter(Boolean) : [];
+      const horsePass = horseFilter === "all" || assignedHorseIds.includes(horseFilter);
       const fromPass = !fromDate || date >= fromDate;
       const toPass = !toDate || date <= toDate;
       const searchPass = !q || abbreviateInvoiceName(row.invoiceName || formatInvoiceName({ providerName: getProvider(row), date })).toLowerCase().includes(q)
         || (row.categoryName ?? "").toLowerCase().includes(q)
         || (getProvider(row)).toLowerCase().includes(q)
         || date.includes(q);
-      return categoryPass && fromPass && toPass && searchPass;
+      return categoryPass && horsePass && fromPass && toPass && searchPass;
     });
 
     const sorted = [...base];
@@ -143,14 +149,12 @@ export default function InvoicesPage() {
         const bTime = Date.parse(getInvoiceDate(b));
         return sortDirection === "asc" ? aTime - bTime : bTime - aTime;
       }
-      const aKey = normalizeKey(a.categorySlug ?? slugify(a.categoryName ?? ""));
-      const bKey = normalizeKey(b.categorySlug ?? slugify(b.categoryName ?? ""));
-      const aAmount = INCOME_CATEGORIES.has(aKey) ? getTotal(a) : -getTotal(a);
-      const bAmount = INCOME_CATEGORIES.has(bKey) ? getTotal(b) : -getTotal(b);
+      const aAmount = isIncomeRow(a) ? getTotal(a) : -getTotal(a);
+      const bAmount = isIncomeRow(b) ? getTotal(b) : -getTotal(b);
       return sortDirection === "asc" ? aAmount - bAmount : bAmount - aAmount;
     });
     return sorted;
-  }, [activeTab, approvedRows, pendingRows, categoryFilter, fromDate, toDate, searchQuery, sortColumn, sortDirection]);
+  }, [rows, categoryFilter, horseFilter, fromDate, toDate, searchQuery, sortColumn, sortDirection]);
 
   function handleSort(column: Exclude<SortColumn, null>) {
     if (sortColumn === column) {
@@ -208,23 +212,6 @@ export default function InvoicesPage() {
           <h1 className={styles.title}>Invoices</h1>
         </div>
 
-        <div className={styles.tabs}>
-          <button
-            type="button"
-            className={activeTab === "pending" ? styles.tabActive : styles.tab}
-            onClick={() => setActiveTab("pending")}
-          >
-            Pending ({pendingRows.length})
-          </button>
-          <button
-            type="button"
-            className={activeTab === "approved" ? styles.tabActive : styles.tab}
-            onClick={() => setActiveTab("approved")}
-          >
-            Approved ({approvedRows.length})
-          </button>
-        </div>
-
         <section className={styles.filters}>
           <label>
             <span>Category</span>
@@ -233,6 +220,15 @@ export default function InvoicesPage() {
                 <option key={name} value={name}>
                   {name === "all" ? "All" : name}
                 </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Horse</span>
+            <select value={horseFilter} onChange={(e) => setHorseFilter(e.target.value)}>
+              <option value="all">All</option>
+              {activeHorses.map((horse) => (
+                <option key={horse._id} value={String(horse._id)}>{horse.name}</option>
               ))}
             </select>
           </label>
@@ -270,7 +266,7 @@ export default function InvoicesPage() {
           {filtered.map((row) => {
             const date = getInvoiceDate(row);
             const rawTotal = getTotal(row);
-            const isIncome = INCOME_CATEGORIES.has(normalizeKey(row.categorySlug ?? slugify(row.categoryName ?? "")));
+            const isIncome = isIncomeRow(row);
             const total = isIncome ? rawTotal : -rawTotal;
             const categoryKey = normalizeKey(row.categorySlug ?? slugify(row.categoryName ?? ""));
             const categoryColor = CATEGORY_COLORS[categoryKey] ?? {
@@ -435,11 +431,7 @@ export default function InvoicesPage() {
               </div>
             );
           })}
-          {filtered.length === 0 ? (
-            <div className={styles.empty}>
-              {activeTab === "pending" ? "No pending invoices." : "No approved invoices."}
-            </div>
-          ) : null}
+          {filtered.length === 0 ? <div className={styles.empty}>No invoices found.</div> : null}
         </section>
       </main>
 

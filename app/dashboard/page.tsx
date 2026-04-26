@@ -51,7 +51,7 @@ type InvoiceDetectionState = {
   matched: boolean;
   confidence: DetectionConfidence;
   providerName: string | null;
-  providerId: Id<"providers"> | null;
+  contactId: Id<"contacts"> | null;
   category: string | null;
   subcategory: string | null;
   categoryId: Id<"categories"> | null;
@@ -163,15 +163,17 @@ export default function DashboardPage() {
   const categories = useQuery(api.categories.getAllCategories) ?? [];
   const upcomingRecords = useQuery(api.horseRecords.getUpcoming) ?? [];
   const recordProviderCategory = selectedRecordType ? RECORD_TYPE_TO_CATEGORY[selectedRecordType] : "";
-  const recordProviders =
-    useQuery(api.providers.listByCategory, recordProviderCategory ? { category: recordProviderCategory } : "skip") ?? [];
+  const allContactsForRecord = useQuery(api.contacts.getAllContacts) ?? [];
+  const recordProviders = useMemo(
+    () => allContactsForRecord.filter((c: any) => recordProviderCategory && c.category === recordProviderCategory),
+    [allContactsForRecord, recordProviderCategory]
+  );
 
   const createHorse = useMutation(api.horses.createHorse);
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);
   const updateHorseRecord = useMutation(api.horseRecords.updateHorseRecord);
   const uploadDocument = useMutation(api.documents.upload);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
-  const detectProvider = useAction((api as any).invoiceDetect.detectProvider);
   const parseUploadedInvoice = useAction((api as any).uploads.parseUploadedInvoice);
 
   const shownHorses = activeHorses;
@@ -460,46 +462,16 @@ export default function DashboardPage() {
       const storageId = uploadPayload.storageId as Id<"_storage">;
       console.log("1. PDF uploaded, storageId:", storageId);
 
-      setInvoiceStatusMessage("detecting provider...");
-      setInvoiceStage("detecting");
-      console.log("2. Extracting text from PDF...");
-      const detection = (await detectProvider({ fileStorageId: storageId })) as InvoiceDetectionState;
-      if (typeof detection.extractedText === "string") {
-        console.log("3. Extracted text length:", detection.extractedText.length);
-        console.log("4. Extracted text preview:", detection.extractedText.substring(0, 500));
-      }
-      console.log("5. Provider match result:", detection);
-
-      if (!detection.matched || !detection.providerId || !detection.categoryId) {
-        const fallbackCategory = categories.find((row) => row.slug === "admin");
-        if (!fallbackCategory) throw new Error("Fallback category not found");
-        setInvoiceStatusMessage("doing things...");
-        setInvoiceStage("parsing");
-        const fallback = await parseUploadedInvoice({
-          fileStorageId: storageId,
-          categoryId: fallbackCategory._id,
-          customProviderName:
-            detection.extractedName && detection.extractedName.toUpperCase() !== "UNKNOWN"
-              ? detection.extractedName
-              : "Unknown Provider"
-        });
-        setInvoiceStatusMessage("redirecting...");
-        setInvoiceStage("redirecting");
-        closePanel();
-        router.push(`/invoices/preview/${fallback.billId}`);
-        return;
-      }
-
-      setInvoiceStatusMessage("doing things...");
+      // Skip provider/contact detection — we now let the user pick a contact
+      // from the preview page while parseBillPdf runs in the background.
+      // parseUploadedInvoice creates the bill and schedules the async parse,
+      // then returns immediately so we can redirect without waiting on Claude.
+      setInvoiceStatusMessage("starting parse...");
       setInvoiceStage("parsing");
       const result = await parseUploadedInvoice({
         fileStorageId: storageId,
-        categoryId: detection.categoryId,
-        providerId: detection.providerId,
-        adminSubcategory: detection.category === "admin" ? detection.subcategory || undefined : undefined,
-        duesSubcategory: detection.category === "dues-registrations" ? detection.subcategory || undefined : undefined
       });
-      console.log("6. Parsed invoice data:", result);
+      console.log("2. Bill created, parse scheduled:", result);
 
       setInvoiceStatusMessage("redirecting...");
       setInvoiceStage("redirecting");
@@ -873,14 +845,28 @@ function prettyType(type: RecordType) {
   return capitalize(type);
 }
 
+const VISIT_TYPE_LABELS: Record<string, string> = {
+  vaccination: "Vaccination",
+  vaccinations: "Vaccinations",
+  treatment: "Treatment",
+  medication: "Medication",
+  joint_injections: "Joint Injections",
+  exams_diagnostics: "Exam",
+  shockwave: "Shockwave",
+  sedation: "Sedation",
+  fees: "Fees",
+  lab_work: "Lab Work",
+  other: "Other",
+};
+
 function getUpcomingSubtype(record: {
   type: RecordType;
-  visitType?: "vaccination" | "treatment";
+  visitType?: string;
   serviceType?: string;
   customType?: string;
 }) {
   if (record.type === "veterinary" && record.visitType) {
-    return record.visitType === "vaccination" ? "Vaccination" : "Treatment";
+    return VISIT_TYPE_LABELS[record.visitType] ?? record.visitType;
   }
   if (record.type === "farrier" && record.serviceType) {
     return record.serviceType;
@@ -893,14 +879,14 @@ function getUpcomingSubtype(record: {
 
 function getUpcomingDetail(record: {
   type: RecordType;
-  visitType?: "vaccination" | "treatment";
+  visitType?: string;
   vaccineName?: string;
   treatmentDescription?: string;
   serviceType?: string;
   providerName?: string;
 }) {
   if (record.type === "veterinary" && record.visitType === "vaccination" && record.vaccineName) return record.vaccineName;
-  if (record.type === "veterinary" && record.visitType === "treatment" && record.treatmentDescription) return record.treatmentDescription;
+  if (record.type === "veterinary" && record.treatmentDescription) return record.treatmentDescription;
   if (record.type === "farrier" && record.serviceType) return record.serviceType;
   return "";
 }

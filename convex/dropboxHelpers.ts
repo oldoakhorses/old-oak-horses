@@ -16,15 +16,11 @@ export const getBillForDropbox = internalQuery({
 
     const category = bill.categoryId ? await ctx.db.get(bill.categoryId) : null;
 
-    // Resolve provider/contact name
+    // Resolve contact name
     let providerName: string | undefined;
     if (bill.contactId) {
       const contact = await ctx.db.get(bill.contactId);
       providerName = contact?.name;
-    }
-    if (!providerName && bill.providerId) {
-      const provider = await ctx.db.get(bill.providerId);
-      providerName = provider?.name;
     }
     if (!providerName) {
       providerName = bill.customProviderName ?? undefined;
