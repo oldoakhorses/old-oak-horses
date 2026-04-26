@@ -442,7 +442,7 @@ export default function HorseRecordsPage() {
                       <div className={styles.expandedFields}>
                         {editing ? (
                           <>
-                            <ExpandedInput label="PROVIDER">
+                            <ExpandedInput label={providerLabel(record.type)}>
                               <input
                                 className={styles.expandedInput}
                                 value={editState.providerName}
@@ -586,7 +586,7 @@ export default function HorseRecordsPage() {
                           </>
                         ) : (
                           <>
-                            <ExpandedField label="PROVIDER" value={record.providerName} />
+                            <ExpandedField label={providerLabel(record.type)} value={record.providerName} />
                             <ExpandedField label="DATE" value={formatDateLong(record.date)} />
                             <ExpandedField label="NOTES" value={record.notes} />
                             {record.billInfo ? (
@@ -845,6 +845,14 @@ function pretty(value: string) {
     .filter(Boolean)
     .map((part) => part[0].toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function providerLabel(type: RecordType) {
+  if (type === "veterinary") return "VETERINARIAN";
+  if (type === "medication") return "ADMINISTERED BY";
+  if (type === "farrier") return "FARRIER";
+  if (type === "bodywork") return "PRACTITIONER";
+  return "CONTACT";
 }
 
 function formatDateLong(timestamp: number) {

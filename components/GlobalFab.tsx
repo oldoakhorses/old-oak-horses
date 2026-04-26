@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent,
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { formatInvoiceName } from "@/lib/formatInvoiceName";
 import styles from "@/app/dashboard/dashboard.module.css";
 
 type RecordType = "veterinary" | "medication" | "farrier" | "bodywork" | "other";
@@ -65,6 +66,7 @@ type RecordFormState = {
   medications: string[];
   nextVisitDate: string;
   notes: string;
+  billId: string;
 };
 
 type DocumentFormState = {
@@ -175,6 +177,7 @@ function createInitialRecordForm(): RecordFormState {
     medications: [],
     nextVisitDate: "",
     notes: "",
+    billId: "",
   };
 }
 
@@ -224,6 +227,9 @@ export default function GlobalFab() {
   const [documentSuccess, setDocumentSuccess] = useState(false);
   const [documentError, setDocumentError] = useState("");
   const [documentDragOver, setDocumentDragOver] = useState(false);
+  const [recordInvoiceSearch, setRecordInvoiceSearch] = useState("");
+  const [recordInvoiceDropdownOpen, setRecordInvoiceDropdownOpen] = useState(false);
+  const recordInvoiceDropdownRef = useRef<HTMLDivElement | null>(null);
   const [invoiceDragOver, setInvoiceDragOver] = useState(false);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [invoiceStage, setInvoiceStage] = useState<"idle" | "uploading" | "detecting" | "parsing" | "redirecting">("idle");
@@ -248,6 +254,7 @@ export default function GlobalFab() {
     [allContactsForRecord, recordProviderCategory]
   );
 
+  const allInvoicesForLinking = useQuery(api.bills.listForLinking) ?? [];
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);
   const updateHorseRecord = useMutation(api.horseRecords.updateHorseRecord);
   const uploadDocument = useMutation(api.documents.upload);
@@ -274,6 +281,16 @@ export default function GlobalFab() {
     const handleClickOutside = (event: MouseEvent) => {
       if (horseDropdownRef.current && !horseDropdownRef.current.contains(event.target as Node)) {
         setHorseDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (recordInvoiceDropdownRef.current && !recordInvoiceDropdownRef.current.contains(event.target as Node)) {
+        setRecordInvoiceDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -360,6 +377,8 @@ export default function GlobalFab() {
       setRecordError("");
       setRecordSubmitting(false);
       setHorseDropdownOpen(false);
+      setRecordInvoiceSearch("");
+      setRecordInvoiceDropdownOpen(false);
       setDocumentForm(createInitialDocumentForm());
       setDocumentFile(null);
       setDocumentUploading(false);
@@ -727,6 +746,7 @@ export default function GlobalFab() {
           isUpcoming: false,
           notes: notesForHorse || undefined,
           attachmentStorageId,
+          billId: recordForm.billId ? recordForm.billId as Id<"bills"> : undefined,
         });
         if (recordForm.nextVisitDate) {
           const upcomingRecordId = await createHorseRecord({
@@ -1296,6 +1316,66 @@ export default function GlobalFab() {
                 onChange={(e) => setRecordForm((prev) => ({ ...prev, notes: e.target.value }))}
                 placeholder="add any details..."
               />
+            </RecordField>
+
+            <RecordField label="LINKED INVOICE">
+              <div className={styles.invoiceSearchWrap} ref={recordInvoiceDropdownRef}>
+                {recordForm.billId ? (
+                  <div className={styles.invoiceSelected}>
+                    <span className={styles.invoiceSelectedName}>
+                      {(() => {
+                        const linked = allInvoicesForLinking.find((b) => String(b._id) === recordForm.billId);
+                        return linked ? formatInvoiceName({ providerName: linked.providerName, date: linked.invoiceDate }) : "linked invoice";
+                      })()}
+                    </span>
+                    <button type="button" className={styles.invoiceClearBtn} onClick={() => setRecordForm((prev) => ({ ...prev, billId: "" }))}>✕</button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      className={styles.recordInput}
+                      value={recordInvoiceSearch}
+                      onChange={(e) => { setRecordInvoiceSearch(e.target.value); setRecordInvoiceDropdownOpen(true); }}
+                      onFocus={() => setRecordInvoiceDropdownOpen(true)}
+                      placeholder="search invoices..."
+                    />
+                    {recordInvoiceDropdownOpen && (
+                      <div className={styles.invoiceDropdown}>
+                        {allInvoicesForLinking
+                          .filter((b) => {
+                            if (!recordInvoiceSearch.trim()) return true;
+                            const term = recordInvoiceSearch.toLowerCase();
+                            return b.providerName.toLowerCase().includes(term) ||
+                              b.invoiceNumber.toLowerCase().includes(term) ||
+                              b.invoiceDate.includes(term);
+                          })
+                          .slice(0, 8)
+                          .map((b) => (
+                            <button
+                              key={String(b._id)}
+                              type="button"
+                              className={styles.invoiceDropdownItem}
+                              onClick={() => {
+                                setRecordForm((prev) => ({ ...prev, billId: String(b._id) }));
+                                setRecordInvoiceSearch("");
+                                setRecordInvoiceDropdownOpen(false);
+                              }}
+                            >
+                              {formatInvoiceName({ providerName: b.providerName, date: b.invoiceDate })}
+                            </button>
+                          ))}
+                        {allInvoicesForLinking.filter((b) => {
+                          if (!recordInvoiceSearch.trim()) return true;
+                          const term = recordInvoiceSearch.toLowerCase();
+                          return b.providerName.toLowerCase().includes(term) || b.invoiceNumber.toLowerCase().includes(term) || b.invoiceDate.includes(term);
+                        }).length === 0 && (
+                          <div className={styles.invoiceDropdownEmpty}>no invoices found</div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </RecordField>
 
             <RecordField label="ATTACHMENT">
