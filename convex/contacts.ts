@@ -153,6 +153,29 @@ export const createContact = mutation({
   }
 });
 
+export const findOrCreateContact = mutation({
+  args: {
+    name: v.string(),
+    category: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const trimmedName = args.name.trim();
+    if (!trimmedName) return null;
+    const normalizedCategory = normalizeCategory(args.category);
+    const key = trimmedName.toLowerCase();
+    const existing = await ctx.db.query("contacts").withIndex("by_name").collect();
+    const match = existing.find((c) => c.name.toLowerCase().trim() === key);
+    if (match) return match._id;
+    const slug = await generateUniqueSlug(ctx, trimmedName);
+    return await ctx.db.insert("contacts", {
+      name: trimmedName,
+      slug,
+      category: normalizedCategory,
+      createdAt: Date.now(),
+    });
+  },
+});
+
 export const updateContact = mutation({
   args: {
     contactId: v.optional(v.id("contacts")),
