@@ -1395,15 +1395,6 @@ export default function RecordsPage() {
               </>
             ) : null}
 
-            <RecordField label="NEXT VISIT">
-              <input
-                className={styles.recordInput}
-                type="date"
-                value={recordForm.nextVisitDate}
-                onChange={(event) => setRecordForm((prev) => ({ ...prev, nextVisitDate: event.target.value }))}
-              />
-            </RecordField>
-
             <RecordField label="NOTES">
               <textarea
                 className={styles.recordTextarea}
@@ -1479,15 +1470,36 @@ export default function RecordsPage() {
                 <input
                   type="file"
                   className={styles.fileInput}
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  accept=".pdf,.jpg,.jpeg,.png,.mp4,.mov,.webm"
                   onChange={(event: ChangeEvent<HTMLInputElement>) => setRecordAttachment(event.target.files?.[0] ?? null)}
                 />
                 <div className={styles.dropZoneText}>
                   drop file or <span className={styles.dropZoneBrowse}>browse</span>
                 </div>
-                <div className={styles.dropZoneSubtext}>PDF, JPG, PNG — max 10MB</div>
+                <div className={styles.dropZoneSubtext}>PDF, JPG, PNG, MP4, MOV — max 10MB</div>
                 {recordAttachment ? <div className={styles.dropZoneFile}>{recordAttachment.name}</div> : null}
               </label>
+            </RecordField>
+
+            <RecordField label="NEXT VISIT">
+              <div style={{ position: "relative" }}>
+                <input
+                  className={styles.recordInput}
+                  type="date"
+                  value={recordForm.nextVisitDate}
+                  onChange={(event) => setRecordForm((prev) => ({ ...prev, nextVisitDate: event.target.value }))}
+                />
+                {recordForm.nextVisitDate ? (
+                  <button
+                    type="button"
+                    className={styles.clearDateBtn}
+                    onClick={() => setRecordForm((prev) => ({ ...prev, nextVisitDate: "" }))}
+                    aria-label="Clear next visit date"
+                  >
+                    ✕
+                  </button>
+                ) : null}
+              </div>
             </RecordField>
 
             {recordError ? <p className={styles.recordError}>{recordError}</p> : null}
