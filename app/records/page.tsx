@@ -103,6 +103,7 @@ type RecordFormState = {
   vaccineName: string;
   treatmentDescription: string;
   serviceType: string;
+  medications: string[];
   nextVisitDate: string;
   notes: string;
   billId: string;
@@ -125,6 +126,11 @@ const RECORD_TYPE_TO_CATEGORY: Record<RecordType, string> = {
 };
 
 const farrierServiceTypes = ["Full Set", "Reset", "Trim", "Front Only", "Other"];
+const MEDICATION_OPTIONS = [
+  "adequan", "aspirin", "banamine", "bute", "dexamethasone",
+  "gastroguard", "gentamicin", "legend", "marquis", "metacam",
+  "pentosan", "traumeel", "other",
+];
 
 function getTodayDate() {
   return new Date().toISOString().split("T")[0];
@@ -159,6 +165,7 @@ function createInitialRecordForm(): RecordFormState {
     vaccineName: "",
     treatmentDescription: "",
     serviceType: "",
+    medications: [],
     nextVisitDate: "",
     notes: "",
     billId: "",
@@ -386,6 +393,7 @@ export default function RecordsPage() {
         vaccineName: "",
         treatmentDescription: "",
         serviceType: "",
+        medications: [],
       }));
       return;
     }
@@ -401,6 +409,7 @@ export default function RecordsPage() {
       vaccineName: "",
       treatmentDescription: "",
       serviceType: "",
+      medications: nextType === "medication" ? prev.medications : [],
     }));
   }
 
@@ -453,7 +462,10 @@ export default function RecordsPage() {
           date: new Date(`${recordForm.date}T00:00:00`).getTime(),
           providerName,
           visitType: selectedRecordType === "veterinary" ? recordForm.visitType || undefined : undefined,
+          vaccineName: selectedRecordType === "veterinary" && recordForm.visitType === "vaccination" ? recordForm.vaccineName.trim() || undefined : undefined,
+          treatmentDescription: selectedRecordType === "veterinary" && recordForm.visitType === "treatment" ? recordForm.treatmentDescription.trim() || undefined : undefined,
           serviceType: selectedRecordType === "farrier" ? recordForm.serviceType || undefined : undefined,
+          medications: selectedRecordType === "medication" && recordForm.medications.length > 0 ? recordForm.medications : undefined,
           isUpcoming: false,
           notes: recordForm.notes.trim() || undefined,
           attachmentStorageId,
@@ -468,7 +480,10 @@ export default function RecordsPage() {
             date: new Date(`${recordForm.nextVisitDate}T00:00:00`).getTime(),
             providerName,
             visitType: selectedRecordType === "veterinary" ? recordForm.visitType || undefined : undefined,
+            vaccineName: selectedRecordType === "veterinary" && recordForm.visitType === "vaccination" ? recordForm.vaccineName.trim() || undefined : undefined,
+            treatmentDescription: selectedRecordType === "veterinary" && recordForm.visitType === "treatment" ? recordForm.treatmentDescription.trim() || undefined : undefined,
             serviceType: selectedRecordType === "farrier" ? recordForm.serviceType || undefined : undefined,
+            medications: selectedRecordType === "medication" && recordForm.medications.length > 0 ? recordForm.medications : undefined,
             isUpcoming: true,
             linkedRecordId: mainRecordId,
             notes: undefined,
@@ -1306,6 +1321,33 @@ export default function RecordsPage() {
                             onClick={() => setRecordForm((prev) => ({ ...prev, serviceType: service }))}
                           >
                             {service}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </RecordField>
+                ) : null}
+
+                {selectedRecordType === "medication" ? (
+                  <RecordField label="MEDICATION(S)">
+                    <div className={styles.chipRow}>
+                      {MEDICATION_OPTIONS.map((med) => {
+                        const active = recordForm.medications.includes(med);
+                        return (
+                          <button
+                            type="button"
+                            key={med}
+                            className={`${styles.serviceChip} ${active ? styles.serviceChipActive : ""}`}
+                            onClick={() =>
+                              setRecordForm((prev) => ({
+                                ...prev,
+                                medications: active
+                                  ? prev.medications.filter((m) => m !== med)
+                                  : [...prev.medications, med],
+                              }))
+                            }
+                          >
+                            {med}
                           </button>
                         );
                       })}
