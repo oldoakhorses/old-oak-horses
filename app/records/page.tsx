@@ -205,6 +205,8 @@ export default function RecordsPage() {
   const filtersPopoverRef = useRef<HTMLDivElement | null>(null);
   const [sortColumn, setSortColumn] = useState<SortColumn>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [sortOpen, setSortOpen] = useState(false);
+  const sortPopoverRef = useRef<HTMLDivElement | null>(null);
 
   const [expandedId, setExpandedId] = useState<Id<"horseRecords"> | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<Id<"horseRecords"> | null>(null);
@@ -285,6 +287,9 @@ export default function RecordsPage() {
       }
       if (filtersPopoverRef.current && !filtersPopoverRef.current.contains(event.target as Node)) {
         setFiltersOpen(false);
+      }
+      if (sortPopoverRef.current && !sortPopoverRef.current.contains(event.target as Node)) {
+        setSortOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -699,6 +704,38 @@ export default function RecordsPage() {
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                 />
+                <div className={styles.toolbarFiltersWrap} ref={sortPopoverRef}>
+                  <button
+                    type="button"
+                    className={`${styles.toolbarFiltersBtn} ${sortColumn !== "date" ? styles.toolbarFiltersBtnActive : ""}`}
+                    onClick={() => setSortOpen((v) => !v)}
+                    aria-expanded={sortOpen}
+                  >
+                    <span>sort</span>
+                    <span className={styles.toolbarFiltersChevron}>▾</span>
+                  </button>
+                  {sortOpen ? (
+                    <div className={styles.toolbarSortPopover} role="dialog">
+                      {(["date", "horse", "category"] as SortColumn[]).map((col) => {
+                        const label = col === "category" ? "type" : col;
+                        const isActive = sortColumn === col;
+                        return (
+                          <button
+                            type="button"
+                            key={col}
+                            className={`${styles.sortOption} ${isActive ? styles.sortOptionActive : ""}`}
+                            onClick={() => {
+                              handleSort(col);
+                              setSortOpen(false);
+                            }}
+                          >
+                            {label} {isActive ? (sortDirection === "asc" ? "↑" : "↓") : ""}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
                 <div className={styles.toolbarFiltersWrap} ref={filtersPopoverRef}>
                   <button
                     type="button"
@@ -796,19 +833,6 @@ export default function RecordsPage() {
         </div>
 
         <section className={styles.recordsCard}>
-          <div className={styles.listMeta}>
-            <div className={styles.sortButtons}>
-              <button type="button" className={sortClass(sortColumn, "date", styles)} onClick={() => handleSort("date")}>
-                date {sortColumn === "date" ? <span className={styles.sortArrow}>{sortDirection === "asc" ? "↑" : "↓"}</span> : null}
-              </button>
-              <button type="button" className={sortClass(sortColumn, "horse", styles)} onClick={() => handleSort("horse")}>
-                horse {sortColumn === "horse" ? <span className={styles.sortArrow}>{sortDirection === "asc" ? "↑" : "↓"}</span> : null}
-              </button>
-              <button type="button" className={sortClass(sortColumn, "category", styles)} onClick={() => handleSort("category")}>
-                type {sortColumn === "category" ? <span className={styles.sortArrow}>{sortDirection === "asc" ? "↑" : "↓"}</span> : null}
-              </button>
-            </div>
-          </div>
 
           {sortedRecords.length === 0 ? (
             <div className={styles.emptyState}>
