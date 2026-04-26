@@ -486,10 +486,10 @@ export default function RecordsPage() {
     setRecordSubmitting(true);
     try {
       const providerName = recordForm.providerName.trim() || undefined;
-      let providerId: Id<"contacts"> | undefined;
+      let resolvedContactId: Id<"contacts"> | undefined;
       if (providerName && recordProviderCategory) {
-        const contactId = await findOrCreateContact({ name: providerName, category: recordProviderCategory });
-        if (contactId) providerId = contactId;
+        const cid = await findOrCreateContact({ name: providerName, category: recordProviderCategory });
+        if (cid) resolvedContactId = cid;
       }
 
       const attachmentStorageId = await uploadAttachmentIfPresent();
@@ -504,7 +504,7 @@ export default function RecordsPage() {
           customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
           date: new Date(`${recordForm.date}T00:00:00`).getTime(),
           providerName,
-          providerId,
+          contactId: resolvedContactId,
           visitType: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes[0] as VetSubcategory : undefined,
           visitTypes: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes : undefined,
           vetOtherDescription: selectedRecordType === "veterinary" && recordForm.visitTypes.includes("other") ? recordForm.vetOtherDescription.trim() || undefined : undefined,
@@ -525,7 +525,7 @@ export default function RecordsPage() {
             customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
             date: new Date(`${recordForm.nextVisitDate}T00:00:00`).getTime(),
             providerName,
-            providerId,
+            contactId: resolvedContactId,
             visitType: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes[0] as VetSubcategory : undefined,
             visitTypes: selectedRecordType === "veterinary" && recordForm.visitTypes.length > 0 ? recordForm.visitTypes : undefined,
             vetOtherDescription: selectedRecordType === "veterinary" && recordForm.visitTypes.includes("other") ? recordForm.vetOtherDescription.trim() || undefined : undefined,
@@ -589,11 +589,11 @@ export default function RecordsPage() {
   async function saveEdit() {
     if (!editingRecordId || !editState) return;
     const editProviderName = editState.providerName?.trim() || undefined;
-    let editProviderId: Id<"contacts"> | undefined;
+    let editContactId: Id<"contacts"> | undefined;
     if (editProviderName) {
       const category = RECORD_TYPE_TO_CATEGORY[editState.type] || "other";
       const contactId = await findOrCreateContact({ name: editProviderName, category });
-      if (contactId) editProviderId = contactId;
+      if (contactId) editContactId = contactId;
     }
     const nextVisitTimestamp = editState.nextVisitDate ? new Date(`${editState.nextVisitDate}T00:00:00`).getTime() : undefined;
     await updateRecordWithNextVisit({
@@ -604,7 +604,7 @@ export default function RecordsPage() {
         visitTypes: editState.type === "veterinary" && editState.visitTypes.length > 0 ? editState.visitTypes : undefined,
         vetOtherDescription: editState.type === "veterinary" && editState.visitTypes.includes("other") ? editState.vetOtherDescription || undefined : undefined,
         providerName: editProviderName,
-        providerId: editProviderId,
+        contactId: editContactId,
         date: editState.date ? new Date(`${editState.date}T00:00:00`).getTime() : undefined,
         notes: editState.notes || undefined,
         serviceType: editState.type === "farrier" ? editState.serviceType || undefined : undefined,

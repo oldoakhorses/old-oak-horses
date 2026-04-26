@@ -229,12 +229,12 @@ export default function HorseRecordsPage() {
   async function saveEdit() {
     if (!editingRecordId || !editState) return;
     const editProviderName = editState.providerName?.trim() || undefined;
-    let editProviderId: Id<"contacts"> | undefined;
+    let editContactId: Id<"contacts"> | undefined;
     if (editProviderName) {
       const catMap: Record<string, string> = { veterinary: "veterinary", medication: "veterinary", farrier: "farrier", bodywork: "bodywork" };
       const category = catMap[editState.type] || "other";
       const contactId = await findOrCreateContact({ name: editProviderName, category });
-      if (contactId) editProviderId = contactId;
+      if (contactId) editContactId = contactId;
     }
     const nextVisitTimestamp = editState.nextVisitDate ? new Date(`${editState.nextVisitDate}T00:00:00`).getTime() : undefined;
 
@@ -257,7 +257,7 @@ export default function HorseRecordsPage() {
       recordId: editingRecordId,
       updates: {
         providerName: editProviderName,
-        providerId: editProviderId,
+        contactId: editContactId,
         date: editState.date ? new Date(`${editState.date}T00:00:00`).getTime() : undefined,
         notes: editState.notes || undefined,
         serviceType: editState.serviceType || undefined,
