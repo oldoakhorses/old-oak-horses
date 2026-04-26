@@ -103,7 +103,7 @@ export default function HorseRecordTypePage() {
             records.map((row) => (
               <Link key={row._id} href={row.href} className={styles.recordRow}>
                 <div className={styles.recordLeft}>
-                  <span className={styles.recordProvider}>{row.providerName}</span>
+                  <span className={styles.recordProvider}>{row.contactName}</span>
                   <div className={styles.recordMeta}>
                     <span className={styles.recordDateTime}>{formatDateTime(row.date, row.uploadedAt)}</span>
                     {row.invoiceNumber ? <span>#{row.invoiceNumber}</span> : null}

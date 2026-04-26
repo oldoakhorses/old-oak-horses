@@ -300,7 +300,7 @@ export default function OwnerInvoiceDetailPage() {
                     <div key={`${charge.billId}-${charge.horseId}`} className={styles.chargeRow}>
                       <div className={styles.chargeInfo}>
                         <div className={styles.chargeName}>
-                          {charge.providerName || charge.fileName}
+                          {charge.contactName || charge.fileName}
                         </div>
                         <div className={styles.chargeMeta}>
                           🐴 {charge.horseName}
@@ -447,8 +447,8 @@ export default function OwnerInvoiceDetailPage() {
               const allBillApproved = billGroup.approvedCount === billGroup.items.length;
               const displayName = (billGroup.invoiceName && billGroup.invoiceName.trim().length > 0)
                 ? billGroup.invoiceName
-                : billGroup.providerName
-                  ? `${billGroup.providerName}${billGroup.invoiceDate ? ` \u2014 ${fmtDate(billGroup.invoiceDate)}` : ""}`
+                : billGroup.contactName
+                  ? `${billGroup.contactName}${billGroup.invoiceDate ? ` \u2014 ${fmtDate(billGroup.invoiceDate)}` : ""}`
                   : billGroup.fileName;
 
               return (

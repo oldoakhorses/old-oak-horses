@@ -167,15 +167,15 @@ export default function CategoryOverviewPage({
   const invoiceList: InvoiceListItem[] = useMemo(() => {
     return allParsedBills.map((row) => {
       const c = row.bill.contactId ? contactById.get(String(row.bill.contactId)) : null;
-      const providerSlug = c?.slug ?? slugify(c?.name ?? "contact");
+      const contactSlug = c?.slug ?? slugify(c?.name ?? "contact");
       return {
         id: row.bill._id,
         href: `/invoices/preview/${row.bill._id}`,
         category: categorySlug,
         invoiceNumber: row.extracted.invoice_number ?? row.bill.fileName,
         invoiceDate: row.extracted.invoice_date ?? null,
-        providerName: c?.name ?? "Unknown",
-        providerSlug,
+        contactName: c?.name ?? "Unknown",
+        contactSlug,
         horses: [...new Set(row.lineItems.map((item) => item.horse_name ?? "Unassigned"))],
         lineItemCount: row.lineItems.length,
         fileName: row.bill.fileName,
@@ -272,17 +272,17 @@ export default function CategoryOverviewPage({
           <HorseScrollRow items={summary.spendByHorse} formatter={fmtUSD} />
         </section>
 
-        <section className={styles.providersGrid}>
+        <section className={styles.contactsGrid}>
           {contactCards.map(({ contact, invoiceCount, totalSpend, horses, recent }) => (
-            <Link key={contact._id} href={`/contacts/${contact.slug ?? slugify(contact.name)}`} className={styles.providerCard}>
-              <div className={styles.providerName}>{contact.name}</div>
+            <Link key={contact._id} href={`/contacts/${contact.slug ?? slugify(contact.name)}`} className={styles.contactCard}>
+              <div className={styles.contactName}>{contact.name}</div>
               {invoiceCount === 0 ? (
                 <div className={styles.muted}>no invoices in this period</div>
               ) : (
                 <>
-                  <div className={styles.providerAmount}>{fmtUSD(totalSpend)}</div>
-                  <div className={styles.providerMeta}>{invoiceCount} invoices · {recent || "no date"}</div>
-                  <div className={styles.providerMeta}>{horses.slice(0, 3).join(", ")}{horses.length > 3 ? "..." : ""}</div>
+                  <div className={styles.contactAmount}>{fmtUSD(totalSpend)}</div>
+                  <div className={styles.contactMeta}>{invoiceCount} invoices · {recent || "no date"}</div>
+                  <div className={styles.contactMeta}>{horses.slice(0, 3).join(", ")}{horses.length > 3 ? "..." : ""}</div>
                 </>
               )}
             </Link>

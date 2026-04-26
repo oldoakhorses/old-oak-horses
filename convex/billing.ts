@@ -82,13 +82,13 @@ export const getOwnerInvoice = query({
 
     // Resolve source bill info for each line item
     const billIds = [...new Set(lineItems.map((i) => String(i.sourceBillId)))];
-    const billMap = new Map<string, { fileName: string; billId: string; invoiceName?: string; invoiceDate?: string; providerName?: string; category?: string; subcategory?: string; notes?: string }>();
+    const billMap = new Map<string, { fileName: string; billId: string; invoiceName?: string; invoiceDate?: string; contactName?: string; category?: string; subcategory?: string; notes?: string }>();
     for (const billIdStr of billIds) {
       const bill = await ctx.db.get(billIdStr as Id<"bills">);
       if (bill) {
         const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
         const invoiceDate = (extracted.invoice_date ?? extracted.invoiceDate ?? "") as string;
-        const providerName = (extracted.provider_name ?? extracted.providerName ?? "") as string;
+        const contactName = (extracted.contact_name ?? extracted.contactName ?? "") as string;
         let categorySlug: string | undefined;
         if (bill.categoryId) {
           const cat = await ctx.db.get(bill.categoryId);
@@ -99,7 +99,7 @@ export const getOwnerInvoice = query({
           billId: billIdStr,
           invoiceName: typeof bill.invoiceName === "string" && bill.invoiceName.trim().length > 0 ? bill.invoiceName : undefined,
           invoiceDate,
-          providerName,
+          contactName,
           category: categorySlug,
           subcategory: (bill as any).travelSubcategory ?? (bill as any).housingSubcategory ?? (bill as any).adminSubcategory ?? (bill as any).marketingSubcategory ?? (bill as any).groomingSubcategory ?? (bill as any).duesSubcategory ?? undefined,
           notes: (bill as any).notes,
@@ -116,7 +116,7 @@ export const getOwnerInvoice = query({
         fileName: string;
         invoiceName: string;
         invoiceDate: string;
-        providerName: string;
+        contactName: string;
         category: string;
         subcategory: string;
         notes: string;
@@ -143,7 +143,7 @@ export const getOwnerInvoice = query({
         fileName: billInfo?.fileName ?? "Unknown Invoice",
         invoiceName: billInfo?.invoiceName ?? "",
         invoiceDate: billInfo?.invoiceDate ?? "",
-        providerName: billInfo?.providerName ?? "",
+        contactName: billInfo?.contactName ?? "",
         category: billInfo?.category ?? "",
         subcategory: billInfo?.subcategory ?? "",
         notes: billInfo?.notes ?? "",
@@ -637,7 +637,7 @@ export const addManualLineItem = mutation({
       source: "cc_transaction" as const,
       extractedData: {
         invoice_total_usd: args.amount,
-        provider_name: args.description,
+        contact_name: args.description,
         line_items: [{ description: args.description, amount: args.amount, confirmed: true }],
       },
       ...(args.horseId ? {
@@ -699,7 +699,7 @@ export const getAvailableCharges = query({
     const available: Array<{
       billId: string;
       fileName: string;
-      providerName: string;
+      contactName: string;
       invoiceDate: string;
       amount: number;
       category: string;
@@ -712,7 +712,7 @@ export const getAvailableCharges = query({
       if (existingBillIds.has(String(bill._id))) continue;
 
       const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
-      const providerName = String(extracted.provider_name ?? extracted.providerName ?? bill.fileName ?? "");
+      const contactName = String(extracted.contact_name ?? extracted.contactName ?? bill.fileName ?? "");
       const invoiceDate = String(extracted.invoice_date ?? extracted.invoiceDate ?? "");
       const total = typeof extracted.invoice_total_usd === "number" ? extracted.invoice_total_usd : 0;
 
@@ -728,7 +728,7 @@ export const getAvailableCharges = query({
             available.push({
               billId: String(bill._id),
               fileName: bill.fileName,
-              providerName,
+              contactName,
               invoiceDate,
               amount: h.amount,
               category: categorySlug,
@@ -764,7 +764,7 @@ export const addBillCharges = mutation({
 
     const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
     const lineItems = Array.isArray(extracted.line_items) ? extracted.line_items : [];
-    const providerName = String(extracted.provider_name ?? extracted.providerName ?? bill.fileName ?? "");
+    const contactName = String(extracted.contact_name ?? extracted.contactName ?? bill.fileName ?? "");
 
     if (lineItems.length > 0) {
       // Add each line item from the bill
@@ -781,7 +781,7 @@ export const addBillCharges = mutation({
           sourceBillId: args.billId,
           horseId: args.horseId,
           horseName: args.horseName,
-          description: String(li.description ?? providerName),
+          description: String(li.description ?? contactName),
           amount: round2(liAmount * scale),
           category: args.category ?? String(li.category ?? ""),
           sourceLineItemIndex: i,
@@ -796,7 +796,7 @@ export const addBillCharges = mutation({
         sourceBillId: args.billId,
         horseId: args.horseId,
         horseName: args.horseName,
-        description: providerName || bill.fileName,
+        description: contactName || bill.fileName,
         amount: args.amount,
         category: args.category,
         isApproved: false,
@@ -1130,7 +1130,7 @@ export const createOwnerInvoiceForOwner = mutation({
       for (const bill of businessGeneralBills) {
         const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
         const lineItems = getLineItems(extracted);
-        const providerName = String(extracted.provider_name ?? extracted.providerName ?? bill.fileName ?? "");
+        const contactName = String(extracted.contact_name ?? extracted.contactName ?? bill.fileName ?? "");
         let categorySlug: string | undefined;
         if (bill.categoryId) {
           const cat = await ctx.db.get(bill.categoryId);
@@ -1147,7 +1147,7 @@ export const createOwnerInvoiceForOwner = mutation({
                 sourceBillId: bill._id,
                 horseId: horse._id,
                 horseName: horse.name,
-                description: `${String(li.description ?? providerName)} (shared)`,
+                description: `${String(li.description ?? contactName)} (shared)`,
                 category: categorySlug ?? (typeof li.category === "string" ? li.category : undefined),
                 subcategory: typeof li.subcategory === "string" ? li.subcategory : undefined,
                 amount: perHorse,
@@ -1164,7 +1164,7 @@ export const createOwnerInvoiceForOwner = mutation({
               sourceBillId: bill._id,
               horseId: horse._id,
               horseName: horse.name,
-              description: `${providerName || bill.fileName} (shared)`,
+              description: `${contactName || bill.fileName} (shared)`,
               category: categorySlug,
               amount: perHorse,
             });

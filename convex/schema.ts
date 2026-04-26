@@ -144,6 +144,18 @@ export default defineSchema({
     ,
     hasUnmatchedHorses: v.optional(v.boolean()),
     unmatchedHorseNames: v.optional(v.array(v.string())),
+    extractedVendorContact: v.optional(
+      v.object({
+        vendorName: v.optional(v.string()),
+        contactName: v.optional(v.string()),
+        address: v.optional(v.string()),
+        phone: v.optional(v.string()),
+        email: v.optional(v.string()),
+        website: v.optional(v.string()),
+        accountNumber: v.optional(v.string())
+      })
+    ),
+    // Deprecated: kept for backwards compatibility with existing data until migration runs
     extractedProviderContact: v.optional(
       v.object({
         providerName: v.optional(v.string()),
@@ -233,6 +245,9 @@ export default defineSchema({
     type: v.string(),
     horseId: v.id("horses"),
     date: v.string(),
+    contactId: v.optional(v.id("contacts")),
+    contactName: v.optional(v.string()),
+    // Deprecated: kept for backwards compat until migration runs
     providerId: v.optional(v.id("contacts")),
     providerName: v.optional(v.string()),
     note: v.optional(v.string()),
@@ -254,8 +269,10 @@ export default defineSchema({
     customType: v.optional(v.string()),
     date: v.number(),
     nextVisitDate: v.optional(v.number()),
-    providerName: v.optional(v.string()),
+    contactName: v.optional(v.string()),
     contactId: v.optional(v.id("contacts")),
+    // Deprecated: kept for backwards compat until migration runs
+    providerName: v.optional(v.string()),
     visitType: v.optional(v.union(
       v.literal("vaccination"),
       v.literal("treatment"),

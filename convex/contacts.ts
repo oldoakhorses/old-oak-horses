@@ -329,7 +329,7 @@ export const cleanupContactsForSchemaSlim = mutation({
       "company",
       "primaryContactName",
       "primaryContactPhone",
-      "providerName",
+      "contactName",
       "expectedFields",
       "extractionPrompt",
     ] as const;
@@ -412,7 +412,7 @@ export const cleanupContactsForSchemaSlim = mutation({
 
 /**
  * One-off migration for the providers-table removal: nullify every
- * `providerId` reference across bills + contacts, and delete the entire
+ * `contactId` reference across bills + contacts, and delete the entire
  * providerAliases + providers tables' rows. Idempotent.
  */
 export const stripAllProviderFields = mutation({
@@ -421,13 +421,13 @@ export const stripAllProviderFields = mutation({
     const contacts = await ctx.db.query("contacts").collect();
     let contactsCleared = 0;
     for (const c of contacts) {
-      if ((c as any).providerId !== undefined) {
-        await ctx.db.patch(c._id, { providerId: undefined } as any);
+      if ((c as any).contactId !== undefined) {
+        await ctx.db.patch(c._id, { contactId: undefined } as any);
         contactsCleared++;
       }
     }
 
-    // providerId/providerDetected/providerConfirmed have been dropped from
+    // contactId/providerDetected/providerConfirmed have been dropped from
     // the bills schema entirely, so nothing to clear here. Kept as a no-op
     // so the migration remains idempotent if called again.
     const billsCleared = 0;

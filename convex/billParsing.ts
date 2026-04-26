@@ -39,7 +39,7 @@ const USD_EXCHANGE_RATES: Record<string, number> = {
   GBP: 1.26,
 };
 const PROVIDER_CONTACT_PROMPT = `Also extract the provider/vendor contact details from the invoice header or footer:
-- providerName: the full business or company name
+- contactName: the full business or company name
 - contactName: individual contact person name if shown separately from business name
 - address: full mailing address
 - phone: phone number (any format)
@@ -136,7 +136,7 @@ export const parseBillPdf = internalAction({
           bill.marketingSubcategory ??
           bill.groomingSubcategory ??
           bill.travelSubcategory,
-        providerName: provider?.name,
+        contactName: provider?.name,
         providerPrompt: provider?.extractionPrompt,
         extractedPdfText
       });
@@ -178,10 +178,10 @@ export const parseBillPdf = internalAction({
       console.log(JSON.stringify(parsedRaw, null, 2));
       console.log("=== END PARSED ===");
       let parsed = normalizeParsedPayload(parsedRaw);
-      if (categorySlug === "dues-registrations" && isUsefProviderSignal(provider?.name, pickString(parsed, ["provider_name", "providerName"]))) {
+      if (categorySlug === "dues-registrations" && isUsefProviderSignal(provider?.name, pickString(parsed, ["contact_name", "contactName"]))) {
         parsed = normalizeUsefDuesParse(parsed, bill.duesSubcategory);
       }
-      if (categorySlug === "horse-transport" && isBrookLedgeProviderSignal(provider?.name, pickString(parsed, ["provider_name", "providerName"]))) {
+      if (categorySlug === "horse-transport" && isBrookLedgeProviderSignal(provider?.name, pickString(parsed, ["contact_name", "contactName"]))) {
         parsed = normalizeBrookLedgeHorseTransportParse(parsed);
       }
       if (isAirbnbProviderSignal(provider?.name, pickString(parsed, ["provider_name", "providerName"]), extractedPdfText)) {
@@ -189,7 +189,7 @@ export const parseBillPdf = internalAction({
       }
       const eqSportsSignal = isEqSportsProviderSignal(
         provider?.name,
-        pickString(parsed, ["provider_name", "providerName"]),
+        pickString(parsed, ["contact_name", "contactName"]),
         extractedPdfText
       );
       const multiPatientInvoice = isMultiPatientInvoice(extractedPdfText);
@@ -232,8 +232,8 @@ export const parseBillPdf = internalAction({
       let resolvedProvider = provider;
       let extractedCustomProviderName = bill.customProviderName;
       const extractedProviderName = pickString(parsed, [
-        "provider_name",
-        "providerName",
+        "contact_name",
+        "contactName",
         "vendor_name",
         "vendorName",
         "supplier_name",
@@ -374,8 +374,8 @@ export const parseBillPdf = internalAction({
       const currencyMeta = extractCurrencyMeta(parsed);
       const billDiscount = pickNumber(parsed, ["discount", "professional_discount", "professionalDiscount"]);
 
-      const providerContactPatch = extractProviderContactInfo(parsed);
-      const extractedProviderContact = buildExtractedProviderContact(providerContactPatch);
+      const providerContactPatch = extractVendorContactInfo(parsed);
+      const extractedVendorContact = buildExtractedVendorContact(providerContactPatch);
       const parsedLineItemsForLog = getLineItems(parsed);
       const parsedTotalForLog = pickNumber(parsed, ["invoice_total_usd", "invoiceTotalUsd", "total", "subtotal"]);
       console.log("=== SAVING BILL ===");
@@ -413,7 +413,7 @@ export const parseBillPdf = internalAction({
         unmatchedHorseNames: matchHorses ? unmatchedHorseNames : [],
         contactId: resolvedContactId as any,
         customProviderName: extractedCustomProviderName,
-        extractedProviderContact,
+        extractedVendorContact,
         inferredCategoryId: inferredCategoryId as any,
         ...currencyMeta,
         discount: typeof billDiscount === "number" ? round2(billDiscount) : undefined,
@@ -501,8 +501,8 @@ function hasHorseNameInLineItems(parsed: Record<string, unknown>) {
   });
 }
 
-function extractProviderContactInfo(parsed: Record<string, unknown>) {
-  const fullNameCandidates = ["providerName", "provider_full_name", "provider_name", "clinic_name", "client_name"];
+function extractVendorContactInfo(parsed: Record<string, unknown>) {
+  const fullNameCandidates = ["contactName", "provider_full_name", "contact_name", "clinic_name", "client_name"];
   const contactNameCandidates = ["contactName", "contact_name", "provider_contact_name"];
   const primaryContactNameCandidates = ["primary_contact_name", "contact_name", "provider_contact_name", "contactName"];
   const primaryContactPhoneCandidates = ["primary_contact_phone", "contact_phone"];
@@ -549,7 +549,7 @@ function pickNumber(source: Record<string, unknown>, keys: string[]) {
   return undefined;
 }
 
-function buildExtractedProviderContact(patch: {
+function buildExtractedVendorContact(patch: {
   fullName?: string;
   contactName?: string;
   address?: string;
@@ -559,8 +559,8 @@ function buildExtractedProviderContact(patch: {
   accountNumber?: string;
 }) {
   const result: Record<string, string> = {};
-  // Only fields the markDone schema allows on bills.extractedProviderContact
-  if (patch.fullName) result.providerName = patch.fullName;
+  // Only fields the markDone schema allows on bills.extractedVendorContact
+  if (patch.fullName) result.vendorName = patch.fullName;
   if (patch.address) result.address = patch.address;
   if (patch.phone) result.phone = patch.phone;
   if (patch.email) result.email = patch.email;
@@ -571,7 +571,7 @@ function buildExtractedProviderContact(patch: {
 
 function normalizeParsedPayload(input: Record<string, unknown>) {
   const output: Record<string, unknown> = { ...input };
-  const providerName = pickString(output, ["provider_name", "providerName", "vendor_name", "merchant_name"]);
+  const contactName = pickString(output, ["contact_name", "contactName", "vendor_name", "merchant_name"]);
   const invoiceNumber = pickString(output, ["invoice_number", "invoiceNumber", "doc_no", "doc_number", "document_number"]);
   const invoiceDate = pickString(output, ["invoice_date", "invoiceDate", "date"]);
   const dueDate = pickString(output, ["due_date", "dueDate"]);
@@ -652,9 +652,9 @@ function normalizeParsedPayload(input: Record<string, unknown>) {
     } as any);
   }
 
-  if (providerName) {
-    output.provider_name = providerName;
-    output.providerName = providerName;
+  if (contactName) {
+    output.contact_name = contactName;
+    output.contactName = contactName;
   }
   if (invoiceNumber) {
     output.invoice_number = invoiceNumber;
@@ -818,14 +818,14 @@ function normalizeLineItem(item: unknown) {
 
 function enrichTravelRentalCarParse(parsed: Record<string, unknown>) {
   const normalized = { ...parsed };
-  const hasSixtSignal = /sixt/i.test(String(normalized.provider_name ?? "")) || /sixt/i.test(String(normalized.providerName ?? ""));
+  const hasSixtSignal = /sixt/i.test(String(normalized.contact_name ?? "")) || /sixt/i.test(String(normalized.contactName ?? ""));
   if (!hasSixtSignal) {
     return normalized;
   }
 
-  const providerName = pickString(normalized, ["provider_name", "providerName"]) ?? "Sixt Rent a Car, LLC";
-  normalized.provider_name = providerName;
-  normalized.providerName = providerName;
+  const contactName = pickString(normalized, ["contact_name", "contactName"]) ?? "Sixt Rent a Car, LLC";
+  normalized.contact_name = contactName;
+  normalized.contactName = contactName;
 
   const driverName = pickString(normalized, ["driver_name", "driverName", "driver"]);
   if (driverName) {
@@ -875,11 +875,11 @@ function slugify(value: string) {
     .replace(/(^-|-$)+/g, "");
 }
 
-function extractTravelMeta(parsed: Record<string, unknown>, providerSlugOrName: string | undefined) {
+function extractTravelMeta(parsed: Record<string, unknown>, contactSlugOrName: string | undefined) {
   const originalCurrency = pickString(parsed, ["original_currency", "currency"])?.toUpperCase();
   const originalTotal = pickNumber(parsed, ["original_total", "invoice_total_original"]);
   const exchangeRate = pickNumber(parsed, ["exchange_rate", "exchange_rate_used"]);
-  const providerSubcategory = slugify(providerSlugOrName ?? "");
+  const providerSubcategory = slugify(contactSlugOrName ?? "");
   const parsedSubcategory = slugify(pickString(parsed, ["travel_subcategory", "subcategory"]) ?? "");
   const travelSubcategory = TRAVEL_SUBCATEGORY_SLUGS.has(parsedSubcategory)
     ? parsedSubcategory
@@ -896,11 +896,11 @@ function extractTravelMeta(parsed: Record<string, unknown>, providerSlugOrName: 
   };
 }
 
-function extractHousingMeta(parsed: Record<string, unknown>, providerSlugOrName: string | undefined) {
+function extractHousingMeta(parsed: Record<string, unknown>, contactSlugOrName: string | undefined) {
   const originalCurrency = pickString(parsed, ["original_currency", "currency"])?.toUpperCase();
   const originalTotal = pickNumber(parsed, ["original_total", "invoice_total_original"]);
   const exchangeRate = pickNumber(parsed, ["exchange_rate", "exchange_rate_used"]);
-  const providerSubcategory = slugify(providerSlugOrName ?? "");
+  const providerSubcategory = slugify(contactSlugOrName ?? "");
   const parsedSubcategory = slugify(pickString(parsed, ["housing_subcategory", "subcategory"]) ?? "");
   const housingSubcategory = HOUSING_SUBCATEGORY_SLUGS.has(parsedSubcategory)
     ? parsedSubcategory
@@ -1078,18 +1078,18 @@ function getExtractionPrompt(args: {
   categorySlug?: string;
   travelSubcategory?: string;
   billSubcategory?: string;
-  providerName?: string;
+  contactName?: string;
   providerPrompt?: string;
   extractedPdfText?: string;
 }) {
-  if (isEqSportsProviderSignal(args.providerName, args.extractedPdfText) || isMultiPatientInvoice(args.extractedPdfText ?? "")) {
+  if (isEqSportsProviderSignal(args.contactName, args.extractedPdfText) || isMultiPatientInvoice(args.extractedPdfText ?? "")) {
     return eqSportsVeterinaryExtractionPrompt(args.providerPrompt);
   }
   if (args.categorySlug === "horse-transport") {
-    return horseTransportExtractionPrompt(args.providerName, args.providerPrompt);
+    return horseTransportExtractionPrompt(args.contactName, args.providerPrompt);
   }
   if (args.categorySlug === "farrier") {
-    return farrierExtractionPrompt(args.providerName);
+    return farrierExtractionPrompt(args.contactName);
   }
   if (args.providerPrompt && args.providerPrompt.trim().length > 0) {
     return `${args.providerPrompt.trim()}\n\n${PROVIDER_CONTACT_PROMPT}`;
@@ -1104,7 +1104,7 @@ function autoDetectCategoryExtractionPrompt() {
   return `Parse this invoice PDF and extract structured data as JSON.
 
 For the overall invoice, extract:
-- provider_name: Name of the company/person who issued the invoice
+- contact_name: Name of the company/person who issued the invoice
 - contact_name: Specific contact person on the invoice (if different from provider)
 - address: Provider's address
 - phone: Provider's phone number
@@ -1169,7 +1169,7 @@ Footer fields (document-level):
 
 Return strict JSON:
 {
-  "providerName": "EQ Sports Medicine Group",
+  "contactName": "EQ Sports Medicine Group",
   "providerDoctor": "Morgan Geller",
   "grandTotal": <number>,
   "subtotal": <number>,
@@ -1203,10 +1203,10 @@ Parse ALL patient sections. Do not skip any. Do not merge sections.
 ${PROVIDER_CONTACT_PROMPT}`;
 }
 
-function horseTransportExtractionPrompt(providerName?: string, providerPrompt?: string) {
-  const providerHint = providerName ? `Provider hint: ${providerName}.` : "";
+function horseTransportExtractionPrompt(contactName?: string, providerPrompt?: string) {
+  const providerHint = contactName ? `Provider hint: ${contactName}.` : "";
   const custom = providerPrompt?.trim() ? `${providerPrompt.trim()}\n\n` : "";
-  if (isBrookLedgeProviderSignal(providerName)) {
+  if (isBrookLedgeProviderSignal(contactName)) {
     return `${custom}${providerHint}
 Extract this Brook Ledge horse transport invoice as strict JSON.
 
@@ -1220,7 +1220,7 @@ Expected structure:
 - destination from "Destination:" (keep full text, including pipes)
 - route as "ORIGIN -> DESTINATION"
 - invoice_total_usd from "Please Pay This Amount:"
-- provider_name should be "Brook Ledge"
+- contact_name should be "Brook Ledge"
 - provider_email should be "billing@brookledge.com" when shown in Remit To
 - provider_phone should include "610-987-6284" when shown
 - provider_address should include "PO Box 56, Oley, PA 19547-0056" when shown
@@ -1246,7 +1246,7 @@ Return strict JSON only.`;
 Extract all data from this horse transport invoice as strict JSON.
 
 Key fields:
-- provider_name: transport company name from header/logo/"Remit To"
+- contact_name: transport company name from header/logo/"Remit To"
 - invoice_number
 - invoice_date (billing date)
 - due_date
@@ -1292,8 +1292,8 @@ ${PROVIDER_CONTACT_PROMPT}
 Return strict JSON only.`;
 }
 
-function farrierExtractionPrompt(providerName?: string) {
-  const providerHint = providerName ? `Provider name on this invoice: ${providerName}.` : "";
+function farrierExtractionPrompt(contactName?: string) {
+  const providerHint = contactName ? `Provider name on this invoice: ${contactName}.` : "";
   return `Extract line items from this farrier invoice as strict JSON.
 ${providerHint}
 IMPORTANT: Horse names appear on the line directly BELOW each service description. Pair each service line with the horse name on the next line.
@@ -1322,13 +1322,13 @@ Full Shoeing / Gigi
 DIHS Per Horse Travel Fee / null
 2 pads with Equithane / Carlin
 
-Return strict JSON with invoice_number, invoice_date, provider_name, invoice_total_usd, line_items[].
+Return strict JSON with invoice_number, invoice_date, contact_name, invoice_total_usd, line_items[].
 
 ${PROVIDER_CONTACT_PROMPT}`;
 }
 
 function genericExtractionPrompt(categorySlug?: string, travelSubcategory?: string, billSubcategory?: string) {
-  const base = `Extract invoice data as strict JSON with invoice_number, invoice_date, provider_name, account_number, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[].
+  const base = `Extract invoice data as strict JSON with invoice_number, invoice_date, contact_name, account_number, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[].
 
 ${PROVIDER_CONTACT_PROMPT}`;
   if (categorySlug === "veterinary") {
@@ -1354,7 +1354,7 @@ For each line item extract:
 - date_of_service if shown per line item
 
 Return strict JSON only with:
-- provider_name
+- contact_name
 - invoice_number (best global identifier, optional if section-level only)
 - invoice_date (latest date across sections)
 - subtotal
@@ -1367,7 +1367,7 @@ Return strict JSON only with:
   if (categorySlug === "travel" && travelSubcategory === "rental-car") {
     return `Extract this travel rental-car invoice as strict JSON.
 Sixt Rental Car requirements:
-- provider_name: from header (e.g. "Sixt Rent a Car, LLC")
+- contact_name: from header (e.g. "Sixt Rent a Car, LLC")
 - driver_name: from "Driver's name:" field
 - invoice_number: from "Doc. no.:"
 - invoice_date: from date next to "Fort Lauderdale," at top
@@ -1398,7 +1398,7 @@ Return strict JSON.`;
     return `Extract all data from this admin/business operations invoice as strict JSON.
 
 Key fields:
-- provider_name
+- contact_name
 - invoice_number
 - invoice_date
 - due_date
@@ -1426,7 +1426,7 @@ Return strict JSON.`;
     return `Extract all data from this dues, registration, or membership invoice as strict JSON.
 
 Key fields:
-- provider_name (organization, e.g. USEF, USHJA)
+- contact_name (organization, e.g. USEF, USHJA)
 - invoice_number (invoice/transaction/confirmation id)
 - invoice_date
 - due_date
@@ -1468,7 +1468,7 @@ Return strict JSON.`;
     return `Extract all data from this supplies/equipment invoice, receipt, order confirmation, or email receipt as strict JSON.
 
 Required fields:
-- provider_name: company name (prefer branded/trading name, e.g. "Horseplay")
+- contact_name: company name (prefer branded/trading name, e.g. "Horseplay")
 - invoice_number: invoice/order/receipt/transaction number (e.g. ORDER #23866 => "23866")
 - invoice_date: date of invoice/order/receipt (YYYY-MM-DD)
 - due_date: due date when present, otherwise null for receipts/paid orders
@@ -1490,7 +1490,7 @@ Horseplay email receipt format handling:
 - No due date for this format => due_date: null
 
 For the sample Horseplay receipt, parse:
-- provider_name: "Horseplay"
+- contact_name: "Horseplay"
 - invoice_number: "23866"
 - invoice_date: "2026-02-18"
 - subtotal: 265.00
@@ -1501,11 +1501,11 @@ ${PROVIDER_CONTACT_PROMPT}
 Return strict JSON only.`;
   }
   if (categorySlug === "bodywork") {
-    return `Extract from this bodywork/chiropractic/massage invoice: invoice_number, invoice_date, due_date, provider_name, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, horse_name (if identifiable), quantity, unit_price, total_usd.
+    return `Extract from this bodywork/chiropractic/massage invoice: invoice_number, invoice_date, due_date, contact_name, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, horse_name (if identifiable), quantity, unit_price, total_usd.
 
 Provider naming rules:
-- Prefer the branded or trading name shown in logo/header/"Billed From" for provider_name.
-- Do NOT use legal entity numbers or corporation names as provider_name when a branded name exists.
+- Prefer the branded or trading name shown in logo/header/"Billed From" for contact_name.
+- Do NOT use legal entity numbers or corporation names as contact_name when a branded name exists.
 
 Horse extraction rules:
 - Horse names may appear on a separate line below service description.
@@ -1523,7 +1523,7 @@ Return strict JSON.`;
 - invoice_number
 - invoice_date
 - due_date
-- provider_name
+- contact_name
 - original_currency
 - original_total
 - exchange_rate
@@ -1543,7 +1543,7 @@ ${PROVIDER_CONTACT_PROMPT}`;
     return `${base} For each line item include suggestedCategory as null if it belongs in stabling, or one of: feed_bedding, stabling, farrier, supplies, veterinary.`;
   }
   if (categorySlug === "show-expenses") {
-    return `Extract invoice/statement data as strict JSON with invoice_number, invoice_date, provider_name, account_number, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[].
+    return `Extract invoice/statement data as strict JSON with invoice_number, invoice_date, contact_name, account_number, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[].
 
 IMPORTANT: Horse show statements often contain BOTH expenses (entry fees, office charges, facility fees, drug testing, etc.) AND income/credits (prize money, prize winnings, awards).
 
@@ -1566,7 +1566,7 @@ ${PROVIDER_CONTACT_PROMPT}
 Return strict JSON only.`;
   }
   if (categorySlug === "grooming") {
-    return `Extract from this grooming invoice: invoice_number, invoice_date, due_date, provider_name, pay_period, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, person_name (if identifiable), quantity, unit_price, total_usd.
+    return `Extract from this grooming invoice: invoice_number, invoice_date, due_date, contact_name, pay_period, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, person_name (if identifiable), quantity, unit_price, total_usd.
 
 ${PROVIDER_CONTACT_PROMPT}
 Return strict JSON.`;
@@ -1719,8 +1719,8 @@ function normalizeUsefDuesParse(parsed: Record<string, unknown>, billSubcategory
   const topSubcategory = resolveTopUsefSubcategory(subcategoryCounts, billSubcategory);
   normalized.dues_subcategory = topSubcategory;
   normalized.subcategory = topSubcategory;
-  normalized.provider_name = "USEF";
-  normalized.providerName = "USEF";
+  normalized.contact_name = "USEF";
+  normalized.contactName = "USEF";
   normalized.line_items = lineItems;
   normalized.lineItems = lineItems;
   return normalized;
@@ -1847,8 +1847,8 @@ function normalizeBrookLedgeHorseTransportParse(parsed: Record<string, unknown>)
   if (origin) normalized.origin = origin;
   if (destination) normalized.destination = destination;
   if (origin && destination) normalized.route = `${origin} -> ${destination}`;
-  normalized.provider_name = "Brook Ledge";
-  normalized.providerName = "Brook Ledge";
+  normalized.contact_name = "Brook Ledge";
+  normalized.contactName = "Brook Ledge";
 
   const pleasePay =
     pickNumber(normalized, ["please_pay_this_amount", "pleasePayThisAmount"]) ??
@@ -1978,12 +1978,12 @@ function normalizeEqSportsVeterinaryParse(
   const shouldForceEqSports =
     options?.forceEqSportsProvider === true ||
     isEqSportsProviderSignal(
-      pickString(normalized, ["provider_name", "providerName"]),
+      pickString(normalized, ["contact_name", "contactName"]),
       extractedText
     );
   if (shouldForceEqSports) {
-    normalized.provider_name = "EQ Sports Medicine Group";
-    normalized.providerName = "EQ Sports Medicine Group";
+    normalized.contact_name = "EQ Sports Medicine Group";
+    normalized.contactName = "EQ Sports Medicine Group";
     normalized.provider_email = pickString(normalized, ["provider_email", "email"]) ?? "eqsportsmedicinegroup@gmail.com";
     normalized.provider_phone = pickString(normalized, ["provider_phone", "phone"]) ?? "310-944-0570";
     normalized.provider_address =
@@ -2069,7 +2069,7 @@ function transformEQSportsInvoice(parsed: Record<string, unknown>, extractedText
   const tax = pickNumber(parsed, ["tax", "tax_total_usd"]) ?? footer.tax ?? undefined;
 
   return {
-    providerName: "EQ Sports Medicine Group",
+    contactName: "EQ Sports Medicine Group",
     category: "veterinary",
     date: latestSectionDate,
     total,
@@ -2585,13 +2585,13 @@ function stripHorseNamesFromText(
 
 function preferBrandedProviderName(parsed: Record<string, unknown>) {
   const normalized = { ...parsed };
-  const providerName = pickString(normalized, ["provider_name", "providerName"]);
-  const contactName = pickString(normalized, ["contactName", "contact_name", "provider_contact_name"]);
-  if (!providerName) return normalized;
-  const looksLegalEntity = /\b(inc|llc|limited|ltd|corp|corporation|ontario)\b/i.test(providerName) || /^\d{6,}/.test(providerName.trim());
-  if (looksLegalEntity && contactName) {
-    normalized.provider_name = contactName;
-    normalized.providerName = contactName;
+  const vendorName = pickString(normalized, ["contact_name", "contactName"]);
+  const personName = pickString(normalized, ["contactName", "contact_name", "provider_contact_name"]);
+  if (!vendorName) return normalized;
+  const looksLegalEntity = /\b(inc|llc|limited|ltd|corp|corporation|ontario)\b/i.test(vendorName) || /^\d{6,}/.test(vendorName.trim());
+  if (looksLegalEntity && personName) {
+    normalized.contact_name = personName;
+    normalized.contactName = personName;
   }
   return normalized;
 }
@@ -2606,7 +2606,7 @@ function extractPrizeMoneyEntries(
 ) {
   const lineItems = getLineItems(parsed);
   const invoiceDate = pickString(parsed, ["invoice_date", "invoiceDate"]);
-  const showName = pickString(parsed, ["provider_name", "providerName"]);
+  const showName = pickString(parsed, ["contact_name", "contactName"]);
   const entries: Array<{
     horseId: Id<"horses">;
     amount: number;

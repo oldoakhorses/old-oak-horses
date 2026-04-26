@@ -409,13 +409,13 @@
   gap: 10px;
 }
 
-.providerModeRow {
+.contactModeRow {
   display: inline-flex;
   gap: 6px;
 }
 
-.providerMode,
-.providerModeActive {
+.contactMode,
+.contactModeActive {
   border: 1px solid var(--color-border);
   border-radius: 6px;
   background: transparent;
@@ -425,7 +425,7 @@
   cursor: pointer;
 }
 
-.providerModeActive {
+.contactModeActive {
   background: var(--color-text);
   border-color: var(--color-text);
   color: #fff;
@@ -802,15 +802,15 @@
   border-color: #4a5bdb;
 }
 
-.providerOtherWrap {
+.contactOtherWrap {
   margin-top: 10px;
 }
 
-.providerSearchWrap {
+.contactSearchWrap {
   position: relative;
 }
 
-.providerDropdown {
+.contactDropdown {
   position: absolute;
   top: 100%;
   left: 0;
@@ -825,7 +825,7 @@
   z-index: 20;
 }
 
-.providerDropdownItem {
+.contactDropdownItem {
   display: block;
   width: 100%;
   padding: 8px 12px;
@@ -840,7 +840,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.providerDropdownItem:hover {
+.contactDropdownItem:hover {
   background: #f2f3f7;
 }
 

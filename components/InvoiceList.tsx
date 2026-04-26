@@ -13,9 +13,9 @@ export type InvoiceListItem = {
   category: string;
   invoiceNumber: string;
   invoiceDate: string | null;
-  providerName?: string;
+  contactName?: string;
   subcategory?: string | null;
-  providerSlug?: string;
+  contactSlug?: string;
   horses: string[];
   lineItemCount: number;
   fileName?: string;
@@ -43,7 +43,7 @@ export default function InvoiceList({
     return items.filter((item) => {
       const invoiceTitle = formatInvoiceName({
         category: item.category,
-        providerName: item.providerName,
+        contactName: item.contactName,
         subcategory: item.subcategory,
         date: item.invoiceDate ?? "",
       });
@@ -51,7 +51,7 @@ export default function InvoiceList({
         invoiceTitle,
         item.invoiceNumber,
         item.invoiceDate ?? "",
-        item.providerName ?? "",
+        item.contactName ?? "",
         item.fileName ?? "",
         ...item.horses,
       ]
@@ -97,13 +97,13 @@ export default function InvoiceList({
                 <span className={styles.invoice}>
                   {formatInvoiceName({
                     category: item.category,
-                    providerName: item.providerName,
+                    contactName: item.contactName,
                     subcategory: item.subcategory,
                     date: item.invoiceDate ?? "",
                   })}
                 </span>
-                {showProviderTag && item.providerName ? (
-                  <span className={styles.providerTag}>{item.providerName}</span>
+                {showProviderTag && item.contactName ? (
+                  <span className={styles.contactTag}>{item.contactName}</span>
                 ) : null}
               </div>
               <div className={styles.line2}>

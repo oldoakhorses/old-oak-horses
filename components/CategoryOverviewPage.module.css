@@ -90,14 +90,14 @@
   padding: 20px;
 }
 
-.providersGrid {
+.contactsGrid {
   margin-top: 16px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
 }
 
-.providerCard {
+.contactCard {
   background: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: 12px;
@@ -105,18 +105,18 @@
   text-decoration: none;
 }
 
-.providerName {
+.contactName {
   font-size: 16px;
   font-weight: 700;
 }
 
-.providerAmount {
+.contactAmount {
   margin-top: 8px;
   font-size: 24px;
   font-weight: 700;
 }
 
-.providerMeta {
+.contactMeta {
   margin-top: 6px;
   font-size: 11px;
   color: var(--color-text-secondary);
@@ -153,11 +153,11 @@
     padding: 18px 18px;
   }
 
-  .providersGrid {
+  .contactsGrid {
     grid-template-columns: 1fr;
   }
 
-  .providerAmount {
+  .contactAmount {
     font-size: 20px;
   }
 }

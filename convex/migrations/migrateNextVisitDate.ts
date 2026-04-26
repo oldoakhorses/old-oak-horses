@@ -13,7 +13,7 @@ export const migrate = mutation({
           horseId: record.horseId,
           type: record.type,
           date: nextVisitDate,
-          providerName: record.providerName,
+          contactName: record.contactName,
           isUpcoming: true,
           linkedRecordId: record._id,
         });

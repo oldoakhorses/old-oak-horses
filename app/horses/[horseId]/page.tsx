@@ -28,7 +28,7 @@ type HorseRecord = {
   type: RecordType;
   customType?: string;
   date: number;
-  providerName?: string;
+  contactName?: string;
   visitType?: string;
   visitTypes?: string[];
   vetOtherDescription?: string;
@@ -45,7 +45,7 @@ type HorseRecord = {
 
 type RecordEditState = {
   type: RecordType;
-  providerName: string;
+  contactName: string;
   date: string;
   nextVisitDate: string;
   notes: string;
@@ -160,7 +160,7 @@ export default function HorseProfilePage() {
   const [editingRecordId, setEditingRecordId] = useState<Id<"horseRecords"> | null>(null);
   const [recordEdit, setRecordEdit] = useState<RecordEditState | null>(null);
   const [editProviderDropdownOpen, setEditProviderDropdownOpen] = useState(false);
-  const editProviderDropdownRef = useRef<HTMLDivElement | null>(null);
+  const editContactDropdownRef = useRef<HTMLDivElement | null>(null);
   const [openDocumentMenu, setOpenDocumentMenu] = useState<Id<"documents"> | null>(null);
   const [documentToDelete, setDocumentToDelete] = useState<{ id: Id<"documents">; name: string } | null>(null);
   const [isDeletingDocument, setIsDeletingDocument] = useState(false);
@@ -199,7 +199,7 @@ export default function HorseProfilePage() {
       if (documentsCardRef.current && !documentsCardRef.current.contains(event.target as Node)) {
         setOpenDocumentMenu(null);
       }
-      if (editProviderDropdownRef.current && !editProviderDropdownRef.current.contains(event.target as Node)) {
+      if (editContactDropdownRef.current && !editContactDropdownRef.current.contains(event.target as Node)) {
         setEditProviderDropdownOpen(false);
       }
     };
@@ -215,7 +215,7 @@ export default function HorseProfilePage() {
     return recordsAll.filter((record) => {
       const bag = [
         record.type,
-        record.providerName,
+        record.contactName,
         record.notes,
         record.vaccineName,
         record.treatmentDescription,
@@ -293,7 +293,7 @@ export default function HorseProfilePage() {
   async function onSaveRecordEdit() {
     if (!editingRecordId || !recordEdit) return;
     const nextVisitTimestamp = recordEdit.nextVisitDate ? new Date(`${recordEdit.nextVisitDate}T00:00:00`).getTime() : undefined;
-    const editProviderName = recordEdit.providerName?.trim() || undefined;
+    const editProviderName = recordEdit.contactName?.trim() || undefined;
     let editContactId: Id<"contacts"> | undefined;
     if (editProviderName) {
       const catMap: Record<string, string> = { veterinary: "veterinary", medication: "veterinary", farrier: "farrier", bodywork: "bodywork" };
@@ -320,7 +320,7 @@ export default function HorseProfilePage() {
     await updateRecordWithNextVisit({
       recordId: editingRecordId,
       updates: {
-        providerName: editProviderName,
+        contactName: editProviderName,
         contactId: editContactId,
         date: recordEdit.date ? new Date(`${recordEdit.date}T00:00:00`).getTime() : undefined,
         notes: recordEdit.notes || undefined,
@@ -523,7 +523,7 @@ export default function HorseProfilePage() {
                     {formatInvoiceName({
                       invoiceName: row.invoiceName,
                       category: row.category,
-                      providerName: row.providerName,
+                      contactName: row.contactName,
                       date: toIsoDateString(row.date || ""),
                     })}
                   </span>
@@ -685,30 +685,30 @@ export default function HorseProfilePage() {
                       <div className={styles.recordExpandedFields}>
                         {isEditingRecord ? (
                           <>
-                            <ExpandedInput label={providerLabel(record.type)}>
-                              <div className={styles.providerSearchWrap} ref={editProviderDropdownRef}>
+                            <ExpandedInput label={contactLabel(record.type)}>
+                              <div className={styles.contactSearchWrap} ref={editContactDropdownRef}>
                                 <input
                                   className={styles.expandedInput}
-                                  value={recordEdit.providerName}
+                                  value={recordEdit.contactName}
                                   onChange={(event) => {
-                                    setRecordEdit({ ...recordEdit, providerName: event.target.value });
+                                    setRecordEdit({ ...recordEdit, contactName: event.target.value });
                                     setEditProviderDropdownOpen(true);
                                   }}
                                   onFocus={() => setEditProviderDropdownOpen(true)}
                                 />
-                                {editProviderDropdownOpen && recordEdit.providerName.trim() && (() => {
-                                  const term = recordEdit.providerName.trim().toLowerCase();
+                                {editProviderDropdownOpen && recordEdit.contactName.trim() && (() => {
+                                  const term = recordEdit.contactName.trim().toLowerCase();
                                   const matches = allContactsForRecord.filter((c: any) => c.name.toLowerCase().includes(term));
                                   if (matches.length === 0) return null;
                                   return (
-                                    <div className={styles.providerDropdown}>
+                                    <div className={styles.contactDropdown}>
                                       {matches.slice(0, 8).map((c: any) => (
                                         <button
                                           type="button"
                                           key={c._id}
-                                          className={styles.providerDropdownItem}
+                                          className={styles.contactDropdownItem}
                                           onClick={() => {
-                                            setRecordEdit({ ...recordEdit, providerName: c.name });
+                                            setRecordEdit({ ...recordEdit, contactName: c.name });
                                             setEditProviderDropdownOpen(false);
                                           }}
                                         >
@@ -785,7 +785,7 @@ export default function HorseProfilePage() {
                           </>
                         ) : (
                           <>
-                            <ExpandedField label={providerLabel(record.type)} value={record.providerName} />
+                            <ExpandedField label={contactLabel(record.type)} value={record.contactName} />
                             <ExpandedField label="DATE" value={formatDateLong(record.date)} />
                             <ExpandedField label="NOTES" value={record.notes} />
                           </>
@@ -860,7 +860,7 @@ export default function HorseProfilePage() {
                                 setEditingRecordId(record._id);
                                 setRecordEdit({
                                   type: record.type as RecordType,
-                                  providerName: record.providerName || "",
+                                  contactName: record.contactName || "",
                                   date: toDateInput(record.date),
                                   nextVisitDate: getLinkedUpcomingDateInput(record),
                                   notes: record.notes || "",
@@ -1081,7 +1081,7 @@ function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function providerLabel(type: RecordType) {
+function contactLabel(type: RecordType) {
   if (type === "veterinary") return "VETERINARIAN";
   if (type === "medication") return "ADMINISTERED BY";
   if (type === "farrier") return "FARRIER";
@@ -1137,7 +1137,7 @@ function getRecordDetail(record: HorseRecord): React.ReactNode {
     return (
       <>
         {meds ? <span className={styles.recordDetailPrimary}>{meds}</span> : null}
-        {record.providerName ? <span className={styles.recordDetailSecondary}>{record.providerName}{record.notes ? ` · ${record.notes}` : ""}</span> : record.notes ? <span className={styles.recordDetailSecondary}>{record.notes}</span> : null}
+        {record.contactName ? <span className={styles.recordDetailSecondary}>{record.contactName}{record.notes ? ` · ${record.notes}` : ""}</span> : record.notes ? <span className={styles.recordDetailSecondary}>{record.notes}</span> : null}
       </>
     );
   }
@@ -1145,12 +1145,12 @@ function getRecordDetail(record: HorseRecord): React.ReactNode {
   if (record.type === "veterinary") {
     return (
       <>
-        {record.providerName ? <span className={styles.recordDetailPrimary}>{record.providerName}</span> : null}
+        {record.contactName ? <span className={styles.recordDetailPrimary}>{record.contactName}</span> : null}
         {record.notes ? <span className={styles.recordDetailSecondary}>{record.notes}</span> : null}
       </>
     );
   }
 
-  if (record.providerName) return record.providerName;
+  if (record.contactName) return record.contactName;
   return "";
 }

@@ -126,7 +126,7 @@ export default function InvoicesPage() {
       const horsePass = horseFilter === "all" || assignedHorseIds.includes(horseFilter);
       const fromPass = !fromDate || date >= fromDate;
       const toPass = !toDate || date <= toDate;
-      const searchPass = !q || abbreviateInvoiceName(row.invoiceName || formatInvoiceName({ providerName: getProvider(row), date })).toLowerCase().includes(q)
+      const searchPass = !q || abbreviateInvoiceName(row.invoiceName || formatInvoiceName({ contactName: getProvider(row), date })).toLowerCase().includes(q)
         || (row.categoryName ?? "").toLowerCase().includes(q)
         || (getProvider(row)).toLowerCase().includes(q)
         || date.includes(q);
@@ -137,8 +137,8 @@ export default function InvoicesPage() {
     if (!sortColumn) return sorted;
     sorted.sort((a, b) => {
       if (sortColumn === "invoice") {
-        const aVal = abbreviateInvoiceName(a.invoiceName || formatInvoiceName({ providerName: getProvider(a), date: getInvoiceDate(a) })).toLowerCase();
-        const bVal = abbreviateInvoiceName(b.invoiceName || formatInvoiceName({ providerName: getProvider(b), date: getInvoiceDate(b) })).toLowerCase();
+        const aVal = abbreviateInvoiceName(a.invoiceName || formatInvoiceName({ contactName: getProvider(a), date: getInvoiceDate(a) })).toLowerCase();
+        const bVal = abbreviateInvoiceName(b.invoiceName || formatInvoiceName({ contactName: getProvider(b), date: getInvoiceDate(b) })).toLowerCase();
         return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
       }
       if (sortColumn === "category") {
@@ -177,7 +177,7 @@ export default function InvoicesPage() {
     if (!url) return;
     const a = document.createElement("a");
     a.href = url;
-    a.download = formatInvoiceFileName({ providerName: getProvider(row), date: getInvoiceDate(row) });
+    a.download = formatInvoiceFileName({ contactName: getProvider(row), date: getInvoiceDate(row) });
     a.click();
   }
 
@@ -329,7 +329,7 @@ export default function InvoicesPage() {
                           router.push(url);
                         }}
                       >
-                        {abbreviateInvoiceName(row.invoiceName || formatInvoiceName({ providerName: getProvider(row), date }))}
+                        {abbreviateInvoiceName(row.invoiceName || formatInvoiceName({ contactName: getProvider(row), date }))}
                       </a>
                       <span className={styles.amountCol} style={total >= 0 ? { color: "#16A34A" } : undefined}>{formatUsd(total)}</span>
                     </div>
@@ -469,7 +469,7 @@ export default function InvoicesPage() {
             <div className={styles.modalIcon}>⚠</div>
             <div className={styles.modalTitle}>delete invoice?</div>
             <div className={styles.modalText}>
-              Are you sure you want to delete "{formatInvoiceName({ providerName: getProvider(deleteTarget), date: getInvoiceDate(deleteTarget) })}"?
+              Are you sure you want to delete "{formatInvoiceName({ contactName: getProvider(deleteTarget), date: getInvoiceDate(deleteTarget) })}"?
               <br />
               This cannot be undone.
             </div>
@@ -514,20 +514,20 @@ function getTotal(row: any) {
 }
 
 function getProvider(row: any) {
-  return row?.providerName ?? row?.customProviderName ?? "Unassigned Invoice";
+  return row?.contactName ?? row?.customProviderName ?? "Unassigned Invoice";
 }
 
 function getInvoiceUrl(bill: any) {
   const category = bill.categorySlug ?? slugify(bill.categoryName ?? "");
-  const providerSlug = bill.providerSlug || slugify(bill.providerName || bill.customProviderName || "provider");
+  const contactSlug = bill.contactSlug || slugify(bill.contactName || bill.customProviderName || "provider");
   if (category === "travel") return `/travel/${bill.travelSubcategory ?? "rental-car"}/${bill._id}`;
   if (category === "housing") return `/housing/${bill.housingSubcategory ?? "rider-housing"}/${bill._id}`;
-  if (category === "marketing") return `/marketing/${bill.marketingSubcategory ?? providerSlug}/${bill._id}`;
-  if (category === "admin") return `/admin/${bill.adminSubcategory ?? "legal"}/${providerSlug}/${bill._id}`;
-  if (category === "dues-registrations") return `/dues-registrations/${bill.duesSubcategory ?? "memberships"}/${providerSlug}/${bill._id}`;
-  if (category === "horse-transport") return `/horse-transport/${bill.horseTransportSubcategory ?? "ground-transport"}/${providerSlug}/${bill._id}`;
+  if (category === "marketing") return `/marketing/${bill.marketingSubcategory ?? contactSlug}/${bill._id}`;
+  if (category === "admin") return `/admin/${bill.adminSubcategory ?? "legal"}/${contactSlug}/${bill._id}`;
+  if (category === "dues-registrations") return `/dues-registrations/${bill.duesSubcategory ?? "memberships"}/${contactSlug}/${bill._id}`;
+  if (category === "horse-transport") return `/horse-transport/${bill.horseTransportSubcategory ?? "ground-transport"}/${contactSlug}/${bill._id}`;
   if (category === "grooming") return `/grooming/${bill.groomingSubcategory ?? "other"}/${bill._id}`;
-  return `/${category}/${providerSlug}/${bill._id}`;
+  return `/${category}/${contactSlug}/${bill._id}`;
 }
 
 function prettyCategory(value: string) {

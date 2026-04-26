@@ -63,7 +63,7 @@ export const detectReportFromPdf = action({
                 "This report may contain treatment notes for MULTIPLE horses.\n\n" +
                 "Return strict JSON with these keys:\n" +
                 "- reportDate: string (YYYY-MM-DD)\n" +
-                "- providerName: string\n" +
+                "- contactName: string\n" +
                 "- horses: array of objects, each with { horseName: string, treatmentNotes: string, sessionNumber: number|null }\n\n" +
                 "IMPORTANT rules for treatmentNotes:\n" +
                 "- Write a clean, readable clinical summary for each horse individually.\n" +
@@ -86,7 +86,7 @@ export const detectReportFromPdf = action({
     const rawJson = parseTextBlock && parseTextBlock.type === "text" ? parseTextBlock.text ?? "" : "";
     const parsed = parseJsonObject(rawJson) as {
       reportDate?: string | null;
-      providerName?: string | null;
+      contactName?: string | null;
       horses?: Array<{
         horseName?: string | null;
         treatmentNotes?: string | null;
@@ -99,8 +99,8 @@ export const detectReportFromPdf = action({
     };
 
     const reportDate = normalizeDate(clean(parsed.reportDate)) ?? normalizeDateFromText(extractedText);
-    const providerFromText = clean(parsed.providerName);
-    const providerName = providerFromText && providerFromText.toLowerCase().includes("fred") ? "Fred Michelon" : providerFromText || "Fred Michelon";
+    const providerFromText = clean(parsed.contactName);
+    const contactName = providerFromText && providerFromText.toLowerCase().includes("fred") ? "Fred Michelon" : providerFromText || "Fred Michelon";
 
     // Handle multi-horse response
     const rawHorses = Array.isArray(parsed.horses) && parsed.horses.length > 0
@@ -126,7 +126,7 @@ export const detectReportFromPdf = action({
       extractedHorseName: firstHorse?.extractedHorseName ?? "",
       matchedHorseName: firstHorse?.matchedHorseName ?? null,
       reportDate,
-      providerName,
+      contactName,
       treatmentNotes: firstHorse?.treatmentNotes ?? "",
       sessionNumber: firstHorse?.sessionNumber ?? null,
       horses,

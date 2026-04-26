@@ -167,7 +167,7 @@ export const listForLinking = query(async (ctx) => {
     const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
     return {
       _id: bill._id,
-      providerName: resolved?.name ?? bill.customProviderName ?? "Unknown",
+      contactName: resolved?.name ?? bill.customProviderName ?? "Unknown",
       invoiceDate: String(extracted.invoice_date ?? extracted.invoiceDate ?? ""),
       invoiceNumber: String(extracted.invoice_number ?? extracted.invoiceNumber ?? ""),
     };
@@ -192,8 +192,8 @@ export const listAll = query(async (ctx) => {
     const primaryCategoryName = category?.name ?? (lineItemCats.length > 0 ? formatCategorySlug(lineItemCats[0]) : "Unknown");
     return {
       ...bill,
-      providerName: resolved?.name ?? bill.customProviderName ?? "Unknown",
-      providerSlug: resolved?.slug ?? slugify(bill.customProviderName ?? "unknown"),
+      contactName: resolved?.name ?? bill.customProviderName ?? "Unknown",
+      contactSlug: resolved?.slug ?? slugify(bill.customProviderName ?? "unknown"),
       categoryName: primaryCategoryName,
       categorySlug: primaryCategorySlug,
       lineItemCategories: lineItemCats,
@@ -236,7 +236,7 @@ export const getTravelBills = query({
         );
         return {
           ...bill,
-          providerName: resolved?.name ?? bill.customProviderName ?? "Unknown",
+          contactName: resolved?.name ?? bill.customProviderName ?? "Unknown",
           assignedPeople: bill.assignedPeople ?? [],
           assignedPeopleResolved,
           approvalStatus: bill.status === "done" && bill.isApproved ? "approved" : "pending"
@@ -361,21 +361,21 @@ export const getHousingSpendByProvider = query({
   args: { categoryId: v.id("categories") },
   handler: async (ctx, args) => {
     const bills = (await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect()).filter(isApprovedBill);
-    const totals = new Map<string, { providerName: string; totalSpend: number; invoiceCount: number }>();
+    const totals = new Map<string, { contactName: string; totalSpend: number; invoiceCount: number }>();
 
     for (const bill of bills) {
       const resolved = await resolveContactForBill(ctx, bill as any);
-      const providerName = resolved?.name ?? bill.customProviderName ?? "Unknown";
-      const current = totals.get(providerName) ?? { providerName, totalSpend: 0, invoiceCount: 0 };
+      const contactName = resolved?.name ?? bill.customProviderName ?? "Unknown";
+      const current = totals.get(contactName) ?? { contactName, totalSpend: 0, invoiceCount: 0 };
       current.totalSpend += getInvoiceTotalUsdFromAny(bill.extractedData);
       current.invoiceCount += 1;
-      totals.set(providerName, current);
+      totals.set(contactName, current);
     }
 
     const grandTotal = [...totals.values()].reduce((sum, row) => sum + row.totalSpend, 0);
     return [...totals.values()]
       .map((row) => ({
-        providerName: row.providerName,
+        contactName: row.contactName,
         totalSpend: row.totalSpend,
         invoiceCount: row.invoiceCount,
         pctOfTotal: grandTotal > 0 ? (row.totalSpend / grandTotal) * 100 : 0
@@ -407,7 +407,7 @@ export const getHousingBills = query({
         );
         return {
           ...bill,
-          providerName: resolved?.name ?? bill.customProviderName ?? "Unknown",
+          contactName: resolved?.name ?? bill.customProviderName ?? "Unknown",
           assignedPeopleResolved,
           approvalStatus: bill.status === "done" && bill.isApproved ? "approved" : "pending"
         };
@@ -472,8 +472,8 @@ export const getMarketingBills = query({
         const lineItems = getLineItems(bill.extractedData);
         return {
           ...bill,
-          providerName: resolved?.name ?? bill.customProviderName ?? (typeof extracted.provider_name === "string" ? extracted.provider_name : "Unknown"),
-          providerSlug: resolved?.slug ?? slugify(resolved?.name ?? bill.customProviderName ?? "unknown"),
+          contactName: resolved?.name ?? bill.customProviderName ?? (typeof extracted.contact_name === "string" ? extracted.contact_name : "Unknown"),
+          contactSlug: resolved?.slug ?? slugify(resolved?.name ?? bill.customProviderName ?? "unknown"),
           invoiceNumber,
           invoiceDate,
           totalUsd: getInvoiceTotalUsdFromAny(bill.extractedData),
@@ -520,20 +520,20 @@ export const getMarketingSpendByProvider = query({
   args: { categoryId: v.id("categories") },
   handler: async (ctx, args) => {
     const bills = (await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect()).filter(isApprovedBill);
-    const totals = new Map<string, { providerName: string; totalSpend: number; invoiceCount: number }>();
+    const totals = new Map<string, { contactName: string; totalSpend: number; invoiceCount: number }>();
     for (const bill of bills) {
       const resolved = await resolveContactForBill(ctx, bill as any);
       const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
-      const providerName = resolved?.name ?? bill.customProviderName ?? (typeof extracted.provider_name === "string" ? extracted.provider_name : "Unknown");
-      const current = totals.get(providerName) ?? { providerName, totalSpend: 0, invoiceCount: 0 };
+      const contactName = resolved?.name ?? bill.customProviderName ?? (typeof extracted.contact_name === "string" ? extracted.contact_name : "Unknown");
+      const current = totals.get(contactName) ?? { contactName, totalSpend: 0, invoiceCount: 0 };
       current.totalSpend += getInvoiceTotalUsdFromAny(bill.extractedData);
       current.invoiceCount += 1;
-      totals.set(providerName, current);
+      totals.set(contactName, current);
     }
     const grandTotal = [...totals.values()].reduce((sum, row) => sum + row.totalSpend, 0);
     return [...totals.values()]
       .map((row) => ({
-        providerName: row.providerName,
+        contactName: row.contactName,
         totalSpend: row.totalSpend,
         invoiceCount: row.invoiceCount,
         pctOfTotal: grandTotal > 0 ? (row.totalSpend / grandTotal) * 100 : 0
@@ -566,8 +566,8 @@ export const getSalaryBills = query({
         }
         return {
           ...bill,
-          providerName: resolved?.name ?? bill.customProviderName ?? (typeof extracted.provider_name === "string" ? extracted.provider_name : "Unknown"),
-          providerSlug: resolved?.slug ?? slugify(resolved?.name ?? bill.customProviderName ?? "unknown"),
+          contactName: resolved?.name ?? bill.customProviderName ?? (typeof extracted.contact_name === "string" ? extracted.contact_name : "Unknown"),
+          contactSlug: resolved?.slug ?? slugify(resolved?.name ?? bill.customProviderName ?? "unknown"),
           invoiceNumber: typeof extracted.invoice_number === "string" ? extracted.invoice_number : bill.fileName,
           invoiceDate: typeof extracted.invoice_date === "string" ? extracted.invoice_date : null,
           totalUsd: getInvoiceTotalUsdFromAny(bill.extractedData),
@@ -614,20 +614,20 @@ export const getSalarySpendByProvider = query({
   args: { categoryId: v.id("categories") },
   handler: async (ctx, args) => {
     const bills = (await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect()).filter(isApprovedBill);
-    const totals = new Map<string, { providerName: string; totalSpend: number; invoiceCount: number }>();
+    const totals = new Map<string, { contactName: string; totalSpend: number; invoiceCount: number }>();
     for (const bill of bills) {
       const resolved = await resolveContactForBill(ctx, bill as any);
       const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
-      const providerName = resolved?.name ?? bill.customProviderName ?? (typeof extracted.provider_name === "string" ? extracted.provider_name : "Unknown");
-      const current = totals.get(providerName) ?? { providerName, totalSpend: 0, invoiceCount: 0 };
+      const contactName = resolved?.name ?? bill.customProviderName ?? (typeof extracted.contact_name === "string" ? extracted.contact_name : "Unknown");
+      const current = totals.get(contactName) ?? { contactName, totalSpend: 0, invoiceCount: 0 };
       current.totalSpend += getInvoiceTotalUsdFromAny(bill.extractedData);
       current.invoiceCount += 1;
-      totals.set(providerName, current);
+      totals.set(contactName, current);
     }
     const grandTotal = [...totals.values()].reduce((sum, row) => sum + row.totalSpend, 0);
     return [...totals.values()]
       .map((row) => ({
-        providerName: row.providerName,
+        contactName: row.contactName,
         totalSpend: row.totalSpend,
         invoiceCount: row.invoiceCount,
         pctOfTotal: grandTotal > 0 ? (row.totalSpend / grandTotal) * 100 : 0
@@ -695,7 +695,7 @@ export const getPersonSpendSummary = query({
       billingPeriod: string;
       invoiceDate: number;
       uploadedAt: number;
-      providerName: string;
+      contactName: string;
       fileName: string;
       categorySlug?: string;
       source?: string;
@@ -765,7 +765,7 @@ export const getPersonSpendSummary = query({
         billingPeriod: bill.billingPeriod,
         invoiceDate,
         uploadedAt: bill.uploadedAt,
-        providerName: resolved?.name ?? bill.customProviderName ?? (typeof extracted.provider_name === "string" ? extracted.provider_name : "Unknown"),
+        contactName: resolved?.name ?? bill.customProviderName ?? (typeof extracted.contact_name === "string" ? extracted.contact_name : "Unknown"),
         fileName: bill.invoiceName ?? bill.fileName,
         categorySlug,
         source: bill.source,
@@ -818,8 +818,8 @@ export const getFeedBeddingBills = query({
         }
         return {
           ...bill,
-          providerName: resolved?.name ?? bill.customProviderName ?? "Unknown",
-          providerSlug: resolved?.slug ?? slugify(resolved?.name ?? bill.customProviderName ?? "unknown"),
+          contactName: resolved?.name ?? bill.customProviderName ?? "Unknown",
+          contactSlug: resolved?.slug ?? slugify(resolved?.name ?? bill.customProviderName ?? "unknown"),
           invoiceNumber: typeof extracted.invoice_number === "string" ? extracted.invoice_number : bill.fileName,
           invoiceDate: typeof extracted.invoice_date === "string" ? extracted.invoice_date : null,
           totalUsd: getInvoiceTotalUsdFromAny(bill.extractedData),
@@ -924,7 +924,7 @@ export const getStablingBills = query({
 
         return {
           ...bill,
-          providerName: resolved?.name ?? bill.customProviderName ?? "Unknown",
+          contactName: resolved?.name ?? bill.customProviderName ?? "Unknown",
           horses: [...horseTotals.values()],
           approvalStatus: bill.status === "done" && bill.isApproved ? "approved" : "pending"
         };
@@ -944,12 +944,12 @@ export const getStablingSpendByContact = query({
   args: { categoryId: v.id("categories") },
   handler: async (ctx, args) => {
     const bills = (await ctx.db.query("bills").withIndex("by_category", (q) => q.eq("categoryId", args.categoryId)).collect()).filter(isApprovedBill);
-    const totals = new Map<string, { contactId: string; providerName: string; totalSpend: number; invoiceCount: number }>();
+    const totals = new Map<string, { contactId: string; contactName: string; totalSpend: number; invoiceCount: number }>();
     for (const bill of bills) {
       const resolved = await resolveContactForBill(ctx, bill as any);
-      const providerName = resolved?.name ?? bill.customProviderName ?? "Unknown";
-      const contactId = String(bill.contactId ?? providerName);
-      const current = totals.get(contactId) ?? { contactId, providerName, totalSpend: 0, invoiceCount: 0 };
+      const contactName = resolved?.name ?? bill.customProviderName ?? "Unknown";
+      const contactId = String(bill.contactId ?? contactName);
+      const current = totals.get(contactId) ?? { contactId, contactName, totalSpend: 0, invoiceCount: 0 };
       current.totalSpend += getInvoiceTotalUsdFromAny(bill.extractedData);
       current.invoiceCount += 1;
       totals.set(contactId, current);
@@ -958,7 +958,7 @@ export const getStablingSpendByContact = query({
     return [...totals.values()]
       .map((row) => ({
         contactId: row.contactId,
-        providerName: row.providerName,
+        contactName: row.contactName,
         totalSpend: row.totalSpend,
         invoiceCount: row.invoiceCount,
         pctOfTotal: grandTotal > 0 ? (row.totalSpend / grandTotal) * 100 : 0
@@ -1171,17 +1171,17 @@ export const getBizOverview = query({
         const category = categoryById.get(String(bill.categoryId));
         const categorySlug = category?.slug ?? "unknown";
         const resolved = contactResolved.get(String(bill._id));
-        const providerName = resolved?.name ?? bill.customProviderName ?? "Unknown";
-        const providerSlug =
+        const contactName = resolved?.name ?? bill.customProviderName ?? "Unknown";
+        const contactSlug =
           categorySlug === "travel"
-            ? bill.travelSubcategory ?? slugify(providerName)
+            ? bill.travelSubcategory ?? slugify(contactName)
             : categorySlug === "housing"
-              ? bill.housingSubcategory ?? slugify(providerName)
+              ? bill.housingSubcategory ?? slugify(contactName)
               : categorySlug === "marketing"
-                ? bill.marketingSubcategory ?? slugify(providerName)
+                ? bill.marketingSubcategory ?? slugify(contactName)
                 : categorySlug === "grooming"
                   ? bill.groomingSubcategory ?? "other"
-              : resolved?.slug ?? slugify(providerName);
+              : resolved?.slug ?? slugify(contactName);
         const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
         const invoiceNumber =
           typeof extracted.invoice_number === "string" && extracted.invoice_number.trim().length > 0
@@ -1198,14 +1198,14 @@ export const getBizOverview = query({
           invoiceNumber,
           category: category?.name ?? "Unknown",
           categoryColor: getCategoryColor(categorySlug),
-          provider: providerName,
+          vendor: contactName,
           date,
           entities: entities.names,
           entityType: entities.type,
           status: (bill.status === "done" && bill.isApproved) || categorySlug === "veterinary" ? "done" : "pending",
           total: getInvoiceTotalUsdFromAny(bill.extractedData),
           categorySlug,
-          providerSlug
+          contactSlug
         };
       })
       .sort((a, b) => {
@@ -1219,7 +1219,7 @@ export const getBizOverview = query({
     const businessGeneralItems: Array<{
       billId: string;
       invoiceName: string;
-      providerName: string;
+      contactName: string;
       invoiceDate: string;
       categorySlug: string;
       lineDescription: string;
@@ -1231,7 +1231,7 @@ export const getBizOverview = query({
       const category = categoryById.get(String(bill.categoryId));
       const categorySlug = category?.slug ?? "unknown";
       const resolved = contactResolved.get(String(bill._id));
-      const providerName = resolved?.name ?? bill.customProviderName ?? "Unknown";
+      const contactName = resolved?.name ?? bill.customProviderName ?? "Unknown";
       const invoiceDate =
         typeof extracted.invoice_date === "string" && extracted.invoice_date.trim().length > 0
           ? extracted.invoice_date
@@ -1247,8 +1247,8 @@ export const getBizOverview = query({
         const total = lineItems.reduce((sum: number, item: any) => sum + getLineItemTotalUsd(item as Record<string, unknown>), 0);
         businessGeneralItems.push({
           billId: String(bill._id),
-          invoiceName: (bill as any).invoiceName || providerName,
-          providerName,
+          invoiceName: (bill as any).invoiceName || contactName,
+          contactName,
           invoiceDate,
           categorySlug,
           lineDescription: `Whole invoice (${lineItems.length} items)`,
@@ -1261,8 +1261,8 @@ export const getBizOverview = query({
           if (String(itemObj.assigneeType ?? "").toLowerCase() === "business_general") {
             businessGeneralItems.push({
               billId: String(bill._id),
-              invoiceName: (bill as any).invoiceName || providerName,
-              providerName,
+              invoiceName: (bill as any).invoiceName || contactName,
+              contactName,
               invoiceDate,
               categorySlug,
               lineDescription: String(itemObj.description ?? "Line item"),
@@ -1321,7 +1321,7 @@ export const getBillById = query({
     const bill = await ctx.db.get(args.billId);
     if (!bill) return null;
     const resolved = await resolveContactForBill(ctx, bill as any);
-    const provider = null;
+    const vendor = null;
     const category = bill.categoryId ? await ctx.db.get(bill.categoryId) : null;
     const extracted = ((bill.extractedData ?? {}) as Record<string, unknown>) ?? {};
     const lineItems = Array.isArray(extracted.line_items)
@@ -1330,17 +1330,22 @@ export const getBillById = query({
         ? extracted.lineItems
         : [];
     const lineItemCats = (bill.lineItemCategories ?? []) as string[];
+    const evc = bill.extractedVendorContact ?? (bill as any).extractedProviderContact;
     return {
       ...bill,
-      provider,
+      vendor,
       category,
+      extractedVendorContact: evc ? {
+        ...evc,
+        vendorName: evc.vendorName ?? evc.providerName,
+      } : undefined,
       pdfStorageId: bill.fileId,
-      providerName:
+      contactName:
         resolved?.name ??
         bill.customProviderName ??
-        (typeof extracted.provider_name === "string" ? extracted.provider_name : null),
-      providerDetected: Boolean(resolved),
-      providerConfirmed: Boolean(resolved),
+        (typeof extracted.contact_name === "string" ? extracted.contact_name : null),
+      vendorDetected: Boolean(resolved),
+      vendorConfirmed: Boolean(resolved),
       categorySlug: category?.slug ?? (lineItemCats.length > 0 ? lineItemCats[0] : null),
       lineItemCategories: lineItemCats,
       invoiceNumber:
@@ -1379,7 +1384,7 @@ export const getById = query({
     const bill = await ctx.db.get(args.billId);
     if (!bill) return null;
     const resolved = await resolveContactForBill(ctx, bill as any);
-    const provider = null;
+    const vendor = null;
     const category = bill.categoryId ? await ctx.db.get(bill.categoryId) : null;
     const extracted = ((bill.extractedData ?? {}) as Record<string, unknown>) ?? {};
     const lineItems = Array.isArray(extracted.line_items)
@@ -1387,17 +1392,22 @@ export const getById = query({
       : Array.isArray(extracted.lineItems)
         ? extracted.lineItems
         : [];
+    const evc2 = bill.extractedVendorContact ?? (bill as any).extractedProviderContact;
     return {
       ...bill,
-      provider,
+      vendor,
       category,
+      extractedVendorContact: evc2 ? {
+        ...evc2,
+        vendorName: evc2.vendorName ?? evc2.providerName,
+      } : undefined,
       pdfStorageId: bill.fileId,
-      providerName:
+      contactName:
         resolved?.name ??
         bill.customProviderName ??
-        (typeof extracted.provider_name === "string" ? extracted.provider_name : null),
-      providerDetected: Boolean(resolved),
-      providerConfirmed: Boolean(resolved),
+        (typeof extracted.contact_name === "string" ? extracted.contact_name : null),
+      vendorDetected: Boolean(resolved),
+      vendorConfirmed: Boolean(resolved),
       categorySlug: category?.slug ?? ((bill.lineItemCategories as string[] | undefined)?.[0] ?? null),
       lineItemCategories: (bill.lineItemCategories ?? []) as string[],
       invoiceNumber:
@@ -1694,7 +1704,7 @@ async function syncBillDerivedFields(
   let contact: any = null;
   if (args.contactId) contact = await ctx.db.get(args.contactId);
 
-  const providerName =
+  const contactName =
     contact?.name ??
     args.fallbackCustomProviderName ??
     bill.customProviderName ??
@@ -1729,7 +1739,7 @@ async function syncBillDerivedFields(
   }
   if (!isoDate) isoDate = new Date(bill.uploadedAt).toISOString().slice(0, 10);
 
-  const newFileName = `${categoryName} - ${providerName} - ${isoDate}`;
+  const newFileName = `${categoryName} - ${contactName} - ${isoDate}`;
   if (newFileName !== bill.fileName) patch.fileName = newFileName;
 
   // Clear invoiceName so the invoice list falls back to formatInvoiceName
@@ -1799,9 +1809,9 @@ export const markDone = internalMutation({
     groomingSubcategory: v.optional(v.string()),
     contactId: v.optional(v.id("contacts")),
     customProviderName: v.optional(v.string()),
-    extractedProviderContact: v.optional(
+    extractedVendorContact: v.optional(
       v.object({
-        providerName: v.optional(v.string()),
+        vendorName: v.optional(v.string()),
         address: v.optional(v.string()),
         phone: v.optional(v.string()),
         email: v.optional(v.string()),
@@ -1881,7 +1891,7 @@ export const markDone = internalMutation({
       groomingSubcategory: args.groomingSubcategory,
       contactId: args.contactId,
       customProviderName: args.customProviderName,
-      extractedProviderContact: args.extractedProviderContact,
+      extractedVendorContact: args.extractedVendorContact,
       horseAssignments: args.horseAssignments,
       splitLineItems: args.splitLineItems,
       personAssignments: args.personAssignments,
@@ -1915,12 +1925,12 @@ export const markDone = internalMutation({
         if (!Number.isNaN(parsed.getTime())) {
           const isoDate = parsed.toISOString().slice(0, 10);
           // Derive provider display name
-          const providerName = args.customProviderName
-            ?? args.extractedProviderContact?.providerName
+          const contactName = args.customProviderName
+            ?? args.extractedVendorContact?.vendorName
             ?? null;
           const currentParts = bill.fileName.split(" - ");
           const categoryPart = currentParts[0] ?? "Invoice";
-          const namePart = providerName ?? (currentParts.length >= 2 ? currentParts[1] : "Other");
+          const namePart = contactName ?? (currentParts.length >= 2 ? currentParts[1] : "Other");
           const suffix = currentParts.length >= 4 ? `-${currentParts[3]}` : "";
           const newBaseName = `${categoryPart} - ${namePart} - ${isoDate}${suffix}`;
           patch.fileName = newBaseName;
@@ -2273,9 +2283,9 @@ export const updatePreviewFields = mutation({
     totalUsd: v.optional(v.number()),
     origin: v.optional(v.string()),
     destination: v.optional(v.string()),
-    extractedProviderContact: v.optional(
+    extractedVendorContact: v.optional(
       v.object({
-        providerName: v.optional(v.string()),
+        vendorName: v.optional(v.string()),
         contactName: v.optional(v.string()),
         address: v.optional(v.string()),
         phone: v.optional(v.string()),
@@ -2289,8 +2299,8 @@ export const updatePreviewFields = mutation({
     const bill = await ctx.db.get(args.billId);
     if (!bill) throw new Error("Bill not found");
 
-    if (args.extractedProviderContact !== undefined) {
-      await ctx.db.patch(args.billId, { extractedProviderContact: args.extractedProviderContact });
+    if (args.extractedVendorContact !== undefined) {
+      await ctx.db.patch(args.billId, { extractedVendorContact: args.extractedVendorContact });
     }
     if (args.invoiceName !== undefined) {
       const trimmed = args.invoiceName.trim() || undefined;
@@ -2348,9 +2358,9 @@ export const updateBillContact = mutation({
   args: {
     billId: v.id("bills"),
     contactId: v.optional(v.id("contacts")),
-    extractedProviderContact: v.optional(
+    extractedVendorContact: v.optional(
       v.object({
-        providerName: v.optional(v.string()),
+        vendorName: v.optional(v.string()),
         contactName: v.optional(v.string()),
         address: v.optional(v.string()),
         phone: v.optional(v.string()),
@@ -2367,7 +2377,7 @@ export const updateBillContact = mutation({
       args.contactId !== undefined && String(args.contactId ?? "") !== String(bill.contactId ?? "");
     const patch: Record<string, unknown> = {};
     if (args.contactId !== undefined) patch.contactId = args.contactId;
-    if (args.extractedProviderContact !== undefined) patch.extractedProviderContact = args.extractedProviderContact;
+    if (args.extractedVendorContact !== undefined) patch.extractedVendorContact = args.extractedVendorContact;
     await ctx.db.patch(args.billId, patch);
 
     // If the contact changed, resync derived fields (category, fileName,
@@ -2540,10 +2550,11 @@ export const approveBill = mutation({
       }
     }
 
-    // Auto-resolve contactId from extractedProviderContact if missing
+    // Auto-resolve contactId from extractedVendorContact if missing
     const latestBill = await ctx.db.get(args.billId);
-    if (latestBill && !latestBill.contactId && latestBill.extractedProviderContact) {
-      const provName = (latestBill.extractedProviderContact as any).providerName;
+    const vendorContact = latestBill?.extractedVendorContact ?? (latestBill as any)?.extractedProviderContact;
+    if (latestBill && !latestBill.contactId && vendorContact) {
+      const provName = vendorContact.vendorName ?? vendorContact.providerName;
       if (provName) {
         const allContacts = await ctx.db.query("contacts").collect();
         const match = allContacts.find((c) => c.name?.toLowerCase() === provName.toLowerCase());
@@ -2551,7 +2562,7 @@ export const approveBill = mutation({
           await ctx.db.patch(args.billId, { contactId: match._id });
         } else {
           // Create a new contact from the extracted info
-          const epc = latestBill.extractedProviderContact as any;
+          const epc = vendorContact as any;
           const category = latestBill.categoryId ? await ctx.db.get(latestBill.categoryId) : null;
           const newContactId = await ctx.db.insert("contacts", {
             name: provName,

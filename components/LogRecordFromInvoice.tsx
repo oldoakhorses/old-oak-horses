@@ -18,7 +18,7 @@ type RecordFormState = {
   vaccineName: string;
   treatmentDescription: string;
   serviceType: string;
-  providerName: string;
+  contactName: string;
   notes: string;
 };
 
@@ -48,14 +48,14 @@ type LineItemForNotes = {
 export default function LogRecordFromInvoice({
   billId,
   categorySlug,
-  providerName,
+  contactName,
   invoiceDate,
   assignedHorses,
   lineItems,
 }: {
   billId: Id<"bills">;
   categorySlug: string;
-  providerName: string;
+  contactName: string;
   invoiceDate: string;
   assignedHorses?: AssignedHorse[];
   lineItems?: LineItemForNotes[];
@@ -80,7 +80,7 @@ export default function LogRecordFromInvoice({
     vaccineName: "",
     treatmentDescription: "",
     serviceType: "",
-    providerName: "",
+    contactName: "",
     notes: "",
   });
 
@@ -126,7 +126,7 @@ export default function LogRecordFromInvoice({
       vaccineName: "",
       treatmentDescription: "",
       serviceType: "",
-      providerName: providerName !== "Unknown" ? providerName : "",
+      contactName: contactName !== "Unknown" ? contactName : "",
       notes: "",
     });
     setAttachment(null);
@@ -169,7 +169,7 @@ export default function LogRecordFromInvoice({
           type: form.recordType,
           customType: form.recordType === "other" ? form.customType || undefined : undefined,
           date: dateTs,
-          providerName: form.providerName || undefined,
+          contactName: form.contactName || undefined,
           visitType:
             form.recordType === "veterinary" && form.visitType && form.visitType !== "other"
               ? (form.visitType as "vaccination" | "treatment")
@@ -377,8 +377,8 @@ export default function LogRecordFromInvoice({
             <div className={styles.label}>provider</div>
             <input
               className={styles.input}
-              value={form.providerName}
-              onChange={(e) => setForm((prev) => ({ ...prev, providerName: e.target.value }))}
+              value={form.contactName}
+              onChange={(e) => setForm((prev) => ({ ...prev, contactName: e.target.value }))}
             />
           </div>
 

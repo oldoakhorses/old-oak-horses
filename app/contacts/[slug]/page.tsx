@@ -350,7 +350,7 @@ export default function ContactDetailPage() {
                         // Always render with the contact's current name — the
                         // bill's stored fileName/invoiceName may still reflect
                         // the contact the parser originally matched.
-                        providerName: contact.name,
+                        contactName: contact.name,
                         date: invoiceDate,
                       })}
                     </Link>

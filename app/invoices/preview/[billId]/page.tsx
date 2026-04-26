@@ -22,7 +22,7 @@ type RecordFormState = {
   vaccineName: string;
   treatmentDescription: string;
   serviceType: string;
-  providerName: string;
+  contactName: string;
   notes: string;
 };
 
@@ -226,7 +226,7 @@ export default function InvoicePreviewPage() {
   const horses = useQuery(api.horses.getActiveHorses) ?? [];
   const people = useQuery(api.people.getAllPeople) ?? [];
 
-  const [providerEdit, setProviderEdit] = useState(false);
+  const [vendorEdit, setVendorEdit] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<Id<"categories"> | "">("");
   const [customProviderName, setCustomProviderName] = useState("");
 
@@ -309,7 +309,7 @@ export default function InvoicePreviewPage() {
   const [recordForm, setRecordForm] = useState<RecordFormState>({
     horseIds: [], date: "", recordType: "other", customType: "",
     visitType: "", vaccineName: "", treatmentDescription: "",
-    serviceType: "", providerName: "", notes: ""
+    serviceType: "", contactName: "", notes: ""
   });
   const [savingRecord, setSavingRecord] = useState(false);
   const [recordSavedCount, setRecordSavedCount] = useState(0);
@@ -336,7 +336,7 @@ export default function InvoicePreviewPage() {
     if (!bill) return;
 
     setSelectedCategoryId(bill.categoryId ?? "");
-    setProviderEdit(false);
+    setVendorEdit(false);
 
     setDetails({
       invoiceName: String(bill.invoiceName ?? ""),
@@ -454,8 +454,8 @@ export default function InvoicePreviewPage() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [openDropdownId]);
 
-  const providerName = bill?.extractedProviderContact?.providerName || (bill?.providerName ?? bill?.customProviderName ?? "Unknown");
-  const previewTitle = formatInvoiceName({ providerName: bill?.providerName ?? providerName, date: bill?.date });
+  const contactName = bill?.extractedVendorContact?.vendorName || (bill?.contactName ?? bill?.customProviderName ?? "Unknown");
+  const previewTitle = formatInvoiceName({ contactName: bill?.contactName ?? contactName, date: bill?.date });
   // Display name for the "INVOICE NAME" field. Priority:
   //   1. Saved bill.invoiceName (user-edited or pre-set, e.g. CC txn description)
   //   2. For uploaded bills: "{contact/provider} — {invoice date}"
@@ -466,14 +466,14 @@ export default function InvoicePreviewPage() {
     const isCc = bill?.source === "cc_transaction" || !bill?.fileId;
     if (isCc) {
       const lineDesc = String((Array.isArray((extracted as any)?.line_items) ? (extracted as any).line_items[0]?.description : "") ?? "").trim();
-      const fromExtracted = String((extracted as any)?.provider_name ?? "").trim();
+      const fromExtracted = String((extracted as any)?.contact_name ?? "").trim();
       return lineDesc || fromExtracted || previewTitle;
     }
     const invoiceDate = String((extracted as any)?.invoice_date ?? (extracted as any)?.invoiceDate ?? "").trim();
-    return formatInvoiceName({ providerName: bill?.providerName ?? providerName, date: invoiceDate || bill?.date });
+    return formatInvoiceName({ contactName: bill?.contactName ?? contactName, date: invoiceDate || bill?.date });
   })();
-  const providerDetected = Boolean(bill?.providerDetected ?? bill?.contactId);
-  const providerConfirmed = Boolean((bill?.providerConfirmed ?? bill?.contactId) && !providerEdit);
+  const vendorDetected = Boolean(bill?.vendorDetected ?? bill?.contactId);
+  const vendorConfirmed = Boolean((bill?.vendorConfirmed ?? bill?.contactId) && !vendorEdit);
 
   const assignedDirectIds = useMemo(() => {
     if (mode !== "line") return [];
@@ -506,8 +506,8 @@ export default function InvoicePreviewPage() {
   const groupedLineItems = useMemo(() => {
     if (categorySlug !== "veterinary") return null;
     const hasEqSportsSignal =
-      String(bill?.providerName ?? providerName).toLowerCase().includes("eq sports") ||
-      String(extracted.provider_name ?? extracted.providerName ?? "").toLowerCase().includes("eq sports");
+      String(bill?.contactName ?? contactName).toLowerCase().includes("eq sports") ||
+      String(extracted.contact_name ?? extracted.contactName ?? "").toLowerCase().includes("eq sports");
     if (!hasEqSportsSignal) return null;
 
     const groups = new Map<string, Array<{ line: ParsedLine; index: number }>>();
@@ -526,7 +526,7 @@ export default function InvoicePreviewPage() {
       total: round2(rows.reduce((sum, row) => sum + getLineAmount(row.line), 0)),
       rows
     }));
-  }, [categorySlug, bill?.providerName, extracted.provider_name, extracted.providerName, lineItems, providerName]);
+  }, [categorySlug, bill?.contactName, extracted.contact_name, extracted.contactName, lineItems, contactName]);
 
   const businessGeneralTotal = useMemo(() => {
     if (mode !== "line") return 0;
@@ -898,7 +898,7 @@ export default function InvoicePreviewPage() {
         duesSubcategory: newCategorySlug === "dues-registrations" ? bill.duesSubcategory || undefined : undefined
       });
 
-      setProviderEdit(false);
+      setVendorEdit(false);
     } catch (err) {
       setReparsing(false);
       setError(err instanceof Error ? err.message : "Failed to confirm provider");
@@ -908,17 +908,17 @@ export default function InvoicePreviewPage() {
   }
 
   function openContactEdit() {
-    const c = bill?.extractedProviderContact;
+    const c = bill?.extractedVendorContact;
     setContactForm({
-      name: c?.providerName ?? providerName ?? "",
-      companyName: (c as any)?.fullName ?? c?.providerName ?? "",
+      name: c?.vendorName ?? contactName ?? "",
+      companyName: (c as any)?.fullName ?? c?.vendorName ?? "",
       phone: c?.phone ?? "",
       email: c?.email ?? "",
       address: c?.address ?? "",
       website: c?.website ?? "",
       accountNumber: c?.accountNumber ?? "",
     });
-    setContactSearch(c?.providerName ?? providerName ?? "");
+    setContactSearch(c?.vendorName ?? contactName ?? "");
     setSelectedContactId(bill?.contactId ?? null);
     setShowContactSuggestions(false);
     setContactEdit(true);
@@ -945,7 +945,7 @@ export default function InvoicePreviewPage() {
     setError("");
     try {
       const contactData = {
-        providerName: contactForm.name || undefined,
+        vendorName: contactForm.name || undefined,
         phone: contactForm.phone || undefined,
         email: contactForm.email || undefined,
         address: contactForm.address || undefined,
@@ -976,7 +976,7 @@ export default function InvoicePreviewPage() {
       await updateBillContact({
         billId,
         contactId,
-        extractedProviderContact: contactData,
+        extractedVendorContact: contactData,
       });
       setContactEdit(false);
     } catch (err) {
@@ -1365,7 +1365,7 @@ export default function InvoicePreviewPage() {
       vaccineName: "",
       treatmentDescription: "",
       serviceType: "",
-      providerName: providerName !== "Unknown" ? providerName : "",
+      contactName: contactName !== "Unknown" ? contactName : "",
       notes: ""
     });
     setRecordAttachment(null);
@@ -1405,7 +1405,7 @@ export default function InvoicePreviewPage() {
           type: recordForm.recordType,
           customType: recordForm.recordType === "other" ? recordForm.customType || undefined : undefined,
           date: dateTs,
-          providerName: recordForm.providerName || undefined,
+          contactName: recordForm.contactName || undefined,
           visitType: recordForm.recordType === "veterinary" && recordForm.visitType ? recordForm.visitType as "vaccination" | "treatment" | "exams_diagnostics" | "other" : undefined,
           vaccineName: recordForm.recordType === "veterinary" && recordForm.visitType === "vaccination" ? recordForm.vaccineName || undefined : undefined,
           treatmentDescription: recordForm.recordType === "veterinary" && (recordForm.visitType === "treatment" || recordForm.visitType === "exams_diagnostics" || recordForm.visitType === "other") ? recordForm.treatmentDescription || undefined : undefined,
@@ -1482,9 +1482,9 @@ export default function InvoicePreviewPage() {
 
         <section className={styles.previewLayout}>
           <div className={styles.previewDetails}>
-            <div className={`${styles.card} ${providerDetected ? styles.providerDetected : styles.providerUnknown}`}>
+            <div className={`${styles.card} ${vendorDetected ? styles.vendorDetected : styles.vendorUnknown}`}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div className={styles.bannerTitle}>{providerDetected ? "✓ contact detected" : "⚠ contact unknown"}</div>
+                <div className={styles.bannerTitle}>{vendorDetected ? "✓ contact detected" : "⚠ contact unknown"}</div>
                 {!contactEdit && (
                   <button type="button" className={styles.changeLink} onClick={openContactEdit}>edit</button>
                 )}
@@ -1499,7 +1499,7 @@ export default function InvoicePreviewPage() {
                       value={contactSearch}
                       onChange={(e) => {
                         setContactSearch(e.target.value);
-                        setContactForm((p) => ({ ...p, providerName: e.target.value }));
+                        setContactForm((p) => ({ ...p, contactName: e.target.value }));
                         setSelectedContactId(null);
                         setShowContactSuggestions(true);
                       }}
@@ -1560,29 +1560,29 @@ export default function InvoicePreviewPage() {
                 </div>
               ) : (
                 <>
-                  <div className={styles.providerGrid}>
+                  <div className={styles.vendorGrid}>
                     <div>
                       <div className={styles.label}>CONTACT</div>
-                      <div className={styles.value}>{providerName}</div>
+                      <div className={styles.value}>{contactName}</div>
                     </div>
                   </div>
 
-                  {bill?.extractedProviderContact ? (
+                  {bill?.extractedVendorContact ? (
                     <div className={styles.contactDetailsGrid}>
-                      {bill.extractedProviderContact.phone ? (
-                        <div><span className={styles.label}>PHONE</span><span className={styles.value}>{bill.extractedProviderContact.phone}</span></div>
+                      {bill.extractedVendorContact.phone ? (
+                        <div><span className={styles.label}>PHONE</span><span className={styles.value}>{bill.extractedVendorContact.phone}</span></div>
                       ) : null}
-                      {bill.extractedProviderContact.email ? (
-                        <div><span className={styles.label}>EMAIL</span><span className={styles.value}>{bill.extractedProviderContact.email}</span></div>
+                      {bill.extractedVendorContact.email ? (
+                        <div><span className={styles.label}>EMAIL</span><span className={styles.value}>{bill.extractedVendorContact.email}</span></div>
                       ) : null}
-                      {bill.extractedProviderContact.address ? (
-                        <div><span className={styles.label}>ADDRESS</span><span className={styles.value}>{bill.extractedProviderContact.address}</span></div>
+                      {bill.extractedVendorContact.address ? (
+                        <div><span className={styles.label}>ADDRESS</span><span className={styles.value}>{bill.extractedVendorContact.address}</span></div>
                       ) : null}
-                      {bill.extractedProviderContact.website ? (
-                        <div><span className={styles.label}>WEBSITE</span><span className={styles.value}>{bill.extractedProviderContact.website}</span></div>
+                      {bill.extractedVendorContact.website ? (
+                        <div><span className={styles.label}>WEBSITE</span><span className={styles.value}>{bill.extractedVendorContact.website}</span></div>
                       ) : null}
-                      {bill.extractedProviderContact.accountNumber ? (
-                        <div><span className={styles.label}>ACCOUNT</span><span className={styles.value}>{bill.extractedProviderContact.accountNumber}</span></div>
+                      {bill.extractedVendorContact.accountNumber ? (
+                        <div><span className={styles.label}>ACCOUNT</span><span className={styles.value}>{bill.extractedVendorContact.accountNumber}</span></div>
                       ) : null}
                     </div>
                   ) : null}
@@ -2115,8 +2115,8 @@ export default function InvoicePreviewPage() {
                   <div className={styles.recordModalLabel}>provider</div>
                   <input
                     className={styles.recordModalInput}
-                    value={recordForm.providerName}
-                    onChange={(e) => setRecordForm((prev) => ({ ...prev, providerName: e.target.value }))}
+                    value={recordForm.contactName}
+                    onChange={(e) => setRecordForm((prev) => ({ ...prev, contactName: e.target.value }))}
                   />
                 </div>
 
@@ -2222,7 +2222,7 @@ export default function InvoicePreviewPage() {
                     </span>
                     <span className={styles.linkedRecordInfo}>
                       <span className={styles.linkedRecordName}>{rec.horseName}</span>
-                      <span className={styles.linkedRecordType}>{rec.type}{rec.providerName ? ` · ${rec.providerName}` : ""}</span>
+                      <span className={styles.linkedRecordType}>{rec.type}{rec.contactName ? ` · ${rec.contactName}` : ""}</span>
                     </span>
                     <span className={styles.linkedRecordDate}>
                       {new Date(rec.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}

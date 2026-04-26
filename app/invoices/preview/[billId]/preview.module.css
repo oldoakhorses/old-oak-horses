@@ -33,12 +33,12 @@
   padding: 20px 22px;
 }
 
-.providerDetected {
+.vendorDetected {
   background: rgba(34, 197, 131, 0.04);
   border-color: rgba(34, 197, 131, 0.2);
 }
 
-.providerUnknown {
+.vendorUnknown {
   background: rgba(245, 158, 11, 0.04);
   border-color: rgba(245, 158, 11, 0.2);
 }
@@ -49,7 +49,7 @@
   margin-bottom: 12px;
 }
 
-.providerGrid {
+.vendorGrid {
   display: grid;
   grid-template-columns: 1fr 1fr auto;
   gap: 14px;
@@ -1197,7 +1197,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .providerGrid {
+  .vendorGrid {
     grid-template-columns: 1fr;
   }
 

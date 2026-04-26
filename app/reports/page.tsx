@@ -124,7 +124,7 @@ export default function ReportsPage() {
               const invoiceLabel = invoice.invoice_number ? `Invoice ${invoice.invoice_number}` : "Invoice";
               return (
                 <option key={bill._id} value={bill._id}>
-                  {`${invoiceLabel} · ${bill.providerName} · ${bill.billingPeriod}`}
+                  {`${invoiceLabel} · ${bill.contactName} · ${bill.billingPeriod}`}
                 </option>
               );
             })}
