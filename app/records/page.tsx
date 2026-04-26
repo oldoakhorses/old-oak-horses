@@ -851,7 +851,6 @@ export default function RecordsPage() {
                             >
                               {record.horseName}
                             </Link>
-                            <span className={styles.recordDateInline}>{formatDateLong(row.eventDate)}</span>
                           </div>
                         </>
                       ) : (
@@ -865,7 +864,6 @@ export default function RecordsPage() {
                             >
                               {record.horseName}
                             </Link>
-                            <span className={`${styles.recordDate} ${dateSoon ? styles.recordDateSoon : ""}`}>{formatDateLong(row.eventDate)}</span>
                           </div>
                         </>
                       )}
@@ -889,6 +887,7 @@ export default function RecordsPage() {
                       <span className={styles.categoryBadge} style={{ background: badgeColors.bg, color: badgeColors.color }}>
                         {prettyType(record.type)}
                       </span>
+                      <span className={`${styles.recordDate} ${dateSoon ? styles.recordDateSoon : ""}`}>{formatDateLong(row.eventDate)}</span>
                     </div>
                   </div>
 
