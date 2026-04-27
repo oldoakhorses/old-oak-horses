@@ -571,7 +571,7 @@ function buildExtractedVendorContact(patch: {
 
 function normalizeParsedPayload(input: Record<string, unknown>) {
   const output: Record<string, unknown> = { ...input };
-  const contactName = pickString(output, ["contact_name", "contactName", "vendor_name", "merchant_name"]);
+  const contactName = pickString(output, ["contact_name", "contactName", "provider_name", "providerName", "vendor_name", "merchant_name"]);
   const invoiceNumber = pickString(output, ["invoice_number", "invoiceNumber", "doc_no", "doc_number", "document_number"]);
   const invoiceDate = pickString(output, ["invoice_date", "invoiceDate", "date"]);
   const dueDate = pickString(output, ["due_date", "dueDate"]);

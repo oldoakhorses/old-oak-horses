@@ -5,6 +5,13 @@ import type { Id } from "./_generated/dataModel";
 import { normalizeAliasKey } from "./matchHorse";
 import { syncApprovedBillIntoDraftInvoices } from "./billing";
 
+function extractedContactName(extracted: Record<string, unknown>): string | null {
+  for (const key of ["contact_name", "contactName", "provider_name", "providerName"]) {
+    if (typeof extracted[key] === "string" && extracted[key]) return extracted[key] as string;
+  }
+  return null;
+}
+
 /** Convert a category slug like "feed-bedding" to display name "Feed & Bedding" */
 function formatCategorySlug(slug: string): string {
   return slug
@@ -167,7 +174,7 @@ export const listForLinking = query(async (ctx) => {
     const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
     return {
       _id: bill._id,
-      contactName: resolved?.name ?? bill.customProviderName ?? "Unknown",
+      contactName: resolved?.name ?? bill.customProviderName ?? extractedContactName(extracted) ?? "Unknown",
       invoiceDate: String(extracted.invoice_date ?? extracted.invoiceDate ?? ""),
       invoiceNumber: String(extracted.invoice_number ?? extracted.invoiceNumber ?? ""),
     };
@@ -190,10 +197,12 @@ export const listAll = query(async (ctx) => {
     const lineItemCats = bill.lineItemCategories ?? [];
     const primaryCategorySlug = category?.slug ?? (lineItemCats.length > 0 ? lineItemCats[0] : "unknown");
     const primaryCategoryName = category?.name ?? (lineItemCats.length > 0 ? formatCategorySlug(lineItemCats[0]) : "Unknown");
+    const extracted = ((bill.extractedData ?? {}) as Record<string, unknown>);
+    const billContactName = resolved?.name ?? bill.customProviderName ?? extractedContactName(extracted) ?? "Unknown";
     return {
       ...bill,
-      contactName: resolved?.name ?? bill.customProviderName ?? "Unknown",
-      contactSlug: resolved?.slug ?? slugify(bill.customProviderName ?? "unknown"),
+      contactName: billContactName,
+      contactSlug: resolved?.slug ?? slugify(bill.customProviderName ?? extractedContactName(extracted) ?? "unknown"),
       categoryName: primaryCategoryName,
       categorySlug: primaryCategorySlug,
       lineItemCategories: lineItemCats,
@@ -236,7 +245,7 @@ export const getTravelBills = query({
         );
         return {
           ...bill,
-          contactName: resolved?.name ?? bill.customProviderName ?? "Unknown",
+          contactName: resolved?.name ?? bill.customProviderName ?? extractedContactName(((bill.extractedData ?? {}) as Record<string, unknown>)) ?? "Unknown",
           assignedPeople: bill.assignedPeople ?? [],
           assignedPeopleResolved,
           approvalStatus: bill.status === "done" && bill.isApproved ? "approved" : "pending"
@@ -365,7 +374,7 @@ export const getHousingSpendByProvider = query({
 
     for (const bill of bills) {
       const resolved = await resolveContactForBill(ctx, bill as any);
-      const contactName = resolved?.name ?? bill.customProviderName ?? "Unknown";
+      const contactName = resolved?.name ?? bill.customProviderName ?? extractedContactName(((bill.extractedData ?? {}) as Record<string, unknown>)) ?? "Unknown";
       const current = totals.get(contactName) ?? { contactName, totalSpend: 0, invoiceCount: 0 };
       current.totalSpend += getInvoiceTotalUsdFromAny(bill.extractedData);
       current.invoiceCount += 1;
@@ -407,7 +416,7 @@ export const getHousingBills = query({
         );
         return {
           ...bill,
-          contactName: resolved?.name ?? bill.customProviderName ?? "Unknown",
+          contactName: resolved?.name ?? bill.customProviderName ?? extractedContactName(((bill.extractedData ?? {}) as Record<string, unknown>)) ?? "Unknown",
           assignedPeopleResolved,
           approvalStatus: bill.status === "done" && bill.isApproved ? "approved" : "pending"
         };
@@ -472,7 +481,7 @@ export const getMarketingBills = query({
         const lineItems = getLineItems(bill.extractedData);
         return {
           ...bill,
-          contactName: resolved?.name ?? bill.customProviderName ?? (typeof extracted.contact_name === "string" ? extracted.contact_name : "Unknown"),
+          contactName: resolved?.name ?? bill.customProviderName ?? (extractedContactName(extracted) ?? "Unknown"),
           contactSlug: resolved?.slug ?? slugify(resolved?.name ?? bill.customProviderName ?? "unknown"),
           invoiceNumber,
           invoiceDate,
@@ -524,7 +533,7 @@ export const getMarketingSpendByProvider = query({
     for (const bill of bills) {
       const resolved = await resolveContactForBill(ctx, bill as any);
       const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
-      const contactName = resolved?.name ?? bill.customProviderName ?? (typeof extracted.contact_name === "string" ? extracted.contact_name : "Unknown");
+      const contactName = resolved?.name ?? bill.customProviderName ?? (extractedContactName(extracted) ?? "Unknown");
       const current = totals.get(contactName) ?? { contactName, totalSpend: 0, invoiceCount: 0 };
       current.totalSpend += getInvoiceTotalUsdFromAny(bill.extractedData);
       current.invoiceCount += 1;
@@ -566,7 +575,7 @@ export const getSalaryBills = query({
         }
         return {
           ...bill,
-          contactName: resolved?.name ?? bill.customProviderName ?? (typeof extracted.contact_name === "string" ? extracted.contact_name : "Unknown"),
+          contactName: resolved?.name ?? bill.customProviderName ?? (extractedContactName(extracted) ?? "Unknown"),
           contactSlug: resolved?.slug ?? slugify(resolved?.name ?? bill.customProviderName ?? "unknown"),
           invoiceNumber: typeof extracted.invoice_number === "string" ? extracted.invoice_number : bill.fileName,
           invoiceDate: typeof extracted.invoice_date === "string" ? extracted.invoice_date : null,
@@ -618,7 +627,7 @@ export const getSalarySpendByProvider = query({
     for (const bill of bills) {
       const resolved = await resolveContactForBill(ctx, bill as any);
       const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
-      const contactName = resolved?.name ?? bill.customProviderName ?? (typeof extracted.contact_name === "string" ? extracted.contact_name : "Unknown");
+      const contactName = resolved?.name ?? bill.customProviderName ?? (extractedContactName(extracted) ?? "Unknown");
       const current = totals.get(contactName) ?? { contactName, totalSpend: 0, invoiceCount: 0 };
       current.totalSpend += getInvoiceTotalUsdFromAny(bill.extractedData);
       current.invoiceCount += 1;
@@ -765,7 +774,7 @@ export const getPersonSpendSummary = query({
         billingPeriod: bill.billingPeriod,
         invoiceDate,
         uploadedAt: bill.uploadedAt,
-        contactName: resolved?.name ?? bill.customProviderName ?? (typeof extracted.contact_name === "string" ? extracted.contact_name : "Unknown"),
+        contactName: resolved?.name ?? bill.customProviderName ?? (extractedContactName(extracted) ?? "Unknown"),
         fileName: bill.invoiceName ?? bill.fileName,
         categorySlug,
         source: bill.source,
@@ -818,8 +827,8 @@ export const getFeedBeddingBills = query({
         }
         return {
           ...bill,
-          contactName: resolved?.name ?? bill.customProviderName ?? "Unknown",
-          contactSlug: resolved?.slug ?? slugify(resolved?.name ?? bill.customProviderName ?? "unknown"),
+          contactName: resolved?.name ?? bill.customProviderName ?? extractedContactName(extracted) ?? "Unknown",
+          contactSlug: resolved?.slug ?? slugify(resolved?.name ?? bill.customProviderName ?? extractedContactName(extracted) ?? "unknown"),
           invoiceNumber: typeof extracted.invoice_number === "string" ? extracted.invoice_number : bill.fileName,
           invoiceDate: typeof extracted.invoice_date === "string" ? extracted.invoice_date : null,
           totalUsd: getInvoiceTotalUsdFromAny(bill.extractedData),
@@ -924,7 +933,7 @@ export const getStablingBills = query({
 
         return {
           ...bill,
-          contactName: resolved?.name ?? bill.customProviderName ?? "Unknown",
+          contactName: resolved?.name ?? bill.customProviderName ?? extractedContactName(((bill.extractedData ?? {}) as Record<string, unknown>)) ?? "Unknown",
           horses: [...horseTotals.values()],
           approvalStatus: bill.status === "done" && bill.isApproved ? "approved" : "pending"
         };
@@ -947,7 +956,7 @@ export const getStablingSpendByContact = query({
     const totals = new Map<string, { contactId: string; contactName: string; totalSpend: number; invoiceCount: number }>();
     for (const bill of bills) {
       const resolved = await resolveContactForBill(ctx, bill as any);
-      const contactName = resolved?.name ?? bill.customProviderName ?? "Unknown";
+      const contactName = resolved?.name ?? bill.customProviderName ?? extractedContactName(((bill.extractedData ?? {}) as Record<string, unknown>)) ?? "Unknown";
       const contactId = String(bill.contactId ?? contactName);
       const current = totals.get(contactId) ?? { contactId, contactName, totalSpend: 0, invoiceCount: 0 };
       current.totalSpend += getInvoiceTotalUsdFromAny(bill.extractedData);
@@ -1171,7 +1180,7 @@ export const getBizOverview = query({
         const category = categoryById.get(String(bill.categoryId));
         const categorySlug = category?.slug ?? "unknown";
         const resolved = contactResolved.get(String(bill._id));
-        const contactName = resolved?.name ?? bill.customProviderName ?? "Unknown";
+        const contactName = resolved?.name ?? bill.customProviderName ?? extractedContactName(((bill.extractedData ?? {}) as Record<string, unknown>)) ?? "Unknown";
         const contactSlug =
           categorySlug === "travel"
             ? bill.travelSubcategory ?? slugify(contactName)
@@ -1231,7 +1240,7 @@ export const getBizOverview = query({
       const category = categoryById.get(String(bill.categoryId));
       const categorySlug = category?.slug ?? "unknown";
       const resolved = contactResolved.get(String(bill._id));
-      const contactName = resolved?.name ?? bill.customProviderName ?? "Unknown";
+      const contactName = resolved?.name ?? bill.customProviderName ?? extractedContactName(extracted) ?? "Unknown";
       const invoiceDate =
         typeof extracted.invoice_date === "string" && extracted.invoice_date.trim().length > 0
           ? extracted.invoice_date
@@ -1343,7 +1352,7 @@ export const getBillById = query({
       contactName:
         resolved?.name ??
         bill.customProviderName ??
-        (typeof extracted.contact_name === "string" ? extracted.contact_name : null),
+        (extractedContactName(extracted)),
       vendorDetected: Boolean(resolved),
       vendorConfirmed: Boolean(resolved),
       categorySlug: category?.slug ?? (lineItemCats.length > 0 ? lineItemCats[0] : null),
@@ -1405,7 +1414,7 @@ export const getById = query({
       contactName:
         resolved?.name ??
         bill.customProviderName ??
-        (typeof extracted.contact_name === "string" ? extracted.contact_name : null),
+        (extractedContactName(extracted)),
       vendorDetected: Boolean(resolved),
       vendorConfirmed: Boolean(resolved),
       categorySlug: category?.slug ?? ((bill.lineItemCategories as string[] | undefined)?.[0] ?? null),
