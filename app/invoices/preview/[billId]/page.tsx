@@ -954,23 +954,31 @@ export default function InvoicePreviewPage() {
       };
 
       let contactId = selectedContactId ?? undefined;
+      const trimmedName = contactForm.name?.trim();
 
-      // If no existing contact selected but we have a name, create a new
-      // contact — pull across every auto-extracted field from the invoice so
-      // the new contact starts fully populated.
-      if (!contactId && contactForm.name?.trim()) {
-        const newContactId = await createContact({
-          name: contactForm.name.trim(),
-          category: categorySlug || "other",
-          companyName: contactForm.companyName || undefined,
-          phone: contactForm.phone || undefined,
-          email: contactForm.email || undefined,
-          address: contactForm.address || undefined,
-          website: contactForm.website || undefined,
-          accountNumber: contactForm.accountNumber || undefined,
-        });
-        contactId = newContactId;
-        setSelectedContactId(newContactId);
+      // If no existing contact selected but we have a name, look for one
+      // with the same (case-insensitive) name first to avoid duplicates,
+      // otherwise create a new one — pull across every auto-extracted
+      // field from the invoice so the new contact starts fully populated.
+      if (!contactId && trimmedName) {
+        const existing = allContacts.find(
+          (c) => c.name.trim().toLowerCase() === trimmedName.toLowerCase()
+        );
+        if (existing) {
+          contactId = existing._id;
+        } else {
+          contactId = await createContact({
+            name: trimmedName,
+            category: categorySlug || "other",
+            companyName: contactForm.companyName || undefined,
+            phone: contactForm.phone || undefined,
+            email: contactForm.email || undefined,
+            address: contactForm.address || undefined,
+            website: contactForm.website || undefined,
+            accountNumber: contactForm.accountNumber || undefined,
+          });
+        }
+        setSelectedContactId(contactId ?? null);
       }
 
       await updateBillContact({
@@ -1499,7 +1507,7 @@ export default function InvoicePreviewPage() {
                       value={contactSearch}
                       onChange={(e) => {
                         setContactSearch(e.target.value);
-                        setContactForm((p) => ({ ...p, contactName: e.target.value }));
+                        setContactForm((p) => ({ ...p, name: e.target.value }));
                         setSelectedContactId(null);
                         setShowContactSuggestions(true);
                       }}
