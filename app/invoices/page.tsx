@@ -517,16 +517,7 @@ function getProvider(row: any) {
 }
 
 function getInvoiceUrl(bill: any) {
-  const category = bill.categorySlug ?? slugify(bill.categoryName ?? "");
-  const contactSlug = bill.contactSlug || slugify(bill.contactName || bill.customProviderName || "provider");
-  if (category === "travel") return `/travel/${bill.travelSubcategory ?? "rental-car"}/${bill._id}`;
-  if (category === "housing") return `/housing/${bill.housingSubcategory ?? "rider-housing"}/${bill._id}`;
-  if (category === "marketing") return `/marketing/${bill.marketingSubcategory ?? contactSlug}/${bill._id}`;
-  if (category === "admin") return `/admin/${bill.adminSubcategory ?? "legal"}/${contactSlug}/${bill._id}`;
-  if (category === "dues-registrations") return `/dues-registrations/${bill.duesSubcategory ?? "memberships"}/${contactSlug}/${bill._id}`;
-  if (category === "horse-transport") return `/horse-transport/${bill.horseTransportSubcategory ?? "ground-transport"}/${contactSlug}/${bill._id}`;
-  if (category === "grooming") return `/grooming/${bill.groomingSubcategory ?? "other"}/${bill._id}`;
-  return `/${category}/${contactSlug}/${bill._id}`;
+  return `/invoices/preview/${bill._id}`;
 }
 
 function prettyCategory(value: string) {
