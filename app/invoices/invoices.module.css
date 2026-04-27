@@ -22,10 +22,12 @@
 
 .searchInput {
   flex: 1;
+  height: 40px;
+  box-sizing: border-box;
   background: #f2f3f7;
   border: 1px solid #e8eaf0;
   border-radius: 8px;
-  padding: 10px 14px;
+  padding: 0 14px;
   font-size: 13px;
   font-family: inherit;
   outline: none;
@@ -36,13 +38,15 @@
 }
 
 .filterToggle {
+  height: 40px;
+  box-sizing: border-box;
   font-size: 11px;
   font-weight: 600;
   color: #6b7084;
   background: #f2f3f7;
   border: 1px solid #e8eaf0;
   border-radius: 8px;
-  padding: 10px 14px;
+  padding: 0 14px;
   cursor: pointer;
   white-space: nowrap;
   font-family: inherit;
@@ -123,36 +127,44 @@
   color: #9ea2b0;
 }
 
-.sortButtons {
-  display: flex;
-  gap: 12px;
+.sortWrap {
+  position: relative;
 }
 
-.columnHeader {
+.sortDropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  min-width: 200px;
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 6px 0;
   display: flex;
-  align-items: center;
-  gap: 3px;
-  cursor: pointer;
+  flex-direction: column;
+}
+
+.sortDropdownItem {
+  font-family: inherit;
+  font-size: 11px;
+  color: #6b7084;
   background: transparent;
   border: none;
-  color: #9ea2b0;
-  font-family: inherit;
-  font-size: 10px;
-  letter-spacing: 0.03em;
-  padding: 0;
+  text-align: left;
+  padding: 8px 14px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-.columnHeader:hover {
-  color: #1a1a2e;
+.sortDropdownItem:hover {
+  background: #fafafc;
 }
 
-.columnHeaderActive {
+.sortDropdownItemActive {
   color: #4a5bdb;
-}
-
-.sortArrow {
-  font-size: 8px;
-  color: #4a5bdb;
+  font-weight: 600;
 }
 
 /* ── Invoice rows ── */

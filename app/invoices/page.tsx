@@ -9,8 +9,14 @@ import NavBar from "@/components/NavBar";
 import { formatInvoiceFileName, formatInvoiceName } from "@/lib/formatInvoiceName";
 import styles from "./invoices.module.css";
 
-type SortColumn = "invoice" | "category" | "date" | "amount" | null;
-type SortDirection = "asc" | "desc";
+type SortMode = "date" | "amount" | "name-asc" | "name-desc";
+
+const SORT_LABELS: Record<SortMode, string> = {
+  date: "date",
+  amount: "amount",
+  "name-asc": "name a–z",
+  "name-desc": "name z–a",
+};
 
 /** Clean up raw CC descriptions and ALL-CAPS names into readable abbreviated titles */
 function abbreviateInvoiceName(name: string, maxLen = 50): string {
@@ -104,8 +110,8 @@ export default function InvoicesPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const activeHorses = useQuery(api.horses.getActiveHorses) ?? [];
-  const [sortColumn, setSortColumn] = useState<SortColumn>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [sortMode, setSortMode] = useState<SortMode>("date");
+  const [sortOpen, setSortOpen] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -134,43 +140,21 @@ export default function InvoicesPage() {
     });
 
     const sorted = [...base];
-    if (!sortColumn) return sorted;
     sorted.sort((a, b) => {
-      if (sortColumn === "invoice") {
-        const aVal = abbreviateInvoiceName(a.invoiceName || formatInvoiceName({ contactName: getProvider(a), date: getInvoiceDate(a) })).toLowerCase();
-        const bVal = abbreviateInvoiceName(b.invoiceName || formatInvoiceName({ contactName: getProvider(b), date: getInvoiceDate(b) })).toLowerCase();
-        return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      if (sortMode === "date") {
+        return Date.parse(getInvoiceDate(b)) - Date.parse(getInvoiceDate(a));
       }
-      if (sortColumn === "category") {
-        const aVal = prettyCategory(a.categorySlug ?? slugify(a.categoryName)).toLowerCase();
-        const bVal = prettyCategory(b.categorySlug ?? slugify(b.categoryName)).toLowerCase();
-        return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      if (sortMode === "amount") {
+        const aAmount = Math.abs(getTotal(a));
+        const bAmount = Math.abs(getTotal(b));
+        return bAmount - aAmount;
       }
-      if (sortColumn === "date") {
-        const aTime = Date.parse(getInvoiceDate(a));
-        const bTime = Date.parse(getInvoiceDate(b));
-        return sortDirection === "asc" ? aTime - bTime : bTime - aTime;
-      }
-      const aAmount = isIncomeRow(a) ? getTotal(a) : -getTotal(a);
-      const bAmount = isIncomeRow(b) ? getTotal(b) : -getTotal(b);
-      return sortDirection === "asc" ? aAmount - bAmount : bAmount - aAmount;
+      const aName = abbreviateInvoiceName(a.invoiceName || formatInvoiceName({ contactName: getProvider(a), date: getInvoiceDate(a) })).toLowerCase();
+      const bName = abbreviateInvoiceName(b.invoiceName || formatInvoiceName({ contactName: getProvider(b), date: getInvoiceDate(b) })).toLowerCase();
+      return sortMode === "name-asc" ? aName.localeCompare(bName) : bName.localeCompare(aName);
     });
     return sorted;
-  }, [rows, categoryFilter, horseFilter, fromDate, toDate, searchQuery, sortColumn, sortDirection]);
-
-  function handleSort(column: Exclude<SortColumn, null>) {
-    if (sortColumn === column) {
-      if (sortDirection === "asc") {
-        setSortDirection("desc");
-      } else {
-        setSortColumn(null);
-        setSortDirection("asc");
-      }
-    } else {
-      setSortColumn(column);
-      setSortDirection("asc");
-    }
-  }
+  }, [rows, categoryFilter, horseFilter, fromDate, toDate, searchQuery, sortMode]);
 
   async function handleDownloadPdf(row: any) {
     const url = row.originalPdfUrl;
@@ -226,10 +210,42 @@ export default function InvoicesPage() {
             <button
               type="button"
               className={`${styles.filterToggle} ${hasActiveFilters ? styles.filterToggleActive : ""}`}
-              onClick={() => setFiltersOpen((prev) => !prev)}
+              onClick={() => {
+                setFiltersOpen((prev) => !prev);
+                setSortOpen(false);
+              }}
             >
               {filtersOpen ? "hide filters" : "filters"}{hasActiveFilters ? ` •` : ""}
             </button>
+            <div className={styles.sortWrap}>
+              <button
+                type="button"
+                className={`${styles.filterToggle} ${sortOpen ? styles.filterToggleActive : ""}`}
+                onClick={() => {
+                  setSortOpen((prev) => !prev);
+                  setFiltersOpen(false);
+                }}
+              >
+                sort: {SORT_LABELS[sortMode]}
+              </button>
+              {sortOpen && (
+                <div className={styles.sortDropdown}>
+                  {(Object.keys(SORT_LABELS) as SortMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={`${styles.sortDropdownItem} ${sortMode === mode ? styles.sortDropdownItemActive : ""}`}
+                      onClick={() => {
+                        setSortMode(mode);
+                        setSortOpen(false);
+                      }}
+                    >
+                      {SORT_LABELS[mode]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {filtersOpen && (
@@ -282,14 +298,6 @@ export default function InvoicesPage() {
         <section className={styles.listCard}>
           <div className={styles.listMeta}>
             <span>{filtered.length} invoice{filtered.length !== 1 ? "s" : ""}</span>
-            <div className={styles.sortButtons}>
-              <button type="button" className={headerClass(sortColumn === "date", styles)} onClick={() => handleSort("date")}>
-                date {sortArrow(sortColumn === "date", sortDirection, styles)}
-              </button>
-              <button type="button" className={headerClass(sortColumn === "amount", styles)} onClick={() => handleSort("amount")}>
-                amount {sortArrow(sortColumn === "amount", sortDirection, styles)}
-              </button>
-            </div>
           </div>
 
           {filtered.map((row) => {
@@ -486,15 +494,6 @@ export default function InvoicesPage() {
       ) : null}
     </div>
   );
-}
-
-function headerClass(active: boolean, css: Record<string, string>) {
-  return active ? `${css.columnHeader} ${css.columnHeaderActive}` : css.columnHeader;
-}
-
-function sortArrow(active: boolean, direction: SortDirection, css: Record<string, string>) {
-  if (!active) return null;
-  return <span className={css.sortArrow}>{direction === "asc" ? "↑" : "↓"}</span>;
 }
 
 function getInvoiceDate(row: any) {
