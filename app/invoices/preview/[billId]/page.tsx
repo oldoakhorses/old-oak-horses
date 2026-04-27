@@ -399,6 +399,31 @@ export default function InvoicePreviewPage() {
     setWholeAssignMode("split");
     setNotes(String(bill.notes ?? ""));
 
+    // Restore the whole-invoice category/subcategory overrides by inspecting
+    // the saved line items: if they all share a single category that differs
+    // from the bill-level category, that's the override the user picked.
+    // Same logic for subcategory. If line items disagree, leave the override
+    // empty (the user can only have used line-item mode).
+    const lineCategories = new Set<string>();
+    const lineSubcategories = new Set<string>();
+    for (const row of lineItems) {
+      const cat = String((row as any).category ?? "").trim().toLowerCase();
+      if (cat) lineCategories.add(cat);
+      const sub = String((row as any).subcategory ?? "").trim();
+      if (sub) lineSubcategories.add(sub);
+    }
+    if (lineCategories.size === 1) {
+      const onlyCat = [...lineCategories][0];
+      setWholeCategoryOverride(onlyCat === categorySlug.toLowerCase() ? "" : onlyCat);
+    } else {
+      setWholeCategoryOverride("");
+    }
+    if (lineSubcategories.size === 1) {
+      setWholeSubcategoryOverride([...lineSubcategories][0]);
+    } else {
+      setWholeSubcategoryOverride("");
+    }
+
     if (requiresHorse && bill.assignedHorses?.length) {
       setMode("whole");
       setWholeAssignedIds(bill.assignedHorses.map((entry) => String(entry.horseId)));
