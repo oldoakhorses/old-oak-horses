@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
+import { findStaticMapping, formatCcBillName } from "./ccMappings";
 
 // ── helpers ──────────────────────────────────────────────────────────────
 function round2(n: number) { return Math.round(n * 100) / 100; }
@@ -112,13 +113,34 @@ async function findBestContactMatch(ctx: any, cleanedDesc: string) {
   return best;
 }
 
-/** Resolve the display name for a CC transaction: matched contact name, or cleaned+title-cased description. */
-async function resolveCcDisplayName(ctx: any, rawDescription: string): Promise<{ displayName: string; contactId?: Id<"contacts"> }> {
+/** Resolve the contact for a CC transaction. Tries (in order):
+ *   1. Static descriptor mappings → look up contact by name
+ *   2. Keyword-overlap match against existing contacts
+ *   3. Cleaned + title-cased description (no contactId) */
+async function resolveCcContact(
+  ctx: any,
+  rawDescription: string
+): Promise<{ contactName: string; contactId?: Id<"contacts"> }> {
+  // 1. Static mapping
+  const mapping = findStaticMapping(rawDescription);
+  if (mapping) {
+    const contacts = await ctx.db.query("contacts").collect();
+    const key = mapping.contactName.toLowerCase().trim();
+    const direct = contacts.find((c: any) => (c.name ?? "").toLowerCase().trim() === key);
+    return direct
+      ? { contactName: direct.name, contactId: direct._id }
+      : { contactName: mapping.contactName };
+  }
+
+  // 2. Keyword match against contacts
   const cleaned = cleanCcDescription(rawDescription);
-  if (!cleaned) return { displayName: rawDescription };
-  const match = await findBestContactMatch(ctx, cleaned);
-  if (match) return { displayName: match.name, contactId: match._id };
-  return { displayName: toTitleCase(cleaned) };
+  if (cleaned) {
+    const match = await findBestContactMatch(ctx, cleaned);
+    if (match) return { contactName: match.name, contactId: match._id };
+    return { contactName: toTitleCase(cleaned) };
+  }
+
+  return { contactName: rawDescription };
 }
 
 // ── queries ──────────────────────────────────────────────────────────────
@@ -217,6 +239,7 @@ export const uploadStatement = mutation({
       fileName: string;
       amount: number;
       contactName: string;
+      contactId?: Id<"contacts">;
       providerKeywords: string[];
     };
 
@@ -241,6 +264,7 @@ export const uploadStatement = mutation({
         fileName: b.fileName,
         amount: round2(total),
         contactName: pName || contactName,
+        contactId: b.contactId,
         providerKeywords: extractKeywords(allNames),
       };
     });
@@ -254,6 +278,17 @@ export const uploadStatement = mutation({
       const absAmount = round2(Math.abs(row.amount));
       const txnKeywords = extractKeywords(row.description);
 
+      // Resolve any static descriptor mapping for this row (e.g., "AIRBNB" → Airbnb).
+      // Used to (a) prefer same-contact bills during matching and
+      // (b) pre-fill category/subcategory if no bill match is found.
+      const staticMapping = findStaticMapping(row.description);
+      const staticContact = staticMapping
+        ? contacts.find(
+            (c) => (c.name ?? "").toLowerCase().trim() === staticMapping.contactName.toLowerCase().trim()
+          )
+        : undefined;
+      const staticContactId = staticContact?._id;
+
       // Try to find a matching bill
       let bestMatch: { billRef: BillRef; confidence: "exact" | "high" | "medium" | "low" } | null = null;
 
@@ -262,6 +297,24 @@ export const uploadStatement = mutation({
         const amountDiff = Math.abs(ref.amount - absAmount);
         const amountMatch = amountDiff < 0.02; // exact match within 2 cents
         const closeAmount = amountDiff / Math.max(absAmount, 1) < 0.05; // within 5%
+
+        // Static-mapping contact match: when the txn maps to a known contact and
+        // this bill is for that same contact, that's a much stronger signal than
+        // keyword overlap. Treat amountMatch+contactMatch as exact, closeAmount
+        // +contactMatch as high.
+        const contactMatch = staticContactId && ref.contactId
+          ? String(ref.contactId) === String(staticContactId)
+          : false;
+        if (contactMatch && amountMatch) {
+          bestMatch = { billRef: ref, confidence: "exact" };
+          break;
+        }
+        if (contactMatch && closeAmount) {
+          if (!bestMatch || bestMatch.confidence !== "exact") {
+            bestMatch = { billRef: ref, confidence: "high" };
+          }
+          continue;
+        }
 
         // Name/keyword match
         const commonKeywords = txnKeywords.filter((kw) =>
@@ -315,7 +368,8 @@ export const uploadStatement = mutation({
         matchedBillName: bestMatch ? bestMatch.billRef.fileName : undefined,
         matchConfidence: bestMatch ? bestMatch.confidence : "none",
         isApproved: false,
-        // Apply learned rule as pre-populated suggestion
+        // Apply learned rule as pre-populated suggestion (takes precedence over
+        // static mapping because rules carry assignment info that mappings don't).
         ...(ruleMatch && !bestMatch ? {
           assignType: ruleMatch.assignType as any,
           assignedHorses: ruleMatch.assignType === "horse" && ruleMatch.assignedHorses
@@ -335,6 +389,11 @@ export const uploadStatement = mutation({
             : undefined,
           category: ruleMatch.category,
           subcategory: ruleMatch.subcategory,
+        } : staticMapping && !bestMatch ? {
+          // Pre-fill category/subcategory only — assignType requires user judgment
+          // (which horse / person / business this expense should land on).
+          category: staticMapping.category,
+          subcategory: staticMapping.subcategory,
         } : {}),
       });
 
@@ -590,13 +649,17 @@ async function createBillFromTransaction(
     lineItem.confirmed = true;
   }
 
-  // Clean the CC description into a nicer invoice name, matching against contacts when possible
-  const { displayName, contactId: matchedContactId } = await resolveCcDisplayName(ctx, txn.description);
+  // Resolve contact (static mapping → contact lookup → keyword match → cleaned text)
+  // and format the bill name as "<Contact> — <Date>" to match the PDF-upload format.
+  const { contactName, contactId: matchedContactId } = await resolveCcContact(ctx, txn.description);
+  const billName = matchedContactId || findStaticMapping(txn.description)
+    ? formatCcBillName(contactName, txn.postingDate)
+    : contactName;
 
   const billId = await ctx.db.insert("bills", {
-    fileName: displayName,
-    invoiceName: displayName,
-    customProviderName: displayName,
+    fileName: billName,
+    invoiceName: billName,
+    customProviderName: contactName,
     contactId: matchedContactId,
     status: "done" as const,
     billingPeriod,
@@ -611,7 +674,7 @@ async function createBillFromTransaction(
     extractedData: {
       invoice_total_usd: absAmount,
       invoice_date: txn.postingDate,
-      contact_name: displayName,
+      contact_name: contactName,
       line_items: [lineItem],
       isCredit,
     },
@@ -969,11 +1032,21 @@ export const cleanCcBillNames = mutation({
         continue;
       }
 
-      const { displayName, contactId: matchedContactId } = await resolveCcDisplayName(ctx, rawDescription);
-      if (!displayName) {
+      const { contactName, contactId: matchedContactId } = await resolveCcContact(ctx, rawDescription);
+      if (!contactName) {
         skipped++;
         continue;
       }
+
+      // Format as "<Contact> — <Date>" when we have a real contact match
+      // (matching the PDF-upload format); otherwise leave as the cleaned text.
+      const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+      const dateForName =
+        (typeof extracted.invoice_date === "string" ? extracted.invoice_date : undefined) ??
+        bill.billingPeriod ??
+        new Date(bill.uploadedAt).toISOString().slice(0, 10);
+      const knownContact = matchedContactId || findStaticMapping(rawDescription);
+      const displayName = knownContact ? formatCcBillName(contactName, dateForName) : contactName;
 
       const currentDisplay = bill.invoiceName ?? bill.fileName ?? "";
       const sameName = currentDisplay === displayName;
@@ -983,12 +1056,11 @@ export const cleanCcBillNames = mutation({
         continue;
       }
 
-      const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
       const updates: Record<string, unknown> = {
         fileName: displayName,
         invoiceName: displayName,
-        customProviderName: displayName,
-        extractedData: { ...extracted, contact_name: displayName },
+        customProviderName: contactName,
+        extractedData: { ...extracted, contact_name: contactName },
       };
       if (matchedContactId && !bill.contactId) {
         updates.contactId = matchedContactId;
