@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
 import NavBar from "@/components/NavBar";
+import Modal from "@/components/Modal";
 import { formatInvoiceName } from "@/lib/formatInvoiceName";
 import styles from "./contact.module.css";
 
@@ -47,6 +48,7 @@ function formatCategoryLabel(slug: string) {
 
 export default function ContactDetailPage() {
   const params = useParams<{ slug: string }>();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const slug = params.slug;
 
@@ -67,10 +69,13 @@ export default function ContactDetailPage() {
   );
 
   const updateContact = useMutation(api.contacts.updateContact);
+  const deleteContact = useMutation(api.contacts.deleteContact);
 
   const shouldEdit = searchParams.get("edit") === "true";
   const [editing, setEditing] = useState(false);
   const [didAutoEdit, setDidAutoEdit] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (shouldEdit && contact && !didAutoEdit) {
@@ -107,6 +112,17 @@ export default function ContactDetailPage() {
       notes: contact.notes ?? "",
     });
     setEditing(true);
+  }
+
+  async function handleDelete() {
+    if (!contact) return;
+    setDeleting(true);
+    try {
+      await deleteContact({ contactId: contact._id });
+      router.push("/contacts");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function handleSave() {
@@ -163,7 +179,10 @@ export default function ContactDetailPage() {
           </div>
         </div>
         {!editing && (
-          <button type="button" className={styles.editBtn} onClick={startEdit}>edit</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" className={styles.deleteBtn} onClick={() => setShowDeleteModal(true)}>delete</button>
+            <button type="button" className={styles.editBtn} onClick={startEdit}>edit</button>
+          </div>
         )}
       </div>
 
@@ -380,6 +399,26 @@ export default function ContactDetailPage() {
         </table>
       )}
     </main>
+
+    <Modal
+      open={showDeleteModal}
+      title="delete contact"
+      onClose={() => setShowDeleteModal(false)}
+    >
+      <p className={styles.deleteText}>
+        Are you sure you want to delete <strong>{contact.name}</strong>? This cannot be undone. Any
+        invoices already linked to this contact will keep their record but the contact will no longer
+        appear anywhere.
+      </p>
+      <div className={styles.deleteActions}>
+        <button type="button" className={styles.cancelBtn} onClick={() => setShowDeleteModal(false)}>
+          cancel
+        </button>
+        <button type="button" className={styles.deleteBtn} onClick={() => void handleDelete()} disabled={deleting}>
+          {deleting ? "deleting..." : "delete"}
+        </button>
+      </div>
+    </Modal>
     </div>
   );
 }
