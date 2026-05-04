@@ -223,6 +223,24 @@ export const parseBillPdf = internalAction({
         matchHorses,
         matchPeople
       });
+      // Defensive currency detection: the LLM is asked for "invoice_total_usd"
+      // and "total_usd" per line item, which causes it to strip non-USD prefixes
+      // (e.g. "EUR 432.56" → 432.56) and return raw numbers as if they were USD.
+      // If no non-USD currency was extracted, scan the raw PDF text for an
+      // explicit currency-code/symbol adjacent to a decimal number, and stamp
+      // the result on the parsed payload so ensureUsdAmounts can convert.
+      const declaredCurrency = String(
+        (parsed as any).original_currency ?? (parsed as any).originalCurrency ?? (parsed as any).currency ?? ""
+      ).toUpperCase();
+      if (!declaredCurrency || declaredCurrency === "USD") {
+        const detected = detectCurrencyFromText(extractedPdfText);
+        if (detected && detected !== "USD") {
+          console.log(`[billParsing] Detected non-USD currency '${detected}' from raw PDF text; overriding before USD conversion`);
+          (parsed as any).original_currency = detected;
+          (parsed as any).originalCurrency = detected;
+          (parsed as any).currency = detected;
+        }
+      }
       parsed = ensureUsdAmounts(parsed);
       if (categorySlug) annotateSuggestedCategories(parsed, categorySlug);
       // Collect unique line-item categories and store on the bill
@@ -688,6 +706,31 @@ function normalizeParsedPayload(input: Record<string, unknown>) {
   output.line_items = lineItems;
   output.lineItems = lineItems;
   return output;
+}
+
+/** Scan raw PDF text for an explicit non-USD currency code or symbol
+ *  adjacent to a decimal number (e.g., "EUR 432.56" or "€2,821.52"). Returns
+ *  the ISO currency code if found, else undefined. Conservative on purpose:
+ *  requires the code/symbol to be next to an actual amount so we don't get
+ *  false positives from address mentions ("EU country", "European"). */
+function detectCurrencyFromText(text: string): string | undefined {
+  if (!text) return undefined;
+  // amount = digits with optional thousands and a decimal portion
+  const amount = "[\\d,]+(?:\\.[\\d]{2,})?";
+  const codeAdjacent = (code: string) => {
+    const re = new RegExp(`(?:\\b${code}\\b\\s*${amount}|${amount}\\s*\\b${code}\\b)`, "i");
+    return re.test(text);
+  };
+  const symbolAdjacent = (sym: string) => {
+    const escaped = sym.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`(?:${escaped}\\s*${amount}|${amount}\\s*${escaped})`);
+    return re.test(text);
+  };
+  // Order matters: check symbols before generic codes to avoid mismatches.
+  if (codeAdjacent("EUR") || symbolAdjacent("€")) return "EUR";
+  if (codeAdjacent("GBP") || symbolAdjacent("£")) return "GBP";
+  if (codeAdjacent("CAD") || symbolAdjacent("C$")) return "CAD";
+  return undefined;
 }
 
 function ensureUsdAmounts(parsed: Record<string, unknown>) {
