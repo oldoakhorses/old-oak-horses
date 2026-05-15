@@ -105,7 +105,7 @@ export default function AccountsPage() {
     }
   }
 
-  const sorted = [...users].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = [...users].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
 
   return (
     <div className="page-shell">
@@ -143,8 +143,8 @@ export default function AccountsPage() {
             return (
               <div key={user._id} className={styles.row}>
                 <div className={styles.userName}>
-                  {user.name}
-                  <span className={styles.userEmail}>{user.email}</span>
+                  {user.name ?? "—"}
+                  <span className={styles.userEmail}>{user.email ?? ""}</span>
                 </div>
                 <div className={styles.role}>{user.role ?? "—"}</div>
                 <div>
@@ -175,7 +175,7 @@ export default function AccountsPage() {
                         type="button"
                         className={styles.menuItem}
                         onClick={() => {
-                          setResetModal({ userId: user._id, name: user.name });
+                          setResetModal({ userId: user._id, name: user.name ?? "Unknown" });
                           setOpenMenuId("");
                         }}
                       >
@@ -185,7 +185,7 @@ export default function AccountsPage() {
                         type="button"
                         className={`${styles.menuItem} ${styles.menuItemDanger}`}
                         onClick={() => {
-                          setDeleteModal({ userId: user._id, name: user.name });
+                          setDeleteModal({ userId: user._id, name: user.name ?? "Unknown" });
                           setOpenMenuId("");
                         }}
                       >

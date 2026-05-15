@@ -34,7 +34,12 @@ export default function LoginPage() {
     try {
       const result = await loginMutation({ email: email.trim(), passcode });
       if (result.success) {
-        login(result.token, result.user);
+        login(result.token, {
+          id: result.user.id,
+          name: result.user.name ?? "",
+          email: result.user.email ?? "",
+          role: result.user.role,
+        });
         router.replace("/dashboard");
       } else {
         setShowError(true);

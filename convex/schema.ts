@@ -3,14 +3,21 @@ import { v } from "convex/values";
 
 export default defineSchema({
   users: defineTable({
-    name: v.string(),
-    email: v.string(),
-    passcodeHash: v.string(),
+    name: v.optional(v.string()),
+    email: v.optional(v.string()),
+    passcodeHash: v.optional(v.string()),
     role: v.optional(v.union(v.literal("admin"), v.literal("investor"))),
     isActive: v.optional(v.boolean()),
-    createdAt: v.number(),
+    createdAt: v.optional(v.number()),
+    // Deprecated: old auth fields kept for backwards compat
+    image: v.optional(v.string()),
+    emailVerificationTime: v.optional(v.number()),
+    phone: v.optional(v.string()),
+    phoneVerificationTime: v.optional(v.number()),
+    isAnonymous: v.optional(v.boolean()),
   })
-    .index("email", ["email"]),
+    .index("email", ["email"])
+    .index("phone", ["phone"]),
 
   sessions: defineTable({
     userId: v.id("users"),

@@ -40,7 +40,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logoutMutation = useMutation(api.auth.logout);
 
   const isLoading = !hasCheckedStorage || (!!token && sessionUser === undefined);
-  const user: User | null = sessionUser ?? null;
+  const user: User | null = sessionUser
+    ? { id: sessionUser.id, name: sessionUser.name ?? "", email: sessionUser.email ?? "", role: sessionUser.role }
+    : null;
   const isAuthenticated = !!user;
 
   useEffect(() => {
