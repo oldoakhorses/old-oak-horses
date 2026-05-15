@@ -29,6 +29,7 @@ const NAV_ITEMS = [
   { label: "owners", href: "/owners", icon: "👥" },
   { label: "billing", href: "/billing", icon: "💰" },
   { label: "contacts", href: "/contacts", icon: "👤" },
+  { label: "accounts", href: "/accounts", icon: "🔑" },
 ] as const;
 
 export default function NavBar({
@@ -58,7 +59,7 @@ export default function NavBar({
     if (isSigningOut) return;
     setIsSigningOut(true);
     try {
-      logout();
+      await logout();
       setMenuOpen(false);
       router.replace("/login");
     } finally {
