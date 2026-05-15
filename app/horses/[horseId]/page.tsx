@@ -57,6 +57,7 @@ type RecordEditState = {
 
 type FormState = {
   name: string;
+  barnName: string;
   yearOfBirth: string;
   sex: "" | "gelding" | "mare" | "stallion";
   usefNumber: string;
@@ -167,6 +168,7 @@ export default function HorseProfilePage() {
 
   const [form, setForm] = useState<FormState>({
     name: "",
+    barnName: "",
     yearOfBirth: "",
     sex: "",
     usefNumber: "",
@@ -185,6 +187,7 @@ export default function HorseProfilePage() {
     if (!horse) return;
     setForm({
       name: horse.name ?? "",
+      barnName: (horse as any).barnName ?? "",
       yearOfBirth: horse.yearOfBirth ? String(horse.yearOfBirth) : "",
       sex: horse.sex ?? "",
       usefNumber: horse.usefNumber ?? "",
@@ -263,6 +266,7 @@ export default function HorseProfilePage() {
       await updateHorseProfile({
         horseId,
         name: form.name || undefined,
+        barnName: form.barnName || undefined,
         yearOfBirth: form.yearOfBirth ? Number(form.yearOfBirth) : undefined,
         sex: form.sex || undefined,
         usefNumber: form.usefNumber || undefined,
@@ -402,6 +406,9 @@ export default function HorseProfilePage() {
           <div className={styles.profileFields}>
             <Field label="NAME" value={horse.name} editing={isEditing}>
               <input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
+            </Field>
+            <Field label="BARN NAME" value={(horse as any).barnName || "—"} editing={isEditing}>
+              <input value={form.barnName} onChange={(event) => setForm((prev) => ({ ...prev, barnName: event.target.value }))} placeholder="nickname / call name" />
             </Field>
             <Field label="YEAR OF BIRTH" value={horse.yearOfBirth ? String(horse.yearOfBirth) : "—"} editing={isEditing}>
               <input value={form.yearOfBirth} onChange={(event) => setForm((prev) => ({ ...prev, yearOfBirth: event.target.value }))} />

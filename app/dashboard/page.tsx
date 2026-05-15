@@ -16,6 +16,7 @@ type DocumentTag = "coggins" | "health_certificate" | "horse_agreement" | "insur
 
 type HorseFormState = {
   name: string;
+  barnName: string;
   yearOfBirth: string;
   usefNumber: string;
   feiNumber: string;
@@ -60,6 +61,7 @@ const farrierServiceTypes = ["Full Set", "Reset", "Trim", "Front Only", "Other"]
 
 const initialHorseForm: HorseFormState = {
   name: "",
+  barnName: "",
   yearOfBirth: "",
   usefNumber: "",
   feiNumber: "",
@@ -253,6 +255,7 @@ export default function DashboardPage() {
     try {
       await createHorse({
         name: horseForm.name.trim(),
+        barnName: horseForm.barnName.trim() || undefined,
         yearOfBirth: horseForm.yearOfBirth ? Number(horseForm.yearOfBirth) : undefined,
         usefNumber: horseForm.usefNumber || undefined,
         feiNumber: horseForm.feiNumber || undefined,
@@ -699,6 +702,9 @@ export default function DashboardPage() {
         <form className={styles.form} onSubmit={onSubmitHorse}>
           <Field label="name *">
             <input className={styles.input} value={horseForm.name} onChange={(e) => setHorseForm((p) => ({ ...p, name: e.target.value }))} />
+          </Field>
+          <Field label="barn name">
+            <input className={styles.input} value={horseForm.barnName} onChange={(e) => setHorseForm((p) => ({ ...p, barnName: e.target.value }))} placeholder="nickname / call name" />
           </Field>
           <Field label="year of birth">
             <input
