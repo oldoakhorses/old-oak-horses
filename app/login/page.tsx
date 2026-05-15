@@ -3,22 +3,22 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAction } from "convex/react";
+import { useMutation } from "convex/react";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/convex/_generated/api";
 import styles from "./page.module.css";
 
 export default function LoginPage() {
   const router = useRouter();
-  const loginAction = useAction(api.auth.login);
+  const loginMutation = useMutation(api.auth.login);
   const { isAuthenticated, isLoading, login } = useAuth();
 
-  const [email, setEmail] = useState("lucy@oldoakhorses.com");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [passcode, setPasscode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showError, setShowError] = useState(false);
 
-  const disabled = useMemo(() => submitting || !email.trim() || !password.trim(), [email, password, submitting]);
+  const disabled = useMemo(() => submitting || !email.trim() || !passcode.trim(), [email, passcode, submitting]);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -32,9 +32,9 @@ export default function LoginPage() {
     setSubmitting(true);
     setShowError(false);
     try {
-      const result = await loginAction({ email: email.trim(), password });
+      const result = await loginMutation({ email: email.trim(), passcode });
       if (result.success) {
-        login();
+        login(result.token, result.user);
         router.replace("/dashboard");
       } else {
         setShowError(true);
@@ -68,7 +68,7 @@ export default function LoginPage() {
         {showError ? (
           <div className={styles.loginError}>
             <span className={styles.errorIcon}>⚠</span>
-            <span className={styles.errorText}>invalid email or password</span>
+            <span className={styles.errorText}>invalid email or passcode</span>
           </div>
         ) : null}
 
@@ -80,28 +80,25 @@ export default function LoginPage() {
             id="email"
             type="email"
             autoComplete="email"
-            placeholder="lucy@oldoakhorses.com"
+            placeholder="you@oldoakhorses.com"
             className={styles.fieldInput}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
 
           <div className={styles.passwordLabelRow}>
-            <label className={styles.fieldLabel} htmlFor="password">
-              PASSWORD
+            <label className={styles.fieldLabel} htmlFor="passcode">
+              PASSCODE
             </label>
-            <a href="mailto:lucy@oldoakhorses.com" className={styles.forgotLink}>
-              forgot?
-            </a>
           </div>
           <input
-            id="password"
+            id="passcode"
             type="password"
             autoComplete="current-password"
             placeholder="••••••••••••"
             className={`${styles.fieldInput} ${styles.passwordInput}`}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            value={passcode}
+            onChange={(event) => setPasscode(event.target.value)}
           />
 
           <button type="submit" className={styles.btnSignin} disabled={disabled}>

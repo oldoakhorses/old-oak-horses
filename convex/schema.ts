@@ -3,17 +3,23 @@ import { v } from "convex/values";
 
 export default defineSchema({
   users: defineTable({
-    name: v.optional(v.string()),
-    image: v.optional(v.string()),
-    email: v.optional(v.string()),
-    emailVerificationTime: v.optional(v.number()),
-    phone: v.optional(v.string()),
-    phoneVerificationTime: v.optional(v.number()),
-    isAnonymous: v.optional(v.boolean()),
-    role: v.optional(v.union(v.literal("admin"), v.literal("investor")))
+    name: v.string(),
+    email: v.string(),
+    passcodeHash: v.string(),
+    role: v.optional(v.union(v.literal("admin"), v.literal("investor"))),
+    isActive: v.optional(v.boolean()),
+    createdAt: v.number(),
   })
-    .index("email", ["email"])
-    .index("phone", ["phone"]),
+    .index("email", ["email"]),
+
+  sessions: defineTable({
+    userId: v.id("users"),
+    token: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_user", ["userId"]),
 
   categories: defineTable({
     name: v.string(),
