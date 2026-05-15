@@ -13,6 +13,7 @@ type StatusFilter = "active" | "inactive" | "all";
 
 type HorseFormState = {
   name: string;
+  barnName: string;
   yearOfBirth: string;
   sex: "" | "gelding" | "mare" | "stallion";
   usefNumber: string;
@@ -23,6 +24,7 @@ type HorseFormState = {
 
 const EMPTY_FORM: HorseFormState = {
   name: "",
+  barnName: "",
   yearOfBirth: "",
   sex: "",
   usefNumber: "",
@@ -77,6 +79,7 @@ export default function HorsesPage() {
 
       await createHorse({
         name: form.name.trim(),
+        barnName: form.barnName.trim() || undefined,
         yearOfBirth: form.yearOfBirth ? Number(form.yearOfBirth) : undefined,
         sex: form.sex || undefined,
         usefNumber: form.usefNumber || undefined,
@@ -218,6 +221,10 @@ export default function HorsesPage() {
           <label className={styles.field}>
             <span className={styles.fieldLabel}>NAME *</span>
             <input className={styles.input} value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>BARN NAME</span>
+            <input className={styles.input} value={form.barnName} onChange={(e) => setForm((p) => ({ ...p, barnName: e.target.value }))} placeholder="nickname / call name" />
           </label>
           <div className={styles.twoCol}>
             <label className={styles.field}>

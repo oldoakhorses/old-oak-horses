@@ -180,6 +180,7 @@ export default defineSchema({
 
   horses: defineTable({
     name: v.string(),
+    barnName: v.optional(v.string()),
     yearOfBirth: v.optional(v.number()),
     sex: v.optional(v.union(v.literal("gelding"), v.literal("mare"), v.literal("stallion"))),
     usefNumber: v.optional(v.string()),

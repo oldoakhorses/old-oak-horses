@@ -37,6 +37,7 @@ export const getHorseById = query({
 export const createHorse = mutation({
   args: {
     name: v.string(),
+    barnName: v.optional(v.string()),
     yearOfBirth: v.optional(v.number()),
     sex: v.optional(v.union(v.literal("gelding"), v.literal("mare"), v.literal("stallion"))),
     usefNumber: v.optional(v.string()),
@@ -61,6 +62,7 @@ export const createHorse = mutation({
 
     return await ctx.db.insert("horses", {
       name: args.name.trim(),
+      barnName: args.barnName?.trim() || undefined,
       yearOfBirth: args.yearOfBirth,
       sex: args.sex,
       usefNumber: args.usefNumber?.trim() || undefined,
@@ -77,6 +79,7 @@ export const updateHorseProfile = mutation({
   args: {
     horseId: v.id("horses"),
     name: v.optional(v.string()),
+    barnName: v.optional(v.string()),
     yearOfBirth: v.optional(v.number()),
     sex: v.optional(v.union(v.literal("gelding"), v.literal("mare"), v.literal("stallion"))),
     usefNumber: v.optional(v.string()),
@@ -92,6 +95,7 @@ export const updateHorseProfile = mutation({
 
     await ctx.db.patch(args.horseId, {
       name: args.name?.trim(),
+      barnName: args.barnName?.trim() || undefined,
       yearOfBirth: args.yearOfBirth,
       sex: args.sex,
       usefNumber: args.usefNumber?.trim() || undefined,
