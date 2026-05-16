@@ -210,6 +210,45 @@ export const listAll = query(async (ctx) => {
   });
 });
 
+export const listByOwner = query({
+  args: { ownerId: v.id("owners") },
+  handler: async (ctx, args) => {
+    const horses = await ctx.db.query("horses").collect();
+    const ownerHorseIds = new Set(
+      horses.filter((h) => h.ownerId === args.ownerId).map((h) => String(h._id))
+    );
+
+    const bills = await ctx.db.query("bills").withIndex("by_uploadedAt").order("desc").collect();
+    const ownerBills = bills.filter((bill) => {
+      const assigned = Array.isArray(bill.assignedHorses) ? bill.assignedHorses : [];
+      return assigned.some((a: any) => ownerHorseIds.has(String(a.horseId)));
+    });
+
+    const contactResolved = await batchResolveContacts(ctx, ownerBills as any);
+    const categoryIds = [...new Set(ownerBills.map((b) => b.categoryId).filter(Boolean))] as string[];
+    const categoryPairs = await Promise.all(categoryIds.map(async (id) => [id, await ctx.db.get(id as any)] as const));
+    const categoryMap = new Map(categoryPairs.map(([id, category]) => [id, category]));
+
+    return ownerBills.map((bill) => {
+      const resolved = contactResolved.get(String(bill._id));
+      const category = bill.categoryId ? categoryMap.get(bill.categoryId) as { slug?: string; name?: string } | null | undefined : null;
+      const lineItemCats = bill.lineItemCategories ?? [];
+      const primaryCategorySlug = category?.slug ?? (lineItemCats.length > 0 ? lineItemCats[0] : "unknown");
+      const primaryCategoryName = category?.name ?? (lineItemCats.length > 0 ? formatCategorySlug(lineItemCats[0]) : "Unknown");
+      const extracted = ((bill.extractedData ?? {}) as Record<string, unknown>);
+      const billContactName = resolved?.name ?? bill.customProviderName ?? extractedContactName(extracted) ?? "Unknown";
+      return {
+        ...bill,
+        contactName: billContactName,
+        contactSlug: resolved?.slug ?? slugify(bill.customProviderName ?? extractedContactName(extracted) ?? "unknown"),
+        categoryName: primaryCategoryName,
+        categorySlug: primaryCategorySlug,
+        lineItemCategories: lineItemCats,
+      };
+    });
+  },
+});
+
 export const getBillsByCategory = query({
   args: { categoryId: v.id("categories") },
   handler: async (ctx, args) => {

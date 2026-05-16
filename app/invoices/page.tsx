@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import { useAuth } from "@/contexts/AuthContext";
 import NavBar from "@/components/NavBar";
 import { formatInvoiceFileName, formatInvoiceName } from "@/lib/formatInvoiceName";
 import styles from "./invoices.module.css";
@@ -101,7 +103,14 @@ const CATEGORY_COLORS: Record<string, { bg: string; color: string; label: string
 
 export default function InvoicesPage() {
   const router = useRouter();
-  const rows = useQuery(api.bills.listAll) ?? [];
+  const { user } = useAuth();
+  const isOwnerRole = user?.role === "owner";
+  const ownerIdForFilter = isOwnerRole && user?.ownerId ? (user.ownerId as Id<"owners">) : undefined;
+
+  const allRows = useQuery(api.bills.listAll, isOwnerRole ? "skip" : {}) ?? [];
+  const ownerRows = useQuery(api.bills.listByOwner, ownerIdForFilter ? { ownerId: ownerIdForFilter } : "skip") ?? [];
+  const rows = isOwnerRole ? ownerRows : allRows;
+
   const deleteBill = useMutation(api.bills.deleteBill);
   const updateBillNotes = useMutation(api.bills.updateBillNotes);
 

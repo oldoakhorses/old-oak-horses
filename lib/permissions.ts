@@ -1,10 +1,10 @@
 type UserRole = "admin" | "owner" | "team" | "investor" | undefined;
 
 const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
-  "/invoices": ["admin"],
+  "/invoices": ["admin", "owner"],
   "/billing": ["admin"],
   "/owners": ["admin"],
-  "/contacts": ["admin"],
+  "/contacts": ["admin", "team"],
   "/dashboard": ["admin", "team"],
   "/horses": ["admin", "owner", "team"],
   "/records": ["admin", "owner", "team"],
