@@ -34,6 +34,7 @@ const NAV_SECTIONS = [
     items: [
       { label: "dashboard", href: "/dashboard", icon: "📊" },
       { label: "invoices", href: "/invoices", icon: "📄" },
+      { label: "billing", href: "/billing", icon: "💰" },
       { label: "owners", href: "/owners", icon: "👥" },
       { label: "contacts", href: "/contacts", icon: "👤" },
     ],
