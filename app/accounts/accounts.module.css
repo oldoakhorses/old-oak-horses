@@ -12,153 +12,186 @@
   color: #1a1a2e;
 }
 
-.addButton {
+.profileCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 32px;
+}
+
+.photoSection {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #f0f1f5;
+}
+
+.avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #f2f3f7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.avatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarPlaceholder {
+  font-size: 28px;
+  font-weight: 700;
+  color: #9ea2b0;
+}
+
+.photoActions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.photoBtn {
   font-size: 11px;
   font-weight: 700;
-  padding: 10px 16px;
+  padding: 8px 14px;
   border-radius: 6px;
+  border: 1px solid #e8eaf0;
+  background: #fff;
+  color: #1a1a2e;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.photoBtn:hover {
+  border-color: #4a5bdb;
+  color: #4a5bdb;
+}
+
+.photoBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.photoBtnRemove {
+  font-size: 11px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #9ea2b0;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.photoBtnRemove:hover {
+  color: #e5484d;
+}
+
+.fields {
+  display: grid;
+  gap: 0;
+}
+
+.fieldRow {
+  display: flex;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid #f0f1f5;
+}
+
+.fieldRow:last-child {
+  border-bottom: none;
+}
+
+.fieldLabel {
+  font-size: 10px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  width: 100px;
+  flex-shrink: 0;
+}
+
+.fieldValueRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.fieldValue {
+  font-size: 14px;
+  color: #1a1a2e;
+}
+
+.fieldEditBtn {
+  font-size: 10px;
+  color: #4a5bdb;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  letter-spacing: 0.03em;
+}
+
+.fieldEditBtn:hover {
+  text-decoration: underline;
+}
+
+.fieldEditRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.fieldInput {
+  font-size: 13px;
+  padding: 8px 12px;
+  background: #f8f9fb;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  color: #1a1a2e;
+  flex: 1;
+  max-width: 260px;
+  outline: none;
+}
+
+.fieldInput:focus {
+  border-color: #4a5bdb;
+}
+
+.fieldSaveBtn {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 5px;
   border: none;
   background: #1a1a2e;
   color: #fff;
   cursor: pointer;
 }
 
-.addButton:hover {
-  background: #2a2a4e;
+.fieldSaveBtn:disabled {
+  opacity: 0.6;
 }
 
-.card {
-  background: #fff;
+.fieldCancelBtn {
+  font-size: 10px;
+  padding: 6px 12px;
+  border-radius: 5px;
   border: 1px solid #e8eaf0;
-  border-radius: 12px;
-}
-
-.cardHeader {
-  display: grid;
-  grid-template-columns: 1fr 180px 100px 60px;
-  padding: 12px 26px;
-  font-size: 9px;
-  color: #9ea2b0;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  border-bottom: 1px solid #e8eaf0;
-}
-
-.row {
-  display: grid;
-  grid-template-columns: 1fr 180px 100px 60px;
-  padding: 14px 26px;
-  align-items: center;
-  border-bottom: 1px solid #f0f1f5;
-  transition: background 0.1s;
-}
-
-.row:hover {
-  background: #fafafc;
-}
-
-.row:last-child {
-  border-bottom: none;
-}
-
-.userName {
-  font-size: 13px;
-  font-weight: 700;
-  color: #1a1a2e;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.userEmail {
-  font-size: 11px;
-  color: #9ea2b0;
-  font-weight: 400;
-}
-
-.role {
-  font-size: 12px;
-  color: #6b7084;
-}
-
-.statusActive,
-.statusInactive {
-  font-size: 9px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 4px;
-  text-transform: uppercase;
-  display: inline-block;
-}
-
-.statusActive {
-  background: rgba(34, 197, 131, 0.08);
-  color: #22c583;
-}
-
-.statusInactive {
-  background: #f0f1f5;
-  color: #9ea2b0;
-}
-
-.menuWrap {
-  position: relative;
-}
-
-.menuButton {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: #9ea2b0;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.menuButton:hover {
-  background: #f2f3f7;
-}
-
-.menuDropdown {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  margin-top: 4px;
-  background: #fff;
-  border: 1px solid #e8eaf0;
-  border-radius: 8px;
-  padding: 6px 0;
-  min-width: 180px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  z-index: 20;
-}
-
-.menuItem {
-  font-size: 11px;
-  padding: 8px 16px;
-  border: none;
   background: transparent;
   color: #6b7084;
   cursor: pointer;
-  width: 100%;
-  text-align: left;
-  display: block;
-}
-
-.menuItem:hover {
-  background: #fafafc;
-}
-
-.menuItemDanger {
-  color: #e5484d;
-}
-
-.empty {
-  padding: 40px;
-  text-align: center;
-  font-size: 12px;
-  color: #9ea2b0;
 }
 
 .form {
@@ -171,7 +204,7 @@
   flex-direction: column;
 }
 
-.fieldLabel {
+.formFieldLabel {
   font-size: 10px;
   color: #9ea2b0;
   letter-spacing: 0.05em;
@@ -188,12 +221,6 @@
   color: #1a1a2e;
 }
 
-.twoCol {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
 .error {
   margin: 0;
   font-size: 11px;
@@ -207,11 +234,21 @@
   margin-top: 8px;
 }
 
-.deleteText {
-  margin: 0 0 16px;
+.successMessage {
+  text-align: center;
+}
+
+.successMessage p {
   font-size: 13px;
   color: #1a1a2e;
-  line-height: 1.5;
+  margin: 0 0 16px;
+}
+
+.empty {
+  padding: 40px;
+  text-align: center;
+  font-size: 12px;
+  color: #9ea2b0;
 }
 
 @media (max-width: 640px) {
@@ -219,19 +256,31 @@
     font-size: 24px;
   }
 
-  .headerRow {
+  .profileCard {
+    padding: 20px;
+  }
+
+  .photoSection {
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
     gap: 12px;
   }
 
-  .cardHeader {
-    display: none;
+  .fieldRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
   }
 
-  .row {
-    grid-template-columns: 1fr;
-    gap: 6px;
-    padding: 14px 18px;
+  .fieldLabel {
+    width: auto;
+  }
+
+  .fieldEditRow {
+    width: 100%;
+  }
+
+  .fieldInput {
+    max-width: none;
   }
 }

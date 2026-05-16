@@ -118,3 +118,78 @@ export const deleteUser = mutation({
     await ctx.db.delete(args.userId);
   },
 });
+
+export const getProfile = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) return null;
+    return {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      profilePhotoUrl: user.profilePhotoId
+        ? await ctx.storage.getUrl(user.profilePhotoId)
+        : null,
+    };
+  },
+});
+
+export const updateProfile = mutation({
+  args: {
+    userId: v.id("users"),
+    name: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) throw new Error("User not found");
+
+    const patch: Record<string, unknown> = {};
+    if (args.name !== undefined) patch.name = args.name.trim();
+
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(args.userId, patch);
+    }
+    return args.userId;
+  },
+});
+
+export const generateUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+export const setProfilePhoto = mutation({
+  args: {
+    userId: v.id("users"),
+    storageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) throw new Error("User not found");
+
+    if (user.profilePhotoId) {
+      await ctx.storage.delete(user.profilePhotoId);
+    }
+
+    await ctx.db.patch(args.userId, { profilePhotoId: args.storageId });
+    return args.userId;
+  },
+});
+
+export const removeProfilePhoto = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) throw new Error("User not found");
+
+    if (user.profilePhotoId) {
+      await ctx.storage.delete(user.profilePhotoId);
+      await ctx.db.patch(args.userId, { profilePhotoId: undefined });
+    }
+    return args.userId;
+  },
+});

@@ -9,6 +9,7 @@ export default defineSchema({
     role: v.optional(v.union(v.literal("admin"), v.literal("investor"))),
     isActive: v.optional(v.boolean()),
     createdAt: v.optional(v.number()),
+    profilePhotoId: v.optional(v.id("_storage")),
     // Deprecated: old auth fields kept for backwards compat
     image: v.optional(v.string()),
     emailVerificationTime: v.optional(v.number()),

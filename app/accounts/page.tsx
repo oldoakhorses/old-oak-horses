@@ -1,90 +1,75 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { useAuth } from "@/contexts/AuthContext";
 import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
 import styles from "./accounts.module.css";
 
-type AddFormState = {
-  name: string;
-  email: string;
-  passcode: string;
-  role: "" | "admin" | "investor";
-};
+export default function AccountPage() {
+  const { user } = useAuth();
+  const userId = user?.id as Id<"users"> | undefined;
 
-const EMPTY_ADD_FORM: AddFormState = {
-  name: "",
-  email: "",
-  passcode: "",
-  role: "",
-};
-
-export default function AccountsPage() {
-  const users = useQuery(api.users.list) ?? [];
-  const createUser = useMutation(api.users.createUser);
-  const updateUser = useMutation(api.users.updateUser);
+  const profile = useQuery(api.users.getProfile, userId ? { userId } : "skip");
+  const updateProfile = useMutation(api.users.updateProfile);
   const resetPasscode = useMutation(api.users.resetPasscode);
-  const deleteUser = useMutation(api.users.deleteUser);
+  const generateUploadUrl = useMutation(api.users.generateUploadUrl);
+  const setProfilePhoto = useMutation(api.users.setProfilePhoto);
+  const removeProfilePhoto = useMutation(api.users.removeProfilePhoto);
 
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [addForm, setAddForm] = useState<AddFormState>(EMPTY_ADD_FORM);
-  const [addError, setAddError] = useState("");
-  const [isAdding, setIsAdding] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState("");
+  const [isSavingName, setIsSavingName] = useState(false);
 
-  const [openMenuId, setOpenMenuId] = useState<string>("");
-  const [resetModal, setResetModal] = useState<{ userId: Id<"users">; name: string } | null>(null);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [currentPasscode, setCurrentPasscode] = useState("");
   const [newPasscode, setNewPasscode] = useState("");
+  const [confirmPasscode, setConfirmPasscode] = useState("");
   const [resetError, setResetError] = useState("");
+  const [resetSuccess, setResetSuccess] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
-  const [deleteModal, setDeleteModal] = useState<{ userId: Id<"users">; name: string } | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function onAddUser(e: React.FormEvent) {
-    e.preventDefault();
-    if (!addForm.name.trim() || !addForm.email.trim() || !addForm.passcode.trim()) {
-      setAddError("name, email, and passcode are required");
-      return;
-    }
-    setAddError("");
-    setIsAdding(true);
-    try {
-      await createUser({
-        name: addForm.name.trim(),
-        email: addForm.email.trim(),
-        passcode: addForm.passcode,
-        role: addForm.role || undefined,
-      });
-      setAddForm(EMPTY_ADD_FORM);
-      setShowAddModal(false);
-    } catch (err) {
-      setAddError(err instanceof Error ? err.message : "failed to create user");
-    } finally {
-      setIsAdding(false);
-    }
+  function startEditingName() {
+    setNameValue(profile?.name ?? "");
+    setEditingName(true);
   }
 
-  async function onToggleActive(userId: Id<"users">, currentlyActive: boolean) {
-    await updateUser({ userId, isActive: !currentlyActive });
-    setOpenMenuId("");
+  async function saveName() {
+    if (!userId || !nameValue.trim()) return;
+    setIsSavingName(true);
+    try {
+      await updateProfile({ userId, name: nameValue.trim() });
+      setEditingName(false);
+    } finally {
+      setIsSavingName(false);
+    }
   }
 
   async function onResetPasscode(e: React.FormEvent) {
     e.preventDefault();
-    if (!resetModal || !newPasscode.trim()) {
-      setResetError("passcode is required");
+    if (!userId) return;
+    if (!newPasscode.trim()) {
+      setResetError("new passcode is required");
+      return;
+    }
+    if (newPasscode !== confirmPasscode) {
+      setResetError("passcodes do not match");
       return;
     }
     setResetError("");
     setIsResetting(true);
     try {
-      await resetPasscode({ userId: resetModal.userId, newPasscode: newPasscode });
-      setResetModal(null);
+      await resetPasscode({ userId, newPasscode });
+      setResetSuccess(true);
+      setCurrentPasscode("");
       setNewPasscode("");
+      setConfirmPasscode("");
     } catch (err) {
       setResetError(err instanceof Error ? err.message : "failed to reset passcode");
     } finally {
@@ -92,233 +77,204 @@ export default function AccountsPage() {
     }
   }
 
-  async function onDeleteUser() {
-    if (!deleteModal) return;
-    setIsDeleting(true);
+  async function onUploadPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !userId) return;
+    setIsUploadingPhoto(true);
     try {
-      await deleteUser({ userId: deleteModal.userId });
-      setDeleteModal(null);
-    } catch {
-      // ignore
+      const uploadUrl = await generateUploadUrl();
+      const res = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      const { storageId } = await res.json();
+      await setProfilePhoto({ userId, storageId });
     } finally {
-      setIsDeleting(false);
+      setIsUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
-  const sorted = [...users].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+  async function onRemovePhoto() {
+    if (!userId) return;
+    await removeProfilePhoto({ userId });
+  }
+
+  if (!user || !profile) {
+    return (
+      <div className="page-shell">
+        <NavBar items={[{ label: "old-oak-horses", href: "/dashboard", brand: true }, { label: "account", current: true }]} actions={[]} />
+        <main className="page-main">
+          <div className={styles.empty}>loading...</div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="page-shell">
       <NavBar
         items={[
           { label: "old-oak-horses", href: "/dashboard", brand: true },
-          { label: "accounts", current: true },
+          { label: "account", current: true },
         ]}
         actions={[]}
       />
       <main className="page-main">
-        <Link href="/dashboard" className="ui-back-link">
-          ← cd /dashboard
-        </Link>
-
         <section className={styles.headerRow}>
           <div>
-            <div className="ui-label">// ACCOUNTS</div>
-            <h1 className={styles.title}>accounts</h1>
+            <div className="ui-label">// ACCOUNT</div>
+            <h1 className={styles.title}>profile</h1>
           </div>
-          <button type="button" className={styles.addButton} onClick={() => setShowAddModal(true)}>
-            + add user
-          </button>
         </section>
 
-        <section className={styles.card}>
-          <div className={styles.cardHeader}>
-            <div>USER</div>
-            <div>ROLE</div>
-            <div>STATUS</div>
-            <div />
+        <section className={styles.profileCard}>
+          {/* Photo */}
+          <div className={styles.photoSection}>
+            <div className={styles.avatar}>
+              {profile.profilePhotoUrl ? (
+                <img src={profile.profilePhotoUrl} alt="Profile" className={styles.avatarImg} />
+              ) : (
+                <span className={styles.avatarPlaceholder}>
+                  {(profile.name ?? "?").charAt(0).toUpperCase()}
+                </span>
+              )}
+            </div>
+            <div className={styles.photoActions}>
+              <button
+                type="button"
+                className={styles.photoBtn}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingPhoto}
+              >
+                {isUploadingPhoto ? "uploading..." : "upload photo"}
+              </button>
+              {profile.profilePhotoUrl ? (
+                <button type="button" className={styles.photoBtnRemove} onClick={onRemovePhoto}>
+                  remove
+                </button>
+              ) : null}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={onUploadPhoto}
+              />
+            </div>
           </div>
-          {sorted.map((user) => {
-            const menuOpen = openMenuId === String(user._id);
-            return (
-              <div key={user._id} className={styles.row}>
-                <div className={styles.userName}>
-                  {user.name ?? "—"}
-                  <span className={styles.userEmail}>{user.email ?? ""}</span>
-                </div>
-                <div className={styles.role}>{user.role ?? "—"}</div>
-                <div>
-                  {user.isActive ? (
-                    <span className={styles.statusActive}>active</span>
-                  ) : (
-                    <span className={styles.statusInactive}>inactive</span>
-                  )}
-                </div>
-                <div className={styles.menuWrap}>
-                  <button
-                    type="button"
-                    className={styles.menuButton}
-                    onClick={() => setOpenMenuId(menuOpen ? "" : String(user._id))}
-                  >
-                    ⋮
+
+          {/* Fields */}
+          <div className={styles.fields}>
+            <div className={styles.fieldRow}>
+              <div className={styles.fieldLabel}>NAME</div>
+              {editingName ? (
+                <div className={styles.fieldEditRow}>
+                  <input
+                    className={styles.fieldInput}
+                    value={nameValue}
+                    onChange={(e) => setNameValue(e.target.value)}
+                    autoFocus
+                  />
+                  <button type="button" className={styles.fieldSaveBtn} onClick={saveName} disabled={isSavingName}>
+                    {isSavingName ? "..." : "save"}
                   </button>
-                  {menuOpen ? (
-                    <div className={styles.menuDropdown}>
-                      <button
-                        type="button"
-                        className={styles.menuItem}
-                        onClick={() => onToggleActive(user._id, user.isActive)}
-                      >
-                        {user.isActive ? "Deactivate" : "Activate"}
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.menuItem}
-                        onClick={() => {
-                          setResetModal({ userId: user._id, name: user.name ?? "Unknown" });
-                          setOpenMenuId("");
-                        }}
-                      >
-                        Reset Passcode
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.menuItem} ${styles.menuItemDanger}`}
-                        onClick={() => {
-                          setDeleteModal({ userId: user._id, name: user.name ?? "Unknown" });
-                          setOpenMenuId("");
-                        }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  ) : null}
+                  <button type="button" className={styles.fieldCancelBtn} onClick={() => setEditingName(false)}>
+                    cancel
+                  </button>
                 </div>
+              ) : (
+                <div className={styles.fieldValueRow}>
+                  <span className={styles.fieldValue}>{profile.name ?? "—"}</span>
+                  <button type="button" className={styles.fieldEditBtn} onClick={startEditingName}>
+                    edit
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className={styles.fieldRow}>
+              <div className={styles.fieldLabel}>EMAIL</div>
+              <div className={styles.fieldValueRow}>
+                <span className={styles.fieldValue}>{profile.email ?? "—"}</span>
               </div>
-            );
-          })}
-          {sorted.length === 0 ? <div className={styles.empty}>no accounts yet</div> : null}
+            </div>
+
+            <div className={styles.fieldRow}>
+              <div className={styles.fieldLabel}>PASSCODE</div>
+              <div className={styles.fieldValueRow}>
+                <span className={styles.fieldValue}>••••••••</span>
+                <button type="button" className={styles.fieldEditBtn} onClick={() => { setShowResetModal(true); setResetSuccess(false); }}>
+                  reset
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.fieldRow}>
+              <div className={styles.fieldLabel}>ROLE</div>
+              <div className={styles.fieldValueRow}>
+                <span className={styles.fieldValue}>{profile.role ?? "—"}</span>
+              </div>
+            </div>
+          </div>
         </section>
 
-        <div className="ui-footer">OLD_OAK_HORSES // ACCOUNTS</div>
+        <div className="ui-footer">OLD_OAK_HORSES // ACCOUNT</div>
       </main>
 
-      {/* Add user modal */}
-      <Modal open={showAddModal} title="add user" onClose={() => setShowAddModal(false)}>
-        <form className={styles.form} onSubmit={onAddUser}>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>NAME *</span>
-            <input
-              className={styles.input}
-              value={addForm.name}
-              onChange={(e) => setAddForm((p) => ({ ...p, name: e.target.value }))}
-            />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>EMAIL *</span>
-            <input
-              className={styles.input}
-              type="email"
-              value={addForm.email}
-              onChange={(e) => setAddForm((p) => ({ ...p, email: e.target.value }))}
-            />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>PASSCODE *</span>
-            <input
-              className={styles.input}
-              type="text"
-              value={addForm.passcode}
-              onChange={(e) => setAddForm((p) => ({ ...p, passcode: e.target.value }))}
-            />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>ROLE</span>
-            <select
-              className={styles.input}
-              value={addForm.role}
-              onChange={(e) => setAddForm((p) => ({ ...p, role: e.target.value as AddFormState["role"] }))}
-            >
-              <option value="">-- select --</option>
-              <option value="admin">Admin</option>
-              <option value="investor">Investor</option>
-            </select>
-          </label>
-          {addError ? <p className={styles.error}>{addError}</p> : null}
-          <div className={styles.modalActions}>
-            <button type="button" className="ui-button-outlined" onClick={() => setShowAddModal(false)}>
-              cancel
-            </button>
-            <button type="submit" className="ui-button-filled" disabled={isAdding}>
-              {isAdding ? "creating..." : "add user"}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Reset passcode modal */}
       <Modal
-        open={!!resetModal}
-        title={`reset passcode — ${resetModal?.name ?? ""}`}
+        open={showResetModal}
+        title="reset passcode"
         onClose={() => {
-          setResetModal(null);
+          setShowResetModal(false);
+          setCurrentPasscode("");
           setNewPasscode("");
+          setConfirmPasscode("");
           setResetError("");
+          setResetSuccess(false);
         }}
       >
-        <form className={styles.form} onSubmit={onResetPasscode}>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>NEW PASSCODE *</span>
-            <input
-              className={styles.input}
-              type="text"
-              value={newPasscode}
-              onChange={(e) => setNewPasscode(e.target.value)}
-            />
-          </label>
-          {resetError ? <p className={styles.error}>{resetError}</p> : null}
-          <div className={styles.modalActions}>
-            <button
-              type="button"
-              className="ui-button-outlined"
-              onClick={() => {
-                setResetModal(null);
-                setNewPasscode("");
-                setResetError("");
-              }}
-            >
-              cancel
-            </button>
-            <button type="submit" className="ui-button-filled" disabled={isResetting}>
-              {isResetting ? "resetting..." : "reset passcode"}
-            </button>
+        {resetSuccess ? (
+          <div className={styles.successMessage}>
+            <p>Passcode updated successfully. You will need to sign in again.</p>
+            <div className={styles.modalActions}>
+              <button type="button" className="ui-button-filled" onClick={() => setShowResetModal(false)}>
+                done
+              </button>
+            </div>
           </div>
-        </form>
-      </Modal>
-
-      {/* Delete user modal */}
-      <Modal
-        open={!!deleteModal}
-        title="delete user"
-        onClose={() => setDeleteModal(null)}
-      >
-        <p className={styles.deleteText}>
-          Are you sure you want to delete <strong>{deleteModal?.name}</strong>? This will remove their account and all active sessions.
-        </p>
-        <div className={styles.modalActions}>
-          <button type="button" className="ui-button-outlined" onClick={() => setDeleteModal(null)}>
-            cancel
-          </button>
-          <button
-            type="button"
-            className="ui-button-filled"
-            style={{ background: "#e5484d" }}
-            disabled={isDeleting}
-            onClick={onDeleteUser}
-          >
-            {isDeleting ? "deleting..." : "delete user"}
-          </button>
-        </div>
+        ) : (
+          <form className={styles.form} onSubmit={onResetPasscode}>
+            <label className={styles.field}>
+              <span className={styles.formFieldLabel}>NEW PASSCODE *</span>
+              <input
+                className={styles.input}
+                type="password"
+                value={newPasscode}
+                onChange={(e) => setNewPasscode(e.target.value)}
+              />
+            </label>
+            <label className={styles.field}>
+              <span className={styles.formFieldLabel}>CONFIRM PASSCODE *</span>
+              <input
+                className={styles.input}
+                type="password"
+                value={confirmPasscode}
+                onChange={(e) => setConfirmPasscode(e.target.value)}
+              />
+            </label>
+            {resetError ? <p className={styles.error}>{resetError}</p> : null}
+            <div className={styles.modalActions}>
+              <button type="button" className="ui-button-outlined" onClick={() => setShowResetModal(false)}>
+                cancel
+              </button>
+              <button type="submit" className="ui-button-filled" disabled={isResetting}>
+                {isResetting ? "resetting..." : "reset passcode"}
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
     </div>
   );
