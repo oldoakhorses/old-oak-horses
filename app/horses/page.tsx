@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { useAuth } from "@/contexts/AuthContext";
 import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
 import styles from "./horses.module.css";
@@ -34,7 +35,14 @@ const EMPTY_FORM: HorseFormState = {
 };
 
 export default function HorsesPage() {
-  const horses = useQuery(api.horses.getAllHorses) ?? [];
+  const { user } = useAuth();
+  const isOwnerRole = user?.role === "owner";
+  const ownerIdForFilter = isOwnerRole && user?.ownerId ? (user.ownerId as Id<"owners">) : undefined;
+
+  const allHorses = useQuery(api.horses.getAllHorses, isOwnerRole ? "skip" : {}) ?? [];
+  const ownerHorses = useQuery(api.horses.getHorsesByOwner, ownerIdForFilter ? { ownerId: ownerIdForFilter } : "skip") ?? [];
+  const horses = isOwnerRole ? ownerHorses : allHorses;
+
   const owners = useQuery(api.owners.list) ?? [];
   const createHorse = useMutation(api.horses.createHorse);
   const setHorseStatus = useMutation(api.horses.setHorseStatus);

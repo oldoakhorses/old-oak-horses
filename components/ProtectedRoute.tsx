@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { canAccessRoute } from "@/lib/permissions";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuth();
+  const pathname = usePathname();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -14,7 +16,16 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthenticated, isLoading, router]);
 
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user && !canAccessRoute(user.role, pathname)) {
+      const fallback = user.role === "owner" ? "/horses" : "/dashboard";
+      router.replace(fallback);
+    }
+  }, [isLoading, isAuthenticated, user, pathname, router]);
+
   if (isLoading || !isAuthenticated) return null;
+
+  if (user && !canAccessRoute(user.role, pathname)) return null;
 
   return <>{children}</>;
 }

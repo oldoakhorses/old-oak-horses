@@ -38,9 +38,11 @@ export default function LoginPage() {
           id: result.user.id,
           name: result.user.name ?? "",
           email: result.user.email ?? "",
-          role: result.user.role,
+          role: result.user.role ?? undefined,
+          ownerId: result.user.ownerId ?? undefined,
         });
-        router.replace("/dashboard");
+        const landingPage = result.user.role === "owner" ? "/horses" : "/dashboard";
+        router.replace(landingPage);
       } else {
         setShowError(true);
       }

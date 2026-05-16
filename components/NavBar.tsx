@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { getNavSections } from "@/lib/permissions";
 import styles from "./NavBar.module.css";
 
 export type BreadcrumbItem = {
@@ -20,33 +21,6 @@ type NavAction = {
   newTab?: boolean;
 };
 
-const NAV_SECTIONS = [
-  {
-    label: "Barn",
-    items: [
-      { label: "horses", href: "/horses", icon: "🐴" },
-      { label: "records", href: "/records", icon: "📋" },
-      { label: "team", href: "/team", icon: "🧑‍🤝‍🧑" },
-    ],
-  },
-  {
-    label: "Admin",
-    items: [
-      { label: "dashboard", href: "/dashboard", icon: "📊" },
-      { label: "invoices", href: "/invoices", icon: "📄" },
-      { label: "billing", href: "/billing", icon: "💰" },
-      { label: "owners", href: "/owners", icon: "👥" },
-      { label: "contacts", href: "/contacts", icon: "👤" },
-    ],
-  },
-  {
-    label: "Settings",
-    items: [
-      { label: "account", href: "/accounts", icon: "🔑" },
-    ],
-  },
-];
-
 export default function NavBar({
   items,
   actions = [],
@@ -58,9 +32,11 @@ export default function NavBar({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const navSections = useMemo(() => getNavSections(user?.role), [user?.role]);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -108,7 +84,7 @@ export default function NavBar({
         </div>
 
         <div className={styles.sidebarNav}>
-          {NAV_SECTIONS.map((section) => (
+          {navSections.map((section) => (
             <div key={section.label} className={styles.navSection}>
               <div className={styles.navSectionLabel}>// {section.label.toUpperCase()}</div>
               {section.items.map((item) => {

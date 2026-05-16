@@ -4,11 +4,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
+type UserRole = "admin" | "owner" | "team" | "investor";
+
 type User = {
   id: string;
   name: string;
   email: string;
-  role?: "admin" | "investor";
+  role?: UserRole;
+  ownerId?: string;
 };
 
 type AuthContextValue = {
@@ -41,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isLoading = !hasCheckedStorage || (!!token && sessionUser === undefined);
   const user: User | null = sessionUser
-    ? { id: sessionUser.id, name: sessionUser.name ?? "", email: sessionUser.email ?? "", role: sessionUser.role }
+    ? { id: sessionUser.id, name: sessionUser.name ?? "", email: sessionUser.email ?? "", role: sessionUser.role ?? undefined, ownerId: sessionUser.ownerId ?? undefined }
     : null;
   const isAuthenticated = !!user;
 

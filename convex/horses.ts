@@ -27,6 +27,14 @@ export const getAllHorses = query({
   }
 });
 
+export const getHorsesByOwner = query({
+  args: { ownerId: v.id("owners") },
+  handler: async (ctx, args) => {
+    const horses = await ctx.db.query("horses").withIndex("by_name").collect();
+    return horses.filter((h) => h.ownerId === args.ownerId);
+  },
+});
+
 export const getHorseById = query({
   args: { horseId: v.id("horses") },
   handler: async (ctx, args) => {

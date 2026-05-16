@@ -30,7 +30,8 @@ export const createUser = mutation({
     name: v.string(),
     email: v.string(),
     passcode: v.string(),
-    role: v.optional(v.union(v.literal("admin"), v.literal("investor"))),
+    role: v.optional(v.union(v.literal("admin"), v.literal("owner"), v.literal("team"), v.literal("investor"))),
+    ownerId: v.optional(v.id("owners")),
   },
   handler: async (ctx, args) => {
     const email = args.email.trim().toLowerCase();
@@ -52,6 +53,7 @@ export const createUser = mutation({
       email,
       passcodeHash,
       role: args.role,
+      ownerId: args.ownerId,
       isActive: true,
       createdAt: Date.now(),
     });
@@ -62,8 +64,9 @@ export const updateUser = mutation({
   args: {
     userId: v.id("users"),
     name: v.optional(v.string()),
-    role: v.optional(v.union(v.literal("admin"), v.literal("investor"))),
+    role: v.optional(v.union(v.literal("admin"), v.literal("owner"), v.literal("team"), v.literal("investor"))),
     isActive: v.optional(v.boolean()),
+    ownerId: v.optional(v.id("owners")),
   },
   handler: async (ctx, args) => {
     const user = await ctx.db.get(args.userId);
@@ -73,6 +76,7 @@ export const updateUser = mutation({
     if (args.name !== undefined) patch.name = args.name.trim();
     if (args.role !== undefined) patch.role = args.role;
     if (args.isActive !== undefined) patch.isActive = args.isActive;
+    if (args.ownerId !== undefined) patch.ownerId = args.ownerId;
 
     await ctx.db.patch(args.userId, patch);
     return args.userId;

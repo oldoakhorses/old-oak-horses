@@ -50,7 +50,7 @@ export const login = mutation({
     return {
       success: true as const,
       token,
-      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+      user: { id: user._id, name: user.name, email: user.email, role: user.role, ownerId: user.ownerId },
     };
   },
 });
@@ -69,7 +69,7 @@ export const validateSession = query({
     const user = await ctx.db.get(session.userId);
     if (!user || user.isActive === false) return null;
 
-    return { id: user._id, name: user.name, email: user.email, role: user.role };
+    return { id: user._id, name: user.name, email: user.email, role: user.role, ownerId: user.ownerId };
   },
 });
 
