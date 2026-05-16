@@ -145,6 +145,7 @@ export default function HorseProfilePage() {
   const deleteIncomeEntry = useMutation(api.incomeEntries.deleteEntry);
   const assignHorseToOwner = useMutation(api.owners.assignHorseToOwner);
   const deleteHorse = useMutation(api.horses.deleteHorse);
+  const transferOwnership = useMutation(api.horses.transferOwnership);
   const router = useRouter();
   const updateRecordWithNextVisit = useMutation(api.horseRecords.updateRecordWithNextVisit);
   const findOrCreateContact = useMutation(api.contacts.findOrCreateContact);
@@ -165,6 +166,15 @@ export default function HorseProfilePage() {
   const [openDocumentMenu, setOpenDocumentMenu] = useState<Id<"documents"> | null>(null);
   const [documentToDelete, setDocumentToDelete] = useState<{ id: Id<"documents">; name: string } | null>(null);
   const [isDeletingDocument, setIsDeletingDocument] = useState(false);
+
+  // Transfer ownership state
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferStep, setTransferStep] = useState<1 | 2 | 3>(1);
+  const [transferOwnerId, setTransferOwnerId] = useState<Id<"owners"> | null>(null);
+  const [transferOwnerSearch, setTransferOwnerSearch] = useState("");
+  const [transferItems, setTransferItems] = useState<Set<string>>(new Set());
+  const [transferOriginalAction, setTransferOriginalAction] = useState<"deactivate" | "delete">("deactivate");
+  const [isTransferring, setIsTransferring] = useState(false);
 
   const [form, setForm] = useState<FormState>({
     name: "",
@@ -463,6 +473,20 @@ export default function HorseProfilePage() {
                 }}
               >
                 delete horse
+              </button>
+              <button
+                type="button"
+                className={styles.btnTransfer}
+                onClick={() => {
+                  setShowTransferModal(true);
+                  setTransferStep(1);
+                  setTransferOwnerId(null);
+                  setTransferOwnerSearch("");
+                  setTransferItems(new Set());
+                  setTransferOriginalAction("deactivate");
+                }}
+              >
+                transfer ownership
               </button>
               <div style={{ flex: 1 }} />
               <button type="button" className={styles.btnCancel} onClick={() => setIsEditing(false)}>
@@ -1027,6 +1051,176 @@ export default function HorseProfilePage() {
             {isDeletingDocument ? "deleting..." : "yes, delete"}
           </button>
         </div>
+      </Modal>
+
+      {/* Transfer Ownership Modal */}
+      <Modal
+        open={showTransferModal}
+        title={`transfer ownership — ${horse?.name ?? ""}`}
+        onClose={() => setShowTransferModal(false)}
+      >
+        {transferStep === 1 ? (
+          <div className={styles.transferStep}>
+            <p className={styles.transferLabel}>Select new owner</p>
+            <input
+              className={styles.transferSearch}
+              type="text"
+              placeholder="search owners..."
+              value={transferOwnerSearch}
+              onChange={(e) => setTransferOwnerSearch(e.target.value)}
+              autoFocus
+            />
+            <div className={styles.transferOwnerList}>
+              {ownersList
+                .filter((o) => o.isActive && o.name.toLowerCase().includes(transferOwnerSearch.toLowerCase()))
+                .map((o) => (
+                  <button
+                    key={o._id}
+                    type="button"
+                    className={`${styles.transferOwnerItem} ${transferOwnerId === o._id ? styles.transferOwnerItemSelected : ""}`}
+                    onClick={() => setTransferOwnerId(o._id as Id<"owners">)}
+                  >
+                    {o.name}
+                  </button>
+                ))}
+            </div>
+            <div className={styles.transferActions}>
+              <button type="button" className="ui-button-outlined" onClick={() => setShowTransferModal(false)}>
+                cancel
+              </button>
+              <button
+                type="button"
+                className="ui-button-filled"
+                disabled={!transferOwnerId}
+                onClick={() => setTransferStep(2)}
+              >
+                next
+              </button>
+            </div>
+          </div>
+        ) : transferStep === 2 ? (
+          <div className={styles.transferStep}>
+            <p className={styles.transferLabel}>What should be transferred to the new profile?</p>
+            {[
+              { key: "full", label: "Full profile (records, documents, feed plan)" },
+              { key: "records", label: "Records" },
+              { key: "documents", label: "Documents" },
+              { key: "feedPlan", label: "Feed plan" },
+              { key: "none", label: "None (basic info only)" },
+            ].map((option) => {
+              const isFullSelected = transferItems.has("full");
+              const isDisabled = option.key !== "full" && option.key !== "none" && isFullSelected;
+              const isChecked = transferItems.has(option.key);
+              return (
+                <label key={option.key} className={`${styles.transferCheckbox} ${isDisabled ? styles.transferCheckboxDisabled : ""}`}>
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    disabled={isDisabled}
+                    onChange={() => {
+                      setTransferItems((prev) => {
+                        const next = new Set(prev);
+                        if (option.key === "full") {
+                          if (next.has("full")) {
+                            next.delete("full");
+                          } else {
+                            next.clear();
+                            next.add("full");
+                          }
+                        } else if (option.key === "none") {
+                          if (next.has("none")) {
+                            next.delete("none");
+                          } else {
+                            next.clear();
+                            next.add("none");
+                          }
+                        } else {
+                          next.delete("none");
+                          next.delete("full");
+                          if (next.has(option.key)) {
+                            next.delete(option.key);
+                          } else {
+                            next.add(option.key);
+                          }
+                        }
+                        return next;
+                      });
+                    }}
+                  />
+                  <span>{option.label}</span>
+                </label>
+              );
+            })}
+            <div className={styles.transferActions}>
+              <button type="button" className="ui-button-outlined" onClick={() => setTransferStep(1)}>
+                back
+              </button>
+              <button
+                type="button"
+                className="ui-button-filled"
+                disabled={transferItems.size === 0}
+                onClick={() => setTransferStep(3)}
+              >
+                next
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className={styles.transferStep}>
+            <p className={styles.transferLabel}>What should happen to the original profile?</p>
+            <label className={styles.transferRadio}>
+              <input
+                type="radio"
+                name="originalAction"
+                checked={transferOriginalAction === "deactivate"}
+                onChange={() => setTransferOriginalAction("deactivate")}
+              />
+              <span>Deactivate (keep for reference)</span>
+            </label>
+            <label className={styles.transferRadio}>
+              <input
+                type="radio"
+                name="originalAction"
+                checked={transferOriginalAction === "delete"}
+                onChange={() => setTransferOriginalAction("delete")}
+              />
+              <span>Delete permanently</span>
+            </label>
+            <div className={styles.transferActions}>
+              <button type="button" className="ui-button-outlined" onClick={() => setTransferStep(2)}>
+                back
+              </button>
+              <button
+                type="button"
+                className="ui-button-filled"
+                disabled={isTransferring}
+                onClick={async () => {
+                  if (!transferOwnerId) return;
+                  setIsTransferring(true);
+                  try {
+                    const items = transferItems.has("none")
+                      ? ["none" as const]
+                      : ([...transferItems] as Array<"full" | "records" | "documents" | "feedPlan" | "none">);
+                    const newId = await transferOwnership({
+                      horseId,
+                      newOwnerId: transferOwnerId,
+                      transferItems: items,
+                      originalAction: transferOriginalAction,
+                    });
+                    setShowTransferModal(false);
+                    router.push(`/horses/${newId}`);
+                  } catch (err) {
+                    alert(err instanceof Error ? err.message : "Transfer failed");
+                  } finally {
+                    setIsTransferring(false);
+                  }
+                }}
+              >
+                {isTransferring ? "transferring..." : "confirm transfer"}
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

@@ -1184,3 +1184,126 @@
 .contactDropdownItem:hover {
   background: #f2f3f7;
 }
+
+.btnTransfer {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #4a5bdb;
+  cursor: pointer;
+}
+
+.btnTransfer:hover {
+  background: rgba(74, 91, 219, 0.06);
+  border-color: #4a5bdb;
+}
+
+.transferStep {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.transferLabel {
+  font-size: 13px;
+  color: #1a1a2e;
+  margin: 0;
+  font-weight: 600;
+}
+
+.transferSearch {
+  font-size: 12px;
+  padding: 10px 14px;
+  background: #f8f9fb;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  color: #1a1a2e;
+  outline: none;
+}
+
+.transferSearch:focus {
+  border-color: #4a5bdb;
+}
+
+.transferOwnerList {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.transferOwnerItem {
+  font-size: 12px;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: #1a1a2e;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f1f5;
+  transition: background 0.1s;
+}
+
+.transferOwnerItem:last-child {
+  border-bottom: none;
+}
+
+.transferOwnerItem:hover {
+  background: #f8f9fb;
+}
+
+.transferOwnerItemSelected {
+  background: rgba(74, 91, 219, 0.08);
+  color: #4a5bdb;
+  font-weight: 700;
+}
+
+.transferCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #1a1a2e;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.transferCheckbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: #4a5bdb;
+}
+
+.transferCheckboxDisabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.transferRadio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #1a1a2e;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.transferRadio input {
+  width: 16px;
+  height: 16px;
+  accent-color: #4a5bdb;
+}
+
+.transferActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}

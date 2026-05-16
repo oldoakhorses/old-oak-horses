@@ -151,6 +151,90 @@ export const deleteHorse = mutation({
   }
 });
 
+export const transferOwnership = mutation({
+  args: {
+    horseId: v.id("horses"),
+    newOwnerId: v.id("owners"),
+    transferItems: v.array(v.union(
+      v.literal("full"),
+      v.literal("records"),
+      v.literal("documents"),
+      v.literal("feedPlan"),
+      v.literal("none")
+    )),
+    originalAction: v.union(v.literal("deactivate"), v.literal("delete")),
+  },
+  handler: async (ctx, args) => {
+    const horse = await ctx.db.get(args.horseId);
+    if (!horse) throw new Error("Horse not found");
+
+    const newOwner = await ctx.db.get(args.newOwnerId);
+    if (!newOwner) throw new Error("Owner not found");
+
+    const transferFull = args.transferItems.includes("full");
+    const transferRecords = transferFull || args.transferItems.includes("records");
+    const transferDocuments = transferFull || args.transferItems.includes("documents");
+    const transferFeedPlan = transferFull || args.transferItems.includes("feedPlan");
+
+    const newHorseId = await ctx.db.insert("horses", {
+      name: horse.name,
+      barnName: horse.barnName,
+      yearOfBirth: horse.yearOfBirth,
+      sex: horse.sex,
+      usefNumber: horse.usefNumber,
+      feiNumber: horse.feiNumber,
+      owner: newOwner.name,
+      ownerId: args.newOwnerId,
+      status: "active",
+      createdAt: Date.now(),
+    });
+
+    if (transferRecords) {
+      const records = await ctx.db
+        .query("horseRecords")
+        .withIndex("by_horse", (q) => q.eq("horseId", args.horseId))
+        .collect();
+      for (const record of records) {
+        const { _id, _creationTime, horseId: _oldHorseId, ...rest } = record;
+        await ctx.db.insert("horseRecords", { ...rest, horseId: newHorseId });
+      }
+    }
+
+    if (transferDocuments) {
+      const docs = await ctx.db
+        .query("documents")
+        .withIndex("by_horse", (q) => q.eq("horseId", args.horseId))
+        .collect();
+      for (const doc of docs) {
+        const { _id, _creationTime, horseId: _oldHorseId, ...rest } = doc;
+        await ctx.db.insert("documents", { ...rest, horseId: newHorseId });
+      }
+    }
+
+    if (transferFeedPlan) {
+      const feedPlan = await ctx.db
+        .query("feedPlans")
+        .withIndex("by_horse", (q) => q.eq("horseId", args.horseId))
+        .first();
+      if (feedPlan) {
+        const { _id, _creationTime, horseId: _oldHorseId, ...rest } = feedPlan;
+        await ctx.db.insert("feedPlans", { ...rest, horseId: newHorseId });
+      }
+    }
+
+    if (args.originalAction === "delete") {
+      await ctx.db.delete(args.horseId);
+    } else {
+      await ctx.db.patch(args.horseId, {
+        status: "inactive",
+        inactiveSince: Date.now(),
+      });
+    }
+
+    return newHorseId;
+  },
+});
+
 export const getHorseSpendSummary = query({
   args: { horseId: v.id("horses") },
   handler: async (ctx, args) => {
