@@ -20,17 +20,31 @@ type NavAction = {
   newTab?: boolean;
 };
 
-const NAV_ITEMS = [
-  { label: "dashboard", href: "/dashboard", icon: "📊" },
-  { label: "horses", href: "/horses", icon: "🐴" },
-  { label: "team", href: "/team", icon: "🧑‍🤝‍🧑" },
-  { label: "records", href: "/records", icon: "📋" },
-  { label: "invoices", href: "/invoices", icon: "📄" },
-  { label: "owners", href: "/owners", icon: "👥" },
-  { label: "billing", href: "/billing", icon: "💰" },
-  { label: "contacts", href: "/contacts", icon: "👤" },
-  { label: "accounts", href: "/accounts", icon: "🔑" },
-] as const;
+const NAV_SECTIONS = [
+  {
+    label: "Barn",
+    items: [
+      { label: "horses", href: "/horses", icon: "🐴" },
+      { label: "records", href: "/records", icon: "📋" },
+      { label: "team", href: "/team", icon: "🧑‍🤝‍🧑" },
+    ],
+  },
+  {
+    label: "Admin",
+    items: [
+      { label: "dashboard", href: "/dashboard", icon: "📊" },
+      { label: "invoices", href: "/invoices", icon: "📄" },
+      { label: "owners", href: "/owners", icon: "👥" },
+      { label: "contacts", href: "/contacts", icon: "👤" },
+    ],
+  },
+  {
+    label: "Settings",
+    items: [
+      { label: "account", href: "/accounts", icon: "🔑" },
+    ],
+  },
+];
 
 export default function NavBar({
   items,
@@ -93,21 +107,25 @@ export default function NavBar({
         </div>
 
         <div className={styles.sidebarNav}>
-          <div className={styles.navSectionLabel}>// NAVIGATION</div>
-          {NAV_ITEMS.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-            return (
-              <button
-                key={item.href}
-                type="button"
-                className={`${styles.navItem} ${active ? styles.navItemActive : ""}`}
-                onClick={() => onSidebarNavigate(item.href)}
-              >
-                <span className={styles.navIcon}>{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
+          {NAV_SECTIONS.map((section) => (
+            <div key={section.label} className={styles.navSection}>
+              <div className={styles.navSectionLabel}>// {section.label.toUpperCase()}</div>
+              {section.items.map((item) => {
+                const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                return (
+                  <button
+                    key={item.href}
+                    type="button"
+                    className={`${styles.navItem} ${active ? styles.navItemActive : ""}`}
+                    onClick={() => onSidebarNavigate(item.href)}
+                  >
+                    <span className={styles.navIcon}>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
 
         <div className={styles.sidebarFooter}>

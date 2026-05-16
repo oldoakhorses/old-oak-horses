@@ -257,6 +257,12 @@
 
 .sidebarNav {
   padding: 16px 12px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.navSection {
+  margin-bottom: 16px;
 }
 
 .navSectionLabel {
