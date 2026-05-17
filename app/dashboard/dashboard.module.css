@@ -1463,3 +1463,95 @@
     padding: 10px 12px;
   }
 }
+
+.invoiceModeTabs {
+  display: flex;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.invoiceModeTab,
+.invoiceModeTabActive {
+  flex: 1;
+  font-size: 10px;
+  padding: 9px 12px;
+  border: none;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.invoiceModeTab {
+  background: transparent;
+  color: #6b7084;
+}
+
+.invoiceModeTabActive {
+  background: #1a1a2e;
+  color: #fff;
+  font-weight: 700;
+}
+
+.manualInvoiceForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.manualField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.manualFieldLabel {
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.manualReceiptZone {
+  padding: 14px;
+  border: 1px dashed #e8eaf0;
+  border-radius: 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.manualReceiptZone:hover {
+  border-color: #4a5bdb;
+}
+
+.manualReceiptName {
+  font-size: 11px;
+  color: #1a1a2e;
+  font-weight: 600;
+}
+
+.manualReceiptPlaceholder {
+  font-size: 11px;
+  color: #9ea2b0;
+}
+
+.manualCreateBtn {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.manualCreateBtn:disabled {
+  background: #e8eaf0;
+  color: #9ea2b0;
+  cursor: default;
+}
