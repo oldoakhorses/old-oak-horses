@@ -259,6 +259,7 @@ export default function GlobalFab() {
   const updateHorseRecord = useMutation(api.horseRecords.updateHorseRecord);
   const uploadDocument = useMutation(api.documents.upload);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
+  const createManualBill = useMutation(api.bills.createManualBill);
   const detectRecordReport = useAction((api as any).reportDetect.detectReportFromPdf);
   const parseUploadedInvoice = useAction((api as any).uploads.parseUploadedInvoice);
   const findOrCreateContact = useMutation(api.contacts.findOrCreateContact);
@@ -656,6 +657,8 @@ export default function GlobalFab() {
   async function processInvoiceUpload(file: File) {
     if (!file) return;
 
+    const isImage = file.type.startsWith("image/");
+
     setInvoiceError("");
     setInvoiceStatusMessage("uploading...");
     setInvoiceStage("uploading");
@@ -667,23 +670,32 @@ export default function GlobalFab() {
         body: file
       });
       if (!uploadResponse.ok) {
-        throw new Error("Failed to upload invoice PDF");
+        throw new Error("Failed to upload file");
       }
       const uploadPayload = await uploadResponse.json();
       const storageId = uploadPayload.storageId as Id<"_storage">;
 
-      // Skip upfront detection — parseBillPdf will extract provider info
-      // and the user picks a contact on the preview page.
-      setInvoiceStatusMessage("starting parse...");
-      setInvoiceStage("parsing");
-      const result = await parseUploadedInvoice({
-        fileStorageId: storageId,
-      });
-
-      setInvoiceStatusMessage("redirecting...");
-      setInvoiceStage("redirecting");
-      closePanel();
-      router.push(`/invoices/preview/${result.billId}`);
+      if (isImage) {
+        setInvoiceStatusMessage("creating record...");
+        const billId = await createManualBill({
+          fileId: storageId,
+          fileName: file.name,
+        });
+        setInvoiceStatusMessage("redirecting...");
+        setInvoiceStage("redirecting");
+        closePanel();
+        router.push(`/invoices/preview/${billId}?manual=1`);
+      } else {
+        setInvoiceStatusMessage("starting parse...");
+        setInvoiceStage("parsing");
+        const result = await parseUploadedInvoice({
+          fileStorageId: storageId,
+        });
+        setInvoiceStatusMessage("redirecting...");
+        setInvoiceStage("redirecting");
+        closePanel();
+        router.push(`/invoices/preview/${result.billId}`);
+      }
     } catch (error) {
       setInvoiceStage("idle");
       setInvoiceStatusMessage("");
@@ -1026,7 +1038,7 @@ export default function GlobalFab() {
               <input
                 ref={invoiceFileInputRef}
                 type="file"
-                accept=".pdf"
+                accept=".pdf,.jpg,.jpeg,.png,.heic,.webp"
                 className={styles.fileInput}
                 onChange={(event: ChangeEvent<HTMLInputElement>) => {
                   const file = event.target.files?.[0] ?? null;
@@ -1044,7 +1056,7 @@ export default function GlobalFab() {
                   <div className={styles.docDropzoneIcon}>📄</div>
                   <div className={styles.docDropzoneTitle}>drop invoice here</div>
                   <div className={styles.docDropzoneBrowse}>or click to browse</div>
-                  <div className={styles.docDropzoneTypes}>PDF — max 10MB</div>
+                  <div className={styles.docDropzoneTypes}>PDF or photo — max 10MB</div>
                 </>
               ) : (
                 <>

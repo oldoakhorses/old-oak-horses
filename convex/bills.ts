@@ -1735,6 +1735,27 @@ export const createParsingBill = internalMutation({
   }
 });
 
+export const createManualBill = mutation({
+  args: {
+    fileId: v.id("_storage"),
+    fileName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const url = await ctx.storage.getUrl(args.fileId);
+    const billId = await ctx.db.insert("bills", {
+      fileId: args.fileId,
+      fileName: args.fileName,
+      status: "pending",
+      billingPeriod: new Date(now).toISOString().slice(0, 7),
+      uploadedAt: now,
+      originalPdfUrl: url ?? undefined,
+      source: "upload",
+    });
+    return billId;
+  },
+});
+
 /**
  * Recompute a bill's derived fields (fileName, categoryId, invoiceName)
  * to match whichever contact is currently assigned. Writes only the fields

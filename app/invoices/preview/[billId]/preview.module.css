@@ -1227,3 +1227,30 @@
     justify-content: space-between;
   }
 }
+
+.manualEntryBanner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(74, 91, 219, 0.06);
+  border: 1px solid rgba(74, 91, 219, 0.2);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+
+.manualEntryIcon {
+  font-size: 20px;
+}
+
+.manualEntryTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 2px;
+}
+
+.manualEntrySub {
+  font-size: 11px;
+  color: #6b7084;
+}

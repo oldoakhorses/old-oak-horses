@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -217,8 +217,10 @@ const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
 
 export default function InvoicePreviewPage() {
   const params = useParams<{ billId: string }>();
+  const searchParams = useSearchParams();
   const billId = params.billId as Id<"bills">;
   const router = useRouter();
+  const isManualEntry = searchParams.get("manual") === "1";
 
   const bill = useQuery(api.bills.getById, { billId });
   const linkedRecords = useQuery(api.horseRecords.getByBill, { billId }) ?? [];
@@ -1512,6 +1514,16 @@ export default function InvoicePreviewPage() {
 
       <main className="page-main">
         <Link href="/invoices" className="ui-back-link">← cd /invoices</Link>
+
+        {isManualEntry ? (
+          <div className={styles.manualEntryBanner}>
+            <span className={styles.manualEntryIcon}>📷</span>
+            <div>
+              <div className={styles.manualEntryTitle}>photo invoice — manual entry</div>
+              <div className={styles.manualEntrySub}>Fill in the invoice details below. Use "view original" to reference the uploaded image.</div>
+            </div>
+          </div>
+        ) : null}
 
         <section className={styles.previewLayout}>
           <div className={styles.previewDetails}>
