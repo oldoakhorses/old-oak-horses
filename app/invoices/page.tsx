@@ -203,7 +203,7 @@ export default function InvoicesPage() {
         ]}
       />
 
-      <main className={`page-main ${styles.pageMain}`}>
+      <main className="page-main">
         <Link href="/dashboard" className="ui-back-link">
           ← cd /dashboard
         </Link>
