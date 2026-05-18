@@ -23,8 +23,13 @@ const SORT_LABELS: Record<SortMode, string> = {
 /** Clean up raw CC descriptions and ALL-CAPS names into readable abbreviated titles */
 function abbreviateInvoiceName(name: string, maxLen = 50): string {
   if (!name) return name;
-  // Remove common CC noise prefixes/suffixes
+  // Strip trailing " — <date>" or " - <date>" suffixes from saved names
   let cleaned = name
+    .replace(/\s*[—–-]\s*(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s*\d{4}\s*$/i, "")
+    .replace(/\s*[—–-]\s*\d{1,2}\/\d{1,2}\/\d{2,4}\s*$/, "")
+    .replace(/\s*[—–-]\s*\d{4}-\d{2}-\d{2}\s*$/, "");
+  // Remove common CC noise prefixes/suffixes
+  cleaned = cleaned
     .replace(/\b(ORIG CO NAME:|ORIG ID:\S+|DESC DATE:\S+|CO ENTRY DESCR?:\S+|SEC:\S+|TRACE#?:\S+|EED:\S+|IND ID:\S+|IND NAME:\S+|TRN:\S+|CCD|PPD)\b/gi, "")
     .replace(/\b(CHIPS CREDIT VIA:.*?B\/O:\s*)/gi, "")
     .replace(/\b(C\/O\s+\w+\s+\w+\s+\w+)/gi, "")

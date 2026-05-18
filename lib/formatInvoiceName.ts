@@ -23,10 +23,17 @@ export function toIsoDateString(value?: string | number | Date | null) {
   return date.toISOString().slice(0, 10);
 }
 
+function stripTrailingDate(name: string): string {
+  return name
+    .replace(/\s*[—–-]\s*(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s*\d{4}\s*$/i, "")
+    .replace(/\s*[—–-]\s*\d{1,2}\/\d{1,2}\/\d{2,4}\s*$/, "")
+    .replace(/\s*[—–-]\s*\d{4}-\d{2}-\d{2}\s*$/, "")
+    .trim();
+}
+
 export function formatInvoiceName(input: InvoiceNameInput) {
-  // 1. Saved/canonical invoice name wins (set by user edits or by CC import).
   const saved = input.invoiceName?.trim();
-  if (saved) return saved;
+  if (saved) return stripTrailingDate(saved);
 
   const provider =
     input.contactName?.trim() ||

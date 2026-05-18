@@ -81,15 +81,6 @@ export function findStaticMapping(description: string): CcDescriptorMapping | nu
 /** Format a bill name as "<Contact> — <Date>", matching the PDF-upload
  *  invoice-name format from lib/formatInvoiceName.ts. Convex-side
  *  duplicate (no shared lib import) so it's available in mutations. */
-export function formatCcBillName(contactName: string, postingDate: string): string {
-  const date = new Date(postingDate);
-  if (Number.isNaN(date.getTime())) return contactName;
-  // toLocaleDateString in Node defaults to system locale; force en-US.
-  const formatted = date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-  return `${contactName} — ${formatted}`;
+export function formatCcBillName(contactName: string, _postingDate: string): string {
+  return contactName;
 }
