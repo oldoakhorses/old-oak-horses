@@ -224,7 +224,6 @@ export default function ContactsPage() {
         ]}
         actions={[
           { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
-          { label: "biz overview", href: "/biz-overview", variant: "filled" },
         ]}
       />
 

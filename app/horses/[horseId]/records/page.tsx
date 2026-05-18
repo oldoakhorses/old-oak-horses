@@ -323,7 +323,6 @@ export default function HorseRecordsPage() {
         ]}
         actions={[
           { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
-          { label: "biz overview", href: "/biz-overview", variant: "filled" },
         ]}
       />
 

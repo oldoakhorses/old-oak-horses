@@ -642,7 +642,7 @@ export default function RecordsPage() {
           { label: "old-oak-horses", href: "/dashboard", brand: true },
           { label: "records", current: true },
         ]}
-        actions={[{ label: "biz overview", href: "/biz-overview", variant: "filled" }]}
+
       />
 
       <main className="page-main">

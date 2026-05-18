@@ -600,9 +600,8 @@ export default function DashboardPage() {
           { label: "old-oak-horses", href: "/dashboard", brand: true },
           { label: "dashboard", current: true },
         ]}
-        actions={[
-          { label: "biz overview", href: "/biz-overview", variant: "filled" },
-        ]}
+
+
       />
 
       <main className="page-main">

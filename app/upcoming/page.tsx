@@ -11,7 +11,7 @@ export default function UpcomingPage() {
           { label: "old-oak-horses", href: "/dashboard", brand: true },
           { label: "upcoming", current: true },
         ]}
-        actions={[{ label: "biz overview", href: "/biz-overview", variant: "filled" }]}
+
       />
 
       <main className="page-main">
