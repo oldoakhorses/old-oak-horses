@@ -1,3 +1,7 @@
+.pageMain {
+  max-width: 1200px;
+}
+
 .header {
   margin-bottom: 14px;
 }
@@ -120,7 +124,7 @@
 
 .tableHeader {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) 110px minmax(0, 1.2fr) 120px minmax(0, 1fr) 100px 36px;
+  grid-template-columns: minmax(0, 2fr) 72px minmax(0, 1.2fr) 120px minmax(0, 1fr) 100px 36px;
   gap: 8px;
   padding: 10px 18px;
   border-bottom: 1px solid #e8eaf0;
@@ -184,7 +188,7 @@
 
 .invoiceRow {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) 110px minmax(0, 1.2fr) 120px minmax(0, 1fr) 100px 36px;
+  grid-template-columns: minmax(0, 2fr) 72px minmax(0, 1.2fr) 120px minmax(0, 1fr) 100px 36px;
   gap: 8px;
   align-items: center;
   padding: 12px 18px;

@@ -198,7 +198,7 @@ export default function InvoicesPage() {
         ]}
       />
 
-      <main className="page-main">
+      <main className={`page-main ${styles.pageMain}`}>
         <Link href="/dashboard" className="ui-back-link">
           ← cd /dashboard
         </Link>
@@ -540,7 +540,10 @@ function slugify(value: string) {
 function formatDate(iso: string) {
   const d = new Date(iso + "T00:00:00");
   if (isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const m = (d.getMonth() + 1).toString().padStart(2, "0");
+  const day = d.getDate().toString().padStart(2, "0");
+  const y = d.getFullYear().toString().slice(2);
+  return `${m}/${day}/${y}`;
 }
 
 function formatUsd(value: number) {
