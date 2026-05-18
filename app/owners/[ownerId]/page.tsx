@@ -136,7 +136,9 @@ export default function OwnerDetailPage() {
                 {[owner.email, owner.phone].filter(Boolean).join(" \u00B7 ") || "no contact info"}
               </div>
             </div>
-            <button type="button" className={styles.btnEdit} onClick={startEditInfo}>edit</button>
+            <button type="button" className={styles.btnEdit} onClick={startEditInfo} title="Edit">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11.5 1.5l3 3L5 14H2v-3L11.5 1.5z" /></svg>
+            </button>
           </div>
           {owner.address ? <div className={styles.ownerAddress}>{owner.address}</div> : null}
           {(() => {

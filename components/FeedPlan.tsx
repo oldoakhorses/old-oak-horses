@@ -214,7 +214,9 @@ export default function FeedPlan({ horseId, horseName }: { horseId: Id<"horses">
               <button type="button" className={styles.btnSave} onClick={onSave} disabled={saving}>{saving ? "saving..." : "save"}</button>
             </>
           ) : (
-            <button type="button" className={styles.btnEdit} onClick={startEdit}>edit</button>
+            <button type="button" className={styles.btnEdit} onClick={startEdit} title="Edit">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11.5 1.5l3 3L5 14H2v-3L11.5 1.5z" /></svg>
+            </button>
           )}
         </div>
       </div>

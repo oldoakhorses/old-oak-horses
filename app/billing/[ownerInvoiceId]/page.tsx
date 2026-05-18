@@ -609,7 +609,9 @@ export default function OwnerInvoiceDetailPage() {
                 className={styles.btnNotesEdit}
                 onClick={() => { setEditingNotes(true); setNotesValue(invoice.notes ?? ""); }}
               >
-                {invoice.notes ? "edit" : "+ add notes"}
+                {invoice.notes ? (
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11.5 1.5l3 3L5 14H2v-3L11.5 1.5z" /></svg>
+                ) : "+ add notes"}
               </button>
             ) : null}
           </div>
