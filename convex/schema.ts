@@ -583,4 +583,13 @@ export default defineSchema({
   })
     .index("by_horse", ["horseId"])
     .index("by_bill", ["billId"]),
+
+  todos: defineTable({
+    text: v.string(),
+    completed: v.boolean(),
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+    sortOrder: v.number(),
+  })
+    .index("by_sort", ["sortOrder"]),
 });

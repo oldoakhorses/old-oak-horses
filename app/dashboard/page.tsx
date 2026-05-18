@@ -177,6 +177,15 @@ export default function DashboardPage() {
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
   const parseUploadedInvoice = useAction((api as any).uploads.parseUploadedInvoice);
 
+  const todos = useQuery(api.todos.list) ?? [];
+  const addTodo = useMutation(api.todos.add);
+  const toggleTodo = useMutation(api.todos.toggle);
+  const updateTodoText = useMutation(api.todos.updateText);
+  const removeTodo = useMutation(api.todos.remove);
+  const [newTodoText, setNewTodoText] = useState("");
+  const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
+  const [editingTodoText, setEditingTodoText] = useState("");
+
   const shownHorses = activeHorses;
 
   const visibleUpcoming = useMemo(() => upcomingRecords.slice(0, 3), [upcomingRecords]);
@@ -605,6 +614,116 @@ export default function DashboardPage() {
       />
 
       <main className="page-main">
+        <section className={styles.card}>
+          <div className={styles.upcomingLabel}>// TO-DO</div>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>to-do</h2>
+          </div>
+
+          <div className={styles.todoInputRow}>
+            <input
+              className={styles.todoInput}
+              placeholder="add a task..."
+              value={newTodoText}
+              onChange={(e) => setNewTodoText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newTodoText.trim()) {
+                  void addTodo({ text: newTodoText.trim() });
+                  setNewTodoText("");
+                }
+              }}
+            />
+            <button
+              type="button"
+              className={styles.todoAddBtn}
+              disabled={!newTodoText.trim()}
+              onClick={() => {
+                if (newTodoText.trim()) {
+                  void addTodo({ text: newTodoText.trim() });
+                  setNewTodoText("");
+                }
+              }}
+            >
+              +
+            </button>
+          </div>
+
+          {todos.filter((t) => !t.completed).length === 0 && todos.filter((t) => t.completed).length === 0 ? (
+            <div className={styles.todoEmpty}>no tasks yet</div>
+          ) : null}
+
+          {todos.filter((t) => !t.completed).map((todo) => (
+            <div key={todo._id} className={styles.todoRow}>
+              <button
+                type="button"
+                className={styles.todoCheck}
+                onClick={() => void toggleTodo({ id: todo._id })}
+              />
+              {editingTodoId === todo._id ? (
+                <input
+                  className={styles.todoEditInput}
+                  value={editingTodoText}
+                  autoFocus
+                  onChange={(e) => setEditingTodoText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      void updateTodoText({ id: todo._id, text: editingTodoText.trim() || todo.text });
+                      setEditingTodoId(null);
+                    }
+                    if (e.key === "Escape") setEditingTodoId(null);
+                  }}
+                  onBlur={() => {
+                    void updateTodoText({ id: todo._id, text: editingTodoText.trim() || todo.text });
+                    setEditingTodoId(null);
+                  }}
+                />
+              ) : (
+                <span
+                  className={styles.todoText}
+                  onDoubleClick={() => {
+                    setEditingTodoId(todo._id);
+                    setEditingTodoText(todo.text);
+                  }}
+                >
+                  {todo.text}
+                </span>
+              )}
+              <button
+                type="button"
+                className={styles.todoRemove}
+                onClick={() => void removeTodo({ id: todo._id })}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+
+          {todos.filter((t) => t.completed).length > 0 ? (
+            <div className={styles.todoDoneSection}>
+              <div className={styles.todoDoneLabel}>completed</div>
+              {todos.filter((t) => t.completed).map((todo) => (
+                <div key={todo._id} className={`${styles.todoRow} ${styles.todoRowDone}`}>
+                  <button
+                    type="button"
+                    className={`${styles.todoCheck} ${styles.todoCheckDone}`}
+                    onClick={() => void toggleTodo({ id: todo._id })}
+                  >
+                    ✓
+                  </button>
+                  <span className={`${styles.todoText} ${styles.todoTextDone}`}>{todo.text}</span>
+                  <button
+                    type="button"
+                    className={styles.todoRemove}
+                    onClick={() => void removeTodo({ id: todo._id })}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>
+
         <section className={styles.card}>
           <div className={styles.upcomingLabel}>// UPCOMING</div>
           <div className={styles.sectionHeader}>

@@ -36,6 +36,7 @@ import type * as people from "../people.js";
 import type * as personAliases from "../personAliases.js";
 import type * as reportDetect from "../reportDetect.js";
 import type * as scheduleEvents from "../scheduleEvents.js";
+import type * as todos from "../todos.js";
 import type * as uploads from "../uploads.js";
 import type * as users from "../users.js";
 
@@ -74,6 +75,7 @@ declare const fullApi: ApiFromModules<{
   personAliases: typeof personAliases;
   reportDetect: typeof reportDetect;
   scheduleEvents: typeof scheduleEvents;
+  todos: typeof todos;
   uploads: typeof uploads;
   users: typeof users;
 }>;
