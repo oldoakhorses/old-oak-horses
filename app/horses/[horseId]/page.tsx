@@ -9,6 +9,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { formatInvoiceName, toIsoDateString } from "@/lib/formatInvoiceName";
 import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
+import { useAuth } from "@/contexts/AuthContext";
 import styles from "./profile.module.css";
 
 type DocumentTag =
@@ -125,6 +126,8 @@ const RECORD_ICONS: Record<RecordType, string> = {
 };
 
 export default function HorseProfilePage() {
+  const { user } = useAuth();
+  const isTeam = user?.role === "team";
   const params = useParams<{ horseId: string }>();
   const searchParams = useSearchParams();
   const horseId = params?.horseId as Id<"horses">;
@@ -456,9 +459,11 @@ export default function HorseProfilePage() {
             <Field label="FEI #" value={horse.feiNumber || "—"} editing={isEditing}>
               <input value={form.feiNumber} onChange={(event) => setForm((prev) => ({ ...prev, feiNumber: event.target.value }))} />
             </Field>
-            <Field label="PRIZE MONEY" value={(prizeMoneyData?.total ?? 0) > 0 ? formatUsd(prizeMoneyData!.total) : "—"} editing={false}>
-              <span />
-            </Field>
+            {!isTeam && (
+              <Field label="PRIZE MONEY" value={(prizeMoneyData?.total ?? 0) > 0 ? formatUsd(prizeMoneyData!.total) : "—"} editing={false}>
+                <span />
+              </Field>
+            )}
           </div>
           {isEditing ? (
             <div className={styles.editActions}>
@@ -499,128 +504,134 @@ export default function HorseProfilePage() {
           ) : null}
         </section>
 
-        <section className={styles.spendRow}>
-          <div className={styles.spendTotalCard}>
-            <div className={styles.spendLabel}>TOTAL SPEND</div>
-            <div className={styles.spendTotal}>{formatUsd(spendMeta.totalSpend)}</div>
-            <div className={spendMeta.momPct > 0 ? styles.momUp : styles.momDown}>
-              {spendMeta.momPct >= 0 ? "↗" : "↘"} {spendMeta.momPct >= 0 ? "+" : ""}
-              {Math.abs(spendMeta.momPct).toFixed(1)}% vs last month
-            </div>
-            {(prizeMoneyData?.total ?? 0) > 0 ? (
-              <>
-                <div className={styles.prizeMoneyRow}>
-                  <span className={styles.prizeMoneyLabel}>PRIZE MONEY</span>
-                  <span className={styles.prizeMoneyValue}>+{formatUsd(prizeMoneyData!.total)}</span>
-                </div>
-                <div className={styles.netCostRow}>
-                  <span className={styles.netCostLabel}>NET COST</span>
-                  <span className={styles.netCostValue}>{formatUsd(spendMeta.totalSpend - prizeMoneyData!.total)}</span>
-                </div>
-              </>
-            ) : null}
-          </div>
-          <div className={styles.spendBreakdownCard}>
-            <div className={styles.spendLabel}>SPEND BY CATEGORY</div>
-            <div className={styles.breakdownList}>
-              {spendByCategory.map((row) => {
-                const color = CATEGORY_COLORS[row.category] ?? "#6B7084";
-                return (
-                  <div key={row.category} className={styles.breakdownRow}>
-                    <span className={styles.breakdownName}>{pretty(row.category)}</span>
-                    <span className={styles.breakdownTrack}>
-                      <span className={styles.breakdownFill} style={{ width: `${Math.min(100, row.pct)}%`, background: color }} />
-                    </span>
-                    <span className={styles.breakdownAmount}>{formatUsd(row.amount)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        <section className={styles.invoicesSection}>
-          <div className={styles.invoicesHeader}>
-            <div className={styles.invoicesTitle}>invoices</div>
-          </div>
-          {visibleInvoices.length === 0 ? (
-            <div className={styles.emptyInvoices}>no invoices for this horse</div>
-          ) : (
-            visibleInvoices.map((row) => (
-              <Link key={row._id} href={row.href} className={styles.invoiceRow}>
-                <div className={styles.invoiceLeft}>
-                  <span className={row.status === "approved" ? styles.dotApproved : styles.dotPending} />
-                  <span className={styles.invoiceLabel}>
-                    {formatInvoiceName({
-                      invoiceName: row.invoiceName,
-                      category: row.category,
-                      contactName: row.contactName,
-                      date: toIsoDateString(row.date || ""),
-                    })}
-                  </span>
-                </div>
-                <span className={styles.invoiceAmount}>{formatUsd(row.amount)}</span>
-              </Link>
-            ))
-          )}
-          {invoices.length > 10 ? (
-            <button type="button" className={styles.viewAll} onClick={() => setShowAllInvoices((prev) => !prev)}>
-              {showAllInvoices ? "show less" : "view all"}
-            </button>
-          ) : null}
-        </section>
-
-        <section className={styles.prizeSection}>
-          <div className={styles.prizeHeader}>
-            <div className={styles.prizeTitle}>prize money</div>
-            <button type="button" className={styles.addPrizeBtn} onClick={() => setShowPrizeForm((prev) => !prev)}>
-              {showPrizeForm ? "cancel" : "+ add"}
-            </button>
-          </div>
-          {showPrizeForm ? (
-            <div className={styles.prizeFormGrid}>
-              <input className={styles.prizeInput} type="number" step="0.01" placeholder="Amount ($)" value={prizeForm.amount} onChange={(e) => setPrizeForm((p) => ({ ...p, amount: e.target.value }))} />
-              <input className={styles.prizeInput} placeholder="Show name" value={prizeForm.showName} onChange={(e) => setPrizeForm((p) => ({ ...p, showName: e.target.value }))} />
-              <input className={styles.prizeInput} placeholder="Class" value={prizeForm.className} onChange={(e) => setPrizeForm((p) => ({ ...p, className: e.target.value }))} />
-              <input className={styles.prizeInput} placeholder="Placing (e.g. 1st)" value={prizeForm.placing} onChange={(e) => setPrizeForm((p) => ({ ...p, placing: e.target.value }))} />
-              <input className={styles.prizeInput} type="date" value={prizeForm.date} onChange={(e) => setPrizeForm((p) => ({ ...p, date: e.target.value }))} />
-              <input className={styles.prizeInput} placeholder="Description" value={prizeForm.description} onChange={(e) => setPrizeForm((p) => ({ ...p, description: e.target.value }))} />
-              <button type="button" className={styles.btnSave} onClick={async () => {
-                if (!prizeForm.amount) return;
-                await addIncomeEntry({
-                  horseId: horse._id,
-                  type: "prize_money",
-                  amount: Number(prizeForm.amount),
-                  description: prizeForm.description || `Prize money${prizeForm.showName ? ` - ${prizeForm.showName}` : ""}`,
-                  showName: prizeForm.showName || undefined,
-                  className: prizeForm.className || undefined,
-                  placing: prizeForm.placing || undefined,
-                  date: prizeForm.date || undefined,
-                });
-                setPrizeForm({ amount: "", description: "", showName: "", className: "", placing: "", date: "" });
-                setShowPrizeForm(false);
-              }}>save</button>
-            </div>
-          ) : null}
-          {(prizeMoneyData?.entries ?? []).length === 0 && !showPrizeForm ? (
-            <div className={styles.emptyInvoices}>no prize money recorded</div>
-          ) : (
-            (prizeMoneyData?.entries ?? []).map((entry) => (
-              <div key={entry._id} className={styles.prizeEntryRow}>
-                <div className={styles.prizeEntryLeft}>
-                  <span className={styles.prizeEntryAmount}>+{formatUsd(entry.amount)}</span>
-                  <span className={styles.prizeEntryDesc}>
-                    {entry.showName ?? entry.description}
-                    {entry.className ? ` · ${entry.className}` : ""}
-                    {entry.placing ? ` · ${entry.placing}` : ""}
-                  </span>
-                  {entry.date ? <span className={styles.prizeEntryDate}>{entry.date}</span> : null}
-                </div>
-                <button type="button" className={styles.prizeDeleteBtn} onClick={() => deleteIncomeEntry({ entryId: entry._id })}>×</button>
+        {!isTeam && (
+          <section className={styles.spendRow}>
+            <div className={styles.spendTotalCard}>
+              <div className={styles.spendLabel}>TOTAL SPEND</div>
+              <div className={styles.spendTotal}>{formatUsd(spendMeta.totalSpend)}</div>
+              <div className={spendMeta.momPct > 0 ? styles.momUp : styles.momDown}>
+                {spendMeta.momPct >= 0 ? "↗" : "↘"} {spendMeta.momPct >= 0 ? "+" : ""}
+                {Math.abs(spendMeta.momPct).toFixed(1)}% vs last month
               </div>
-            ))
-          )}
-        </section>
+              {(prizeMoneyData?.total ?? 0) > 0 ? (
+                <>
+                  <div className={styles.prizeMoneyRow}>
+                    <span className={styles.prizeMoneyLabel}>PRIZE MONEY</span>
+                    <span className={styles.prizeMoneyValue}>+{formatUsd(prizeMoneyData!.total)}</span>
+                  </div>
+                  <div className={styles.netCostRow}>
+                    <span className={styles.netCostLabel}>NET COST</span>
+                    <span className={styles.netCostValue}>{formatUsd(spendMeta.totalSpend - prizeMoneyData!.total)}</span>
+                  </div>
+                </>
+              ) : null}
+            </div>
+            <div className={styles.spendBreakdownCard}>
+              <div className={styles.spendLabel}>SPEND BY CATEGORY</div>
+              <div className={styles.breakdownList}>
+                {spendByCategory.map((row) => {
+                  const color = CATEGORY_COLORS[row.category] ?? "#6B7084";
+                  return (
+                    <div key={row.category} className={styles.breakdownRow}>
+                      <span className={styles.breakdownName}>{pretty(row.category)}</span>
+                      <span className={styles.breakdownTrack}>
+                        <span className={styles.breakdownFill} style={{ width: `${Math.min(100, row.pct)}%`, background: color }} />
+                      </span>
+                      <span className={styles.breakdownAmount}>{formatUsd(row.amount)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {!isTeam && (
+          <section className={styles.invoicesSection}>
+            <div className={styles.invoicesHeader}>
+              <div className={styles.invoicesTitle}>invoices</div>
+            </div>
+            {visibleInvoices.length === 0 ? (
+              <div className={styles.emptyInvoices}>no invoices for this horse</div>
+            ) : (
+              visibleInvoices.map((row) => (
+                <Link key={row._id} href={row.href} className={styles.invoiceRow}>
+                  <div className={styles.invoiceLeft}>
+                    <span className={row.status === "approved" ? styles.dotApproved : styles.dotPending} />
+                    <span className={styles.invoiceLabel}>
+                      {formatInvoiceName({
+                        invoiceName: row.invoiceName,
+                        category: row.category,
+                        contactName: row.contactName,
+                        date: toIsoDateString(row.date || ""),
+                      })}
+                    </span>
+                  </div>
+                  <span className={styles.invoiceAmount}>{formatUsd(row.amount)}</span>
+                </Link>
+              ))
+            )}
+            {invoices.length > 10 ? (
+              <button type="button" className={styles.viewAll} onClick={() => setShowAllInvoices((prev) => !prev)}>
+                {showAllInvoices ? "show less" : "view all"}
+              </button>
+            ) : null}
+          </section>
+        )}
+
+        {!isTeam && (
+          <section className={styles.prizeSection}>
+            <div className={styles.prizeHeader}>
+              <div className={styles.prizeTitle}>prize money</div>
+              <button type="button" className={styles.addPrizeBtn} onClick={() => setShowPrizeForm((prev) => !prev)}>
+                {showPrizeForm ? "cancel" : "+ add"}
+              </button>
+            </div>
+            {showPrizeForm ? (
+              <div className={styles.prizeFormGrid}>
+                <input className={styles.prizeInput} type="number" step="0.01" placeholder="Amount ($)" value={prizeForm.amount} onChange={(e) => setPrizeForm((p) => ({ ...p, amount: e.target.value }))} />
+                <input className={styles.prizeInput} placeholder="Show name" value={prizeForm.showName} onChange={(e) => setPrizeForm((p) => ({ ...p, showName: e.target.value }))} />
+                <input className={styles.prizeInput} placeholder="Class" value={prizeForm.className} onChange={(e) => setPrizeForm((p) => ({ ...p, className: e.target.value }))} />
+                <input className={styles.prizeInput} placeholder="Placing (e.g. 1st)" value={prizeForm.placing} onChange={(e) => setPrizeForm((p) => ({ ...p, placing: e.target.value }))} />
+                <input className={styles.prizeInput} type="date" value={prizeForm.date} onChange={(e) => setPrizeForm((p) => ({ ...p, date: e.target.value }))} />
+                <input className={styles.prizeInput} placeholder="Description" value={prizeForm.description} onChange={(e) => setPrizeForm((p) => ({ ...p, description: e.target.value }))} />
+                <button type="button" className={styles.btnSave} onClick={async () => {
+                  if (!prizeForm.amount) return;
+                  await addIncomeEntry({
+                    horseId: horse._id,
+                    type: "prize_money",
+                    amount: Number(prizeForm.amount),
+                    description: prizeForm.description || `Prize money${prizeForm.showName ? ` - ${prizeForm.showName}` : ""}`,
+                    showName: prizeForm.showName || undefined,
+                    className: prizeForm.className || undefined,
+                    placing: prizeForm.placing || undefined,
+                    date: prizeForm.date || undefined,
+                  });
+                  setPrizeForm({ amount: "", description: "", showName: "", className: "", placing: "", date: "" });
+                  setShowPrizeForm(false);
+                }}>save</button>
+              </div>
+            ) : null}
+            {(prizeMoneyData?.entries ?? []).length === 0 && !showPrizeForm ? (
+              <div className={styles.emptyInvoices}>no prize money recorded</div>
+            ) : (
+              (prizeMoneyData?.entries ?? []).map((entry) => (
+                <div key={entry._id} className={styles.prizeEntryRow}>
+                  <div className={styles.prizeEntryLeft}>
+                    <span className={styles.prizeEntryAmount}>+{formatUsd(entry.amount)}</span>
+                    <span className={styles.prizeEntryDesc}>
+                      {entry.showName ?? entry.description}
+                      {entry.className ? ` · ${entry.className}` : ""}
+                      {entry.placing ? ` · ${entry.placing}` : ""}
+                    </span>
+                    {entry.date ? <span className={styles.prizeEntryDate}>{entry.date}</span> : null}
+                  </div>
+                  <button type="button" className={styles.prizeDeleteBtn} onClick={() => deleteIncomeEntry({ entryId: entry._id })}>×</button>
+                </div>
+              ))
+            )}
+          </section>
+        )}
 
         <section className={styles.recordsCard}>
           <div className={styles.recordsHeaderNew}>
