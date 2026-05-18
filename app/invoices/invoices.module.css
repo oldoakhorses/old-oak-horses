@@ -128,12 +128,15 @@
   gap: 8px;
   padding: 10px 18px;
   border-bottom: 1px solid #e8eaf0;
+  align-items: center;
+}
+
+.tableHeader > span {
   font-size: 9px;
   font-weight: 600;
   color: #9ea2b0;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  align-items: center;
 }
 
 .colName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
