@@ -305,8 +305,14 @@ export default function InvoicesPage() {
         </section>
 
         <section className={styles.listCard}>
-          <div className={styles.listMeta}>
-            <span>{filtered.length} invoice{filtered.length !== 1 ? "s" : ""}</span>
+          <div className={styles.tableHeader}>
+            <span className={styles.colName}>Invoice</span>
+            <span className={styles.colDate}>Date</span>
+            <span className={styles.colContact}>Contact</span>
+            <span className={styles.colCategory}>Category</span>
+            <span className={styles.colHorses}>Horses</span>
+            <span className={styles.colAmount}>Amount</span>
+            <span className={styles.colMenu} />
           </div>
 
           {filtered.map((row) => {
@@ -324,7 +330,8 @@ export default function InvoicesPage() {
             const rowId = String(row._id);
             const isExpanded = expandedId === rowId;
             const assignedHorses = Array.isArray(row.assignedHorses) ? row.assignedHorses.map((entry: any) => entry.horseName).filter(Boolean) : [];
-            const invoiceNumber = String(row?.extractedData?.invoice_number ?? row?.extractedData?.invoiceNumber ?? "—");
+            const contact = getProvider(row);
+            const displayName = abbreviateInvoiceName(row.invoiceName || formatInvoiceName({ contactName: contact }));
             return (
               <div key={rowId}>
                 <div
@@ -335,30 +342,30 @@ export default function InvoicesPage() {
                     setOpenMenuId(null);
                   }}
                 >
-                  <div className={styles.invoiceMain}>
-                    <div className={styles.invoiceTopLine}>
-                      <a
-                        className={styles.invoiceNameLink}
-                        href={url}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          router.push(url);
-                        }}
-                      >
-                        {abbreviateInvoiceName(row.invoiceName || formatInvoiceName({ contactName: getProvider(row), date }))}
-                      </a>
-                      <span className={styles.amountCol} style={total >= 0 ? { color: "#16A34A" } : undefined}>{formatUsd(total)}</span>
-                    </div>
-                    <div className={styles.invoiceBottomLine}>
-                      <span className={styles.categoryBadge} style={{ background: categoryColor.bg, color: categoryColor.color }}>
-                        {categoryColor.label}
-                      </span>
-                      {row.source === "cc_transaction" && <span className={styles.ccBadge}>CC</span>}
-                      <span className={styles.dateCol}>{date}</span>
-                    </div>
-                  </div>
-                  <div className={styles.menuWrap} onClick={(e) => e.stopPropagation()}>
+                  <a
+                    className={`${styles.colName} ${styles.invoiceNameLink}`}
+                    href={url}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      router.push(url);
+                    }}
+                  >
+                    {displayName}
+                    {row.source === "cc_transaction" && <span className={styles.ccBadge}>CC</span>}
+                  </a>
+                  <span className={styles.colDate}>{formatDate(date)}</span>
+                  <span className={styles.colContact}>{contact}</span>
+                  <span className={styles.colCategory}>
+                    <span className={styles.categoryBadge} style={{ background: categoryColor.bg, color: categoryColor.color }}>
+                      {categoryColor.label}
+                    </span>
+                  </span>
+                  <span className={styles.colHorses}>
+                    {assignedHorses.length > 0 ? assignedHorses.join(", ") : <span className={styles.muted}>—</span>}
+                  </span>
+                  <span className={`${styles.colAmount} ${styles.amountCol}`} style={total >= 0 ? { color: "#16A34A" } : undefined}>{formatUsd(total)}</span>
+                  <div className={`${styles.colMenu} ${styles.menuWrap}`} onClick={(e) => e.stopPropagation()}>
                     <button type="button" className={styles.invoiceMenuBtn} onClick={(e) => { e.stopPropagation(); setOpenMenuId((prev) => (prev === rowId ? null : rowId)); }}>
                       ⋮
                     </button>
@@ -430,23 +437,6 @@ export default function InvoicesPage() {
                     ) : (
                       <div className={styles.noNotes}>no notes</div>
                     )}
-
-                    <div className={styles.quickInfo}>
-                      <div>
-                        <div className={styles.detailLabel}>INVOICE #</div>
-                        <div className={styles.detailValue}>{invoiceNumber}</div>
-                      </div>
-                      <div>
-                        <div className={styles.detailLabel}>CATEGORY</div>
-                        <div className={styles.detailValue}>{prettyCategory(categoryKey)}</div>
-                      </div>
-                      {assignedHorses.length > 0 ? (
-                        <div>
-                          <div className={styles.detailLabel}>HORSES</div>
-                          <div className={styles.detailValue}>{assignedHorses.join(", ")}</div>
-                        </div>
-                      ) : null}
-                    </div>
 
                     <div className={styles.expandedActions}>
                       <button
@@ -545,6 +535,12 @@ function slugify(value: string) {
     .replace(/[^\w\s-]/g, "")
     .trim()
     .replace(/\s+/g, "-");
+}
+
+function formatDate(iso: string) {
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function formatUsd(value: number) {

@@ -33,10 +33,7 @@ export function formatInvoiceName(input: InvoiceNameInput) {
     input.provider?.trim() ||
     "Unassigned Invoice";
 
-  const date = formatInvoiceDate(input.date ?? input.invoiceDate ?? input.invoice_date);
-  if (!provider && !date) return "Unassigned Invoice";
-  if (!date) return provider || "Unassigned Invoice";
-  return `${provider || "Unassigned Invoice"} — ${date}`;
+  return provider || "Unassigned Invoice";
 }
 
 export function formatInvoiceFileName(input: InvoiceNameInput) {
