@@ -1515,63 +1515,61 @@ export default function InvoicePreviewPage() {
       <main className="page-main">
         <Link href="/invoices" className="ui-back-link">← cd /invoices</Link>
 
-        {isManualEntry ? (
-          <div className={styles.manualEntryBanner}>
-            <span className={styles.manualEntryIcon}>📷</span>
-            <div>
-              <div className={styles.manualEntryTitle}>photo invoice — manual entry</div>
-              <div className={styles.manualEntrySub}>Fill in the invoice details below. Use "view original" to reference the uploaded image.</div>
-            </div>
-          </div>
-        ) : null}
-
         <section className={styles.previewLayout}>
           <div className={styles.previewDetails}>
-            <div className={`${styles.card} ${vendorDetected ? styles.vendorDetected : styles.vendorUnknown}`}>
+            <div className={styles.card}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div className={styles.bannerTitle}>{vendorDetected ? "✓ contact detected" : "⚠ contact unknown"}</div>
+                <div className={styles.label} style={{ marginBottom: 0 }}>CONTACT</div>
                 {!contactEdit && (
-                  <button type="button" className={styles.changeLink} onClick={openContactEdit}>edit</button>
+                  <button type="button" className={styles.changeLink} onClick={openContactEdit} title="Edit contact">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11.5 1.5l3 3L5 14H2v-3L11.5 1.5z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              <div style={{ position: "relative", marginTop: 6 }}>
+                <input
+                  className={styles.inputCompact}
+                  value={contactEdit ? contactSearch : contactName}
+                  onChange={(e) => {
+                    setContactSearch(e.target.value);
+                    setContactForm((p) => ({ ...p, name: e.target.value }));
+                    setSelectedContactId(null);
+                    setShowContactSuggestions(true);
+                  }}
+                  onFocus={() => {
+                    if (!contactEdit) openContactEdit();
+                    setShowContactSuggestions(true);
+                  }}
+                  placeholder="search or type contact name..."
+                  autoComplete="off"
+                  readOnly={!contactEdit}
+                />
+                {contactEdit && showContactSuggestions && contactSuggestions.length > 0 && (
+                  <div className={styles.contactSuggestions}>
+                    {contactSuggestions.map((c) => (
+                      <button
+                        key={String(c._id)}
+                        type="button"
+                        className={styles.contactSuggestionItem}
+                        onMouseDown={(e) => { e.preventDefault(); selectExistingContact(c); }}
+                      >
+                        <span className={styles.contactSuggestionName}>{c.name}</span>
+                        {c.email ? <span className={styles.contactSuggestionMeta}>{c.email}</span> : null}
+                        {c.category ? <span className={styles.contactSuggestionMeta}>{c.category}</span> : null}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {selectedContactId && (
+                  <div style={{ fontSize: 9, color: "#22C583", marginTop: 2 }}>✓ linked to existing contact</div>
                 )}
               </div>
 
               {contactEdit ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-                  <div style={{ position: "relative" }}>
-                    <div className={styles.label}>CONTACT</div>
-                    <input
-                      className={styles.inputCompact}
-                      value={contactSearch}
-                      onChange={(e) => {
-                        setContactSearch(e.target.value);
-                        setContactForm((p) => ({ ...p, name: e.target.value }));
-                        setSelectedContactId(null);
-                        setShowContactSuggestions(true);
-                      }}
-                      onFocus={() => setShowContactSuggestions(true)}
-                      placeholder="search or type contact name..."
-                      autoComplete="off"
-                    />
-                    {showContactSuggestions && contactSuggestions.length > 0 && (
-                      <div className={styles.contactSuggestions}>
-                        {contactSuggestions.map((c) => (
-                          <button
-                            key={String(c._id)}
-                            type="button"
-                            className={styles.contactSuggestionItem}
-                            onMouseDown={(e) => { e.preventDefault(); selectExistingContact(c); }}
-                          >
-                            <span className={styles.contactSuggestionName}>{c.name}</span>
-                            {c.email ? <span className={styles.contactSuggestionMeta}>{c.email}</span> : null}
-                            {c.category ? <span className={styles.contactSuggestionMeta}>{c.category}</span> : null}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {selectedContactId && (
-                      <div style={{ fontSize: 9, color: "#22C583", marginTop: 2 }}>✓ linked to existing contact</div>
-                    )}
-                  </div>
                   <div>
                     <div className={styles.label}>COMPANY NAME</div>
                     <input className={styles.inputCompact} value={contactForm.companyName} onChange={(e) => setContactForm((p) => ({ ...p, companyName: e.target.value }))} />
@@ -1605,13 +1603,6 @@ export default function InvoicePreviewPage() {
                 </div>
               ) : (
                 <>
-                  <div className={styles.vendorGrid}>
-                    <div>
-                      <div className={styles.label}>CONTACT</div>
-                      <div className={styles.value}>{contactName}</div>
-                    </div>
-                  </div>
-
                   {bill?.extractedVendorContact ? (
                     <div className={styles.contactDetailsGrid}>
                       {bill.extractedVendorContact.phone ? (
