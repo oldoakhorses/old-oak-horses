@@ -209,6 +209,7 @@ export default defineSchema({
     /** Timestamp when horse became inactive/past. Used to determine if
      *  a horse was active at the time a bill was uploaded. */
     inactiveSince: v.optional(v.number()),
+    transferredAt: v.optional(v.number()),
     createdAt: v.number()
   })
     .index("by_name", ["name"])

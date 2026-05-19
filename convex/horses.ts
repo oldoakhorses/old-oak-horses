@@ -184,6 +184,7 @@ export const transferOwnership = mutation({
     const transferDocuments = transferFull || args.transferItems.includes("documents");
     const transferFeedPlan = transferFull || args.transferItems.includes("feedPlan");
 
+    const now = Date.now();
     const newHorseId = await ctx.db.insert("horses", {
       name: horse.name,
       barnName: horse.barnName,
@@ -194,7 +195,8 @@ export const transferOwnership = mutation({
       owner: newOwner.name,
       ownerId: args.newOwnerId,
       status: "active",
-      createdAt: Date.now(),
+      transferredAt: now,
+      createdAt: now,
     });
 
     if (transferRecords) {
@@ -575,6 +577,12 @@ async function collectHorseInvoices(ctx: any, horseId: any) {
     const contact = bill.contactId ? await ctx.db.get(bill.contactId) : null;
     const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
     const invoiceDate = typeof extracted.invoice_date === "string" ? extracted.invoice_date : null;
+
+    if (horse.transferredAt) {
+      const billTs = invoiceDate ? Date.parse(invoiceDate) : bill.uploadedAt;
+      if (!Number.isNaN(billTs) && billTs < horse.transferredAt) continue;
+    }
+
     const contactName = contact?.name ?? bill.customProviderName ?? "Unknown";
     const contactSlug = contact?.slug ?? slugify(contactName);
 
