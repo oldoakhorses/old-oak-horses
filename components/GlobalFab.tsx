@@ -65,6 +65,8 @@ type RecordFormState = {
   treatmentDescription: string;
   serviceType: string;
   medications: string[];
+  medicationRepeatValue: string;
+  medicationRepeatUnit: "" | "days" | "weeks" | "months";
   nextVisitDate: string;
   notes: string;
   billId: string;
@@ -102,6 +104,7 @@ const MEDICATION_OPTIONS = [
   "Dexamethasone",
   "Gastroguard",
   "Gentamicin",
+  "Ketofen",
   "Legend",
   "Marquis",
   "Metacam",
@@ -175,6 +178,8 @@ function createInitialRecordForm(): RecordFormState {
     treatmentDescription: "",
     serviceType: "",
     medications: [],
+    medicationRepeatValue: "",
+    medicationRepeatUnit: "",
     nextVisitDate: "",
     notes: "",
     billId: "",
@@ -455,6 +460,8 @@ export default function GlobalFab() {
         treatmentDescription: "",
         serviceType: "",
         medications: [],
+        medicationRepeatValue: "",
+        medicationRepeatUnit: "",
       }));
       return;
     }
@@ -472,6 +479,8 @@ export default function GlobalFab() {
       treatmentDescription: "",
       serviceType: "",
       medications: nextType === "medication" ? prev.medications : [],
+      medicationRepeatValue: "",
+      medicationRepeatUnit: "",
     }));
   }
 
@@ -811,7 +820,9 @@ export default function GlobalFab() {
               ? recordForm.treatmentDescription.trim() || undefined
               : undefined,
           serviceType: selectedRecordType === "farrier" ? recordForm.serviceType || undefined : undefined,
-          medications: selectedRecordType === "medication" && recordForm.medications.length > 0 ? recordForm.medications : undefined,
+          medications: recordForm.medications.length > 0 ? recordForm.medications : undefined,
+          medicationRepeatValue: recordForm.medications.length > 0 && recordForm.medicationRepeatValue ? parseInt(recordForm.medicationRepeatValue, 10) : undefined,
+          medicationRepeatUnit: recordForm.medications.length > 0 && recordForm.medicationRepeatUnit ? recordForm.medicationRepeatUnit : undefined,
           isUpcoming: false,
           notes: notesForHorse || undefined,
           attachmentStorageId,
@@ -838,7 +849,9 @@ export default function GlobalFab() {
                 ? recordForm.treatmentDescription.trim() || undefined
                 : undefined,
             serviceType: selectedRecordType === "farrier" ? recordForm.serviceType || undefined : undefined,
-            medications: selectedRecordType === "medication" && recordForm.medications.length > 0 ? recordForm.medications : undefined,
+            medications: recordForm.medications.length > 0 ? recordForm.medications : undefined,
+            medicationRepeatValue: recordForm.medications.length > 0 && recordForm.medicationRepeatValue ? parseInt(recordForm.medicationRepeatValue, 10) : undefined,
+            medicationRepeatUnit: recordForm.medications.length > 0 && recordForm.medicationRepeatUnit ? recordForm.medicationRepeatUnit : undefined,
             isUpcoming: true,
             linkedRecordId: mainRecordId,
             notes: undefined,
@@ -1395,6 +1408,30 @@ export default function GlobalFab() {
                               </button>
                             );
                           })}
+                        </div>
+                      </RecordField>
+                    ) : null}
+                    {recordForm.medications.length > 0 ? (
+                      <RecordField label="REPEAT">
+                        <div className={styles.repeatRow}>
+                          <input
+                            className={styles.repeatNumberInput}
+                            type="number"
+                            min="1"
+                            value={recordForm.medicationRepeatValue}
+                            onChange={(e) => setRecordForm((prev) => ({ ...prev, medicationRepeatValue: e.target.value }))}
+                            placeholder="#"
+                          />
+                          <select
+                            className={styles.repeatUnitSelect}
+                            value={recordForm.medicationRepeatUnit}
+                            onChange={(e) => setRecordForm((prev) => ({ ...prev, medicationRepeatUnit: e.target.value as "" | "days" | "weeks" | "months" }))}
+                          >
+                            <option value="">select...</option>
+                            <option value="days">Days</option>
+                            <option value="weeks">Weeks</option>
+                            <option value="months">Months</option>
+                          </select>
                         </div>
                       </RecordField>
                     ) : null}

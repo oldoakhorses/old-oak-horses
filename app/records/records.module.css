@@ -847,6 +847,35 @@
   box-sizing: border-box;
 }
 
+.repeatRow {
+  display: flex;
+  gap: 8px;
+}
+
+.repeatNumberInput {
+  width: 70px;
+  font-size: 12px;
+  padding: 10px 14px;
+  background: #f2f3f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  color: #1a1a2e;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.repeatUnitSelect {
+  flex: 1;
+  font-size: 12px;
+  padding: 10px 14px;
+  background: #f2f3f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  color: #1a1a2e;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
 .recordInput:where(select) {
   appearance: none;
   cursor: pointer;

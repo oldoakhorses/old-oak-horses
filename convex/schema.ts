@@ -314,6 +314,8 @@ export default defineSchema({
     treatmentDescription: v.optional(v.string()),
     serviceType: v.optional(v.string()),
     medications: v.optional(v.array(v.string())),
+    medicationRepeatValue: v.optional(v.number()),
+    medicationRepeatUnit: v.optional(v.union(v.literal("days"), v.literal("weeks"), v.literal("months"))),
     isUpcoming: v.optional(v.boolean()),
     linkedRecordId: v.optional(v.id("horseRecords")),
     notes: v.optional(v.string()),
