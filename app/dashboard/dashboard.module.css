@@ -1033,6 +1033,74 @@
   border-top: 1px solid #e8eaf0;
 }
 
+.newContactCard {
+  background: #f8f9fb;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.newContactCardTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 10px;
+}
+
+.newContactGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.newContactField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.newContactLabel {
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.newContactActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.newContactCancelBtn {
+  font-size: 10px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid #e8eaf0;
+  background: transparent;
+  color: #6b7084;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.newContactSaveBtn {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.newContactSaveBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .contactDropdownEmpty {
   padding: 10px 12px;
   font-size: 11px;

@@ -242,6 +242,10 @@ export default function RecordsPage() {
   const [horseDropdownOpen, setHorseDropdownOpen] = useState(false);
   const [subcatDropdownOpen, setSubcatDropdownOpen] = useState(false);
   const subcatDropdownRef = useRef<HTMLDivElement | null>(null);
+  const [newContactOpen, setNewContactOpen] = useState(false);
+  const [newContactForm, setNewContactForm] = useState({ name: "", companyName: "", phone: "", email: "", category: "", location: "", notes: "" });
+  const [newContactSaving, setNewContactSaving] = useState(false);
+  const [newContactError, setNewContactError] = useState("");
 
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -261,6 +265,7 @@ export default function RecordsPage() {
   const deleteHorseRecord = useMutation(api.horseRecords.deleteHorseRecord);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
   const findOrCreateContact = useMutation(api.contacts.findOrCreateContact);
+  const createContact = useMutation(api.contacts.createContact);
 
   useEffect(() => {
     setSortColumn("date");
@@ -430,6 +435,8 @@ export default function RecordsPage() {
       setRecordError("");
       setRecordSubmitting(false);
       setHorseDropdownOpen(false);
+      setNewContactOpen(false);
+      setNewContactError("");
     }, 300);
   }
 
@@ -1519,11 +1526,12 @@ export default function RecordsPage() {
                       onChange={(event) => {
                         setRecordForm((prev) => ({ ...prev, contactName: event.target.value }));
                         setContactDropdownOpen(true);
+                        setNewContactOpen(false);
                       }}
-                      onFocus={() => setContactDropdownOpen(true)}
+                      onFocus={() => { setContactDropdownOpen(true); setNewContactOpen(false); }}
                       placeholder={contactPlaceholder(selectedRecordType)}
                     />
-                    {contactDropdownOpen && (() => {
+                    {contactDropdownOpen && !newContactOpen && (() => {
                       const contactPool = recordProviderCategory ? recordProviders : allContactsForRecord;
                       const term = recordForm.contactName.trim().toLowerCase();
                       const matches = term
@@ -1549,19 +1557,129 @@ export default function RecordsPage() {
                             <button
                               type="button"
                               className={`${styles.contactDropdownItem} ${styles.contactDropdownAdd}`}
-                              onClick={() => setContactDropdownOpen(false)}
+                              onClick={() => {
+                                setContactDropdownOpen(false);
+                                setNewContactOpen(true);
+                                setNewContactError("");
+                                setNewContactForm({
+                                  name: recordForm.contactName.trim(),
+                                  companyName: "",
+                                  phone: "",
+                                  email: "",
+                                  category: recordProviderCategory || "",
+                                  location: "",
+                                  notes: "",
+                                });
+                              }}
                             >
                               + Add &ldquo;{recordForm.contactName.trim()}&rdquo;
                             </button>
                           ) : null}
                           {!term && matches.length === 0 ? (
-                            <div className={styles.contactDropdownEmpty}>no contacts found — type to add new</div>
+                            <button
+                              type="button"
+                              className={`${styles.contactDropdownItem} ${styles.contactDropdownAdd}`}
+                              onClick={() => {
+                                setContactDropdownOpen(false);
+                                setNewContactOpen(true);
+                                setNewContactError("");
+                                setNewContactForm({ name: "", companyName: "", phone: "", email: "", category: recordProviderCategory || "", location: "", notes: "" });
+                              }}
+                            >
+                              + Create new contact
+                            </button>
                           ) : null}
                         </div>
                       );
                     })()}
                   </div>
                 </RecordField>
+                {newContactOpen ? (
+                  <div className={styles.newContactCard}>
+                    <div className={styles.newContactCardTitle}>+ new contact</div>
+                    <div className={styles.newContactGrid}>
+                      <label className={styles.newContactField}>
+                        <span className={styles.newContactLabel}>NAME *</span>
+                        <input className={styles.recordInput} value={newContactForm.name} onChange={(e) => setNewContactForm((prev) => ({ ...prev, name: e.target.value }))} />
+                      </label>
+                      <label className={styles.newContactField}>
+                        <span className={styles.newContactLabel}>COMPANY</span>
+                        <input className={styles.recordInput} value={newContactForm.companyName} onChange={(e) => setNewContactForm((prev) => ({ ...prev, companyName: e.target.value }))} />
+                      </label>
+                      <label className={styles.newContactField}>
+                        <span className={styles.newContactLabel}>PHONE</span>
+                        <input className={styles.recordInput} value={newContactForm.phone} onChange={(e) => setNewContactForm((prev) => ({ ...prev, phone: e.target.value }))} />
+                      </label>
+                      <label className={styles.newContactField}>
+                        <span className={styles.newContactLabel}>EMAIL</span>
+                        <input className={styles.recordInput} type="email" value={newContactForm.email} onChange={(e) => setNewContactForm((prev) => ({ ...prev, email: e.target.value }))} />
+                      </label>
+                      <label className={styles.newContactField}>
+                        <span className={styles.newContactLabel}>CATEGORY</span>
+                        <select className={styles.recordInput} value={newContactForm.category} onChange={(e) => setNewContactForm((prev) => ({ ...prev, category: e.target.value }))}>
+                          <option value="">select...</option>
+                          <option value="veterinary">Veterinary</option>
+                          <option value="farrier">Farrier</option>
+                          <option value="bodywork">Bodywork</option>
+                          <option value="stabling">Stabling</option>
+                          <option value="travel">Travel</option>
+                          <option value="supplies">Supplies</option>
+                          <option value="admin">Admin</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </label>
+                      <label className={styles.newContactField}>
+                        <span className={styles.newContactLabel}>LOCATION</span>
+                        <select className={styles.recordInput} value={newContactForm.location} onChange={(e) => setNewContactForm((prev) => ({ ...prev, location: e.target.value }))}>
+                          <option value="">select...</option>
+                          <option value="wellington">Wellington</option>
+                          <option value="thermal">Thermal</option>
+                          <option value="ocala">Ocala</option>
+                          <option value="la">LA</option>
+                          <option value="eu">EU</option>
+                          <option value="can">CAN</option>
+                        </select>
+                      </label>
+                    </div>
+                    <label className={styles.newContactField} style={{ marginTop: 8 }}>
+                      <span className={styles.newContactLabel}>NOTES</span>
+                      <textarea className={styles.recordTextarea} rows={2} value={newContactForm.notes} onChange={(e) => setNewContactForm((prev) => ({ ...prev, notes: e.target.value }))} />
+                    </label>
+                    {newContactError ? <p className={styles.recordError}>{newContactError}</p> : null}
+                    <div className={styles.newContactActions}>
+                      <button type="button" className={styles.newContactCancelBtn} onClick={() => setNewContactOpen(false)}>cancel</button>
+                      <button
+                        type="button"
+                        className={styles.newContactSaveBtn}
+                        disabled={newContactSaving}
+                        onClick={async () => {
+                          if (!newContactForm.name.trim()) { setNewContactError("Name is required."); return; }
+                          setNewContactSaving(true);
+                          setNewContactError("");
+                          try {
+                            await createContact({
+                              name: newContactForm.name.trim(),
+                              companyName: newContactForm.companyName.trim() || undefined,
+                              category: newContactForm.category || "other",
+                              location: newContactForm.location ? (newContactForm.location as "wellington" | "thermal" | "ocala" | "la" | "eu" | "can") : undefined,
+                              phone: newContactForm.phone.trim() || undefined,
+                              email: newContactForm.email.trim() || undefined,
+                              notes: newContactForm.notes.trim() || undefined,
+                            });
+                            setRecordForm((prev) => ({ ...prev, contactName: newContactForm.name.trim() }));
+                            setNewContactOpen(false);
+                          } catch (err) {
+                            setNewContactError(err instanceof Error ? err.message : "Failed to create contact");
+                          } finally {
+                            setNewContactSaving(false);
+                          }
+                        }}
+                      >
+                        {newContactSaving ? "saving..." : "save contact"}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </>
             ) : null}
 
