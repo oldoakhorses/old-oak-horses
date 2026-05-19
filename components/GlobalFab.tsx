@@ -240,6 +240,7 @@ export default function GlobalFab() {
   const contactDropdownRef = useRef<HTMLDivElement | null>(null);
   const [subcatDropdownOpen, setSubcatDropdownOpen] = useState(false);
   const subcatDropdownRef = useRef<HTMLDivElement | null>(null);
+  const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
   const [newContactOpen, setNewContactOpen] = useState(false);
   const [newContactForm, setNewContactForm] = useState({ name: "", companyName: "", phone: "", email: "", category: "", location: "", notes: "" });
   const [newContactSaving, setNewContactSaving] = useState(false);
@@ -406,6 +407,7 @@ export default function GlobalFab() {
       setRecordError("");
       setRecordSubmitting(false);
       setHorseDropdownOpen(false);
+      setMoreOptionsOpen(false);
       setNewContactOpen(false);
       setNewContactError("");
       setRecordInvoiceSearch("");
@@ -1648,105 +1650,118 @@ export default function GlobalFab() {
               />
             </RecordField>
 
-            <RecordField label="LINKED INVOICE">
-              <div className={styles.invoiceSearchWrap} ref={recordInvoiceDropdownRef}>
-                {recordForm.billId ? (
-                  <div className={styles.invoiceSelected}>
-                    <span className={styles.invoiceSelectedName}>
-                      {(() => {
-                        const linked = allInvoicesForLinking.find((b) => String(b._id) === recordForm.billId);
-                        return linked ? formatInvoiceName({ contactName: linked.contactName, date: linked.invoiceDate }) : "linked invoice";
-                      })()}
-                    </span>
-                    <button type="button" className={styles.invoiceClearBtn} onClick={() => setRecordForm((prev) => ({ ...prev, billId: "" }))}>✕</button>
+            <button
+              type="button"
+              className={styles.moreOptionsToggle}
+              onClick={() => setMoreOptionsOpen((prev) => !prev)}
+            >
+              <span>more options</span>
+              <span className={`${styles.moreOptionsArrow} ${moreOptionsOpen ? styles.moreOptionsArrowOpen : ""}`}>&#9662;</span>
+            </button>
+
+            {moreOptionsOpen ? (
+              <>
+                <RecordField label="LINKED INVOICE">
+                  <div className={styles.invoiceSearchWrap} ref={recordInvoiceDropdownRef}>
+                    {recordForm.billId ? (
+                      <div className={styles.invoiceSelected}>
+                        <span className={styles.invoiceSelectedName}>
+                          {(() => {
+                            const linked = allInvoicesForLinking.find((b) => String(b._id) === recordForm.billId);
+                            return linked ? formatInvoiceName({ contactName: linked.contactName, date: linked.invoiceDate }) : "linked invoice";
+                          })()}
+                        </span>
+                        <button type="button" className={styles.invoiceClearBtn} onClick={() => setRecordForm((prev) => ({ ...prev, billId: "" }))}>✕</button>
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          className={styles.recordInput}
+                          value={recordInvoiceSearch}
+                          onChange={(e) => { setRecordInvoiceSearch(e.target.value); setRecordInvoiceDropdownOpen(true); }}
+                          onFocus={() => setRecordInvoiceDropdownOpen(true)}
+                          placeholder="search invoices..."
+                        />
+                        {recordInvoiceDropdownOpen && (
+                          <div className={styles.invoiceDropdown}>
+                            {allInvoicesForLinking
+                              .filter((b) => {
+                                if (!recordInvoiceSearch.trim()) return true;
+                                const term = recordInvoiceSearch.toLowerCase();
+                                return b.contactName.toLowerCase().includes(term) ||
+                                  b.invoiceNumber.toLowerCase().includes(term) ||
+                                  b.invoiceDate.includes(term);
+                              })
+                              .slice(0, 8)
+                              .map((b) => (
+                                <button
+                                  key={String(b._id)}
+                                  type="button"
+                                  className={styles.invoiceDropdownItem}
+                                  onClick={() => {
+                                    setRecordForm((prev) => ({ ...prev, billId: String(b._id) }));
+                                    setRecordInvoiceSearch("");
+                                    setRecordInvoiceDropdownOpen(false);
+                                  }}
+                                >
+                                  {formatInvoiceName({ contactName: b.contactName, date: b.invoiceDate })}
+                                </button>
+                              ))}
+                            {allInvoicesForLinking.filter((b) => {
+                              if (!recordInvoiceSearch.trim()) return true;
+                              const term = recordInvoiceSearch.toLowerCase();
+                              return b.contactName.toLowerCase().includes(term) || b.invoiceNumber.toLowerCase().includes(term) || b.invoiceDate.includes(term);
+                            }).length === 0 && (
+                              <div className={styles.invoiceDropdownEmpty}>no invoices found</div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
-                ) : (
-                  <>
+                </RecordField>
+
+                <RecordField label="ATTACHMENT">
+                  <label className={styles.dropZone}>
+                    <input
+                      type="file"
+                      className={styles.fileInput}
+                      accept=".pdf,.jpg,.jpeg,.png,.mp4,.mov,.webm"
+                      onChange={(e) => {
+                        void handleRecordAttachmentSelect(e.target.files?.[0] ?? null);
+                      }}
+                    />
+                    <div className={styles.dropZoneText}>
+                      drop file or <span className={styles.dropZoneBrowse}>browse</span>
+                    </div>
+                    <div className={styles.dropZoneSubtext}>PDF, JPG, PNG, MP4, MOV — max 10MB</div>
+                    {recordAttachment ? <div className={styles.dropZoneFile}>{recordAttachment.name}</div> : null}
+                    {recordDetecting ? <div className={styles.dropZoneFile}>detecting report...</div> : null}
+                  </label>
+                </RecordField>
+
+                <RecordField label="NEXT VISIT">
+                  <div style={{ position: "relative" }}>
                     <input
                       className={styles.recordInput}
-                      value={recordInvoiceSearch}
-                      onChange={(e) => { setRecordInvoiceSearch(e.target.value); setRecordInvoiceDropdownOpen(true); }}
-                      onFocus={() => setRecordInvoiceDropdownOpen(true)}
-                      placeholder="search invoices..."
+                      type="date"
+                      value={recordForm.nextVisitDate}
+                      onChange={(e) => setRecordForm((prev) => ({ ...prev, nextVisitDate: e.target.value }))}
                     />
-                    {recordInvoiceDropdownOpen && (
-                      <div className={styles.invoiceDropdown}>
-                        {allInvoicesForLinking
-                          .filter((b) => {
-                            if (!recordInvoiceSearch.trim()) return true;
-                            const term = recordInvoiceSearch.toLowerCase();
-                            return b.contactName.toLowerCase().includes(term) ||
-                              b.invoiceNumber.toLowerCase().includes(term) ||
-                              b.invoiceDate.includes(term);
-                          })
-                          .slice(0, 8)
-                          .map((b) => (
-                            <button
-                              key={String(b._id)}
-                              type="button"
-                              className={styles.invoiceDropdownItem}
-                              onClick={() => {
-                                setRecordForm((prev) => ({ ...prev, billId: String(b._id) }));
-                                setRecordInvoiceSearch("");
-                                setRecordInvoiceDropdownOpen(false);
-                              }}
-                            >
-                              {formatInvoiceName({ contactName: b.contactName, date: b.invoiceDate })}
-                            </button>
-                          ))}
-                        {allInvoicesForLinking.filter((b) => {
-                          if (!recordInvoiceSearch.trim()) return true;
-                          const term = recordInvoiceSearch.toLowerCase();
-                          return b.contactName.toLowerCase().includes(term) || b.invoiceNumber.toLowerCase().includes(term) || b.invoiceDate.includes(term);
-                        }).length === 0 && (
-                          <div className={styles.invoiceDropdownEmpty}>no invoices found</div>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </RecordField>
-
-            <RecordField label="ATTACHMENT">
-              <label className={styles.dropZone}>
-                <input
-                  type="file"
-                  className={styles.fileInput}
-                  accept=".pdf,.jpg,.jpeg,.png,.mp4,.mov,.webm"
-                  onChange={(e) => {
-                    void handleRecordAttachmentSelect(e.target.files?.[0] ?? null);
-                  }}
-                />
-                <div className={styles.dropZoneText}>
-                  drop file or <span className={styles.dropZoneBrowse}>browse</span>
-                </div>
-                <div className={styles.dropZoneSubtext}>PDF, JPG, PNG, MP4, MOV — max 10MB</div>
-                {recordAttachment ? <div className={styles.dropZoneFile}>{recordAttachment.name}</div> : null}
-                {recordDetecting ? <div className={styles.dropZoneFile}>detecting report...</div> : null}
-              </label>
-            </RecordField>
-
-            <RecordField label="NEXT VISIT">
-              <div style={{ position: "relative" }}>
-                <input
-                  className={styles.recordInput}
-                  type="date"
-                  value={recordForm.nextVisitDate}
-                  onChange={(e) => setRecordForm((prev) => ({ ...prev, nextVisitDate: e.target.value }))}
-                />
-                {recordForm.nextVisitDate ? (
-                  <button
-                    type="button"
-                    className={styles.clearDateBtn}
-                    onClick={() => setRecordForm((prev) => ({ ...prev, nextVisitDate: "" }))}
-                    aria-label="Clear next visit date"
-                  >
-                    ✕
-                  </button>
-                ) : null}
-              </div>
-            </RecordField>
+                    {recordForm.nextVisitDate ? (
+                      <button
+                        type="button"
+                        className={styles.clearDateBtn}
+                        onClick={() => setRecordForm((prev) => ({ ...prev, nextVisitDate: "" }))}
+                        aria-label="Clear next visit date"
+                      >
+                        ✕
+                      </button>
+                    ) : null}
+                  </div>
+                </RecordField>
+              </>
+            ) : null}
 
             {recordError ? <p className={styles.recordError}>{recordError}</p> : null}
           </form>

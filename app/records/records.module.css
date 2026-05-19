@@ -1332,6 +1332,38 @@
   font-size: 11px;
 }
 
+.moreOptionsToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 12px 0;
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #9ea2b0;
+  background: none;
+  border: none;
+  border-top: 1px solid #f0f1f5;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+
+.moreOptionsToggle:hover {
+  color: #4a5bdb;
+}
+
+.moreOptionsArrow {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+
+.moreOptionsArrowOpen {
+  transform: rotate(180deg);
+}
+
 .recordPanelFooter {
   position: absolute;
   bottom: 0;
