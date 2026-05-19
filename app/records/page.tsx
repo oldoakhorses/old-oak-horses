@@ -323,29 +323,32 @@ export default function RecordsPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const now = Date.now();
   const recordById = useMemo(() => new Map(allRecords.map((row) => [String(row._id), row])), [allRecords]);
+  const todayEnd = useMemo(() => {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
+  }, []);
+
   const upcomingRecordsBase = useMemo(() => {
     return allRecords
-      .filter((record) => record.isUpcoming && record.date > now)
-      .map((record) => {
-        return {
-          base: record,
-          eventDate: record.date,
-          isFollowup: Boolean(record.linkedRecordId),
-        } as DisplayRecord;
-      });
-  }, [allRecords, now]);
+      .filter((record) => record.date > todayEnd)
+      .map((record) => ({
+        base: record,
+        eventDate: record.date,
+        isFollowup: Boolean(record.linkedRecordId),
+      } as DisplayRecord));
+  }, [allRecords, todayEnd]);
 
   const pastRecordsBase = useMemo(() => {
     return allRecords
-      .filter((record) => !record.isUpcoming || (record.isUpcoming && record.date <= now))
+      .filter((record) => record.date <= todayEnd)
       .map((record) => ({
         base: record,
         eventDate: record.date,
         isFollowup: false,
       } as DisplayRecord));
-  }, [allRecords, now]);
+  }, [allRecords, todayEnd]);
 
   const tabRecords = activeTab === "upcoming" ? upcomingRecordsBase : pastRecordsBase;
 
