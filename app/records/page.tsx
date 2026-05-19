@@ -513,10 +513,6 @@ export default function RecordsPage() {
       setRecordError("At least one horse is required.");
       return;
     }
-    if (!recordForm.contactName.trim()) {
-      setRecordError("Contact is required.");
-      return;
-    }
     setRecordError("");
     setRecordSubmitting(true);
     try {
@@ -1570,7 +1566,7 @@ export default function RecordsPage() {
                   </RecordField>
                 ) : null}
 
-                <RecordField label="CONTACT" required>
+                <RecordField label="CONTACT">
                   <div className={styles.contactSearchWrap} ref={contactDropdownRef}>
                     <input
                       className={styles.recordInput}
