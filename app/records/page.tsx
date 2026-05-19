@@ -1756,6 +1756,7 @@ export default function RecordsPage() {
                 rows={4}
                 value={recordForm.notes}
                 onChange={(event) => setRecordForm((prev) => ({ ...prev, notes: event.target.value }))}
+                onFocus={(e) => { setTimeout(() => { e.target.scrollIntoView({ behavior: "smooth", block: "center" }); }, 300); }}
                 placeholder="add any details..."
               />
             </RecordField>
