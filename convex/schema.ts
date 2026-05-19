@@ -276,6 +276,7 @@ export default defineSchema({
 
   horseRecords: defineTable({
     horseId: v.id("horses"),
+    title: v.optional(v.string()),
     type: v.union(
       v.literal("veterinary"),
       v.literal("medication"),

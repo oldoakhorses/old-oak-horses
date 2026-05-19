@@ -10,6 +10,7 @@ function withStorageId(value?: string) {
 export const createHorseRecord = mutation({
   args: {
     horseId: v.id("horses"),
+    title: v.optional(v.string()),
     type: v.union(
       v.literal("veterinary"),
       v.literal("medication"),
@@ -54,6 +55,7 @@ export const createHorseRecord = mutation({
     try {
       const recordId = await ctx.db.insert("horseRecords", {
         horseId: args.horseId,
+        title: args.title?.trim() || undefined,
         type: args.type,
         customType: args.customType?.trim() || undefined,
         date: args.date,
@@ -228,6 +230,7 @@ export const getAll = query({
 export const updateHorseRecord = mutation({
   args: {
     recordId: v.id("horseRecords"),
+    title: v.optional(v.string()),
     type: v.optional(v.union(
       v.literal("veterinary"),
       v.literal("medication"),
@@ -273,6 +276,7 @@ export const updateHorseRecord = mutation({
     const { recordId, ...rest } = args;
     await ctx.db.patch(recordId, {
       ...rest,
+      title: rest.title?.trim() || undefined,
       customType: rest.customType?.trim() || undefined,
       contactName: rest.contactName?.trim() || undefined,
       vetOtherDescription: rest.vetOtherDescription?.trim() || undefined,
@@ -290,6 +294,7 @@ export const updateRecordWithNextVisit = mutation({
   args: {
     recordId: v.id("horseRecords"),
     updates: v.object({
+      title: v.optional(v.string()),
       type: v.optional(v.union(
         v.literal("veterinary"),
         v.literal("medication"),
@@ -334,6 +339,7 @@ export const updateRecordWithNextVisit = mutation({
 
     const cleanedUpdates = {
       ...args.updates,
+      title: args.updates.title?.trim() || undefined,
       customType: args.updates.customType?.trim() || undefined,
       contactName: args.updates.contactName?.trim() || undefined,
       serviceType: args.updates.serviceType?.trim() || undefined,

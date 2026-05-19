@@ -66,6 +66,7 @@ type GlobalRecord = {
   horseId: Id<"horses">;
   horseName: string;
   horse: { _id: Id<"horses">; name: string; status: "active" | "inactive" | "past" } | null;
+  title?: string;
   type: RecordType;
   customType?: string;
   date: number;
@@ -93,6 +94,7 @@ type DisplayRecord = {
 };
 
 type EditState = {
+  title: string;
   type: RecordType;
   visitType: "" | VetSubcategory;
   visitTypes: VetSubcategory[];
@@ -110,6 +112,7 @@ type EditState = {
 
 type RecordFormState = {
   horseIds: Id<"horses">[];
+  title: string;
   date: string;
   contactName: string;
   customType: string;
@@ -173,6 +176,7 @@ function buildAttachmentName(
 function createInitialRecordForm(): RecordFormState {
   return {
     horseIds: [],
+    title: "",
     date: getTodayDate(),
     contactName: "",
     customType: "",
@@ -336,6 +340,7 @@ export default function RecordsPage() {
 
       if (!term) return true;
       const bag = [
+        record.title,
         record.type,
         record.contactName,
         record.horseName,
@@ -500,6 +505,7 @@ export default function RecordsPage() {
           : undefined;
         const mainRecordId = await createHorseRecord({
           horseId,
+          title: recordForm.title.trim() || undefined,
           type: selectedRecordType,
           customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
           date: new Date(`${recordForm.date}T00:00:00`).getTime(),
@@ -521,6 +527,7 @@ export default function RecordsPage() {
         if (recordForm.nextVisitDate) {
           const upcomingRecordId = await createHorseRecord({
             horseId,
+            title: recordForm.title.trim() || undefined,
             type: selectedRecordType,
             customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
             date: new Date(`${recordForm.nextVisitDate}T00:00:00`).getTime(),
@@ -599,6 +606,7 @@ export default function RecordsPage() {
     await updateRecordWithNextVisit({
       recordId: editingRecordId,
       updates: {
+        title: editState.title.trim() || undefined,
         type: editState.type,
         visitType: editState.type === "veterinary" && editState.visitTypes.length > 0 ? editState.visitTypes[0] : undefined,
         visitTypes: editState.type === "veterinary" && editState.visitTypes.length > 0 ? editState.visitTypes : undefined,
@@ -910,6 +918,15 @@ export default function RecordsPage() {
                       <div className={styles.expandedFields}>
                         {editing ? (
                           <>
+                            <ExpandedInput label="TITLE">
+                              <input
+                                className={styles.expandedInput}
+                                value={editState.title}
+                                onClick={(event) => event.stopPropagation()}
+                                onChange={(event) => setEditState({ ...editState, title: event.target.value })}
+                                placeholder="e.g., Spring Vaccinations"
+                              />
+                            </ExpandedInput>
                             <ExpandedInput label={contactLabel(editState.type)}>
                               <div className={styles.contactSearchWrap} ref={editContactDropdownRef}>
                                 <input
@@ -1202,6 +1219,7 @@ export default function RecordsPage() {
                                 event.stopPropagation();
                                 setEditingRecordId(record._id);
                                   setEditState({
+                                    title: record.title || "",
                                     type: record.type,
                                     visitType: (record.visitType || "") as "" | VetSubcategory,
                                     visitTypes: (record.visitTypes?.length ? record.visitTypes : record.visitType ? [record.visitType] : []) as VetSubcategory[],
@@ -1331,6 +1349,15 @@ export default function RecordsPage() {
                   </div>
                 ) : null}
               </div>
+            </RecordField>
+
+            <RecordField label="TITLE">
+              <input
+                className={styles.recordInput}
+                value={recordForm.title}
+                onChange={(event) => setRecordForm((prev) => ({ ...prev, title: event.target.value }))}
+                placeholder="e.g., Spring Vaccinations, Annual Coggins"
+              />
             </RecordField>
 
             <RecordField label="DATE" required>
@@ -1706,6 +1733,7 @@ function getRecordSubtitle(record: GlobalRecord): string {
 }
 
 function getRecordLabel(record: GlobalRecord) {
+  if (record.title) return record.title;
   if (record.type === "veterinary") {
     const labels = getVetVisitTypeLabels(record);
     if (labels.length > 0) return labels.join(", ");
