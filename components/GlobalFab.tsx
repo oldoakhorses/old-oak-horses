@@ -233,6 +233,8 @@ export default function GlobalFab() {
   const recordInvoiceDropdownRef = useRef<HTMLDivElement | null>(null);
   const [contactDropdownOpen, setContactDropdownOpen] = useState(false);
   const contactDropdownRef = useRef<HTMLDivElement | null>(null);
+  const [subcatDropdownOpen, setSubcatDropdownOpen] = useState(false);
+  const subcatDropdownRef = useRef<HTMLDivElement | null>(null);
   const [invoiceDragOver, setInvoiceDragOver] = useState(false);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [invoiceStage, setInvoiceStage] = useState<"idle" | "uploading" | "detecting" | "parsing" | "redirecting">("idle");
@@ -304,6 +306,9 @@ export default function GlobalFab() {
       }
       if (contactDropdownRef.current && !contactDropdownRef.current.contains(event.target as Node)) {
         setContactDropdownOpen(false);
+      }
+      if (subcatDropdownRef.current && !subcatDropdownRef.current.contains(event.target as Node)) {
+        setSubcatDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -763,6 +768,10 @@ export default function GlobalFab() {
     }
     if (recordForm.horseIds.length === 0) {
       setRecordError("At least one horse is required.");
+      return;
+    }
+    if (!recordForm.contactName.trim()) {
+      setRecordError("Contact is required.");
       return;
     }
 
@@ -1305,29 +1314,90 @@ export default function GlobalFab() {
                 {selectedRecordType === "veterinary" ? (
                   <>
                     <RecordField label="SUBCATEGORY">
-                      <div className={styles.chipRow} style={{ flexWrap: "wrap" }}>
-                        {VET_VISIT_TYPE_OPTIONS.map((opt) => {
-                          const active = recordForm.visitTypes.includes(opt.value);
-                          return (
-                            <button
-                              type="button"
-                              key={opt.value}
-                              className={`${styles.serviceChip} ${active ? styles.serviceChipActive : ""}`}
-                              onClick={() =>
-                                setRecordForm((prev) => ({
-                                  ...prev,
-                                  visitTypes: active
-                                    ? prev.visitTypes.filter((v) => v !== opt.value)
-                                    : [...prev.visitTypes, opt.value],
-                                }))
-                              }
-                            >
-                              {opt.label}
-                            </button>
-                          );
-                        })}
+                      <div className={styles.multiSelectContainer} ref={subcatDropdownRef}>
+                        <div
+                          className={`${styles.multiSelectInput} ${subcatDropdownOpen ? styles.multiSelectInputOpen : ""}`}
+                          onClick={() => setSubcatDropdownOpen((prev) => !prev)}
+                        >
+                          {recordForm.visitTypes.length > 0 ? (
+                            <>
+                              {recordForm.visitTypes.map((vt) => {
+                                const label = VET_VISIT_TYPE_OPTIONS.find((o) => o.value === vt)?.label ?? vt;
+                                return (
+                                  <span key={vt} className={styles.horsePill}>
+                                    {label}
+                                    <button
+                                      type="button"
+                                      className={styles.horsePillRemove}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        setRecordForm((prev) => ({ ...prev, visitTypes: prev.visitTypes.filter((v) => v !== vt) }));
+                                      }}
+                                    >
+                                      ✕
+                                    </button>
+                                  </span>
+                                );
+                              })}
+                            </>
+                          ) : (
+                            <span className={styles.multiSelectPlaceholder}>select subcategory...</span>
+                          )}
+                          <span className={styles.multiSelectCaret}>▼</span>
+                        </div>
+                        {subcatDropdownOpen ? (
+                          <div className={styles.multiSelectDropdown}>
+                            {VET_VISIT_TYPE_OPTIONS.map((opt) => {
+                              const checked = recordForm.visitTypes.includes(opt.value);
+                              return (
+                                <button
+                                  type="button"
+                                  key={opt.value}
+                                  className={styles.multiSelectOption}
+                                  onClick={() =>
+                                    setRecordForm((prev) => ({
+                                      ...prev,
+                                      visitTypes: checked
+                                        ? prev.visitTypes.filter((v) => v !== opt.value)
+                                        : [...prev.visitTypes, opt.value],
+                                    }))
+                                  }
+                                >
+                                  <span className={`${styles.checkbox} ${checked ? styles.checkboxChecked : styles.checkboxUnchecked}`}>✓</span>
+                                  <span>{opt.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : null}
                       </div>
                     </RecordField>
+                    {recordForm.visitTypes.includes("medication") ? (
+                      <RecordField label="MEDICATION(S)">
+                        <div className={styles.chipRow} style={{ flexWrap: "wrap" }}>
+                          {MEDICATION_OPTIONS.map((med) => {
+                            const active = recordForm.medications.includes(med);
+                            return (
+                              <button
+                                type="button"
+                                key={med}
+                                className={`${styles.serviceChip} ${active ? styles.serviceChipActive : ""}`}
+                                onClick={() =>
+                                  setRecordForm((prev) => ({
+                                    ...prev,
+                                    medications: active
+                                      ? prev.medications.filter((m) => m !== med)
+                                      : [...prev.medications, med],
+                                  }))
+                                }
+                              >
+                                {med}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </RecordField>
+                    ) : null}
                     {recordForm.visitTypes.includes("other") ? (
                       <RecordField label="DESCRIBE OTHER">
                         <input
@@ -1341,33 +1411,6 @@ export default function GlobalFab() {
                   </>
                 ) : null}
 
-                {selectedRecordType === "medication" ? (
-                  <RecordField label="MEDICATION(S)">
-                    <div className={styles.chipRow} style={{ flexWrap: "wrap" }}>
-                      {MEDICATION_OPTIONS.map((med) => {
-                        const active = recordForm.medications.includes(med);
-                        return (
-                          <button
-                            type="button"
-                            key={med}
-                            className={`${styles.serviceChip} ${active ? styles.serviceChipActive : ""}`}
-                            onClick={() =>
-                              setRecordForm((prev) => ({
-                                ...prev,
-                                medications: active
-                                  ? prev.medications.filter((m) => m !== med)
-                                  : [...prev.medications, med],
-                              }))
-                            }
-                          >
-                            {med}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </RecordField>
-                ) : null}
-
                 {selectedRecordType === "other" ? (
                   <RecordField label="DESCRIBE CATEGORY">
                     <input
@@ -1379,61 +1422,54 @@ export default function GlobalFab() {
                   </RecordField>
                 ) : null}
 
-                {selectedRecordType === "farrier" ? (
-                  <RecordField label="SERVICE TYPE">
-                    <div className={styles.chipRow}>
-                      {farrierServiceTypes.map((service) => {
-                        const active = recordForm.serviceType === service;
-                        return (
-                          <button
-                            type="button"
-                            key={service}
-                            className={`${styles.serviceChip} ${active ? styles.serviceChipActive : ""}`}
-                            onClick={() => setRecordForm((prev) => ({ ...prev, serviceType: service }))}
-                          >
-                            {service}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </RecordField>
-                ) : null}
-
-                <RecordField label={contactLabel(selectedRecordType)}>
-                  <div className={styles.contactSearchWrap} ref={contactDropdownRef}>
-                    <input
+                <RecordField label="CONTACT" required>
+                  {selectedRecordType === "other" ? (
+                    <select
                       className={styles.recordInput}
                       value={recordForm.contactName}
-                      onChange={(e) => {
-                        setRecordForm((prev) => ({ ...prev, contactName: e.target.value }));
-                        setContactDropdownOpen(true);
-                      }}
-                      onFocus={() => setContactDropdownOpen(true)}
-                      placeholder={contactPlaceholder(selectedRecordType)}
-                    />
-                    {contactDropdownOpen && recordForm.contactName.trim() && (() => {
-                      const term = recordForm.contactName.trim().toLowerCase();
-                      const matches = allContactsForRecord.filter((c) => c.name.toLowerCase().includes(term));
-                      if (matches.length === 0) return null;
-                      return (
-                        <div className={styles.contactDropdown}>
-                          {matches.slice(0, 8).map((c) => (
-                            <button
-                              type="button"
-                              key={c._id}
-                              className={styles.contactDropdownItem}
-                              onClick={() => {
-                                setRecordForm((prev) => ({ ...prev, contactName: c.name }));
-                                setContactDropdownOpen(false);
-                              }}
-                            >
-                              {c.name}
-                            </button>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </div>
+                      onChange={(e) => setRecordForm((prev) => ({ ...prev, contactName: e.target.value }))}
+                    >
+                      <option value="">select contact...</option>
+                      {allContactsForRecord.map((c) => (
+                        <option key={c._id} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className={styles.contactSearchWrap} ref={contactDropdownRef}>
+                      <input
+                        className={styles.recordInput}
+                        value={recordForm.contactName}
+                        onChange={(e) => {
+                          setRecordForm((prev) => ({ ...prev, contactName: e.target.value }));
+                          setContactDropdownOpen(true);
+                        }}
+                        onFocus={() => setContactDropdownOpen(true)}
+                        placeholder={contactPlaceholder(selectedRecordType)}
+                      />
+                      {contactDropdownOpen && recordForm.contactName.trim() && (() => {
+                        const term = recordForm.contactName.trim().toLowerCase();
+                        const matches = allContactsForRecord.filter((c) => c.name.toLowerCase().includes(term));
+                        if (matches.length === 0) return null;
+                        return (
+                          <div className={styles.contactDropdown}>
+                            {matches.slice(0, 8).map((c) => (
+                              <button
+                                type="button"
+                                key={c._id}
+                                className={styles.contactDropdownItem}
+                                onClick={() => {
+                                  setRecordForm((prev) => ({ ...prev, contactName: c.name }));
+                                  setContactDropdownOpen(false);
+                                }}
+                              >
+                                {c.name}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </RecordField>
               </>
             ) : null}
@@ -1620,17 +1656,12 @@ export default function GlobalFab() {
   );
 }
 
-function contactLabel(type: RecordType) {
-  if (type === "veterinary") return "VETERINARIAN";
-  if (type === "medication") return "ADMINISTERED BY";
-  if (type === "farrier") return "FARRIER";
-  if (type === "bodywork") return "PRACTITIONER";
+function contactLabel(_type: RecordType) {
   return "CONTACT";
 }
 
 function contactPlaceholder(type: RecordType) {
   if (type === "veterinary") return "Dr. Sarah Buthe";
-  if (type === "medication") return "optional";
   if (type === "farrier") return "Steve Lorenzo";
   if (type === "bodywork") return "Fred Michelon";
   return "optional";
