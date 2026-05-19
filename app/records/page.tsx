@@ -1265,11 +1265,16 @@ export default function RecordsPage() {
                               onClick={(event) => {
                                 event.stopPropagation();
                                 setEditingRecordId(record._id);
+                                  const remappedType = record.type === "medication" ? "veterinary" : record.type;
+                                  const baseVisitTypes = (record.visitTypes?.length ? record.visitTypes : record.visitType ? [record.visitType] : []) as VetSubcategory[];
+                                  const visitTypes = record.type === "medication" && !baseVisitTypes.includes("medication" as VetSubcategory)
+                                    ? [...baseVisitTypes, "medication" as VetSubcategory]
+                                    : baseVisitTypes;
                                   setEditState({
                                     title: record.title || "",
-                                    type: record.type,
+                                    type: remappedType,
                                     visitType: (record.visitType || "") as "" | VetSubcategory,
-                                    visitTypes: (record.visitTypes?.length ? record.visitTypes : record.visitType ? [record.visitType] : []) as VetSubcategory[],
+                                    visitTypes,
                                     vetOtherDescription: record.vetOtherDescription || "",
                                     contactName: record.contactName || "",
                                     date: toDateInput(record.date),
