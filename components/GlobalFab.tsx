@@ -6,6 +6,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { formatInvoiceName } from "@/lib/formatInvoiceName";
+import { useAuth } from "@/contexts/AuthContext";
 import styles from "@/app/dashboard/dashboard.module.css";
 
 type RecordType = "veterinary" | "medication" | "farrier" | "bodywork" | "other";
@@ -192,6 +193,7 @@ function createInitialDocumentForm(): DocumentFormState {
 }
 
 export default function GlobalFab() {
+  const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -688,6 +690,7 @@ export default function GlobalFab() {
         const billId = await createManualBill({
           fileId: storageId,
           fileName: file.name,
+          createdBy: user?.name,
         });
         setInvoiceStatusMessage("redirecting...");
         setInvoiceStage("redirecting");
@@ -730,7 +733,7 @@ export default function GlobalFab() {
       }
 
       if (fileId) {
-        const billId = await createManualBill({ fileId, fileName: name });
+        const billId = await createManualBill({ fileId, fileName: name, createdBy: user?.name });
         closePanel();
         router.push(`/invoices/preview/${billId}?manual=1`);
       } else {
@@ -740,7 +743,7 @@ export default function GlobalFab() {
         if (!res.ok) throw new Error("Failed to create invoice");
         const payload = await res.json();
         const storageId = payload.storageId as Id<"_storage">;
-        const billId = await createManualBill({ fileId: storageId, fileName: name });
+        const billId = await createManualBill({ fileId: storageId, fileName: name, createdBy: user?.name });
         closePanel();
         router.push(`/invoices/preview/${billId}?manual=1`);
       }
@@ -787,6 +790,7 @@ export default function GlobalFab() {
         const notesForHorse = horseSpecificNotes ?? recordForm.notes.trim();
         const mainRecordId = await createHorseRecord({
           horseId,
+          createdBy: user?.name,
           type: selectedRecordType,
           customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
           date: new Date(`${recordForm.date}T00:00:00`).getTime(),
@@ -813,6 +817,7 @@ export default function GlobalFab() {
         if (recordForm.nextVisitDate) {
           const upcomingRecordId = await createHorseRecord({
             horseId,
+            createdBy: user?.name,
             type: selectedRecordType,
             customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
             date: new Date(`${recordForm.nextVisitDate}T00:00:00`).getTime(),

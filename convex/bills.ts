@@ -111,7 +111,8 @@ export const createBillRecord = mutation({
     fileId: v.id("_storage"),
     fileName: v.string(),
     billingPeriod: v.string(),
-    originalPdfUrl: v.optional(v.string())
+    originalPdfUrl: v.optional(v.string()),
+    createdBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("bills", {
@@ -122,7 +123,8 @@ export const createBillRecord = mutation({
       status: "uploading",
       billingPeriod: args.billingPeriod,
       uploadedAt: Date.now(),
-      originalPdfUrl: args.originalPdfUrl
+      originalPdfUrl: args.originalPdfUrl,
+      createdBy: args.createdBy?.trim() || undefined,
     });
   }
 });
@@ -134,7 +136,8 @@ export const createAndParseBill = mutation({
     fileId: v.id("_storage"),
     fileName: v.string(),
     billingPeriod: v.string(),
-    originalPdfUrl: v.optional(v.string())
+    originalPdfUrl: v.optional(v.string()),
+    createdBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const billId = await ctx.db.insert("bills", {
@@ -145,7 +148,8 @@ export const createAndParseBill = mutation({
       status: "parsing",
       billingPeriod: args.billingPeriod,
       uploadedAt: Date.now(),
-      originalPdfUrl: args.originalPdfUrl
+      originalPdfUrl: args.originalPdfUrl,
+      createdBy: args.createdBy?.trim() || undefined,
     });
 
     await ctx.scheduler.runAfter(0, internal.billParsing.parseBillPdf, { billId });
@@ -1739,6 +1743,7 @@ export const createManualBill = mutation({
   args: {
     fileId: v.id("_storage"),
     fileName: v.string(),
+    createdBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -1751,6 +1756,7 @@ export const createManualBill = mutation({
       uploadedAt: now,
       originalPdfUrl: url ?? undefined,
       source: "upload",
+      createdBy: args.createdBy?.trim() || undefined,
     });
     return billId;
   },

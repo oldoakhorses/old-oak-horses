@@ -11,6 +11,7 @@ export const createHorseRecord = mutation({
   args: {
     horseId: v.id("horses"),
     title: v.optional(v.string()),
+    createdBy: v.optional(v.string()),
     type: v.union(
       v.literal("veterinary"),
       v.literal("medication"),
@@ -56,6 +57,7 @@ export const createHorseRecord = mutation({
       const recordId = await ctx.db.insert("horseRecords", {
         horseId: args.horseId,
         title: args.title?.trim() || undefined,
+        createdBy: args.createdBy?.trim() || undefined,
         type: args.type,
         customType: args.customType?.trim() || undefined,
         date: args.date,

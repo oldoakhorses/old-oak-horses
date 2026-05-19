@@ -8,6 +8,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
 import { formatInvoiceName } from "@/lib/formatInvoiceName";
+import { useAuth } from "@/contexts/AuthContext";
 import styles from "./records.module.css";
 
 type RecordType = "veterinary" | "medication" | "farrier" | "bodywork" | "other";
@@ -194,6 +195,7 @@ function createInitialRecordForm(): RecordFormState {
 }
 
 export default function RecordsPage() {
+  const { user } = useAuth();
   const allRecords = (useQuery(api.horseRecords.getAll) as GlobalRecord[] | undefined) ?? [];
   const activeHorses = useQuery(api.horses.getActiveHorses) ?? [];
 
@@ -506,6 +508,7 @@ export default function RecordsPage() {
         const mainRecordId = await createHorseRecord({
           horseId,
           title: recordForm.title.trim() || undefined,
+          createdBy: user?.name,
           type: selectedRecordType,
           customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
           date: new Date(`${recordForm.date}T00:00:00`).getTime(),
@@ -528,6 +531,7 @@ export default function RecordsPage() {
           const upcomingRecordId = await createHorseRecord({
             horseId,
             title: recordForm.title.trim() || undefined,
+            createdBy: user?.name,
             type: selectedRecordType,
             customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
             date: new Date(`${recordForm.nextVisitDate}T00:00:00`).getTime(),
@@ -1136,6 +1140,7 @@ export default function RecordsPage() {
                             <ExpandedField label="HORSE" value={record.horseName} />
                             <ExpandedField label={contactLabel(record.type)} value={record.contactName} />
                             <ExpandedField label="DATE" value={formatDateLong(row.eventDate)} />
+                            <ExpandedField label="CREATED BY" value={(record as any).createdBy} />
                             <ExpandedField label="NOTES" value={record.notes} />
                             {record.billInfo ? (
                               <div className={styles.expandedFieldRow}>

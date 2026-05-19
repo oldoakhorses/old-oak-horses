@@ -187,6 +187,7 @@ export default defineSchema({
     ccTransactionId: v.optional(v.id("ccTransactions")),
     /** How this bill was created */
     source: v.optional(v.union(v.literal("upload"), v.literal("cc_transaction"))),
+    createdBy: v.optional(v.string()),
   })
     .index("by_uploadedAt", ["uploadedAt"])
     .index("by_contact", ["contactId"])
@@ -277,6 +278,7 @@ export default defineSchema({
   horseRecords: defineTable({
     horseId: v.id("horses"),
     title: v.optional(v.string()),
+    createdBy: v.optional(v.string()),
     type: v.union(
       v.literal("veterinary"),
       v.literal("medication"),

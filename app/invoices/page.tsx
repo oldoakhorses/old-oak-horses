@@ -401,6 +401,12 @@ export default function InvoicesPage() {
 
                 {isExpanded ? (
                   <div className={styles.invoiceExpanded}>
+                    {(row as any).createdBy ? (
+                      <div className={styles.notesBlock}>
+                        <div className={styles.detailLabel}>CREATED BY</div>
+                        <div className={styles.notesText}>{(row as any).createdBy}</div>
+                      </div>
+                    ) : null}
                     {editingNotesFor === rowId ? (
                       <div className={styles.notesEditor}>
                         <textarea
