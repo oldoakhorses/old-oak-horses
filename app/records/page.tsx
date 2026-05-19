@@ -833,6 +833,13 @@ export default function RecordsPage() {
         </div>
 
         <section className={styles.recordsCard}>
+          <div className={styles.tableHeader}>
+            <span className={styles.colRecord}>Record</span>
+            <span className={styles.colSubtitle}>Detail</span>
+            <span className={styles.colDate}>Date</span>
+            <span className={styles.colCategory}>Category</span>
+            <span className={styles.colHorse}>Horse</span>
+          </div>
 
           {sortedRecords.length === 0 ? (
             <div className={styles.emptyState}>
@@ -861,13 +868,13 @@ export default function RecordsPage() {
               const expanded = expandedId === record._id;
               const editing = editingRecordId === record._id && editState !== null;
               const badgeColors = RECORD_CATEGORY_COLORS[record.type];
-              const detail = getRecordDetail(record);
               const dateSoon = activeTab === "upcoming" && daysUntil(row.eventDate) <= 3;
+              const subtitle = getRecordSubtitle(record);
 
               return (
                 <div key={`${record._id}-${row.isFollowup ? "f" : "s"}-${row.eventDate}`}>
                   <div
-                    className={styles.recordRow}
+                    className={`${styles.recordRow} ${expanded ? styles.recordRowExpanded : ""}`}
                     onClick={() => {
                       setExpandedId((prev) => (prev === record._id ? null : record._id));
                       setMenuOpenId(null);
@@ -875,61 +882,27 @@ export default function RecordsPage() {
                       setEditState(null);
                     }}
                   >
-                    <div className={styles.recordMain}>
-                      <div className={styles.recordTopLine}>
-                        <div className={styles.recordIcon}>{recordIcon(record.type)}</div>
-                        <div className={styles.recordLabel}>{getRecordLabel(record)}</div>
-                        {activeTab === "upcoming" && row.isFollowup ? <span className={styles.followupBadge}>follow-up</span> : null}
-                      </div>
-                      {record.type === "veterinary" ? (
-                        <>
-                          {record.contactName ? <div className={styles.recordSublabel}><span className={styles.recordDetailPrimary}>{record.contactName}</span></div> : null}
-                          <div className={styles.recordSublabel}>
-                            <Link
-                              href={record.horseId ? `/horses/${record.horseId}` : "/horses"}
-                              className={styles.recordHorseLink}
-                              onClick={(event) => event.stopPropagation()}
-                            >
-                              {record.horseName}
-                            </Link>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          {detail ? <div className={styles.recordSublabel}>{detail}</div> : null}
-                          <div className={styles.recordBottomLine}>
-                            <Link
-                              href={record.horseId ? `/horses/${record.horseId}` : "/horses"}
-                              className={styles.recordHorseLink}
-                              onClick={(event) => event.stopPropagation()}
-                            >
-                              {record.horseName}
-                            </Link>
-                          </div>
-                        </>
-                      )}
-                      {record.linkedRecordId ? (
-                        <button
-                          type="button"
-                          className={styles.recordLinkedNote}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setExpandedId(record.linkedRecordId || null);
-                            setActiveTab(record.isUpcoming ? "past" : "upcoming");
-                          }}
-                        >
-                          {record.isUpcoming
-                            ? `📋 follow-up from: ${formatDateLong(recordById.get(String(record.linkedRecordId))?.date ?? record.date)}`
-                            : `📅 follow-up scheduled: ${formatDateLong(recordById.get(String(record.linkedRecordId))?.date ?? record.date)}`}
-                        </button>
-                      ) : null}
-                    </div>
-                    <div className={styles.recordRightCol}>
+                    <span className={styles.colRecord}>
+                      <span className={styles.recordIcon}>{recordIcon(record.type)}</span>
+                      <span className={styles.recordLabel}>{getRecordLabel(record)}</span>
+                      {activeTab === "upcoming" && row.isFollowup ? <span className={styles.followupBadge}>f/u</span> : null}
+                    </span>
+                    <span className={styles.colSubtitle}>{subtitle || <span className={styles.muted}>—</span>}</span>
+                    <span className={`${styles.colDate} ${dateSoon ? styles.recordDateSoon : ""}`}>{formatDateShort(row.eventDate)}</span>
+                    <span className={styles.colCategory}>
                       <span className={styles.categoryBadge} style={{ background: badgeColors.bg, color: badgeColors.color }}>
                         {prettyType(record.type)}
                       </span>
-                      <span className={`${styles.recordDate} ${dateSoon ? styles.recordDateSoon : ""}`}>{formatDateLong(row.eventDate)}</span>
-                    </div>
+                    </span>
+                    <span className={styles.colHorse}>
+                      <Link
+                        href={record.horseId ? `/horses/${record.horseId}` : "/horses"}
+                        className={styles.recordHorseLink}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {record.horseName}
+                      </Link>
+                    </span>
                   </div>
 
                   {expanded ? (
@@ -1724,6 +1697,14 @@ function getRecordSubtype(record: GlobalRecord) {
   return null;
 }
 
+function getRecordSubtitle(record: GlobalRecord): string {
+  if (record.contactName) return record.contactName;
+  if (record.type === "medication") {
+    return record.medications?.length ? record.medications.join(", ") : "";
+  }
+  return "";
+}
+
 function getRecordLabel(record: GlobalRecord) {
   if (record.type === "veterinary") {
     const labels = getVetVisitTypeLabels(record);
@@ -1770,6 +1751,14 @@ function prettyType(type: RecordType) {
 
 function formatDateLong(timestamp: number) {
   return new Date(timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatDateShort(timestamp: number) {
+  const d = new Date(timestamp);
+  const m = (d.getMonth() + 1).toString().padStart(2, "0");
+  const day = d.getDate().toString().padStart(2, "0");
+  const y = d.getFullYear().toString().slice(2);
+  return `${m}/${day}/${y}`;
 }
 
 function toDateInput(timestamp: number) {
