@@ -1137,11 +1137,18 @@ export default function RecordsPage() {
                           </>
                         ) : (
                           <>
-                            <ExpandedField label="HORSE" value={record.horseName} />
-                            <ExpandedField label={contactLabel(record.type)} value={record.contactName} />
-                            <ExpandedField label="DATE" value={formatDateLong(row.eventDate)} />
-                            <ExpandedField label="CREATED BY" value={(record as any).createdBy} />
-                            <ExpandedField label="NOTES" value={record.notes} />
+                            <div className={styles.expandedMetaRow}>
+                              <ExpandedField label="HORSE" value={record.horseName} />
+                              <ExpandedField label={contactLabel(record.type)} value={record.contactName} />
+                              <ExpandedField label="DATE" value={formatDateLong(row.eventDate)} />
+                              <ExpandedField label="CREATED BY" value={(record as any).createdBy} />
+                            </div>
+                            {record.notes ? (
+                              <div className={styles.expandedNotesBlock}>
+                                <div className={styles.expandedFieldLabel}>NOTES</div>
+                                <div className={styles.expandedNotesText}>{record.notes}</div>
+                              </div>
+                            ) : null}
                             {record.billInfo ? (
                               <div className={styles.expandedFieldRow}>
                                 <span className={styles.expandedFieldLabel}>LINKED INVOICE</span>

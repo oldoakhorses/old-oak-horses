@@ -531,19 +531,26 @@
 
 .expandedFields {
   display: flex;
-  gap: 32px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 0;
+}
+
+.expandedMetaRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
   margin-bottom: 16px;
 }
 
 .expandedField {
-  min-width: 120px;
+  min-width: 0;
 }
 
 .expandedFieldLabel {
   font-size: 9px;
   color: #9ea2b0;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   margin-bottom: 4px;
 }
@@ -552,13 +559,25 @@
 .expandedFieldEmpty {
   font-size: 12px;
   color: #1a1a2e;
-  max-width: 250px;
   line-height: 1.5;
   white-space: pre-wrap;
 }
 
 .expandedFieldEmpty {
   color: #c4c7d0;
+}
+
+.expandedNotesBlock {
+  border-top: 1px solid #e8eaf0;
+  padding-top: 12px;
+  margin-bottom: 4px;
+}
+
+.expandedNotesText {
+  font-size: 12px;
+  color: #1a1a2e;
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 .expandedFieldRow {
@@ -1290,6 +1309,10 @@
   .colSubtitle { order: 3; flex: 1 1 100%; font-size: 11px; }
   .colCategory { order: 4; }
   .colHorse { order: 5; font-size: 11px; }
+
+  .expandedMetaRow {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 640px) {
