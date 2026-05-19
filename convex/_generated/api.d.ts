@@ -30,6 +30,7 @@ import type * as http from "../http.js";
 import type * as incomeEntries from "../incomeEntries.js";
 import type * as matchHorse from "../matchHorse.js";
 import type * as matchPerson from "../matchPerson.js";
+import type * as migrations_backfillCreatedBy from "../migrations/backfillCreatedBy.js";
 import type * as migrations_migrateNextVisitDate from "../migrations/migrateNextVisitDate.js";
 import type * as owners from "../owners.js";
 import type * as people from "../people.js";
@@ -69,6 +70,7 @@ declare const fullApi: ApiFromModules<{
   incomeEntries: typeof incomeEntries;
   matchHorse: typeof matchHorse;
   matchPerson: typeof matchPerson;
+  "migrations/backfillCreatedBy": typeof migrations_backfillCreatedBy;
   "migrations/migrateNextVisitDate": typeof migrations_migrateNextVisitDate;
   owners: typeof owners;
   people: typeof people;
