@@ -81,6 +81,8 @@ type GlobalRecord = {
   isUpcoming?: boolean;
   linkedRecordId?: Id<"horseRecords">;
   medications?: string[];
+  medicationRepeatValue?: number;
+  medicationRepeatUnit?: "days" | "weeks" | "months";
   notes?: string;
   attachmentStorageId?: string;
   attachmentUrl?: string | null;
@@ -108,6 +110,9 @@ type EditState = {
   customType: string;
   vaccineName: string;
   treatmentDescription: string;
+  medications: string[];
+  medicationRepeatValue: string;
+  medicationRepeatUnit: "" | "days" | "weeks" | "months";
   billId: string;
 };
 
@@ -235,6 +240,8 @@ export default function RecordsPage() {
   const contactDropdownRef = useRef<HTMLDivElement | null>(null);
   const [editProviderDropdownOpen, setEditProviderDropdownOpen] = useState(false);
   const editContactDropdownRef = useRef<HTMLDivElement | null>(null);
+  const [editSubcatDropdownOpen, setEditSubcatDropdownOpen] = useState(false);
+  const editSubcatDropdownRef = useRef<HTMLDivElement | null>(null);
   const [recordAttachment, setRecordAttachment] = useState<File | null>(null);
   const [recordSubmitting, setRecordSubmitting] = useState(false);
   const [recordSuccess, setRecordSuccess] = useState(false);
@@ -302,6 +309,9 @@ export default function RecordsPage() {
       }
       if (editContactDropdownRef.current && !editContactDropdownRef.current.contains(event.target as Node)) {
         setEditProviderDropdownOpen(false);
+      }
+      if (editSubcatDropdownRef.current && !editSubcatDropdownRef.current.contains(event.target as Node)) {
+        setEditSubcatDropdownOpen(false);
       }
       if (filtersPopoverRef.current && !filtersPopoverRef.current.contains(event.target as Node)) {
         setFiltersOpen(false);
@@ -645,6 +655,9 @@ export default function RecordsPage() {
         customType: editState.type === "other" ? editState.customType || undefined : undefined,
         vaccineName: editState.vaccineName || undefined,
         treatmentDescription: editState.treatmentDescription || undefined,
+        medications: editState.medications.length > 0 ? editState.medications : undefined,
+        medicationRepeatValue: editState.medications.length > 0 && editState.medicationRepeatValue ? parseInt(editState.medicationRepeatValue, 10) : undefined,
+        medicationRepeatUnit: editState.medications.length > 0 && editState.medicationRepeatUnit ? editState.medicationRepeatUnit : undefined,
         billId: editState.billId ? editState.billId as Id<"bills"> : undefined,
       },
       nextVisitDate: nextVisitTimestamp,
@@ -921,7 +934,7 @@ export default function RecordsPage() {
                                 placeholder="e.g., Spring Vaccinations"
                               />
                             </ExpandedInput>
-                            <ExpandedInput label={contactLabel(editState.type)}>
+                            <ExpandedInput label="CONTACT">
                               <div className={styles.contactSearchWrap} ref={editContactDropdownRef}>
                                 <input
                                   className={styles.expandedInput}
@@ -932,10 +945,12 @@ export default function RecordsPage() {
                                   }}
                                   onFocus={() => setEditProviderDropdownOpen(true)}
                                 />
-                                {editProviderDropdownOpen && editState.contactName.trim() && (() => {
+                                {editProviderDropdownOpen && (() => {
+                                  const editCategory = RECORD_TYPE_TO_CATEGORY[editState.type] || "";
+                                  const editPool = editCategory ? allContactsForRecord.filter((c: any) => c.category === editCategory) : allContactsForRecord;
                                   const term = editState.contactName.trim().toLowerCase();
-                                  const matches = allContactsForRecord.filter((c) => c.name.toLowerCase().includes(term));
-                                  if (matches.length === 0) return null;
+                                  const matches = term ? editPool.filter((c) => c.name.toLowerCase().includes(term)) : editPool;
+                                  const exactMatch = matches.some((c) => c.name.toLowerCase() === term);
                                   return (
                                     <div className={styles.contactDropdown}>
                                       {matches.slice(0, 8).map((c) => (
@@ -951,6 +966,15 @@ export default function RecordsPage() {
                                           {c.name}
                                         </button>
                                       ))}
+                                      {term && !exactMatch ? (
+                                        <button
+                                          type="button"
+                                          className={`${styles.contactDropdownItem} ${styles.contactDropdownAdd}`}
+                                          onClick={() => setEditProviderDropdownOpen(false)}
+                                        >
+                                          + Add &ldquo;{editState.contactName.trim()}&rdquo;
+                                        </button>
+                                      ) : null}
                                     </div>
                                   );
                                 })()}
@@ -964,14 +988,13 @@ export default function RecordsPage() {
                                 onChange={(event) => setEditState({ ...editState, date: event.target.value })}
                               />
                             </ExpandedInput>
-                            <ExpandedInput label="RECORD TYPE">
+                            <ExpandedInput label="CATEGORY">
                               <select
                                 className={styles.expandedInput}
                                 value={editState.type}
-                                onChange={(event) => setEditState({ ...editState, type: event.target.value as RecordType, visitType: event.target.value === "veterinary" ? editState.visitType : "", serviceType: event.target.value === "farrier" ? editState.serviceType : "", customType: event.target.value === "other" ? editState.customType : "" })}
+                                onChange={(event) => setEditState({ ...editState, type: event.target.value as RecordType, visitType: "", visitTypes: [], serviceType: "", customType: event.target.value === "other" ? editState.customType : "", medications: [], medicationRepeatValue: "", medicationRepeatUnit: "" })}
                               >
                                 <option value="veterinary">Veterinary</option>
-                                <option value="medication">Medication</option>
                                 <option value="farrier">Farrier</option>
                                 <option value="bodywork">Bodywork</option>
                                 <option value="other">Other</option>
@@ -979,31 +1002,71 @@ export default function RecordsPage() {
                             </ExpandedInput>
                             {editState.type === "veterinary" ? (
                               <>
-                                <ExpandedInput label="VISIT TYPE">
-                                  <div className={styles.chipRow}>
-                                    {VET_SUBCATEGORY_OPTIONS.map((opt) => {
-                                      const active = editState.visitTypes.includes(opt.value);
-                                      return (
-                                        <button
-                                          type="button"
-                                          key={opt.value}
-                                          className={`${styles.serviceChip} ${active ? styles.serviceChipActive : ""}`}
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            setEditState({
-                                              ...editState,
-                                              visitTypes: active
-                                                ? editState.visitTypes.filter((v) => v !== opt.value)
-                                                : [...editState.visitTypes, opt.value],
-                                            });
-                                          }}
-                                        >
-                                          {opt.label}
-                                        </button>
-                                      );
-                                    })}
+                                <ExpandedInput label="SUBCATEGORY">
+                                  <div className={styles.multiSelectContainer} ref={editSubcatDropdownRef}>
+                                    <div
+                                      className={`${styles.multiSelectInput} ${editSubcatDropdownOpen ? styles.multiSelectInputOpen : ""}`}
+                                      onClick={(event) => { event.stopPropagation(); setEditSubcatDropdownOpen((prev) => !prev); }}
+                                    >
+                                      {editState.visitTypes.length > 0 ? (
+                                        <>
+                                          {editState.visitTypes.map((vt) => {
+                                            const label = VET_SUBCATEGORY_OPTIONS.find((o) => o.value === vt)?.label ?? vt;
+                                            return (
+                                              <span key={vt} className={styles.horsePill}>
+                                                {label}
+                                                <button type="button" className={styles.horsePillRemove} onClick={(e) => { e.stopPropagation(); setEditState({ ...editState, visitTypes: editState.visitTypes.filter((v) => v !== vt) }); }}>✕</button>
+                                              </span>
+                                            );
+                                          })}
+                                        </>
+                                      ) : (
+                                        <span className={styles.multiSelectPlaceholder}>select subcategory...</span>
+                                      )}
+                                      <span className={styles.multiSelectCaret}>▼</span>
+                                    </div>
+                                    {editSubcatDropdownOpen ? (
+                                      <div className={styles.multiSelectDropdown}>
+                                        {VET_SUBCATEGORY_OPTIONS.map((opt) => {
+                                          const checked = editState.visitTypes.includes(opt.value);
+                                          return (
+                                            <button type="button" key={opt.value} className={styles.multiSelectOption} onClick={(e) => { e.stopPropagation(); setEditState({ ...editState, visitTypes: checked ? editState.visitTypes.filter((v) => v !== opt.value) : [...editState.visitTypes, opt.value] }); }}>
+                                              <span className={`${styles.checkbox} ${checked ? styles.checkboxChecked : styles.checkboxUnchecked}`}>✓</span>
+                                              <span>{opt.label}</span>
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    ) : null}
                                   </div>
                                 </ExpandedInput>
+                                {editState.visitTypes.includes("medication") ? (
+                                  <ExpandedInput label="MEDICATION(S)">
+                                    <div className={styles.chipRow}>
+                                      {MEDICATION_OPTIONS.map((med) => {
+                                        const active = editState.medications.includes(med);
+                                        return (
+                                          <button type="button" key={med} className={`${styles.serviceChip} ${active ? styles.serviceChipActive : ""}`} onClick={(e) => { e.stopPropagation(); setEditState({ ...editState, medications: active ? editState.medications.filter((m) => m !== med) : [...editState.medications, med] }); }}>
+                                            {med}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </ExpandedInput>
+                                ) : null}
+                                {editState.medications.length > 0 ? (
+                                  <ExpandedInput label="REPEAT">
+                                    <div className={styles.repeatRow}>
+                                      <input className={styles.repeatNumberInput} type="number" min="1" value={editState.medicationRepeatValue} onChange={(e) => setEditState({ ...editState, medicationRepeatValue: e.target.value })} placeholder="#" />
+                                      <select className={styles.repeatUnitSelect} value={editState.medicationRepeatUnit} onChange={(e) => setEditState({ ...editState, medicationRepeatUnit: e.target.value as "" | "days" | "weeks" | "months" })}>
+                                        <option value="">select...</option>
+                                        <option value="days">Days</option>
+                                        <option value="weeks">Weeks</option>
+                                        <option value="months">Months</option>
+                                      </select>
+                                    </div>
+                                  </ExpandedInput>
+                                ) : null}
                                 {editState.visitTypes.includes("other") ? (
                                   <ExpandedInput label="DESCRIBE OTHER">
                                     <input
@@ -1017,22 +1080,8 @@ export default function RecordsPage() {
                                 ) : null}
                               </>
                             ) : null}
-                            {editState.type === "farrier" ? (
-                              <ExpandedInput label="SERVICE TYPE">
-                                <select
-                                  className={styles.expandedInput}
-                                  value={editState.serviceType}
-                                  onChange={(event) => setEditState({ ...editState, serviceType: event.target.value })}
-                                >
-                                  <option value="">select...</option>
-                                  {farrierServiceTypes.map((service) => (
-                                    <option key={service} value={service}>{service}</option>
-                                  ))}
-                                </select>
-                              </ExpandedInput>
-                            ) : null}
                             {editState.type === "other" ? (
-                              <ExpandedInput label="DESCRIBE TYPE">
+                              <ExpandedInput label="DESCRIBE CATEGORY">
                                 <input
                                   className={styles.expandedInput}
                                   value={editState.customType}
@@ -1232,9 +1281,12 @@ export default function RecordsPage() {
                                     notes: record.notes || "",
                                     serviceType: record.serviceType || "",
                                     customType: record.customType || "",
-                                  vaccineName: record.vaccineName || "",
-                                  treatmentDescription: record.treatmentDescription || "",
-                                  billId: record.billId ? String(record.billId) : "",
+                                    vaccineName: record.vaccineName || "",
+                                    treatmentDescription: record.treatmentDescription || "",
+                                    medications: record.medications || [],
+                                    medicationRepeatValue: record.medicationRepeatValue ? String(record.medicationRepeatValue) : "",
+                                    medicationRepeatUnit: (record.medicationRepeatUnit || "") as "" | "days" | "weeks" | "months",
+                                    billId: record.billId ? String(record.billId) : "",
                                 });
                               }}
                             >
