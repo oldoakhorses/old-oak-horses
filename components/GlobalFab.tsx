@@ -257,6 +257,7 @@ export default function GlobalFab() {
 
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropdownJustOpened = useRef(false);
   const horseDropdownRef = useRef<HTMLDivElement | null>(null);
   const fabRef = useRef<HTMLDivElement | null>(null);
   const fabMenuRef = useRef<HTMLDivElement | null>(null);
@@ -897,6 +898,16 @@ export default function GlobalFab() {
     });
   }, [allContactsForRecord, recordReportDetection.detected, selectedRecordType]);
 
+  function openDropdown(setter: (updater: (prev: boolean) => boolean) => void) {
+    setter((prev) => {
+      if (!prev) {
+        dropdownJustOpened.current = true;
+        requestAnimationFrame(() => { dropdownJustOpened.current = false; });
+      }
+      return !prev;
+    });
+  }
+
   function toggleHorse(horseId: Id<"horses">) {
     setRecordForm((prev) => ({
       ...prev,
@@ -1241,7 +1252,7 @@ export default function GlobalFab() {
               <div className={styles.multiSelectContainer} ref={horseDropdownRef}>
                 <div
                   className={`${styles.multiSelectInput} ${horseDropdownOpen ? styles.multiSelectInputOpen : ""}`}
-                  onClick={() => setHorseDropdownOpen((prev) => !prev)}
+                  onClick={() => openDropdown(setHorseDropdownOpen)}
                 >
                   {recordForm.horseIds.length > 0 ? (
                     <>
@@ -1279,7 +1290,7 @@ export default function GlobalFab() {
                           type="button"
                           key={horse._id}
                           className={styles.multiSelectOption}
-                          onClick={() => toggleHorse(horse._id)}
+                          onClick={() => { if (!dropdownJustOpened.current) toggleHorse(horse._id); }}
                         >
                           <span className={`${styles.checkbox} ${checked ? styles.checkboxChecked : styles.checkboxUnchecked}`}>
                             ✓
@@ -1332,7 +1343,7 @@ export default function GlobalFab() {
                       <div className={styles.multiSelectContainer} ref={subcatDropdownRef}>
                         <div
                           className={`${styles.multiSelectInput} ${subcatDropdownOpen ? styles.multiSelectInputOpen : ""}`}
-                          onClick={() => setSubcatDropdownOpen((prev) => !prev)}
+                          onClick={() => openDropdown(setSubcatDropdownOpen)}
                         >
                           {recordForm.visitTypes.length > 0 ? (
                             <>
@@ -1369,14 +1380,15 @@ export default function GlobalFab() {
                                   type="button"
                                   key={opt.value}
                                   className={styles.multiSelectOption}
-                                  onClick={() =>
+                                  onClick={() => {
+                                    if (dropdownJustOpened.current) return;
                                     setRecordForm((prev) => ({
                                       ...prev,
                                       visitTypes: checked
                                         ? prev.visitTypes.filter((v) => v !== opt.value)
                                         : [...prev.visitTypes, opt.value],
-                                    }))
-                                  }
+                                    }));
+                                  }}
                                 >
                                   <span className={`${styles.checkbox} ${checked ? styles.checkboxChecked : styles.checkboxUnchecked}`}>✓</span>
                                   <span>{opt.label}</span>

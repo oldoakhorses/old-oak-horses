@@ -256,6 +256,7 @@ export default function RecordsPage() {
 
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropdownJustOpened = useRef(false);
   const horseDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const recordProviderCategory = selectedRecordType ? RECORD_TYPE_TO_CATEGORY[selectedRecordType] : "";
@@ -603,6 +604,16 @@ export default function RecordsPage() {
         .filter((name): name is string => Boolean(name)),
     [activeHorses, recordForm.horseIds]
   );
+
+  function openDropdown(setter: (updater: (prev: boolean) => boolean) => void) {
+    setter((prev) => {
+      if (!prev) {
+        dropdownJustOpened.current = true;
+        requestAnimationFrame(() => { dropdownJustOpened.current = false; });
+      }
+      return !prev;
+    });
+  }
 
   function toggleHorse(horseId: Id<"horses">) {
     setRecordForm((prev) => ({
@@ -1002,7 +1013,7 @@ export default function RecordsPage() {
                                   <div className={styles.multiSelectContainer} ref={editSubcatDropdownRef}>
                                     <div
                                       className={`${styles.multiSelectInput} ${editSubcatDropdownOpen ? styles.multiSelectInputOpen : ""}`}
-                                      onClick={(event) => { event.stopPropagation(); setEditSubcatDropdownOpen((prev) => !prev); }}
+                                      onClick={(event) => { event.stopPropagation(); openDropdown(setEditSubcatDropdownOpen); }}
                                     >
                                       {editState.visitTypes.length > 0 ? (
                                         <>
@@ -1026,7 +1037,7 @@ export default function RecordsPage() {
                                         {VET_SUBCATEGORY_OPTIONS.map((opt) => {
                                           const checked = editState.visitTypes.includes(opt.value);
                                           return (
-                                            <button type="button" key={opt.value} className={styles.multiSelectOption} onClick={(e) => { e.stopPropagation(); setEditState({ ...editState, visitTypes: checked ? editState.visitTypes.filter((v) => v !== opt.value) : [...editState.visitTypes, opt.value] }); }}>
+                                            <button type="button" key={opt.value} className={styles.multiSelectOption} onClick={(e) => { e.stopPropagation(); if (dropdownJustOpened.current) return; setEditState({ ...editState, visitTypes: checked ? editState.visitTypes.filter((v) => v !== opt.value) : [...editState.visitTypes, opt.value] }); }}>
                                               <span className={`${styles.checkbox} ${checked ? styles.checkboxChecked : styles.checkboxUnchecked}`}>✓</span>
                                               <span>{opt.label}</span>
                                             </button>
@@ -1362,7 +1373,7 @@ export default function RecordsPage() {
               <div className={styles.multiSelectContainer} ref={horseDropdownRef}>
                 <div
                   className={`${styles.multiSelectInput} ${horseDropdownOpen ? styles.multiSelectInputOpen : ""}`}
-                  onClick={() => setHorseDropdownOpen((prev) => !prev)}
+                  onClick={() => openDropdown(setHorseDropdownOpen)}
                 >
                   {recordForm.horseIds.length > 0 ? (
                     <>
@@ -1396,7 +1407,7 @@ export default function RecordsPage() {
                     {activeHorses.map((horse) => {
                       const checked = recordForm.horseIds.includes(horse._id);
                       return (
-                        <button type="button" key={horse._id} className={styles.multiSelectOption} onClick={() => toggleHorse(horse._id)}>
+                        <button type="button" key={horse._id} className={styles.multiSelectOption} onClick={() => { if (!dropdownJustOpened.current) toggleHorse(horse._id); }}>
                           <span className={`${styles.checkbox} ${checked ? styles.checkboxChecked : styles.checkboxUnchecked}`}>✓</span>
                           <span>{horse.name}</span>
                         </button>
@@ -1442,7 +1453,7 @@ export default function RecordsPage() {
                       <div className={styles.multiSelectContainer} ref={subcatDropdownRef}>
                         <div
                           className={`${styles.multiSelectInput} ${subcatDropdownOpen ? styles.multiSelectInputOpen : ""}`}
-                          onClick={() => setSubcatDropdownOpen((prev) => !prev)}
+                          onClick={() => openDropdown(setSubcatDropdownOpen)}
                         >
                           {recordForm.visitTypes.length > 0 ? (
                             <>
@@ -1479,14 +1490,15 @@ export default function RecordsPage() {
                                   type="button"
                                   key={opt.value}
                                   className={styles.multiSelectOption}
-                                  onClick={() =>
+                                  onClick={() => {
+                                    if (dropdownJustOpened.current) return;
                                     setRecordForm((prev) => ({
                                       ...prev,
                                       visitTypes: checked
                                         ? prev.visitTypes.filter((v) => v !== opt.value)
                                         : [...prev.visitTypes, opt.value],
-                                    }))
-                                  }
+                                    }));
+                                  }}
                                 >
                                   <span className={`${styles.checkbox} ${checked ? styles.checkboxChecked : styles.checkboxUnchecked}`}>✓</span>
                                   <span>{opt.label}</span>
