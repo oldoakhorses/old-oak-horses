@@ -483,15 +483,6 @@ export default function RecordsPage() {
       setRecordError("At least one horse is required.");
       return;
     }
-    if (selectedRecordType === "veterinary" && recordForm.visitTypes.length === 0) {
-      setRecordError("Select at least one visit type.");
-      return;
-    }
-    if (selectedRecordType === "veterinary" && recordForm.visitTypes.includes("other") && !recordForm.vetOtherDescription.trim()) {
-      setRecordError("Describe the 'other' visit type.");
-      return;
-    }
-
     setRecordError("");
     setRecordSubmitting(true);
     try {
@@ -1277,6 +1268,15 @@ export default function RecordsPage() {
           </div>
         ) : (
           <form id="record-form" className={styles.recordPanelBody} onSubmit={onSaveRecord}>
+            <RecordField label="TITLE">
+              <input
+                className={styles.recordInput}
+                value={recordForm.title}
+                onChange={(event) => setRecordForm((prev) => ({ ...prev, title: event.target.value }))}
+                placeholder="e.g., Spring Vaccinations, Annual Coggins"
+              />
+            </RecordField>
+
             <RecordField label="HORSE" required>
               <div className={styles.multiSelectContainer} ref={horseDropdownRef}>
                 <div
@@ -1334,15 +1334,6 @@ export default function RecordsPage() {
               </div>
             </RecordField>
 
-            <RecordField label="TITLE">
-              <input
-                className={styles.recordInput}
-                value={recordForm.title}
-                onChange={(event) => setRecordForm((prev) => ({ ...prev, title: event.target.value }))}
-                placeholder="e.g., Spring Vaccinations, Annual Coggins"
-              />
-            </RecordField>
-
             <RecordField label="DATE" required>
               <input
                 className={styles.recordInput}
@@ -1352,11 +1343,10 @@ export default function RecordsPage() {
               />
             </RecordField>
 
-            <RecordField label="RECORD TYPE" required>
+            <RecordField label="CATEGORY" required>
               <select className={styles.recordInput} value={selectedRecordType ?? ""} onChange={(event) => handleRecordTypeChange(event.target.value)}>
-                <option value="">select type...</option>
+                <option value="">select category...</option>
                 <option value="veterinary">Veterinary</option>
-                <option value="medication">Medication</option>
                 <option value="farrier">Farrier</option>
                 <option value="bodywork">Bodywork</option>
                 <option value="other">Other</option>
@@ -1367,7 +1357,7 @@ export default function RecordsPage() {
               <>
                 {selectedRecordType === "veterinary" ? (
                   <>
-                    <RecordField label="VISIT TYPE" required>
+                    <RecordField label="SUBCATEGORY">
                       <div className={styles.chipRow}>
                         {VET_SUBCATEGORY_OPTIONS.map((opt) => {
                           const active = recordForm.visitTypes.includes(opt.value);
@@ -1392,7 +1382,7 @@ export default function RecordsPage() {
                       </div>
                     </RecordField>
                     {recordForm.visitTypes.includes("other") ? (
-                      <RecordField label="DESCRIBE OTHER" required>
+                      <RecordField label="DESCRIBE OTHER">
                         <input
                           className={styles.recordInput}
                           value={recordForm.vetOtherDescription}
@@ -1405,7 +1395,7 @@ export default function RecordsPage() {
                 ) : null}
 
                 {selectedRecordType === "other" ? (
-                  <RecordField label="DESCRIBE RECORD TYPE">
+                  <RecordField label="DESCRIBE CATEGORY">
                     <input
                       className={styles.recordInput}
                       value={recordForm.customType}

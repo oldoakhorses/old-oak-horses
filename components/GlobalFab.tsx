@@ -53,6 +53,7 @@ const VET_VISIT_TYPE_OPTIONS: Array<{ value: VetSubcategory; label: string }> = 
 ];
 
 type RecordFormState = {
+  title: string;
   horseIds: Id<"horses">[];
   date: string;
   contactName: string;
@@ -143,7 +144,6 @@ const PERSON_DOCUMENT_TAGS: DocumentTag[] = [
 
 const recordTypeOptions: Array<{ type: RecordType; label: string }> = [
   { type: "veterinary", label: "Veterinary" },
-  { type: "medication", label: "Medication" },
   { type: "farrier", label: "Farrier" },
   { type: "bodywork", label: "Bodywork" },
   { type: "other", label: "Other" },
@@ -163,6 +163,7 @@ function getTodayDate() {
 
 function createInitialRecordForm(): RecordFormState {
   return {
+    title: "",
     horseIds: [],
     date: getTodayDate(),
     contactName: "",
@@ -764,14 +765,6 @@ export default function GlobalFab() {
       setRecordError("At least one horse is required.");
       return;
     }
-    if (selectedRecordType === "veterinary" && recordForm.visitTypes.length === 0) {
-      setRecordError("Select at least one visit type.");
-      return;
-    }
-    if (selectedRecordType === "veterinary" && recordForm.visitTypes.includes("other") && !recordForm.vetOtherDescription.trim()) {
-      setRecordError("Describe the 'other' visit type.");
-      return;
-    }
 
     setRecordError("");
     setRecordSubmitting(true);
@@ -790,6 +783,7 @@ export default function GlobalFab() {
         const notesForHorse = horseSpecificNotes ?? recordForm.notes.trim();
         const mainRecordId = await createHorseRecord({
           horseId,
+          title: recordForm.title.trim() || undefined,
           createdBy: user?.name,
           type: selectedRecordType,
           customType: selectedRecordType === "other" ? recordForm.customType.trim() || undefined : undefined,
@@ -1210,6 +1204,15 @@ export default function GlobalFab() {
                 <div className={styles.reportDetectedSubtitle}>review and confirm before saving</div>
               </div>
             ) : null}
+            <RecordField label="TITLE">
+              <input
+                className={styles.recordInput}
+                value={recordForm.title}
+                onChange={(event) => setRecordForm((prev) => ({ ...prev, title: event.target.value }))}
+                placeholder="e.g., Spring Vaccinations, Annual Coggins"
+              />
+            </RecordField>
+
             <RecordField label="HORSE" required>
               <div className={styles.multiSelectContainer} ref={horseDropdownRef}>
                 <div
@@ -1283,18 +1286,17 @@ export default function GlobalFab() {
               />
             </RecordField>
 
-            <RecordField label="RECORD TYPE" required>
+            <RecordField label="CATEGORY" required>
               <select
                 className={styles.recordInput}
                 value={selectedRecordType ?? ""}
                 onChange={(e) => handleRecordTypeChange(e.target.value)}
               >
-                <option value="">select type...</option>
-                {recordTypeOptions.map((option) => (
-                  <option key={option.type} value={option.type}>
-                    {option.label}
-                  </option>
-                ))}
+                <option value="">select category...</option>
+                <option value="veterinary">Veterinary</option>
+                <option value="farrier">Farrier</option>
+                <option value="bodywork">Bodywork</option>
+                <option value="other">Other</option>
               </select>
             </RecordField>
 
@@ -1302,7 +1304,7 @@ export default function GlobalFab() {
               <>
                 {selectedRecordType === "veterinary" ? (
                   <>
-                    <RecordField label="VISIT TYPE" required>
+                    <RecordField label="SUBCATEGORY">
                       <div className={styles.chipRow} style={{ flexWrap: "wrap" }}>
                         {VET_VISIT_TYPE_OPTIONS.map((opt) => {
                           const active = recordForm.visitTypes.includes(opt.value);
@@ -1327,7 +1329,7 @@ export default function GlobalFab() {
                       </div>
                     </RecordField>
                     {recordForm.visitTypes.includes("other") ? (
-                      <RecordField label="DESCRIBE OTHER" required>
+                      <RecordField label="DESCRIBE OTHER">
                         <input
                           className={styles.recordInput}
                           value={recordForm.vetOtherDescription}
@@ -1367,7 +1369,7 @@ export default function GlobalFab() {
                 ) : null}
 
                 {selectedRecordType === "other" ? (
-                  <RecordField label="DESCRIBE RECORD TYPE">
+                  <RecordField label="DESCRIBE CATEGORY">
                     <input
                       className={styles.recordInput}
                       value={recordForm.customType}
