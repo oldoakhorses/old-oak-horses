@@ -918,6 +918,18 @@
   background: #f2f3f7;
 }
 
+.contactDropdownAdd {
+  color: #4a5bdb;
+  font-weight: 600;
+  border-top: 1px solid #e8eaf0;
+}
+
+.contactDropdownEmpty {
+  padding: 10px 12px;
+  font-size: 11px;
+  color: #9ea2b0;
+}
+
 .multiSelectContainer {
   position: relative;
 }

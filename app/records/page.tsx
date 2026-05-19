@@ -1476,53 +1476,55 @@ export default function RecordsPage() {
                 ) : null}
 
                 <RecordField label="CONTACT" required>
-                  {selectedRecordType === "other" ? (
-                    <select
+                  <div className={styles.contactSearchWrap} ref={contactDropdownRef}>
+                    <input
                       className={styles.recordInput}
                       value={recordForm.contactName}
-                      onChange={(event) => setRecordForm((prev) => ({ ...prev, contactName: event.target.value }))}
-                    >
-                      <option value="">select contact...</option>
-                      {allContactsForRecord.map((c) => (
-                        <option key={c._id} value={c.name}>{c.name}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div className={styles.contactSearchWrap} ref={contactDropdownRef}>
-                      <input
-                        className={styles.recordInput}
-                        value={recordForm.contactName}
-                        onChange={(event) => {
-                          setRecordForm((prev) => ({ ...prev, contactName: event.target.value }));
-                          setContactDropdownOpen(true);
-                        }}
-                        onFocus={() => setContactDropdownOpen(true)}
-                        placeholder={contactPlaceholder(selectedRecordType)}
-                      />
-                      {contactDropdownOpen && recordForm.contactName.trim() && (() => {
-                        const term = recordForm.contactName.trim().toLowerCase();
-                        const matches = allContactsForRecord.filter((c) => c.name.toLowerCase().includes(term));
-                        if (matches.length === 0) return null;
-                        return (
-                          <div className={styles.contactDropdown}>
-                            {matches.slice(0, 8).map((c) => (
-                              <button
-                                type="button"
-                                key={c._id}
-                                className={styles.contactDropdownItem}
-                                onClick={() => {
-                                  setRecordForm((prev) => ({ ...prev, contactName: c.name }));
-                                  setContactDropdownOpen(false);
-                                }}
-                              >
-                                {c.name}
-                              </button>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
+                      onChange={(event) => {
+                        setRecordForm((prev) => ({ ...prev, contactName: event.target.value }));
+                        setContactDropdownOpen(true);
+                      }}
+                      onFocus={() => setContactDropdownOpen(true)}
+                      placeholder={contactPlaceholder(selectedRecordType)}
+                    />
+                    {contactDropdownOpen && (() => {
+                      const contactPool = recordProviderCategory ? recordProviders : allContactsForRecord;
+                      const term = recordForm.contactName.trim().toLowerCase();
+                      const matches = term
+                        ? contactPool.filter((c) => c.name.toLowerCase().includes(term))
+                        : contactPool;
+                      const exactMatch = matches.some((c) => c.name.toLowerCase() === term);
+                      return (
+                        <div className={styles.contactDropdown}>
+                          {matches.slice(0, 8).map((c) => (
+                            <button
+                              type="button"
+                              key={c._id}
+                              className={styles.contactDropdownItem}
+                              onClick={() => {
+                                setRecordForm((prev) => ({ ...prev, contactName: c.name }));
+                                setContactDropdownOpen(false);
+                              }}
+                            >
+                              {c.name}
+                            </button>
+                          ))}
+                          {term && !exactMatch ? (
+                            <button
+                              type="button"
+                              className={`${styles.contactDropdownItem} ${styles.contactDropdownAdd}`}
+                              onClick={() => setContactDropdownOpen(false)}
+                            >
+                              + Add &ldquo;{recordForm.contactName.trim()}&rdquo;
+                            </button>
+                          ) : null}
+                          {!term && matches.length === 0 ? (
+                            <div className={styles.contactDropdownEmpty}>no contacts found — type to add new</div>
+                          ) : null}
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </RecordField>
               </>
             ) : null}
