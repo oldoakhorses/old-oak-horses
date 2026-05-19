@@ -6,7 +6,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import styles from "./feedplan.module.css";
 
-type FeedItem = { product: string; amount: number; unit: string };
+type FeedItem = { product: string; amount: number; unit: string; cadence?: string };
 type TimeSlot = "am" | "lunch" | "pm";
 type SectionId = "hay" | "grain" | "supplements" | "meds";
 
@@ -23,6 +23,7 @@ const FEED_UNITS = [
   "scoops", "cups", "flakes", "lbs", "oz", "ml", "cc",
   "tabs", "pumps", "tbsp", "tsp", "grams", "tubes",
 ];
+const CADENCE_OPTIONS = ["daily", "weekly", "monthly"];
 
 const FEED_SECTIONS: { id: SectionId; label: string; icon: string; color: string }[] = [
   { id: "hay", label: "Hay", icon: "🌾", color: "#22C583" },
@@ -63,9 +64,11 @@ function generateChangeDescription(oldSections: Sections | null, newSections: Se
       for (const item of newItems) {
         const existed = oldItems.find((o) => o.product === item.product);
         if (!existed) {
-          changes.push(`Added ${item.product} ${item.amount} ${item.unit} ${time.toUpperCase()}`);
-        } else if (existed.amount !== item.amount || existed.unit !== item.unit) {
-          changes.push(`Changed ${item.product} from ${existed.amount} ${existed.unit} to ${item.amount} ${item.unit} ${time.toUpperCase()}`);
+          const cadenceLabel = item.cadence ? ` (${item.cadence})` : "";
+          changes.push(`Added ${item.product} ${item.amount} ${item.unit}${cadenceLabel} ${time.toUpperCase()}`);
+        } else if (existed.amount !== item.amount || existed.unit !== item.unit || existed.cadence !== item.cadence) {
+          const cadenceLabel = item.cadence ? ` (${item.cadence})` : "";
+          changes.push(`Changed ${item.product} to ${item.amount} ${item.unit}${cadenceLabel} ${time.toUpperCase()}`);
         }
       }
 
@@ -110,7 +113,7 @@ export default function FeedPlan({ horseId, horseName }: { horseId: Id<"horses">
 
   const dailySummary = useMemo(() => {
     if (!feedPlan) return [];
-    const grouped: Record<SectionId, Record<string, { total: number; unit: string }>> = {
+    const grouped: Record<SectionId, Record<string, { total: number; unit: string; cadence?: string }>> = {
       hay: {}, grain: {}, supplements: {}, meds: {},
     };
     const times: TimeSlot[] = ["am", "lunch", "pm"];
@@ -119,7 +122,7 @@ export default function FeedPlan({ horseId, horseName }: { horseId: Id<"horses">
         for (const item of sections[secId][time] || []) {
           if (!item.product) continue;
           if (!grouped[secId][item.product]) {
-            grouped[secId][item.product] = { total: 0, unit: item.unit };
+            grouped[secId][item.product] = { total: 0, unit: item.unit, cadence: item.cadence };
           }
           grouped[secId][item.product].total += item.amount;
         }
@@ -127,8 +130,8 @@ export default function FeedPlan({ horseId, horseName }: { horseId: Id<"horses">
     }
     return FEED_SECTIONS.map((sec) => ({
       ...sec,
-      items: Object.entries(grouped[sec.id]).map(([product, { total, unit }]) => ({
-        product, total, unit,
+      items: Object.entries(grouped[sec.id]).map(([product, { total, unit, cadence }]) => ({
+        product, total, unit, cadence,
       })),
     })).filter((s) => s.items.length > 0);
   }, [feedPlan, sections]);
@@ -173,7 +176,9 @@ export default function FeedPlan({ horseId, horseName }: { horseId: Id<"horses">
   function addItem(secId: SectionId, time: TimeSlot) {
     setEditSections((prev) => {
       const next = JSON.parse(JSON.stringify(prev)) as Sections;
-      next[secId][time].push({ product: "", amount: 0, unit: FEED_UNITS[0] });
+      const item: FeedItem = { product: "", amount: 0, unit: FEED_UNITS[0] };
+      if (secId === "meds") item.cadence = "daily";
+      next[secId][time].push(item);
       return next;
     });
   }
@@ -304,7 +309,12 @@ export default function FeedPlan({ horseId, horseName }: { horseId: Id<"horses">
                       ) : (
                         items.map((item, idx) => (
                           <div key={idx} className={styles.itemRow}>
-                            <span className={styles.itemName}>{item.product}</span>
+                            <span className={styles.itemName}>
+                              {item.product}
+                              {sec.id === "meds" && item.cadence ? (
+                                <span className={styles.cadenceBadge}>{item.cadence}</span>
+                              ) : null}
+                            </span>
                             <span className={styles.itemRight}>
                               <span className={styles.itemAmount} style={{ color: sec.color }}>
                                 {item.amount}
@@ -353,6 +363,20 @@ export default function FeedPlan({ horseId, horseName }: { horseId: Id<"horses">
                               ))}
                             </select>
                           </div>
+                          {sec.id === "meds" ? (
+                            <div className={styles.editCadenceRow}>
+                              <span className={styles.editCadenceLabel}>cadence</span>
+                              <select
+                                className={`${styles.inputUnit} ${styles.editCadence}`}
+                                value={item.cadence || "daily"}
+                                onChange={(e) => updateItem(sec.id, activeTime, idx, "cadence", e.target.value)}
+                              >
+                                {CADENCE_OPTIONS.map((c) => (
+                                  <option key={c} value={c}>{c}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : null}
                         </div>
                       ))}
                       <button
@@ -402,7 +426,9 @@ export default function FeedPlan({ horseId, horseName }: { horseId: Id<"horses">
                   {sec.items.map((item) => (
                     <div key={item.product} className={styles.summaryRow}>
                       <span className={styles.summaryProduct}>{item.product}</span>
-                      <span className={styles.summaryAmount}>{item.total} {item.unit}/day</span>
+                      <span className={styles.summaryAmount}>
+                        {item.total} {item.unit}{item.cadence ? `/${item.cadence}` : "/day"}
+                      </span>
                     </div>
                   ))}
                 </div>

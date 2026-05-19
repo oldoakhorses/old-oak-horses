@@ -332,6 +332,37 @@
   font-size: 12px;
 }
 
+.cadenceBadge {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  color: #EC4899;
+  background: rgba(236, 72, 153, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+  font-weight: 700;
+}
+
+.editCadenceRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.editCadenceLabel {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: #9ea2b0;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.editCadence {
+  flex: 1;
+  font-size: 12px;
+}
+
 .addBtn {
   font-family: 'Space Mono', monospace;
   font-size: 11px;

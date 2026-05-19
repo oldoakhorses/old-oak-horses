@@ -9,13 +9,14 @@ import type { Id } from "@/convex/_generated/dataModel";
 import NavBar from "@/components/NavBar";
 import styles from "./feedplan.module.css";
 
-type FeedItem = { product: string; amount: number; unit: string };
+type FeedItem = { product: string; amount: number; unit: string; cadence?: string };
 type TimeSlot = "am" | "lunch" | "pm";
 type SectionId = "hay" | "grain" | "supplements" | "meds";
 type SectionData = { am: FeedItem[]; lunch: FeedItem[]; pm: FeedItem[]; notes?: string };
 type Sections = Record<SectionId, SectionData>;
 
 const FEED_UNITS = ["scoops", "cups", "flakes", "lbs", "oz", "ml", "cc", "tabs", "pumps", "tbsp", "tsp", "grams", "tubes"];
+const CADENCE_OPTIONS = ["daily", "weekly", "monthly"];
 
 const FEED_SECTIONS: { id: SectionId; label: string; icon: string; color: string }[] = [
   { id: "hay", label: "Hay", icon: "\u{1F33E}", color: "#22C583" },
@@ -51,9 +52,11 @@ function generateChangeDescription(oldSections: Sections | null, newSections: Se
       for (const item of newItems) {
         const existed = oldItems.find((o) => o.product === item.product);
         if (!existed) {
-          changes.push(`Added ${item.product} ${item.amount} ${item.unit} ${time.toUpperCase()}`);
-        } else if (existed.amount !== item.amount || existed.unit !== item.unit) {
-          changes.push(`Changed ${item.product} from ${existed.amount} ${existed.unit} to ${item.amount} ${item.unit} ${time.toUpperCase()}`);
+          const cadenceLabel = item.cadence ? ` (${item.cadence})` : "";
+          changes.push(`Added ${item.product} ${item.amount} ${item.unit}${cadenceLabel} ${time.toUpperCase()}`);
+        } else if (existed.amount !== item.amount || existed.unit !== item.unit || existed.cadence !== item.cadence) {
+          const cadenceLabel = item.cadence ? ` (${item.cadence})` : "";
+          changes.push(`Changed ${item.product} to ${item.amount} ${item.unit}${cadenceLabel} ${time.toUpperCase()}`);
         }
       }
 
@@ -125,7 +128,9 @@ export default function FeedPlanPage() {
   function addItem(sectionId: SectionId, time: TimeSlot) {
     setEditSections((prev) => {
       const next = JSON.parse(JSON.stringify(prev)) as Sections;
-      next[sectionId][time].push({ product: "", amount: 0, unit: "scoops" });
+      const item: FeedItem = { product: "", amount: 0, unit: "scoops" };
+      if (sectionId === "meds") item.cadence = "daily";
+      next[sectionId][time].push(item);
       return next;
     });
   }
@@ -168,9 +173,9 @@ export default function FeedPlanPage() {
   }, [currentSections]);
 
   const dailySummary = useMemo(() => {
-    const result: { sectionId: SectionId; icon: string; label: string; color: string; items: { product: string; total: number; unit: string }[] }[] = [];
+    const result: { sectionId: SectionId; icon: string; label: string; color: string; items: { product: string; total: number; unit: string; cadence?: string }[] }[] = [];
     for (const sec of FEED_SECTIONS) {
-      const productMap = new Map<string, { total: number; unit: string }>();
+      const productMap = new Map<string, { total: number; unit: string; cadence?: string }>();
       for (const time of ["am", "lunch", "pm"] as TimeSlot[]) {
         for (const item of sections[sec.id][time]) {
           if (!item.product) continue;
@@ -179,7 +184,7 @@ export default function FeedPlanPage() {
           if (existing) {
             existing.total += item.amount;
           } else {
-            productMap.set(key, { total: item.amount, unit: item.unit });
+            productMap.set(key, { total: item.amount, unit: item.unit, cadence: item.cadence });
           }
         }
       }
@@ -193,6 +198,7 @@ export default function FeedPlanPage() {
             product: key.split("|||")[0],
             total: v.total,
             unit: v.unit,
+            cadence: v.cadence,
           })),
         });
       }
@@ -316,7 +322,12 @@ export default function FeedPlanPage() {
                       ) : (
                         items.map((item, i) => (
                           <div key={i} className={styles.itemRow}>
-                            <span className={styles.itemName}>{item.product}</span>
+                            <span className={styles.itemName}>
+                              {item.product}
+                              {sec.id === "meds" && item.cadence ? (
+                                <span className={styles.cadenceBadge}>{item.cadence}</span>
+                              ) : null}
+                            </span>
                             <div className={styles.itemRight}>
                               <span className={styles.itemAmount} style={{ color: sec.color }}>{item.amount}</span>
                               <span className={styles.itemUnit}>{item.unit}</span>
@@ -358,6 +369,20 @@ export default function FeedPlanPage() {
                               ))}
                             </select>
                           </div>
+                          {sec.id === "meds" ? (
+                            <div className={styles.editCadenceRow}>
+                              <span className={styles.editCadenceLabel}>cadence</span>
+                              <select
+                                className={`${styles.editInput} ${styles.editCadence}`}
+                                value={item.cadence || "daily"}
+                                onChange={(e) => updateItem(sec.id, activeTime, i, "cadence", e.target.value)}
+                              >
+                                {CADENCE_OPTIONS.map((c) => (
+                                  <option key={c} value={c}>{c}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : null}
                         </div>
                       ))}
                       <button
@@ -401,7 +426,9 @@ export default function FeedPlanPage() {
                     {group.items.map((item, i) => (
                       <div key={i} className={styles.summaryRow}>
                         <span className={styles.summaryProduct}>{item.product}</span>
-                        <span className={styles.summaryAmount}>{item.total} {item.unit}/day</span>
+                        <span className={styles.summaryAmount}>
+                          {item.total} {item.unit}{item.cadence ? `/${item.cadence}` : "/day"}
+                        </span>
                       </div>
                     ))}
                   </div>
