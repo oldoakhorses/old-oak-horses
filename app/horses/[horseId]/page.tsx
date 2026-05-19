@@ -127,16 +127,16 @@ const RECORD_ICONS: Record<RecordType, string> = {
 
 export default function HorseProfilePage() {
   const { user } = useAuth();
-  const isTeam = user?.role === "team";
+  const isTeam = user?.role === "team" || user?.role === "owner";
   const params = useParams<{ horseId: string }>();
   const searchParams = useSearchParams();
   const horseId = params?.horseId as Id<"horses">;
   const startsInEditMode = searchParams.get("edit") === "1";
 
   const horse = useQuery(api.horses.getHorseById, horseId ? { horseId } : "skip");
-  const spendMeta = useQuery(api.horses.getHorseSpendMeta, horseId ? { horseId } : "skip");
-  const spendByCategory = useQuery(api.horses.getHorseSpendByCategory, horseId ? { horseId } : "skip") ?? [];
-  const invoices = useQuery(api.horses.getInvoicesByHorse, horseId ? { horseId } : "skip") ?? [];
+  const spendMeta = useQuery(api.horses.getHorseSpendMeta, horseId && !isTeam ? { horseId } : "skip");
+  const spendByCategory = useQuery(api.horses.getHorseSpendByCategory, horseId && !isTeam ? { horseId } : "skip") ?? [];
+  const invoices = useQuery(api.horses.getInvoicesByHorse, horseId && !isTeam ? { horseId } : "skip") ?? [];
   const recordCounts = useQuery(api.horses.getHorseRecordCounts, horseId ? { horseId } : "skip");
   const prizeMoneyData = useQuery(api.incomeEntries.getHorsePrizeMoney, horseId ? { horseId } : "skip");
   const recordsAll = (useQuery(api.horseRecords.getAllByHorse, horseId ? { horseId } : "skip") as HorseRecord[] | undefined) ?? [];
@@ -253,7 +253,7 @@ export default function HorseProfilePage() {
 
   const recentMatchedRecords = matchedRecords.slice(0, 3);
 
-  if (horse === undefined || spendMeta === undefined) {
+  if (horse === undefined || (!isTeam && spendMeta === undefined)) {
     return (
       <div className="page-shell">
         <main className="page-main">
@@ -263,7 +263,7 @@ export default function HorseProfilePage() {
     );
   }
 
-  if (!horse || !spendMeta) {
+  if (!horse || (!isTeam && !spendMeta)) {
     return (
       <div className="page-shell">
         <main className="page-main">
@@ -374,7 +374,7 @@ export default function HorseProfilePage() {
           { label: "horses", href: "/horses" },
           { label: horse.name, current: true },
         ]}
-        actions={[
+        actions={isTeam ? [] : [
           { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
         ]}
       />
@@ -503,7 +503,7 @@ export default function HorseProfilePage() {
           ) : null}
         </section>
 
-        {!isTeam && (
+        {!isTeam && spendMeta && (
           <section className={styles.spendRow}>
             <div className={styles.spendTotalCard}>
               <div className={styles.spendLabel}>TOTAL SPEND</div>
