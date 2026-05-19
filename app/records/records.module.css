@@ -346,6 +346,14 @@
   text-transform: uppercase;
 }
 
+.sortableHeader {
+  cursor: pointer;
+  user-select: none;
+}
+.sortableHeader:hover {
+  color: #4a5bdb;
+}
+
 .colRecord {
   min-width: 0;
   display: flex;

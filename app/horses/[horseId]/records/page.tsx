@@ -380,20 +380,16 @@ export default function HorseRecordsPage() {
           <div className={styles.recordsListHeader}>
             <span />
             <button type="button" className={sortColumn === "record" ? styles.sortHeaderActive : styles.sortHeader} onClick={() => handleSort("record")}>
-              RECORD
-              {sortColumn === "record" ? <span className={styles.sortArrow}>{sortDirection === "asc" ? "↑" : "↓"}</span> : null}
+              RECORD {sortColumn === "record" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
             </button>
             <button type="button" className={sortColumn === "contact" ? styles.sortHeaderActive : styles.sortHeader} onClick={() => handleSort("contact")}>
-              PROVIDER
-              {sortColumn === "contact" ? <span className={styles.sortArrow}>{sortDirection === "asc" ? "↑" : "↓"}</span> : null}
+              PROVIDER {sortColumn === "contact" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
             </button>
             <button type="button" className={sortColumn === "category" ? styles.sortHeaderActive : styles.sortHeader} onClick={() => handleSort("category")}>
-              CATEGORY
-              {sortColumn === "category" ? <span className={styles.sortArrow}>{sortDirection === "asc" ? "↑" : "↓"}</span> : null}
+              CATEGORY {sortColumn === "category" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
             </button>
             <button type="button" className={sortColumn === "date" ? styles.sortHeaderActive : styles.sortHeader} onClick={() => handleSort("date")}>
-              DATE
-              {sortColumn === "date" ? <span className={styles.sortArrow}>{sortDirection === "asc" ? "↑" : "↓"}</span> : null}
+              DATE {sortColumn === "date" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
             </button>
             <span />
           </div>

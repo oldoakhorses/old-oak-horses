@@ -135,6 +135,14 @@
   text-transform: uppercase;
 }
 
+.sortableHeader {
+  cursor: pointer;
+  user-select: none;
+}
+.sortableHeader:hover {
+  color: #4a5bdb;
+}
+
 .colName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .colDate { white-space: nowrap; }
 .colContact { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -58,7 +58,7 @@ function getVetVisitTypeLabels(record: { visitType?: string; visitTypes?: string
   });
 }
 type Tab = "upcoming" | "past";
-type SortColumn = "record" | "horse" | "category" | "date";
+type SortColumn = "record" | "detail" | "date" | "category" | "horse";
 type UpcomingRange = "all" | "7d" | "30d" | "3m" | "6m";
 type PastRange = "all" | "7d" | "30d" | "3m" | "6m" | "1y";
 
@@ -211,8 +211,6 @@ export default function RecordsPage() {
   const filtersPopoverRef = useRef<HTMLDivElement | null>(null);
   const [sortColumn, setSortColumn] = useState<SortColumn>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [sortOpen, setSortOpen] = useState(false);
-  const sortPopoverRef = useRef<HTMLDivElement | null>(null);
 
   const [expandedId, setExpandedId] = useState<Id<"horseRecords"> | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<Id<"horseRecords"> | null>(null);
@@ -294,9 +292,6 @@ export default function RecordsPage() {
       if (filtersPopoverRef.current && !filtersPopoverRef.current.contains(event.target as Node)) {
         setFiltersOpen(false);
       }
-      if (sortPopoverRef.current && !sortPopoverRef.current.contains(event.target as Node)) {
-        setSortOpen(false);
-      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -367,6 +362,9 @@ export default function RecordsPage() {
         case "record":
           cmp = getRecordLabel(a.base).localeCompare(getRecordLabel(b.base));
           break;
+        case "detail":
+          cmp = getRecordSubtitle(a.base).localeCompare(getRecordSubtitle(b.base));
+          break;
         case "horse":
           cmp = a.base.horseName.localeCompare(b.base.horseName);
           break;
@@ -398,6 +396,11 @@ export default function RecordsPage() {
 
     setSortColumn(column);
     setSortDirection(column === "date" ? defaultDirection : "asc");
+  }
+
+  function sortArrow(col: SortColumn) {
+    if (sortColumn !== col) return " ↕";
+    return sortDirection === "asc" ? " ↑" : " ↓";
   }
 
   function openRecordPanel() {
@@ -716,38 +719,6 @@ export default function RecordsPage() {
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                 />
-                <div className={styles.toolbarFiltersWrap} ref={sortPopoverRef}>
-                  <button
-                    type="button"
-                    className={`${styles.toolbarFiltersBtn} ${sortColumn !== "date" ? styles.toolbarFiltersBtnActive : ""}`}
-                    onClick={() => setSortOpen((v) => !v)}
-                    aria-expanded={sortOpen}
-                  >
-                    <span>sort</span>
-                    <span className={styles.toolbarFiltersChevron}>▾</span>
-                  </button>
-                  {sortOpen ? (
-                    <div className={styles.toolbarSortPopover} role="dialog">
-                      {(["date", "horse", "category"] as SortColumn[]).map((col) => {
-                        const label = col === "category" ? "type" : col;
-                        const isActive = sortColumn === col;
-                        return (
-                          <button
-                            type="button"
-                            key={col}
-                            className={`${styles.sortOption} ${isActive ? styles.sortOptionActive : ""}`}
-                            onClick={() => {
-                              handleSort(col);
-                              setSortOpen(false);
-                            }}
-                          >
-                            {label} {isActive ? (sortDirection === "asc" ? "↑" : "↓") : ""}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                </div>
                 <div className={styles.toolbarFiltersWrap} ref={filtersPopoverRef}>
                   <button
                     type="button"
@@ -846,11 +817,11 @@ export default function RecordsPage() {
 
         <section className={styles.recordsCard}>
           <div className={styles.tableHeader}>
-            <span className={styles.colRecord}>Record</span>
-            <span className={styles.colSubtitle}>Detail</span>
-            <span className={styles.colDate}>Date</span>
-            <span className={styles.colCategory}>Category</span>
-            <span className={styles.colHorse}>Horse</span>
+            <span className={`${styles.colRecord} ${styles.sortableHeader}`} onClick={() => handleSort("record")}>Record{sortArrow("record")}</span>
+            <span className={`${styles.colSubtitle} ${styles.sortableHeader}`} onClick={() => handleSort("detail")}>Detail{sortArrow("detail")}</span>
+            <span className={`${styles.colDate} ${styles.sortableHeader}`} onClick={() => handleSort("date")}>Date{sortArrow("date")}</span>
+            <span className={`${styles.colCategory} ${styles.sortableHeader}`} onClick={() => handleSort("category")}>Category{sortArrow("category")}</span>
+            <span className={`${styles.colHorse} ${styles.sortableHeader}`} onClick={() => handleSort("horse")}>Horse{sortArrow("horse")}</span>
           </div>
 
           {sortedRecords.length === 0 ? (
