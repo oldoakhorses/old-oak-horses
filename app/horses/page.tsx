@@ -48,6 +48,7 @@ export default function HorsesPage() {
   const setHorseStatus = useMutation(api.horses.setHorseStatus);
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
+  const [search, setSearch] = useState("");
   const [openMenuHorseId, setOpenMenuHorseId] = useState<string>("");
   const [confirmSoldHorseId, setConfirmSoldHorseId] = useState<string>("");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -56,14 +57,20 @@ export default function HorsesPage() {
   const [form, setForm] = useState<HorseFormState>(EMPTY_FORM);
 
   const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
     return horses
       .filter((horse) => {
-        if (statusFilter === "all") return true;
-        if (statusFilter === "active") return horse.status === "active";
-        return horse.status !== "active";
+        if (statusFilter === "all") { /* pass */ }
+        else if (statusFilter === "active") { if (horse.status !== "active") return false; }
+        else { if (horse.status === "active") return false; }
+        if (term) {
+          const hay = [horse.name, horse.barnName].filter(Boolean).join(" ").toLowerCase();
+          if (!hay.includes(term)) return false;
+        }
+        return true;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [horses, statusFilter]);
+  }, [horses, statusFilter, search]);
 
   async function updateStatus(horseId: Id<"horses">, status: "active" | "inactive", isSold?: boolean) {
     await setHorseStatus({ horseId, status, isSold });
@@ -118,11 +125,11 @@ export default function HorsesPage() {
       />
       <main className="page-main">
         <section className={styles.headerRow}>
-          <div>
-            <h2 className={styles.title}>horses</h2>
-          </div>
-          <button type="button" className={styles.addButton} onClick={() => setShowAddModal(true)}>
-            + add horse
+          <h2 className={styles.title}>horses</h2>
+          <button type="button" className={styles.addButton} onClick={() => setShowAddModal(true)} aria-label="Add horse">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M9 3v12M3 9h12" />
+            </svg>
           </button>
         </section>
 
@@ -142,6 +149,14 @@ export default function HorsesPage() {
             </button>
           </div>
         </section>
+
+        <input
+          className={styles.searchBar}
+          type="text"
+          placeholder="search horses..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
 
         <section className={styles.horsesCard}>
           <div className={styles.horsesHeader}>

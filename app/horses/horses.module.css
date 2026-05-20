@@ -13,18 +13,43 @@
 }
 
 .addButton {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 10px 16px;
-  border-radius: 6px;
-  border: none;
-  background: #1a1a2e;
-  color: #fff;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #e8eaf0;
+  background: #fff;
+  color: #1a1a2e;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
 }
 
 .addButton:hover {
-  background: #2a2a4e;
+  background: #f2f3f7;
+  border-color: #1a1a2e;
+}
+
+.searchBar {
+  width: 100%;
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  padding: 0 14px;
+  height: 38px;
+  font-size: 12px;
+  box-sizing: border-box;
+  color: #1a1a2e;
+  outline: none;
+  font-family: inherit;
+  margin-bottom: 16px;
+}
+
+.searchBar:focus {
+  border-color: #4a5bdb;
+  box-shadow: 0 0 0 3px rgba(74, 91, 219, 0.06);
 }
 
 .filterRow {
