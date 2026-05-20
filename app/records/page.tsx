@@ -359,7 +359,11 @@ export default function RecordsPage() {
 
     return tabRecords.filter((row) => {
       const record = row.base;
-      if (typeFilter !== "all" && record.type !== typeFilter) return false;
+      if (typeFilter !== "all") {
+        if (typeFilter === "veterinary") {
+          if (record.type !== "veterinary" && record.type !== "medication") return false;
+        } else if (record.type !== typeFilter) return false;
+      }
       if (horseFilter !== "all" && record.horseId !== horseFilter) return false;
       if (fromTs !== null && row.eventDate < fromTs) return false;
       if (toTs !== null && row.eventDate > toTs) return false;
@@ -736,7 +740,6 @@ export default function RecordsPage() {
           const categoryLabel =
             typeFilter === "all" ? null : (
               typeFilter === "veterinary" ? "Veterinary" :
-              typeFilter === "medication" ? "Medication" :
               typeFilter === "farrier" ? "Farrier" :
               typeFilter === "bodywork" ? "Bodywork" : "Other"
             );
@@ -779,7 +782,6 @@ export default function RecordsPage() {
                         >
                           <option value="all">All</option>
                           <option value="veterinary">Veterinary</option>
-                          <option value="medication">Medication</option>
                           <option value="farrier">Farrier</option>
                           <option value="bodywork">Bodywork</option>
                           <option value="other">Other</option>
