@@ -13,23 +13,22 @@
 }
 
 .addButton {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
+  font-size: 12px;
+  color: #9ea2b0;
+  padding: 8px 18px;
+  border-radius: 8px;
   border: 1px solid #e8eaf0;
   background: #fff;
-  color: #1a1a2e;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
-  transition: background 0.15s, border-color 0.15s;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .addButton:hover {
   background: #f2f3f7;
-  border-color: #1a1a2e;
+  color: #1a1a2e;
+  border-color: #d1d5db;
 }
 
 .searchBar {
