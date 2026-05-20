@@ -795,13 +795,12 @@ export default function DashboardPage() {
           <div className={styles.grid}>
             {shownHorses.map((horse) => (
               <Link href={`/horses/${horse._id}`} key={horse._id} className={styles.horseCard}>
-                <div className={styles.horseAvatar}>🐴</div>
-                <h3 className={styles.horseName}>{horse.name}</h3>
-                <div className={styles.horseMetaLine}>{horseOwnerSexLine(horse.owner, horse.sex)}</div>
-                <div className={styles.metaGrid}>
-                  <Meta label="YEAR" value={horse.yearOfBirth ? String(horse.yearOfBirth) : "—"} />
-                  <Meta label="USEF #" value={horse.usefNumber || "—"} />
-                  <Meta label="FEI #" value={horse.feiNumber || "—"} />
+                <div className={styles.horseCardTop}>
+                  <div className={styles.horseAvatar}>🐴</div>
+                </div>
+                <div className={styles.horseCardBody}>
+                  <h3 className={styles.horseName}>{horse.name}</h3>
+                  <div className={styles.horseMetaLine}>{horseOwnerSexLine(horse.owner, horse.sex)}</div>
                 </div>
               </Link>
             ))}
