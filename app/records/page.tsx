@@ -705,13 +705,8 @@ export default function RecordsPage() {
       />
 
       <main className="page-main">
-        <Link href="/dashboard" className="ui-back-link">
-          ← cd /dashboard
-        </Link>
-
         <section className={styles.headerRow}>
           <div>
-            <div className="ui-label">// RECORDS</div>
             <h1 className={styles.title}>records</h1>
           </div>
         </section>

@@ -1,32 +1,32 @@
 .headerRow {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+  align-items: flex-end;
+  margin-bottom: 20px;
 }
 
 .title {
-  margin: 8px 0 0;
-  font-size: 36px;
+  margin: 4px 0 0;
+  font-size: 28px;
   font-weight: 700;
   color: #1a1a2e;
 }
 
-/* Tabs — matches invoices page */
+/* Tabs */
 .tabs {
   display: flex;
-  gap: 4px;
-  margin-bottom: 16px;
+  gap: 0;
+  margin-bottom: 20px;
   border-bottom: 1px solid #e8eaf0;
 }
 
 .tab {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: #6b7084;
+  color: #9ea2b0;
   background: transparent;
   border: none;
-  padding: 10px 18px;
+  padding: 10px 20px;
   cursor: pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
@@ -34,6 +34,7 @@
   align-items: center;
   gap: 8px;
   font-family: inherit;
+  transition: color 0.15s;
 }
 
 .tab:hover {
@@ -41,15 +42,15 @@
 }
 
 .tabActive {
-  color: #4a5bdb;
-  border-bottom-color: #4a5bdb;
+  color: #1a1a2e;
+  border-bottom-color: #1a1a2e;
 }
 
 .tabCount {
   font-size: 10px;
   font-weight: 700;
   background: #f2f3f7;
-  color: #6b7084;
+  color: #9ea2b0;
   padding: 2px 7px;
   border-radius: 10px;
   min-width: 18px;
@@ -57,8 +58,8 @@
 }
 
 .tabActive .tabCount {
-  background: rgba(74, 91, 219, 0.1);
-  color: #4a5bdb;
+  background: #1a1a2e;
+  color: #fff;
 }
 
 /* Filters — matches invoices page */
@@ -99,23 +100,22 @@
   border-color: #4a5bdb;
 }
 
-/* Option B toolbar: search + sort + filters centered */
+/* Toolbar: search + filters */
 .toolbar {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .toolbarSearch {
   flex: 1;
-  max-width: 480px;
-  background: #f2f3f7;
+  max-width: 400px;
+  background: #fff;
   border: 1px solid #e8eaf0;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 0 14px;
-  height: 38px;
+  height: 36px;
   font-size: 12px;
   box-sizing: border-box;
   color: #1a1a2e;
@@ -125,6 +125,7 @@
 
 .toolbarSearch:focus {
   border-color: #4a5bdb;
+  box-shadow: 0 0 0 3px rgba(74, 91, 219, 0.06);
 }
 
 .toolbarFiltersWrap {
@@ -137,19 +138,21 @@
   align-items: center;
   gap: 6px;
   padding: 0 14px;
-  height: 38px;
+  height: 36px;
   border: 1px solid #e8eaf0;
   background: #fff;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 12px;
   font-weight: 500;
-  color: #1a1a2e;
+  color: #6b7084;
   cursor: pointer;
   font-family: inherit;
+  transition: all 0.15s;
 }
 
 .toolbarFiltersBtn:hover {
   border-color: #d1d5db;
+  color: #1a1a2e;
 }
 
 .toolbarFiltersBtnActive {
@@ -318,31 +321,33 @@
 
 .resultsCount {
   font-size: 10px;
-  color: #9ea2b0;
-  margin-bottom: 10px;
+  color: #c4c7d0;
+  margin-bottom: 8px;
+  letter-spacing: 0.01em;
 }
 
 .recordsCard {
   background: #fff;
   border: 1px solid #e8eaf0;
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
 }
 
 .tableHeader {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr) 72px 110px minmax(0, 1fr);
-  gap: 8px;
-  padding: 10px 22px;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr) 80px 100px minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 20px;
+  background: #fafafc;
   border-bottom: 1px solid #e8eaf0;
   align-items: center;
 }
 
 .tableHeader > span {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   color: #9ea2b0;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 
@@ -370,13 +375,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
-  color: #6b7084;
+  color: #9ea2b0;
 }
 
 .colDate {
   white-space: nowrap;
   font-size: 12px;
-  color: #6b7084;
+  color: #9ea2b0;
   font-variant-numeric: tabular-nums;
 }
 
@@ -388,32 +393,37 @@
   white-space: nowrap;
 }
 
-.muted { color: #c4c7d0; }
+.muted { color: #d9dbe3; }
 
 .recordRow {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr) 72px 110px minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr) 80px 100px minmax(0, 1fr);
+  gap: 12px;
   align-items: center;
-  padding: 12px 22px;
+  padding: 11px 20px;
   border-bottom: 1px solid #f0f1f5;
   cursor: pointer;
   transition: background 0.1s;
 }
 
+.recordRow:last-child {
+  border-bottom: none;
+}
+
 .recordRow:hover {
-  background: #fafafc;
+  background: #f8f9fb;
 }
 
 .recordRowExpanded {
   border-left: 3px solid #4a5bdb;
-  padding-left: 19px;
-  background: #fafafc;
+  padding-left: 17px;
+  background: #f8f9fb;
 }
 
 .recordIcon {
-  font-size: 14px;
+  font-size: 13px;
   flex-shrink: 0;
+  opacity: 0.7;
 }
 
 .recordLabel {
@@ -439,13 +449,14 @@
 
 .categoryBadge {
   font-size: 9px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 3px 8px;
   border-radius: 4px;
   text-transform: capitalize;
   display: inline-block;
   width: fit-content;
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 .recordDateSoon {
@@ -533,7 +544,7 @@
 
 .recordExpanded {
   background: #f8f9fb;
-  padding: 16px 26px;
+  padding: 16px 20px;
   border-bottom: 1px solid #f0f1f5;
 }
 
