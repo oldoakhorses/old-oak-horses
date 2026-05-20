@@ -21,8 +21,8 @@
 }
 
 .profileBtn {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   background: #1a1a2e;
   display: none;
@@ -30,20 +30,27 @@
   justify-content: center;
   flex-shrink: 0;
   text-decoration: none;
+  overflow: hidden;
+}
+
+.profileImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .profileInitial {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: #fff;
   line-height: 1;
 }
 
 .homeBtn {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  background: #f0f1f5;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: #e8eaf0;
   display: none;
   align-items: center;
   justify-content: center;
@@ -54,14 +61,14 @@
 }
 
 .homeBtn:hover {
-  background: #e8eaf0;
+  background: #dcdee5;
 }
 
 .calendarBtn {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  background: #f0f1f5;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: #e8eaf0;
   display: none;
   align-items: center;
   justify-content: center;
@@ -72,16 +79,16 @@
 }
 
 .calendarBtn:hover {
-  background: #e8eaf0;
+  background: #dcdee5;
   color: #1a1a2e;
 }
 
 .hamburgerBtn {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
   border: none;
-  background: #f0f1f5;
+  background: #e8eaf0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -91,7 +98,7 @@
 }
 
 .hamburgerBtn:hover {
-  background: #e8eaf0;
+  background: #dcdee5;
 }
 
 .breadcrumbs {
