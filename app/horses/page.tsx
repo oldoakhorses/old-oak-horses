@@ -141,7 +141,6 @@ export default function HorsesPage() {
               <span className={styles.tabCount}>{horses.length}</span>
             </button>
           </div>
-          <div className={styles.resultsCount}>showing {filtered.length} horses</div>
         </section>
 
         <section className={styles.horsesCard}>
