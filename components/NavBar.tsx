@@ -113,6 +113,17 @@ export default function NavBar({
 
       <nav className={styles.nav}>
         <div className={styles.left}>
+          <Link href="/accounts" className={styles.profileBtn} aria-label="Account">
+            <span className={styles.profileInitial}>{user?.email?.[0]?.toUpperCase() || "U"}</span>
+          </Link>
+
+          <Link href="/dashboard" className={styles.homeBtn}>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 6.5L8 2l6 4.5V13a1 1 0 01-1 1H3a1 1 0 01-1-1V6.5z" />
+              <path d="M6 14V9h4v5" />
+            </svg>
+          </Link>
+
           <div className={styles.breadcrumbs}>
             {items.map((item, index) => {
               const className = item.brand
@@ -149,6 +160,17 @@ export default function NavBar({
               {action.label}
             </Link>
           ))}
+          <Link href="/records" className={styles.calendarBtn} aria-label="Records">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="3" width="12" height="11" rx="1.5" />
+              <path d="M5 1.5V4M11 1.5V4M2 7h12" />
+              <circle cx="5.5" cy="9.5" r="0.5" fill="currentColor" stroke="none" />
+              <circle cx="8" cy="9.5" r="0.5" fill="currentColor" stroke="none" />
+              <circle cx="10.5" cy="9.5" r="0.5" fill="currentColor" stroke="none" />
+              <circle cx="5.5" cy="11.5" r="0.5" fill="currentColor" stroke="none" />
+              <circle cx="8" cy="11.5" r="0.5" fill="currentColor" stroke="none" />
+            </svg>
+          </Link>
           <button className={styles.hamburgerBtn} onClick={() => setMenuOpen(true)} aria-label="Open menu" type="button">
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <div style={{ width: 16, height: 1.5, background: "#1A1A2E", borderRadius: 1 }} />

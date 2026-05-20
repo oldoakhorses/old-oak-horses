@@ -20,12 +20,68 @@
   flex: 1;
 }
 
+.profileBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #1a1a2e;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
+.profileInitial {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+
+.homeBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: #f0f1f5;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  text-decoration: none;
+  color: #1a1a2e;
+  transition: background 0.15s;
+}
+
+.homeBtn:hover {
+  background: #e8eaf0;
+}
+
+.calendarBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: #f0f1f5;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  text-decoration: none;
+  color: #6b7084;
+  transition: background 0.15s, color 0.15s;
+}
+
+.calendarBtn:hover {
+  background: #e8eaf0;
+  color: #1a1a2e;
+}
+
 .hamburgerBtn {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
-  border: 1px solid #e8eaf0;
-  background: transparent;
+  border-radius: 12px;
+  border: none;
+  background: #f0f1f5;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -35,7 +91,7 @@
 }
 
 .hamburgerBtn:hover {
-  background: #f2f3f7;
+  background: #e8eaf0;
 }
 
 .breadcrumbs {
@@ -125,28 +181,36 @@
 
 @media (max-width: 640px) {
   .nav {
-    padding: 0 12px;
+    padding: 0 10px;
+    height: 56px;
+    border-bottom: none;
+    background: #f5f5f7;
+  }
+
+  .profileBtn {
+    display: flex;
+  }
+
+  .homeBtn {
+    display: flex;
+  }
+
+  .calendarBtn {
+    display: flex;
   }
 
   .breadcrumbs {
-    gap: 4px;
-  }
-
-  .brand,
-  .segment,
-  .current,
-  .sep {
-    font-size: 11px;
+    display: none;
   }
 
   .actionOutlined,
-  .actionFilled {
-    padding: 6px 8px;
-    font-size: 9px;
+  .actionFilled,
+  .actionLink {
+    display: none;
   }
 
   .actions {
-    gap: 4px;
+    gap: 6px;
   }
 }
 
