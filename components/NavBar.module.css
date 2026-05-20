@@ -93,8 +93,7 @@
 
 .actionOutlined,
 .actionFilled,
-.actionLink,
-.actionSignOut {
+.actionLink {
   border-radius: 6px;
   padding: 7px 16px;
   font-size: 11px;
@@ -123,24 +122,6 @@
   padding: 0;
 }
 
-.actionSignOut {
-  border: 1px solid #e8eaf0;
-  background: transparent;
-  color: #9ea2b0;
-  font-weight: 400;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.actionSignOut:hover {
-  color: #e5484d;
-  border-color: #e5484d;
-}
-
-.actionSignOut:disabled {
-  opacity: 0.65;
-  cursor: default;
-}
 
 @media (max-width: 640px) {
   .nav {
@@ -187,13 +168,13 @@
 .sidebar {
   position: fixed;
   top: 0;
-  left: 0;
+  right: 0;
   bottom: 0;
   width: 280px;
   background: #ffffff;
-  border-right: 1px solid #e8eaf0;
+  border-left: 1px solid #e8eaf0;
   z-index: 51;
-  transform: translateX(-100%);
+  transform: translateX(100%);
   transition: transform 0.25s ease;
   display: flex;
   flex-direction: column;
@@ -320,7 +301,7 @@
 
 .sidebarSignOut {
   font-size: 11px;
-  color: #9ea2b0;
+  color: #e5484d;
   background: none;
   border: none;
   cursor: pointer;
@@ -328,11 +309,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  transition: color 0.15s;
+  transition: opacity 0.15s;
 }
 
 .sidebarSignOut:hover {
-  color: #e5484d;
+  opacity: 0.7;
 }
 
 .sidebarCopyright {
