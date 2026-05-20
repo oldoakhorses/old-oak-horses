@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Suspense, type ReactNode } from "react";
 import ConvexClientProvider from "@/components/ConvexClientProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -7,6 +7,12 @@ import GlobalFab from "@/components/GlobalFab";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  interactiveWidget: "resizes-visual",
+};
 
 export const metadata: Metadata = {
   title: "HorseBilz",
