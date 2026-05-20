@@ -857,7 +857,7 @@ export default function RecordsPage() {
         <section className={styles.recordsCard}>
           <div className={styles.tableHeader}>
             <span className={`${styles.colRecord} ${styles.sortableHeader}`} onClick={() => handleSort("record")}>Record{sortArrow("record")}</span>
-            <span className={`${styles.colSubtitle} ${styles.sortableHeader}`} onClick={() => handleSort("detail")}>Detail{sortArrow("detail")}</span>
+            <span className={`${styles.colSubtitle} ${styles.sortableHeader}`} onClick={() => handleSort("detail")}>Contact{sortArrow("detail")}</span>
             <span className={`${styles.colDate} ${styles.sortableHeader}`} onClick={() => handleSort("date")}>Date{sortArrow("date")}</span>
             <span className={`${styles.colCategory} ${styles.sortableHeader}`} onClick={() => handleSort("category")}>Category{sortArrow("category")}</span>
             <span className={`${styles.colHorse} ${styles.sortableHeader}`} onClick={() => handleSort("horse")}>Horse{sortArrow("horse")}</span>
