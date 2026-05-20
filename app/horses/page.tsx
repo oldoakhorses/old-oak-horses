@@ -127,7 +127,7 @@ export default function HorsesPage() {
         <section className={styles.headerRow}>
           <h2 className={styles.title}>horses</h2>
           <button type="button" className={styles.addButton} onClick={() => setShowAddModal(true)} aria-label="Add horse">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M9 3v12M3 9h12" />
             </svg>
           </button>
