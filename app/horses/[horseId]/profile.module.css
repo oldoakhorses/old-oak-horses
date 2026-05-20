@@ -1004,6 +1004,24 @@
   flex-shrink: 0;
 }
 
+.recordDateUpcoming {
+  font-size: 11px;
+  color: #e5484d;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-weight: 700;
+}
+
+.recordsSectionLabel {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ea2b0;
+  padding: 12px 26px 4px;
+  border-top: 1px solid #f0f1f5;
+}
+
 .recordExpanded {
   background: #f8f9fb;
   padding: 16px 26px;
