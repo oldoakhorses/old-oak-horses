@@ -24,11 +24,9 @@ type NavAction = {
 export default function NavBar({
   items,
   actions = [],
-  showSignOut = true,
 }: {
   items: BreadcrumbItem[];
   actions?: NavAction[];
-  showSignOut?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -115,14 +113,6 @@ export default function NavBar({
 
       <nav className={styles.nav}>
         <div className={styles.left}>
-          <button className={styles.hamburgerBtn} onClick={() => setMenuOpen(true)} aria-label="Open menu" type="button">
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <div style={{ width: 16, height: 1.5, background: "#1A1A2E", borderRadius: 1 }} />
-              <div style={{ width: 16, height: 1.5, background: "#1A1A2E", borderRadius: 1 }} />
-              <div style={{ width: 16, height: 1.5, background: "#1A1A2E", borderRadius: 1 }} />
-            </div>
-          </button>
-
           <div className={styles.breadcrumbs}>
             {items.map((item, index) => {
               const className = item.brand
@@ -159,11 +149,13 @@ export default function NavBar({
               {action.label}
             </Link>
           ))}
-          {showSignOut ? (
-            <button type="button" className={styles.actionSignOut} onClick={onSignOut} disabled={isSigningOut}>
-              {isSigningOut ? "signing out..." : "sign out"}
-            </button>
-          ) : null}
+          <button className={styles.hamburgerBtn} onClick={() => setMenuOpen(true)} aria-label="Open menu" type="button">
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ width: 16, height: 1.5, background: "#1A1A2E", borderRadius: 1 }} />
+              <div style={{ width: 16, height: 1.5, background: "#1A1A2E", borderRadius: 1 }} />
+              <div style={{ width: 16, height: 1.5, background: "#1A1A2E", borderRadius: 1 }} />
+            </div>
+          </button>
         </div>
       </nav>
     </>
