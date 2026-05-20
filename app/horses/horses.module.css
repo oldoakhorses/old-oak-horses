@@ -6,8 +6,8 @@
 }
 
 .title {
-  margin: 8px 0 0;
-  font-size: 36px;
+  margin: 4px 0 0;
+  font-size: 28px;
   font-weight: 700;
   color: #1a1a2e;
 }
@@ -34,29 +34,60 @@
 }
 
 .tabs {
-  display: inline-flex;
-  border: 1px solid #e8eaf0;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.tab,
-.tabActive {
-  font-size: 10px;
-  padding: 8px 16px;
-  border: none;
-  cursor: pointer;
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #e8eaf0;
+  margin-bottom: 20px;
 }
 
 .tab {
+  font-size: 13px;
+  font-weight: 600;
+  color: #9ea2b0;
   background: transparent;
-  color: #6b7084;
+  border: none;
+  padding: 10px 20px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: inherit;
+  transition: color 0.15s;
+}
+
+.tab:hover {
+  color: #1a1a2e;
 }
 
 .tabActive {
+  composes: tab;
+  color: #1a1a2e;
+  border-bottom-color: #1a1a2e;
+}
+
+.tabCount {
+  font-size: 10px;
+  font-weight: 700;
+  background: #f2f3f7;
+  color: #9ea2b0;
+  padding: 2px 7px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.tabActive .tabCount {
   background: #1a1a2e;
   color: #fff;
-  font-weight: 700;
+}
+
+.resultsCount {
+  font-size: 10px;
+  color: #c4c7d0;
+  margin-bottom: 8px;
+  letter-spacing: 0.01em;
 }
 
 .horsesCard {
@@ -74,6 +105,7 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
   border-bottom: 1px solid #e8eaf0;
+  background: #fafafc;
 }
 
 .horseRow {

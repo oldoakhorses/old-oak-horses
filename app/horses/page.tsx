@@ -117,14 +117,9 @@ export default function HorsesPage() {
         ]}
       />
       <main className="page-main">
-        <Link href="/dashboard" className="ui-back-link">
-          ← cd /dashboard
-        </Link>
-
         <section className={styles.headerRow}>
           <div>
-            <div className="ui-label">// HORSES</div>
-            <h1 className={styles.title}>horses</h1>
+            <h2 className={styles.title}>horses</h2>
           </div>
           <button type="button" className={styles.addButton} onClick={() => setShowAddModal(true)}>
             + add horse
@@ -135,14 +130,18 @@ export default function HorsesPage() {
           <div className={styles.tabs}>
             <button type="button" className={statusFilter === "active" ? styles.tabActive : styles.tab} onClick={() => setStatusFilter("active")}>
               Active
+              <span className={styles.tabCount}>{horses.filter((h) => h.status === "active").length}</span>
             </button>
             <button type="button" className={statusFilter === "inactive" ? styles.tabActive : styles.tab} onClick={() => setStatusFilter("inactive")}>
               Inactive
+              <span className={styles.tabCount}>{horses.filter((h) => h.status !== "active").length}</span>
             </button>
             <button type="button" className={statusFilter === "all" ? styles.tabActive : styles.tab} onClick={() => setStatusFilter("all")}>
               All
+              <span className={styles.tabCount}>{horses.length}</span>
             </button>
           </div>
+          <div className={styles.resultsCount}>showing {filtered.length} horses</div>
         </section>
 
         <section className={styles.horsesCard}>

@@ -152,13 +152,8 @@ export default function TeamPage() {
         ]}
       />
       <main className="page-main">
-        <Link href="/dashboard" className="ui-back-link">
-          ← cd /dashboard
-        </Link>
-
         <section className={styles.headerRow}>
           <div>
-            <div className="ui-label">// TEAM</div>
             <h1 className={styles.title}>team</h1>
           </div>
           <button type="button" className={styles.addButton} onClick={openAdd}>
@@ -170,26 +165,30 @@ export default function TeamPage() {
           <div className={styles.tabs}>
             <button
               type="button"
-              className={statusFilter === "active" ? styles.tabActive : styles.tab}
+              className={`${styles.tab} ${statusFilter === "active" ? styles.tabActive : ""}`}
               onClick={() => setStatusFilter("active")}
             >
               Active
+              <span className={styles.tabCount}>{people.filter((p) => p.isActive === true).length}</span>
             </button>
             <button
               type="button"
-              className={statusFilter === "inactive" ? styles.tabActive : styles.tab}
+              className={`${styles.tab} ${statusFilter === "inactive" ? styles.tabActive : ""}`}
               onClick={() => setStatusFilter("inactive")}
             >
               Inactive
+              <span className={styles.tabCount}>{people.filter((p) => p.isActive === false).length}</span>
             </button>
             <button
               type="button"
-              className={statusFilter === "all" ? styles.tabActive : styles.tab}
+              className={`${styles.tab} ${statusFilter === "all" ? styles.tabActive : ""}`}
               onClick={() => setStatusFilter("all")}
             >
               All
+              <span className={styles.tabCount}>{people.length}</span>
             </button>
           </div>
+          <div className={styles.resultsCount}>showing {filtered.length} team members</div>
         </section>
 
         <section className={styles.teamCard}>
