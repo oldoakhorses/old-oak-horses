@@ -26,6 +26,12 @@ export function canAccessRoute(role: UserRole, pathname: string): boolean {
 export function getNavSections(role: UserRole) {
   const sections = [
     {
+      label: "Home",
+      items: [
+        { label: "home", href: "/dashboard", icon: "🏠" },
+      ],
+    },
+    {
       label: "Barn",
       items: [
         { label: "horses", href: "/horses", icon: "🐴" },
@@ -36,7 +42,6 @@ export function getNavSections(role: UserRole) {
     {
       label: "Admin",
       items: [
-        { label: "dashboard", href: "/dashboard", icon: "📊" },
         { label: "invoices", href: "/invoices", icon: "📄" },
         { label: "billing", href: "/billing", icon: "💰" },
         { label: "owners", href: "/owners", icon: "👥" },
