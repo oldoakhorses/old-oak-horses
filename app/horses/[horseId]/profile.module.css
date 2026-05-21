@@ -624,8 +624,7 @@
 }
 
 .documentsHeader {
-  padding: 18px 26px;
-  border-bottom: 1px solid #e8eaf0;
+  padding: 18px 20px 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -643,58 +642,84 @@
   margin-top: 2px;
 }
 
-.btnAddDoc {
-  font-size: 10px;
-  padding: 6px 12px;
-  border-radius: 6px;
+.docBody {
+  padding: 12px 20px 18px;
+}
+
+.docSearchBar {
+  width: 100%;
+  background: #f2f3f7;
   border: 1px solid #e8eaf0;
-  background: transparent;
-  color: #6b7084;
-  cursor: pointer;
-  text-decoration: none;
+  border-radius: 8px;
+  padding: 0 14px;
+  height: 36px;
+  font-size: 12px;
+  box-sizing: border-box;
+  color: #1a1a2e;
+  outline: none;
+  font-family: inherit;
+  margin-bottom: 14px;
 }
 
-.btnAddDoc:hover {
+.docSearchBar:focus {
   border-color: #4a5bdb;
-  color: #4a5bdb;
+  box-shadow: 0 0 0 3px rgba(74, 91, 219, 0.06);
 }
 
-.docHeader {
-  display: grid;
-  grid-template-columns: 1fr 140px 120px 40px;
-  padding: 10px 26px;
-  font-size: 9px;
-  color: #9ea2b0;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  border-bottom: 1px solid #e8eaf0;
+.docScroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 4px;
 }
 
-.docRow {
-  display: grid;
-  grid-template-columns: 1fr 140px 120px 40px;
-  padding: 12px 26px;
-  align-items: center;
-  border-bottom: 1px solid #f0f1f5;
+.docScroll::-webkit-scrollbar {
+  display: none;
+}
+
+.docCard {
+  flex-shrink: 0;
+  width: 160px;
+  border: 1px solid #e8eaf0;
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
   cursor: pointer;
-  transition: background 0.1s;
+  scroll-snap-align: start;
+  transition: box-shadow 0.15s;
 }
 
-.docRow:hover {
-  background: #fafafc;
+.docCard:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
-.docRow:last-child {
-  border-bottom: none;
+.docCardTop {
+  height: 90px;
+  background: #f2f3f7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.docName {
+.docCardIcon {
+  font-size: 28px;
+}
+
+.docCardBody {
+  padding: 10px 14px 14px;
+}
+
+.docCardName {
   font-size: 12px;
   font-weight: 700;
   color: #1a1a2e;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 6px;
 }
 
 .tagBadge {
@@ -707,66 +732,10 @@
   width: fit-content;
 }
 
-.docDate {
-  font-size: 11px;
-  color: #6b7084;
-}
-
-.docMenuWrap {
-  position: relative;
-}
-
-.docMenuButton {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
+.docCardDate {
+  font-size: 10px;
   color: #9ea2b0;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.docMenuButton:hover {
-  background: #f2f3f7;
-}
-
-.docMenuDropdown {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  margin-top: 4px;
-  background: #fff;
-  border: 1px solid #e8eaf0;
-  border-radius: 8px;
-  padding: 6px 0;
-  min-width: 180px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  z-index: 20;
-}
-
-.docMenuItem {
-  font-size: 11px;
-  padding: 8px 16px;
-  border: none;
-  background: transparent;
-  color: #6b7084;
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-}
-
-.docMenuItem:hover {
-  background: #fafafc;
-}
-
-.docMenuDivider {
-  border-top: 1px solid #e8eaf0;
-  margin: 4px 0;
-}
-
-.docMenuItemDanger {
-  color: #e5484d;
+  margin-top: 6px;
 }
 
 .documentsEmpty {

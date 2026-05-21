@@ -166,7 +166,7 @@ export default function HorseProfilePage() {
   const [recordEdit, setRecordEdit] = useState<RecordEditState | null>(null);
   const [editProviderDropdownOpen, setEditProviderDropdownOpen] = useState(false);
   const editContactDropdownRef = useRef<HTMLDivElement | null>(null);
-  const [openDocumentMenu, setOpenDocumentMenu] = useState<Id<"documents"> | null>(null);
+  const [docSearch, setDocSearch] = useState("");
   const [documentToDelete, setDocumentToDelete] = useState<{ id: Id<"documents">; name: string } | null>(null);
   const [isDeletingDocument, setIsDeletingDocument] = useState(false);
 
@@ -212,9 +212,6 @@ export default function HorseProfilePage() {
 
   useEffect(() => {
     const onClickOutside = (event: MouseEvent) => {
-      if (documentsCardRef.current && !documentsCardRef.current.contains(event.target as Node)) {
-        setOpenDocumentMenu(null);
-      }
       if (editContactDropdownRef.current && !editContactDropdownRef.current.contains(event.target as Node)) {
         setEditProviderDropdownOpen(false);
       }
@@ -585,7 +582,6 @@ export default function HorseProfilePage() {
     try {
       await deleteDocument({ documentId: documentToDelete.id });
       setDocumentToDelete(null);
-      setOpenDocumentMenu(null);
     } finally {
       setIsDeletingDocument(false);
     }
@@ -1039,9 +1035,6 @@ export default function HorseProfilePage() {
               <div className={styles.documentsTitle}>documents</div>
               <div className={styles.documentsCount}>{documents.length} document{documents.length === 1 ? "" : "s"}</div>
             </div>
-            <Link href={`/dashboard?panel=document&horseId=${horse._id}`} className={styles.btnAddDoc}>
-              + add
-            </Link>
           </div>
 
           {documents.length === 0 ? (
@@ -1050,83 +1043,44 @@ export default function HorseProfilePage() {
               <div className={styles.documentsEmptySub}>upload coggins, health certs, and other horse documents</div>
             </div>
           ) : (
-            <>
-              <div className={styles.docHeader}>
-                <span>NAME</span>
-                <span>TAG</span>
-                <span>DATE</span>
-                <span />
-              </div>
-              {documents.map((doc) => (
-                <div
-                  key={doc._id}
-                  className={styles.docRow}
-                  onClick={() => {
-                    if (doc.fileUrl) window.open(doc.fileUrl, "_blank", "noopener,noreferrer");
-                  }}
-                >
-                  <div className={styles.docName}>📄 {doc.name}</div>
-                  <span className={styles.tagBadge} style={{ background: TAG_COLORS[doc.tag].bg, color: TAG_COLORS[doc.tag].color }}>
-                    {TAG_LABELS[doc.tag]}
-                  </span>
-                  <span className={styles.docDate}>{formatDateLong(doc.documentDate ?? doc.uploadedAt)}</span>
-                  <div className={styles.docMenuWrap}>
-                    <button
-                      type="button"
-                      className={styles.docMenuButton}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setOpenDocumentMenu((prev) => (prev === doc._id ? null : doc._id));
+            <div className={styles.docBody}>
+              <input
+                className={styles.docSearchBar}
+                type="text"
+                placeholder="search documents..."
+                value={docSearch}
+                onChange={(e) => setDocSearch(e.target.value)}
+              />
+              <div className={styles.docScroll}>
+                {documents
+                  .filter((doc) => {
+                    if (!docSearch.trim()) return true;
+                    const term = docSearch.trim().toLowerCase();
+                    const hay = [doc.name, TAG_LABELS[doc.tag]].join(" ").toLowerCase();
+                    return hay.includes(term);
+                  })
+                  .map((doc) => (
+                    <div
+                      key={doc._id}
+                      className={styles.docCard}
+                      onClick={() => {
+                        if (doc.fileUrl) window.open(doc.fileUrl, "_blank", "noopener,noreferrer");
                       }}
                     >
-                      ⋮
-                    </button>
-                    {openDocumentMenu === doc._id ? (
-                      <div className={styles.docMenuDropdown}>
-                        <button
-                          type="button"
-                          className={styles.docMenuItem}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            if (doc.fileUrl) window.open(doc.fileUrl, "_blank", "noopener,noreferrer");
-                            setOpenDocumentMenu(null);
-                          }}
-                        >
-                          Open Document
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.docMenuItem}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            if (doc.fileUrl) {
-                              const link = document.createElement("a");
-                              link.href = doc.fileUrl;
-                              link.download = doc.fileName || doc.name;
-                              link.click();
-                            }
-                            setOpenDocumentMenu(null);
-                          }}
-                        >
-                          Download
-                        </button>
-                        <div className={styles.docMenuDivider} />
-                        <button
-                          type="button"
-                          className={`${styles.docMenuItem} ${styles.docMenuItemDanger}`}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setDocumentToDelete({ id: doc._id, name: doc.name });
-                          }}
-                        >
-                          Delete
-                        </button>
+                      <div className={styles.docCardTop}>
+                        <span className={styles.docCardIcon}>📄</span>
                       </div>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </>
+                      <div className={styles.docCardBody}>
+                        <div className={styles.docCardName}>{doc.name}</div>
+                        <span className={styles.tagBadge} style={{ background: TAG_COLORS[doc.tag].bg, color: TAG_COLORS[doc.tag].color }}>
+                          {TAG_LABELS[doc.tag]}
+                        </span>
+                        <div className={styles.docCardDate}>{formatDateLong(doc.documentDate ?? doc.uploadedAt)}</div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
           )}
         </section>
 
