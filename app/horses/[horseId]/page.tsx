@@ -44,17 +44,6 @@ type HorseRecord = {
   attachmentUrl?: string | null;
 };
 
-type RecordEditState = {
-  type: RecordType;
-  contactName: string;
-  date: string;
-  nextVisitDate: string;
-  notes: string;
-  serviceType: string;
-  customType: string;
-  vaccineName: string;
-  treatmentDescription: string;
-};
 
 type FormState = {
   name: string;
@@ -121,21 +110,10 @@ export default function HorseProfilePage() {
   const deleteHorse = useMutation(api.horses.deleteHorse);
   const transferOwnership = useMutation(api.horses.transferOwnership);
   const router = useRouter();
-  const updateRecordWithNextVisit = useMutation(api.horseRecords.updateRecordWithNextVisit);
-  const findOrCreateContact = useMutation(api.contacts.findOrCreateContact);
-  const allContactsForRecord = useQuery(api.contacts.getAllContacts) ?? [];
-  const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
-  const [recordAttachment, setRecordAttachment] = useState<File | null>(null);
   const deleteDocument = useMutation(api.documents.deleteDocument);
 
   const [isEditing, setIsEditing] = useState(startsInEditMode);
   const [isSaving, setIsSaving] = useState(false);
-  const [recordsSearch, setRecordsSearch] = useState("");
-  const [expandedRecordId, setExpandedRecordId] = useState<Id<"horseRecords"> | null>(null);
-  const [editingRecordId, setEditingRecordId] = useState<Id<"horseRecords"> | null>(null);
-  const [recordEdit, setRecordEdit] = useState<RecordEditState | null>(null);
-  const [editProviderDropdownOpen, setEditProviderDropdownOpen] = useState(false);
-  const editContactDropdownRef = useRef<HTMLDivElement | null>(null);
   const [docSearch, setDocSearch] = useState("");
   const [documentToDelete, setDocumentToDelete] = useState<{ id: Id<"documents">; name: string } | null>(null);
   const [isDeletingDocument, setIsDeletingDocument] = useState(false);
@@ -175,268 +153,20 @@ export default function HorseProfilePage() {
     });
   }, [horse]);
 
-  useEffect(() => {
-    const onClickOutside = (event: MouseEvent) => {
-      if (editContactDropdownRef.current && !editContactDropdownRef.current.contains(event.target as Node)) {
-        setEditProviderDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, []);
-
   const todayEnd = useMemo(() => {
     const d = new Date();
     d.setHours(23, 59, 59, 999);
     return d.getTime();
   }, []);
 
-  const matchedRecords = useMemo(() => {
-    const term = recordsSearch.trim().toLowerCase();
-    if (!term) return recordsAll;
-    return recordsAll.filter((record) => {
-      const bag = [
-        record.type,
-        record.contactName,
-        record.notes,
-        record.vaccineName,
-        record.treatmentDescription,
-        record.serviceType,
-        record.customType,
-        record.visitType,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return bag.includes(term);
-    });
-  }, [recordsAll, recordsSearch]);
-  const recordById = useMemo(() => {
-    const map = new Map<string, HorseRecord>();
-    for (const row of recordsAll) map.set(String(row._id), row);
-    return map;
-  }, [recordsAll]);
-
-  const pastMatchedRecords = useMemo(
-    () => matchedRecords.filter((r) => r.date <= todayEnd),
-    [matchedRecords, todayEnd],
+  const pastRecordCount = useMemo(
+    () => recordsAll.filter((r) => r.date <= todayEnd).length,
+    [recordsAll, todayEnd],
   );
-  const upcomingMatchedRecords = useMemo(
-    () => matchedRecords.filter((r) => r.date > todayEnd).sort((a, b) => a.date - b.date),
-    [matchedRecords, todayEnd],
+  const upcomingRecordCount = useMemo(
+    () => recordsAll.filter((r) => r.date > todayEnd).length,
+    [recordsAll, todayEnd],
   );
-  const recentMatchedRecords = pastMatchedRecords.slice(0, 3);
-
-  function renderRecordExpanded(record: HorseRecord, isEditingRecord: boolean) {
-    return (
-      <div className={styles.recordExpanded}>
-        <div className={styles.recordExpandedFields}>
-          {isEditingRecord ? (
-            <>
-              <ExpandedInput label={contactLabel(record.type)}>
-                <div className={styles.contactSearchWrap} ref={editContactDropdownRef}>
-                  <input
-                    className={styles.expandedInput}
-                    value={recordEdit!.contactName}
-                    onChange={(event) => {
-                      setRecordEdit({ ...recordEdit!, contactName: event.target.value });
-                      setEditProviderDropdownOpen(true);
-                    }}
-                    onFocus={() => setEditProviderDropdownOpen(true)}
-                  />
-                  {editProviderDropdownOpen && recordEdit!.contactName.trim() && (() => {
-                    const term = recordEdit!.contactName.trim().toLowerCase();
-                    const matches = allContactsForRecord.filter((c: any) => c.name.toLowerCase().includes(term));
-                    if (matches.length === 0) return null;
-                    return (
-                      <div className={styles.contactDropdown}>
-                        {matches.slice(0, 8).map((c: any) => (
-                          <button
-                            type="button"
-                            key={c._id}
-                            className={styles.contactDropdownItem}
-                            onClick={() => {
-                              setRecordEdit({ ...recordEdit!, contactName: c.name });
-                              setEditProviderDropdownOpen(false);
-                            }}
-                          >
-                            {c.name}
-                          </button>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                </div>
-              </ExpandedInput>
-              <ExpandedInput label="DATE">
-                <input
-                  type="date"
-                  className={styles.expandedInput}
-                  value={recordEdit!.date}
-                  onChange={(event) => setRecordEdit({ ...recordEdit!, date: event.target.value })}
-                />
-              </ExpandedInput>
-              <ExpandedInput label="NOTES">
-                <textarea
-                  className={styles.expandedTextarea}
-                  value={recordEdit!.notes}
-                  onChange={(event) => setRecordEdit({ ...recordEdit!, notes: event.target.value })}
-                />
-              </ExpandedInput>
-              {record.date <= todayEnd ? (
-                <ExpandedInput label="NEXT VISIT">
-                  <>
-                    <input
-                      type="date"
-                      className={styles.expandedInput}
-                      value={recordEdit!.nextVisitDate}
-                      onChange={(event) => setRecordEdit({ ...recordEdit!, nextVisitDate: event.target.value })}
-                    />
-                    <div style={{ fontSize: 9, color: "#9EA2B0", marginTop: 6 }}>
-                      {record.linkedRecordId
-                        ? "editing this will update the scheduled follow-up"
-                        : "setting a date will create a scheduled follow-up"}
-                    </div>
-                  </>
-                </ExpandedInput>
-              ) : null}
-              {!record.attachmentUrl ? (
-                <ExpandedInput label="ATTACHMENT">
-                  {recordAttachment ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 11, color: "#2D2F39" }}>📎 {recordAttachment.name}</span>
-                      <button
-                        type="button"
-                        style={{ fontSize: 10, color: "#E5484D", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
-                        onClick={(event) => { event.stopPropagation(); setRecordAttachment(null); }}
-                      >
-                        remove
-                      </button>
-                    </div>
-                  ) : (
-                    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10, color: "#4A5BDB", cursor: "pointer" }}>
-                      <input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png,.mp4,.mov,.webm"
-                        style={{ display: "none" }}
-                        onChange={(event) => {
-                          event.stopPropagation();
-                          const file = event.target.files?.[0];
-                          if (file) setRecordAttachment(file);
-                        }}
-                      />
-                      + add document
-                    </label>
-                  )}
-                </ExpandedInput>
-              ) : null}
-            </>
-          ) : (
-            <>
-              <ExpandedField label={contactLabel(record.type)} value={record.contactName} />
-              <ExpandedField label="DATE" value={formatDateLong(record.date)} />
-              <ExpandedField label="NOTES" value={record.notes} />
-            </>
-          )}
-        </div>
-
-        {record.attachmentUrl ? (
-          <div className={styles.attachmentRow}>
-            <span className={styles.attachmentLabel}>ATTACHMENT</span>
-            <div className={styles.attachmentValue}>
-              <span>📎 {(record as any).attachmentName || "attachment"}</span>
-              <button
-                type="button"
-                className={styles.attachmentLink}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  window.open(record.attachmentUrl || "", "_blank", "noopener,noreferrer");
-                }}
-              >
-                open
-              </button>
-              <button
-                type="button"
-                className={styles.attachmentLink}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  const link = document.createElement("a");
-                  link.href = record.attachmentUrl || "";
-                  link.download = (record as any).attachmentName || "attachment";
-                  link.click();
-                }}
-              >
-                download
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        <div className={styles.expandedActions}>
-          {isEditingRecord ? (
-            <>
-              <button
-                type="button"
-                className={styles.expandedEditBtn}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void onSaveRecordEdit();
-                }}
-              >
-                save
-              </button>
-              <button
-                type="button"
-                className={styles.expandedCloseBtn}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setEditingRecordId(null);
-                  setRecordEdit(null);
-                  setRecordAttachment(null);
-                }}
-              >
-                cancel
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                className={styles.expandedEditBtn}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setEditingRecordId(record._id);
-                  setRecordEdit({
-                    type: record.type as RecordType,
-                    contactName: record.contactName || "",
-                    date: toDateInput(record.date),
-                    nextVisitDate: getLinkedUpcomingDateInput(record),
-                    notes: record.notes || "",
-                    serviceType: record.serviceType || "",
-                    customType: record.customType || "",
-                    vaccineName: record.vaccineName || "",
-                    treatmentDescription: record.treatmentDescription || "",
-                  });
-                }}
-              >
-                edit
-              </button>
-              <button
-                type="button"
-                className={styles.expandedCloseBtn}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setExpandedRecordId(null);
-                }}
-              >
-                close
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    );
-  }
 
   if (horse === undefined) {
     return (
@@ -484,59 +214,6 @@ export default function HorseProfilePage() {
     } finally {
       setIsSaving(false);
     }
-  }
-
-  function getLinkedUpcomingDateInput(record: HorseRecord) {
-    if (record.date > todayEnd || !record.linkedRecordId) return "";
-    const linked = recordsAll.find((row) => row._id === record.linkedRecordId);
-    return typeof linked?.date === "number" ? toDateInput(linked.date) : "";
-  }
-
-  async function onSaveRecordEdit() {
-    if (!editingRecordId || !recordEdit) return;
-    const nextVisitTimestamp = recordEdit.nextVisitDate ? new Date(`${recordEdit.nextVisitDate}T00:00:00`).getTime() : undefined;
-    const editProviderName = recordEdit.contactName?.trim() || undefined;
-    let editContactId: Id<"contacts"> | undefined;
-    if (editProviderName) {
-      const catMap: Record<string, string> = { veterinary: "veterinary", medication: "veterinary", farrier: "farrier", bodywork: "bodywork" };
-      const category = catMap[recordEdit.type] || "other";
-      const contactId = await findOrCreateContact({ name: editProviderName, category });
-      if (contactId) editContactId = contactId;
-    }
-
-    let attachmentStorageId: string | undefined;
-    let attachmentName: string | undefined;
-    if (recordAttachment) {
-      const uploadUrl = await generateUploadUrl();
-      const resp = await fetch(uploadUrl, {
-        method: "POST",
-        headers: { "Content-Type": recordAttachment.type || "application/octet-stream" },
-        body: recordAttachment,
-      });
-      if (!resp.ok) throw new Error("Upload failed");
-      const result = await resp.json();
-      attachmentStorageId = result.storageId;
-      attachmentName = recordAttachment.name;
-    }
-
-    await updateRecordWithNextVisit({
-      recordId: editingRecordId,
-      updates: {
-        contactName: editProviderName,
-        contactId: editContactId,
-        date: recordEdit.date ? new Date(`${recordEdit.date}T00:00:00`).getTime() : undefined,
-        notes: recordEdit.notes || undefined,
-        serviceType: recordEdit.serviceType || undefined,
-        customType: recordEdit.customType || undefined,
-        vaccineName: recordEdit.vaccineName || undefined,
-        treatmentDescription: recordEdit.treatmentDescription || undefined,
-        ...(attachmentStorageId ? { attachmentStorageId, attachmentName } : {}),
-      },
-      nextVisitDate: nextVisitTimestamp,
-    });
-    setEditingRecordId(null);
-    setRecordEdit(null);
-    setRecordAttachment(null);
   }
 
   async function onDeleteDocument() {
@@ -700,169 +377,19 @@ export default function HorseProfilePage() {
           </Link>
         )}
 
-        <section className={styles.recordsCard}>
-          <div className={styles.recordsHeaderNew}>
+        <Link href={`/horses/${horse._id}/records`} className={styles.recordsBlock}>
+          <div className={styles.recordsBlockLeft}>
+            <span className={styles.recordsBlockIcon}>📋</span>
             <div>
-              <div className={styles.recordsTitle}>records</div>
-              <div className={styles.recordsSubhead}>
-                {upcomingMatchedRecords.length > 0 ? `${upcomingMatchedRecords.length} upcoming · ` : ""}
-                {pastMatchedRecords.length} past
+              <div className={styles.recordsBlockTitle}>records</div>
+              <div className={styles.recordsBlockSub}>
+                {upcomingRecordCount > 0 ? `${upcomingRecordCount} upcoming · ` : ""}
+                {pastRecordCount} past
               </div>
             </div>
-            <Link href={`/horses/${horse._id}/records`} className={styles.seeAllLink}>
-              see all →
-            </Link>
           </div>
-
-          <div className={styles.recordsSearchRow}>
-            <div className={styles.recordsSearchWrapper}>
-              <span className={styles.recordsSearchIcon}>🔍</span>
-              <input
-                className={styles.recordsSearch}
-                value={recordsSearch}
-                onChange={(event) => setRecordsSearch(event.target.value)}
-                placeholder="search records..."
-              />
-            </div>
-          </div>
-
-          {recordsSearch.trim() && matchedRecords.length > 3 ? (
-            <div className={styles.recordsSearchNote}>
-              showing {Math.min(3, pastMatchedRecords.length) + upcomingMatchedRecords.length} of {matchedRecords.length} matches — <Link href={`/horses/${horse._id}/records`} className={styles.recordsSearchNoteLink}>see all →</Link>
-            </div>
-          ) : null}
-
-          {upcomingMatchedRecords.length > 0 ? (
-            <>
-              <div className={styles.recordsSectionLabel}>upcoming</div>
-              {upcomingMatchedRecords.map((record) => {
-                const expanded = expandedRecordId === record._id;
-                const subtype = getRecordSubtype(record);
-                const detail = getRecordDetail(record);
-                const isEditingRecord = editingRecordId === record._id && recordEdit !== null;
-
-                return (
-                  <div key={record._id}>
-                    <div
-                      className={styles.recordRowNew}
-                      onClick={() => {
-                        setExpandedRecordId((prev) => (prev === record._id ? null : record._id));
-                        setEditingRecordId(null);
-                        setRecordEdit(null);
-                      }}
-                    >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className={styles.recordTitle}>
-                          <span>{RECORD_ICONS[record.type]}</span>
-                          <span>
-                            {record.type === "veterinary" && subtype ? subtype : pretty(record.type)}
-                            {record.type !== "veterinary" && subtype ? ` — ${subtype}` : ""}
-                          </span>
-                        </div>
-                        {detail ? <div className={styles.recordDetail}>{detail}</div> : null}
-                        {record.linkedRecordId ? (
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setExpandedRecordId(record.linkedRecordId || null);
-                              setEditingRecordId(null);
-                              setRecordEdit(null);
-                            }}
-                            style={{
-                              marginTop: 3,
-                              fontSize: 9,
-                              color: "#9EA2B0",
-                              background: "transparent",
-                              border: "none",
-                              padding: 0,
-                              cursor: "pointer",
-                              fontFamily: "inherit",
-                            }}
-                          >
-                            📋 follow-up from: {formatDateLong(recordById.get(String(record.linkedRecordId))?.date ?? record.date)}
-                          </button>
-                        ) : null}
-                      </div>
-                      <div className={styles.recordDateUpcoming}>{formatDateLong(record.date)}</div>
-                    </div>
-                    {expanded ? renderRecordExpanded(record, isEditingRecord) : null}
-                  </div>
-                );
-              })}
-            </>
-          ) : null}
-
-          {upcomingMatchedRecords.length > 0 && recentMatchedRecords.length > 0 ? (
-            <div className={styles.recordsSectionLabel}>past</div>
-          ) : null}
-
-          {recentMatchedRecords.length === 0 && upcomingMatchedRecords.length === 0 ? (
-            <div className={styles.recordsEmpty}>
-              <div className={styles.recordsEmptyTitle}>no records yet</div>
-              <div className={styles.recordsEmptySub}>log vet visits, farrier, and other horse records</div>
-            </div>
-          ) : (
-            recentMatchedRecords.map((record) => {
-              const expanded = expandedRecordId === record._id;
-              const subtype = getRecordSubtype(record);
-              const detail = getRecordDetail(record);
-              const isEditingRecord = editingRecordId === record._id && recordEdit !== null;
-
-              return (
-                <div key={record._id}>
-                  <div
-                    className={styles.recordRowNew}
-                    onClick={() => {
-                      setExpandedRecordId((prev) => (prev === record._id ? null : record._id));
-                      setEditingRecordId(null);
-                      setRecordEdit(null);
-                    }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className={styles.recordTitle}>
-                        <span>{RECORD_ICONS[record.type]}</span>
-                        <span>
-                          {record.type === "veterinary" && subtype ? subtype : pretty(record.type)}
-                          {record.type !== "veterinary" && subtype ? ` — ${subtype}` : ""}
-                        </span>
-                      </div>
-                      {detail ? <div className={styles.recordDetail}>{detail}</div> : null}
-                      {record.linkedRecordId ? (
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setExpandedRecordId(record.linkedRecordId || null);
-                            setEditingRecordId(null);
-                            setRecordEdit(null);
-                          }}
-                          style={{
-                            marginTop: 3,
-                            fontSize: 9,
-                            color: record.date > todayEnd ? "#9EA2B0" : "#4A5BDB",
-                            background: "transparent",
-                            border: "none",
-                            padding: 0,
-                            cursor: "pointer",
-                            fontFamily: "inherit",
-                          }}
-                        >
-                          {record.date > todayEnd
-                            ? `📋 follow-up from: ${formatDateLong(recordById.get(String(record.linkedRecordId))?.date ?? record.date)}`
-                            : `📅 follow-up scheduled: ${formatDateLong(recordById.get(String(record.linkedRecordId))?.date ?? record.date)}`}
-                        </button>
-                      ) : null}
-                    </div>
-                    <div className={styles.recordDate}>{formatDateLong(record.date)}</div>
-                  </div>
-
-                  {expanded ? renderRecordExpanded(record, isEditingRecord) : null}
-                </div>
-              );
-            })
-          )}
-        </section>
+          <span className={styles.recordsBlockArrow}>→</span>
+        </Link>
 
         {/* Feed Plan link block */}
         <Link href={`/horses/${horseId}/feed-plan`} className={styles.feedPlanBlock}>
