@@ -1459,8 +1459,9 @@
   .recordRow {
     display: flex;
     flex-wrap: wrap;
-    gap: 2px 10px;
+    gap: 0 10px;
     padding: 14px 18px;
+    align-items: center;
   }
 
   .colRecord {
@@ -1477,6 +1478,8 @@
     order: 2;
     font-size: 11px;
     color: #9ea2b0;
+    margin-left: auto;
+    flex-shrink: 0;
   }
 
   .colSubtitle {
@@ -1484,14 +1487,15 @@
   }
 
   .colCategory {
-    order: 4;
-    margin-top: 6px;
+    order: 3;
+    margin-top: 8px;
   }
 
   .colHorse {
-    order: 5;
+    order: 4;
     font-size: 11px;
-    margin-top: 6px;
+    margin-top: 8px;
+    color: #6b7084;
   }
 
   .expandedMetaRow {
