@@ -6,7 +6,7 @@ import { useSearchParams, useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { formatInvoiceName, toIsoDateString } from "@/lib/formatInvoiceName";
+
 import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -67,31 +67,7 @@ type FormState = {
   ownerId: string;
 };
 
-type PrizeForm = {
-  amount: string;
-  description: string;
-  showName: string;
-  className: string;
-  placing: string;
-  date: string;
-};
 
-const CATEGORY_COLORS: Record<string, string> = {
-  veterinary: "#4A5BDB",
-  farrier: "#14B8A6",
-  stabling: "#F59E0B",
-  supplies: "#6B7084",
-  bodywork: "#A78BFA",
-  travel: "#EC4899",
-  housing: "#A78BFA",
-  feed_bedding: "#22C583",
-  "feed-bedding": "#22C583",
-  admin: "#6B7084",
-  dues_registrations: "#4A5BDB",
-  "dues-registrations": "#4A5BDB",
-  horse_transport: "#4A5BDB",
-  "horse-transport": "#4A5BDB",
-};
 
 const TAG_COLORS: Record<DocumentTag, { bg: string; color: string }> = {
   coggins: { bg: "rgba(74,91,219,0.08)", color: "#4A5BDB" },
@@ -134,9 +110,6 @@ export default function HorseProfilePage() {
   const startsInEditMode = searchParams.get("edit") === "1";
 
   const horse = useQuery(api.horses.getHorseById, horseId ? { horseId } : "skip");
-  const spendMeta = useQuery(api.horses.getHorseSpendMeta, horseId ? { horseId } : "skip");
-  const spendByCategory = useQuery(api.horses.getHorseSpendByCategory, horseId ? { horseId } : "skip") ?? [];
-  const invoices = useQuery(api.horses.getInvoicesByHorse, horseId ? { horseId } : "skip") ?? [];
   const recordCounts = useQuery(api.horses.getHorseRecordCounts, horseId ? { horseId } : "skip");
   const prizeMoneyData = useQuery(api.incomeEntries.getHorsePrizeMoney, horseId ? { horseId } : "skip");
   const recordsAll = (useQuery(api.horseRecords.getAllByHorse, horseId ? { horseId } : "skip") as HorseRecord[] | undefined) ?? [];
@@ -144,8 +117,6 @@ export default function HorseProfilePage() {
   const ownersList = useQuery(api.owners.list) ?? [];
 
   const updateHorseProfile = useMutation(api.horses.updateHorseProfile);
-  const addIncomeEntry = useMutation(api.incomeEntries.addEntry);
-  const deleteIncomeEntry = useMutation(api.incomeEntries.deleteEntry);
   const assignHorseToOwner = useMutation(api.owners.assignHorseToOwner);
   const deleteHorse = useMutation(api.horses.deleteHorse);
   const transferOwnership = useMutation(api.horses.transferOwnership);
@@ -159,7 +130,6 @@ export default function HorseProfilePage() {
 
   const [isEditing, setIsEditing] = useState(startsInEditMode);
   const [isSaving, setIsSaving] = useState(false);
-  const [showAllInvoices, setShowAllInvoices] = useState(false);
   const [recordsSearch, setRecordsSearch] = useState("");
   const [expandedRecordId, setExpandedRecordId] = useState<Id<"horseRecords"> | null>(null);
   const [editingRecordId, setEditingRecordId] = useState<Id<"horseRecords"> | null>(null);
@@ -189,11 +159,6 @@ export default function HorseProfilePage() {
     owner: "",
     ownerId: "",
   });
-  const [showPrizeForm, setShowPrizeForm] = useState(false);
-  const [prizeForm, setPrizeForm] = useState<PrizeForm>({
-    amount: "", description: "", showName: "", className: "", placing: "", date: "",
-  });
-
   const documentsCardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -219,8 +184,6 @@ export default function HorseProfilePage() {
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
-
-  const visibleInvoices = showAllInvoices ? invoices : invoices.slice(0, 10);
 
   const todayEnd = useMemo(() => {
     const d = new Date();
@@ -475,7 +438,7 @@ export default function HorseProfilePage() {
     );
   }
 
-  if (horse === undefined || spendMeta === undefined) {
+  if (horse === undefined) {
     return (
       <div className="page-shell">
         <main className="page-main">
@@ -485,7 +448,7 @@ export default function HorseProfilePage() {
     );
   }
 
-  if (!horse || !spendMeta) {
+  if (!horse) {
     return (
       <div className="page-shell">
         <main className="page-main">
@@ -725,132 +688,16 @@ export default function HorseProfilePage() {
         </section>
 
         {!isTeam && (
-          <section className={styles.spendRow}>
-            <div className={styles.spendTotalCard}>
-              <div className={styles.spendLabel}>TOTAL SPEND</div>
-              <div className={styles.spendTotal}>{formatUsd(spendMeta.totalSpend)}</div>
-              <div className={spendMeta.momPct > 0 ? styles.momUp : styles.momDown}>
-                {spendMeta.momPct >= 0 ? "↗" : "↘"} {spendMeta.momPct >= 0 ? "+" : ""}
-                {Math.abs(spendMeta.momPct).toFixed(1)}% vs last month
-              </div>
-              {(prizeMoneyData?.total ?? 0) > 0 ? (
-                <>
-                  <div className={styles.prizeMoneyRow}>
-                    <span className={styles.prizeMoneyLabel}>PRIZE MONEY</span>
-                    <span className={styles.prizeMoneyValue}>+{formatUsd(prizeMoneyData!.total)}</span>
-                  </div>
-                  <div className={styles.netCostRow}>
-                    <span className={styles.netCostLabel}>NET COST</span>
-                    <span className={styles.netCostValue}>{formatUsd(spendMeta.totalSpend - prizeMoneyData!.total)}</span>
-                  </div>
-                </>
-              ) : null}
-            </div>
-            <div className={styles.spendBreakdownCard}>
-              <div className={styles.spendLabel}>SPEND BY CATEGORY</div>
-              <div className={styles.breakdownList}>
-                {spendByCategory.map((row) => {
-                  const color = CATEGORY_COLORS[row.category] ?? "#6B7084";
-                  return (
-                    <div key={row.category} className={styles.breakdownRow}>
-                      <span className={styles.breakdownName}>{pretty(row.category)}</span>
-                      <span className={styles.breakdownTrack}>
-                        <span className={styles.breakdownFill} style={{ width: `${Math.min(100, row.pct)}%`, background: color }} />
-                      </span>
-                      <span className={styles.breakdownAmount}>{formatUsd(row.amount)}</span>
-                    </div>
-                  );
-                })}
+          <Link href={`/horses/${horse._id}/financials`} className={styles.financialsBlock}>
+            <div className={styles.financialsBlockLeft}>
+              <span className={styles.financialsBlockIcon}>💰</span>
+              <div>
+                <div className={styles.financialsBlockTitle}>financials</div>
+                <div className={styles.financialsBlockSub}>view spend, invoices & prize money</div>
               </div>
             </div>
-          </section>
-        )}
-
-        {!isTeam && (
-          <section className={styles.invoicesSection}>
-            <div className={styles.invoicesHeader}>
-              <div className={styles.invoicesTitle}>invoices</div>
-            </div>
-            {visibleInvoices.length === 0 ? (
-              <div className={styles.emptyInvoices}>no invoices for this horse</div>
-            ) : (
-              visibleInvoices.map((row) => (
-                <Link key={row._id} href={row.href} className={styles.invoiceRow}>
-                  <div className={styles.invoiceLeft}>
-                    <span className={row.status === "approved" ? styles.dotApproved : styles.dotPending} />
-                    <span className={styles.invoiceLabel}>
-                      {formatInvoiceName({
-                        invoiceName: row.invoiceName,
-                        category: row.category,
-                        contactName: row.contactName,
-                        date: toIsoDateString(row.date || ""),
-                      })}
-                    </span>
-                  </div>
-                  <span className={styles.invoiceAmount}>{formatUsd(row.amount)}</span>
-                </Link>
-              ))
-            )}
-            {invoices.length > 10 ? (
-              <button type="button" className={styles.viewAll} onClick={() => setShowAllInvoices((prev) => !prev)}>
-                {showAllInvoices ? "show less" : "view all"}
-              </button>
-            ) : null}
-          </section>
-        )}
-
-        {!isTeam && (
-          <section className={styles.prizeSection}>
-            <div className={styles.prizeHeader}>
-              <div className={styles.prizeTitle}>prize money</div>
-              <button type="button" className={styles.addPrizeBtn} onClick={() => setShowPrizeForm((prev) => !prev)}>
-                {showPrizeForm ? "cancel" : "+ add"}
-              </button>
-            </div>
-            {showPrizeForm ? (
-              <div className={styles.prizeFormGrid}>
-                <input className={styles.prizeInput} type="number" step="0.01" placeholder="Amount ($)" value={prizeForm.amount} onChange={(e) => setPrizeForm((p) => ({ ...p, amount: e.target.value }))} />
-                <input className={styles.prizeInput} placeholder="Show name" value={prizeForm.showName} onChange={(e) => setPrizeForm((p) => ({ ...p, showName: e.target.value }))} />
-                <input className={styles.prizeInput} placeholder="Class" value={prizeForm.className} onChange={(e) => setPrizeForm((p) => ({ ...p, className: e.target.value }))} />
-                <input className={styles.prizeInput} placeholder="Placing (e.g. 1st)" value={prizeForm.placing} onChange={(e) => setPrizeForm((p) => ({ ...p, placing: e.target.value }))} />
-                <input className={styles.prizeInput} type="date" value={prizeForm.date} onChange={(e) => setPrizeForm((p) => ({ ...p, date: e.target.value }))} />
-                <input className={styles.prizeInput} placeholder="Description" value={prizeForm.description} onChange={(e) => setPrizeForm((p) => ({ ...p, description: e.target.value }))} />
-                <button type="button" className={styles.btnSave} onClick={async () => {
-                  if (!prizeForm.amount) return;
-                  await addIncomeEntry({
-                    horseId: horse._id,
-                    type: "prize_money",
-                    amount: Number(prizeForm.amount),
-                    description: prizeForm.description || `Prize money${prizeForm.showName ? ` - ${prizeForm.showName}` : ""}`,
-                    showName: prizeForm.showName || undefined,
-                    className: prizeForm.className || undefined,
-                    placing: prizeForm.placing || undefined,
-                    date: prizeForm.date || undefined,
-                  });
-                  setPrizeForm({ amount: "", description: "", showName: "", className: "", placing: "", date: "" });
-                  setShowPrizeForm(false);
-                }}>save</button>
-              </div>
-            ) : null}
-            {(prizeMoneyData?.entries ?? []).length === 0 && !showPrizeForm ? (
-              <div className={styles.emptyInvoices}>no prize money recorded</div>
-            ) : (
-              (prizeMoneyData?.entries ?? []).map((entry) => (
-                <div key={entry._id} className={styles.prizeEntryRow}>
-                  <div className={styles.prizeEntryLeft}>
-                    <span className={styles.prizeEntryAmount}>+{formatUsd(entry.amount)}</span>
-                    <span className={styles.prizeEntryDesc}>
-                      {entry.showName ?? entry.description}
-                      {entry.className ? ` · ${entry.className}` : ""}
-                      {entry.placing ? ` · ${entry.placing}` : ""}
-                    </span>
-                    {entry.date ? <span className={styles.prizeEntryDate}>{entry.date}</span> : null}
-                  </div>
-                  <button type="button" className={styles.prizeDeleteBtn} onClick={() => deleteIncomeEntry({ entryId: entry._id })}>×</button>
-                </div>
-              ))
-            )}
-          </section>
+            <span className={styles.financialsBlockArrow}>→</span>
+          </Link>
         )}
 
         <section className={styles.recordsCard}>
