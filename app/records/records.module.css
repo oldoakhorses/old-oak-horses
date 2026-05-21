@@ -1459,14 +1459,44 @@
   .recordRow {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px 12px;
+    gap: 2px 10px;
+    padding: 14px 18px;
   }
 
-  .colRecord { flex: 1 1 60%; order: 1; }
-  .colDate { order: 2; font-size: 11px; color: #9ea2b0; }
-  .colSubtitle { order: 3; flex: 1 1 100%; font-size: 11px; }
-  .colCategory { order: 4; }
-  .colHorse { order: 5; font-size: 11px; }
+  .colRecord {
+    flex: 1 1 60%;
+    order: 1;
+    font-size: 14px;
+  }
+
+  .colRecord .recordLabel {
+    font-size: 14px;
+  }
+
+  .colDate {
+    order: 2;
+    font-size: 11px;
+    color: #9ea2b0;
+  }
+
+  .colSubtitle {
+    order: 3;
+    flex: 1 1 100%;
+    font-size: 11px;
+    margin-top: 2px;
+    color: #9ea2b0;
+  }
+
+  .colCategory {
+    order: 4;
+    margin-top: 6px;
+  }
+
+  .colHorse {
+    order: 5;
+    font-size: 11px;
+    margin-top: 6px;
+  }
 
   .expandedMetaRow {
     grid-template-columns: 1fr 1fr;
@@ -1476,6 +1506,11 @@
 @media (max-width: 640px) {
   .title {
     font-size: 28px;
+  }
+
+  .recordRow {
+    padding: 16px 16px;
+    border-bottom: 1px solid #e8eaf0;
   }
 
   .recordExpanded {
