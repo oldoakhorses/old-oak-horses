@@ -1480,11 +1480,7 @@
   }
 
   .colSubtitle {
-    order: 3;
-    flex: 1 1 100%;
-    font-size: 11px;
-    margin-top: 2px;
-    color: #9ea2b0;
+    display: none;
   }
 
   .colCategory {
