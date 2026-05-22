@@ -268,14 +268,14 @@ export default function HorseProfilePage() {
               ) : !horse.sex ? "—" : ""}
             </div>
           </div>
-          {!isEditing ? (
-            <button type="button" className={styles.btnEdit} onClick={() => setIsEditing(true)}>
-              edit profile
-            </button>
-          ) : null}
         </section>
 
         <section className={styles.profileCard}>
+          {!isEditing ? (
+            <button type="button" className={styles.btnEditInline} onClick={() => setIsEditing(true)}>
+              edit
+            </button>
+          ) : null}
           <div className={styles.profileFields}>
             <Field label="NAME" value={horse.name} editing={isEditing}>
               <input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
