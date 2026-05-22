@@ -995,6 +995,21 @@
     font-size: 28px;
   }
 
+  .toolbar {
+    position: relative;
+  }
+
+  .toolbarFiltersWrap {
+    position: static;
+  }
+
+  .toolbarFiltersPopover {
+    position: absolute;
+    left: 0;
+    right: 0;
+    width: auto;
+  }
+
   .recordRow {
     padding: 16px 16px;
     border-bottom: 1px solid #e8eaf0;
@@ -1006,9 +1021,5 @@
 
   .expandedFields {
     gap: 16px;
-  }
-
-  .toolbarFiltersPopover {
-    width: min(320px, calc(100vw - 40px));
   }
 }
