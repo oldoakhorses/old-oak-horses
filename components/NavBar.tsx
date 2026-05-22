@@ -168,7 +168,13 @@ export default function NavBar({
               {action.label}
             </Link>
           ))}
-          <Link href="/records" className={styles.calendarBtn} aria-label="Records">
+          <Link href="/records" className={styles.recordsBtn} aria-label="Records">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="2" width="10" height="12" rx="1.5" />
+              <path d="M6 5h4M6 8h4M6 11h2" />
+            </svg>
+          </Link>
+          <Link href="/calendar" className={styles.calendarBtn} aria-label="Calendar">
             <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="3" width="12" height="11" rx="1.5" />
               <path d="M5 1.5V4M11 1.5V4M2 7h12" />

@@ -64,6 +64,25 @@
   background: #dcdee5;
 }
 
+.recordsBtn {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: #e8eaf0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  text-decoration: none;
+  color: #6b7084;
+  transition: background 0.15s, color 0.15s;
+}
+
+.recordsBtn:hover {
+  background: #dcdee5;
+  color: #1a1a2e;
+}
+
 .calendarBtn {
   width: 42px;
   height: 42px;
@@ -199,6 +218,10 @@
   }
 
   .homeBtn {
+    display: flex;
+  }
+
+  .recordsBtn {
     display: flex;
   }
 
