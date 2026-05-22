@@ -11,54 +11,49 @@ import NavBar from "@/components/NavBar";
 import { formatInvoiceName } from "@/lib/formatInvoiceName";
 import styles from "./records.module.css";
 
-const RECORD_TYPES = [
-  { key: "veterinary", icon: "📋", label: "Veterinary Records" },
-  { key: "farrier", icon: "🔧", label: "Farrier Records" },
-  { key: "health", icon: "💉", label: "Health & Vaccinations" },
-  { key: "registration", icon: "📄", label: "Registration Documents" },
+type RecordType = "veterinary" | "medication" | "farrier" | "bodywork" | "other";
+type VetSubcategory =
+  | "vaccination" | "treatment" | "medication" | "joint_injections"
+  | "exams_diagnostics" | "vaccinations" | "shockwave" | "sedation"
+  | "fees" | "lab_work" | "exam" | "imaging" | "other";
+
+const VET_SUBCATEGORY_OPTIONS: Array<{ value: VetSubcategory; label: string }> = [
+  { value: "exam", label: "Exam" },
+  { value: "vaccinations", label: "Vaccinations" },
+  { value: "medication", label: "Medication" },
+  { value: "joint_injections", label: "Joint Injections" },
+  { value: "imaging", label: "Imaging" },
+  { value: "lab_work", label: "Lab Work" },
+  { value: "shockwave", label: "Shockwave" },
+  { value: "sedation", label: "Sedation" },
+  { value: "exams_diagnostics", label: "Exams & Diagnostics" },
+  { value: "fees", label: "Fees" },
+  { value: "other", label: "Other" },
 ];
 
-function formatDateTime(dateStr: string | null, uploadedAt: number) {
-  if (dateStr) {
-    const d = new Date(dateStr);
-    if (!isNaN(d.getTime())) {
-      const uploaded = new Date(uploadedAt);
-      d.setHours(uploaded.getHours(), uploaded.getMinutes());
-      return d.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }) + " · " + uploaded.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      });
-    }
-  }
-  const d = new Date(uploadedAt);
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }) + " · " + d.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
+function vetSubcategoryLabel(value?: string | null) {
+  if (!value) return null;
+  const found = VET_SUBCATEGORY_OPTIONS.find((o) => o.value === value);
+  if (found) return found.label;
+  if (value === "vaccination") return "Vaccinations";
+  if (value === "treatment") return "Treatment";
+  return value.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function getVetVisitTypeLabels(record: { visitType?: string; visitTypes?: string[]; vetOtherDescription?: string }): string[] {
+  const types = record.visitTypes?.length ? record.visitTypes : record.visitType ? [record.visitType] : [];
+  return types.map((t) => {
+    if (t === "other" && record.vetOtherDescription) return record.vetOtherDescription;
+    return vetSubcategoryLabel(t) || t;
   });
 }
 
-function formatUsd(n: number) {
-  const abs = Math.abs(n);
-  const formatted = `$${abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  return n < 0 ? `(${formatted})` : formatted;
-}
-
-type RecordType = "veterinary" | "medication" | "farrier" | "bodywork" | "other";
-type DateRange = "all" | "7d" | "30d" | "3m" | "6m" | "1y";
-type SortColumn = "record" | "contact" | "category" | "date";
+type Tab = "past" | "upcoming";
+type SortColumn = "record" | "detail" | "date" | "category";
 
 type HorseRecord = {
   _id: Id<"horseRecords">;
+  title?: string;
   type: RecordType;
   customType?: string;
   date: number;
@@ -72,6 +67,8 @@ type HorseRecord = {
   isUpcoming?: boolean;
   linkedRecordId?: Id<"horseRecords">;
   medications?: string[];
+  medicationRepeatValue?: number;
+  medicationRepeatUnit?: "days" | "weeks" | "months";
   notes?: string;
   attachmentStorageId?: string;
   attachmentUrl?: string | null;
@@ -80,7 +77,11 @@ type HorseRecord = {
 };
 
 type EditState = {
+  title: string;
   type: RecordType;
+  visitType: "" | VetSubcategory;
+  visitTypes: VetSubcategory[];
+  vetOtherDescription: string;
   contactName: string;
   date: string;
   nextVisitDate: string;
@@ -89,15 +90,10 @@ type EditState = {
   customType: string;
   vaccineName: string;
   treatmentDescription: string;
+  medications: string[];
+  medicationRepeatValue: string;
+  medicationRepeatUnit: "" | "days" | "weeks" | "months";
   billId: string;
-};
-
-const RECORD_ICONS: Record<RecordType, string> = {
-  veterinary: "🩺",
-  medication: "💊",
-  farrier: "🔧",
-  bodywork: "🦴",
-  other: "📋",
 };
 
 const RECORD_CATEGORY_COLORS: Record<RecordType, { bg: string; color: string }> = {
@@ -107,6 +103,20 @@ const RECORD_CATEGORY_COLORS: Record<RecordType, { bg: string; color: string }> 
   bodywork: { bg: "rgba(167,139,250,0.08)", color: "#A78BFA" },
   other: { bg: "#F0F1F5", color: "#6B7084" },
 };
+
+const RECORD_TYPE_TO_CATEGORY: Record<RecordType, string> = {
+  veterinary: "veterinary",
+  medication: "veterinary",
+  farrier: "farrier",
+  bodywork: "bodywork",
+  other: "",
+};
+
+const MEDICATION_OPTIONS = [
+  "adequan", "aspirin", "banamine", "bute", "dexamethasone",
+  "gastroguard", "gentamicin", "ketofen", "legend", "marquis", "metacam",
+  "pentosan", "traumeel", "other",
+];
 
 export default function HorseRecordsPage() {
   const params = useParams<{ horseId: string }>();
@@ -122,9 +132,13 @@ export default function HorseRecordsPage() {
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
   const findOrCreateContact = useMutation(api.contacts.findOrCreateContact);
 
+  const [activeTab, setActiveTab] = useState<Tab>("past");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | RecordType>("all");
-  const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersPopoverRef = useRef<HTMLDivElement | null>(null);
   const [sortColumn, setSortColumn] = useState<SortColumn>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
@@ -140,26 +154,58 @@ export default function HorseRecordsPage() {
   const editContactDropdownRef = useRef<HTMLDivElement | null>(null);
   const [editInvoiceSearch, setEditInvoiceSearch] = useState("");
   const [editInvoiceDropdownOpen, setEditInvoiceDropdownOpen] = useState(false);
+  const [editSubcatDropdownOpen, setEditSubcatDropdownOpen] = useState(false);
+  const editSubcatDropdownRef = useRef<HTMLDivElement | null>(null);
+  const dropdownJustOpened = useRef(false);
+
+  useEffect(() => {
+    setSortColumn("date");
+    setSortDirection(activeTab === "upcoming" ? "asc" : "desc");
+  }, [activeTab]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (editContactDropdownRef.current && !editContactDropdownRef.current.contains(event.target as Node)) {
         setEditProviderDropdownOpen(false);
       }
+      if (editSubcatDropdownRef.current && !editSubcatDropdownRef.current.contains(event.target as Node)) {
+        setEditSubcatDropdownOpen(false);
+      }
+      if (filtersPopoverRef.current && !filtersPopoverRef.current.contains(event.target as Node)) {
+        setFiltersOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const todayEnd = useMemo(() => {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
+  }, []);
+
+  const upcomingRecords = useMemo(() => allRecords.filter((r) => r.date > todayEnd), [allRecords, todayEnd]);
+  const pastRecords = useMemo(() => allRecords.filter((r) => r.date <= todayEnd), [allRecords, todayEnd]);
+  const tabRecords = activeTab === "upcoming" ? upcomingRecords : pastRecords;
+
   const filteredRecords = useMemo(() => {
     const term = search.trim().toLowerCase();
+    const fromTs = fromDate ? new Date(`${fromDate}T00:00:00`).getTime() : null;
+    const toTs = toDate ? new Date(`${toDate}T23:59:59.999`).getTime() : null;
 
-    return allRecords.filter((record) => {
-      if (typeFilter !== "all" && record.type !== typeFilter) return false;
-      if (!filterByDate(record.date, dateRange)) return false;
+    return tabRecords.filter((record) => {
+      if (typeFilter !== "all") {
+        if (typeFilter === "veterinary") {
+          if (record.type !== "veterinary" && record.type !== "medication") return false;
+        } else if (record.type !== typeFilter) return false;
+      }
+      if (fromTs !== null && record.date < fromTs) return false;
+      if (toTs !== null && record.date > toTs) return false;
 
       if (!term) return true;
       const bag = [
+        record.title,
         record.type,
         record.contactName,
         record.notes,
@@ -172,10 +218,9 @@ export default function HorseRecordsPage() {
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
-
       return bag.includes(term);
     });
-  }, [allRecords, search, typeFilter, dateRange]);
+  }, [tabRecords, search, typeFilter, fromDate, toDate]);
 
   const sortedRecords = useMemo(() => {
     const rows = [...filteredRecords];
@@ -185,8 +230,8 @@ export default function HorseRecordsPage() {
         case "record":
           cmp = getRecordLabel(a).localeCompare(getRecordLabel(b));
           break;
-        case "contact":
-          cmp = (a.contactName || "").localeCompare(b.contactName || "");
+        case "detail":
+          cmp = getRecordSubtitle(a).localeCompare(getRecordSubtitle(b));
           break;
         case "category":
           cmp = a.type.localeCompare(b.type);
@@ -199,25 +244,36 @@ export default function HorseRecordsPage() {
     });
     return rows;
   }, [filteredRecords, sortColumn, sortDirection]);
-  const recordById = useMemo(() => {
-    const map = new Map<string, HorseRecord>();
-    for (const row of allRecords) map.set(String(row._id), row);
-    return map;
-  }, [allRecords]);
 
   function handleSort(column: SortColumn) {
+    const defaultDirection = activeTab === "upcoming" ? "asc" : "desc";
+    const secondaryDirection = defaultDirection === "asc" ? "desc" : "asc";
     if (sortColumn === column) {
-      if (sortDirection === "desc") {
-        setSortDirection("asc");
+      if (sortDirection === defaultDirection) {
+        setSortDirection(secondaryDirection);
       } else {
         setSortColumn("date");
-        setSortDirection("desc");
+        setSortDirection(defaultDirection);
       }
       return;
     }
-
     setSortColumn(column);
-    setSortDirection(column === "date" ? "desc" : "asc");
+    setSortDirection(column === "date" ? defaultDirection : "asc");
+  }
+
+  function sortArrow(col: SortColumn) {
+    if (sortColumn !== col) return " ↕";
+    return sortDirection === "asc" ? " ↑" : " ↓";
+  }
+
+  function openDropdown(setter: (updater: (prev: boolean) => boolean) => void) {
+    setter((prev) => {
+      if (!prev) {
+        dropdownJustOpened.current = true;
+        requestAnimationFrame(() => { dropdownJustOpened.current = false; });
+      }
+      return !prev;
+    });
   }
 
   function getLinkedUpcomingDateInput(record: HorseRecord) {
@@ -231,8 +287,7 @@ export default function HorseRecordsPage() {
     const editProviderName = editState.contactName?.trim() || undefined;
     let editContactId: Id<"contacts"> | undefined;
     if (editProviderName) {
-      const catMap: Record<string, string> = { veterinary: "veterinary", medication: "veterinary", farrier: "farrier", bodywork: "bodywork" };
-      const category = catMap[editState.type] || "other";
+      const category = RECORD_TYPE_TO_CATEGORY[editState.type] || "other";
       const contactId = await findOrCreateContact({ name: editProviderName, category });
       if (contactId) editContactId = contactId;
     }
@@ -256,16 +311,24 @@ export default function HorseRecordsPage() {
     await updateRecordWithNextVisit({
       recordId: editingRecordId,
       updates: {
+        title: editState.title.trim() || undefined,
+        type: editState.type,
+        visitType: editState.type === "veterinary" && editState.visitTypes.length > 0 ? editState.visitTypes[0] : undefined,
+        visitTypes: editState.type === "veterinary" && editState.visitTypes.length > 0 ? editState.visitTypes : undefined,
+        vetOtherDescription: editState.type === "veterinary" && editState.visitTypes.includes("other") ? editState.vetOtherDescription || undefined : undefined,
         contactName: editProviderName,
         contactId: editContactId,
         date: editState.date ? new Date(`${editState.date}T00:00:00`).getTime() : undefined,
         notes: editState.notes || undefined,
-        serviceType: editState.serviceType || undefined,
-        customType: editState.customType || undefined,
+        serviceType: editState.type === "farrier" ? editState.serviceType || undefined : undefined,
+        customType: editState.type === "other" ? editState.customType || undefined : undefined,
         vaccineName: editState.vaccineName || undefined,
         treatmentDescription: editState.treatmentDescription || undefined,
-        ...(attachmentStorageId ? { attachmentStorageId, attachmentName } : {}),
+        medications: editState.medications.length > 0 ? editState.medications : undefined,
+        medicationRepeatValue: editState.medications.length > 0 && editState.medicationRepeatValue ? parseInt(editState.medicationRepeatValue, 10) : undefined,
+        medicationRepeatUnit: editState.medications.length > 0 && editState.medicationRepeatUnit ? editState.medicationRepeatUnit : undefined,
         billId: editState.billId ? editState.billId as Id<"bills"> : undefined,
+        ...(attachmentStorageId ? { attachmentStorageId, attachmentName } : {}),
       },
       nextVisitDate: nextVisitTimestamp,
     });
@@ -287,20 +350,8 @@ export default function HorseRecordsPage() {
     }
   }
 
-  const totalCount = allRecords.length;
+  const totalCount = tabRecords.length;
   const filteredCount = filteredRecords.length;
-
-  const vetRecords = useQuery(api.horses.getRecordsByType, horseId ? { horseId, type: "veterinary" } : "skip") ?? [];
-  const farrierRecords = useQuery(api.horses.getRecordsByType, horseId ? { horseId, type: "farrier" } : "skip") ?? [];
-  const healthRecords = useQuery(api.horses.getRecordsByType, horseId ? { horseId, type: "health" } : "skip") ?? [];
-  const regRecords = useQuery(api.horses.getRecordsByType, horseId ? { horseId, type: "registration" } : "skip") ?? [];
-
-  const recordsByType: Record<string, typeof vetRecords> = {
-    veterinary: vetRecords,
-    farrier: farrierRecords,
-    health: healthRecords,
-    registration: regRecords,
-  };
 
   if (!horse) {
     return (
@@ -312,6 +363,10 @@ export default function HorseRecordsPage() {
     );
   }
 
+  const categoryLabel = typeFilter === "all" ? null : prettyType(typeFilter as RecordType);
+  const dateLabel = fromDate || toDate ? `${fromDate || "…"} → ${toDate || "…"}` : null;
+  const activeFilterCount = [categoryLabel, dateLabel].filter(Boolean).length;
+
   return (
     <div className="page-shell">
       <NavBar
@@ -322,91 +377,166 @@ export default function HorseRecordsPage() {
           { label: "records", current: true },
         ]}
         actions={[
-          { label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" },
+          { label: "+ log record", href: `/dashboard?panel=record&horseId=${horse._id}` },
         ]}
       />
 
       <main className="page-main">
-        <Link href={horse ? `/horses/${horse._id}` : "/horses"} className="ui-back-link">
-          ← cd /{horse?.name ?? "horse"}
+        <Link href={`/horses/${horse._id}`} className="ui-back-link">
+          ← cd /{horse.name}
         </Link>
 
         <section className={styles.headerRow}>
           <div>
-            <div className="ui-label">// RECORDS</div>
-            <h1 className={styles.title}>{horse?.name ?? "horse"} records</h1>
-            <div className={styles.totalCount}>{totalCount} records</div>
+            <h1 className={styles.title}>{horse.name} records</h1>
           </div>
-          <Link href={horse ? `/dashboard?panel=record&horseId=${horse._id}` : "/dashboard?panel=record"} className={styles.logButton}>
-            + log record
-          </Link>
         </section>
 
-        <section className={styles.filterRow}>
-          <div className={styles.searchWrap}>
-            <span className={styles.searchIcon}>🔍</span>
-            <input
-              className={styles.searchInput}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="search records..."
-            />
-          </div>
-
-          <select className={styles.typeFilter} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as "all" | RecordType)}>
-            <option value="all">All Types</option>
-            <option value="veterinary">Veterinary</option>
-            <option value="medication">Medication</option>
-            <option value="farrier">Farrier</option>
-            <option value="bodywork">Bodywork</option>
-            <option value="other">Other</option>
-          </select>
-
-          <select className={styles.dateFilter} value={dateRange} onChange={(event) => setDateRange(event.target.value as DateRange)}>
-            <option value="all">All Time</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
-            <option value="3m">Last 3 Months</option>
-            <option value="6m">Last 6 Months</option>
-            <option value="1y">Last Year</option>
-          </select>
-        </section>
-
-        <div className={styles.resultsCount}>
-          {filteredCount === totalCount ? `showing ${filteredCount} records` : `showing ${filteredCount} of ${totalCount} records`}
+        <div className={styles.tabs} role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "past"}
+            className={`${styles.tab} ${activeTab === "past" ? styles.tabActive : ""}`}
+            onClick={() => setActiveTab("past")}
+          >
+            Past <span className={styles.tabCount}>{pastRecords.length}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "upcoming"}
+            className={`${styles.tab} ${activeTab === "upcoming" ? styles.tabActive : ""}`}
+            onClick={() => setActiveTab("upcoming")}
+          >
+            Upcoming <span className={styles.tabCount}>{upcomingRecords.length}</span>
+          </button>
         </div>
 
-        <section className={styles.allRecordsCard}>
-          <div className={styles.recordsListHeader}>
-            <span />
-            <button type="button" className={sortColumn === "record" ? styles.sortHeaderActive : styles.sortHeader} onClick={() => handleSort("record")}>
-              RECORD {sortColumn === "record" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+        <section className={styles.toolbar}>
+          <input
+            type="text"
+            className={styles.toolbarSearch}
+            placeholder="search records..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          <div className={styles.toolbarFiltersWrap} ref={filtersPopoverRef}>
+            <button
+              type="button"
+              className={`${styles.toolbarFiltersBtn} ${activeFilterCount > 0 ? styles.toolbarFiltersBtnActive : ""}`}
+              onClick={() => setFiltersOpen((v) => !v)}
+              aria-expanded={filtersOpen}
+            >
+              <span>filters</span>
+              {activeFilterCount > 0 ? <span className={styles.toolbarFiltersCount}>{activeFilterCount}</span> : null}
+              <span className={styles.toolbarFiltersChevron}>▾</span>
             </button>
-            <button type="button" className={sortColumn === "contact" ? styles.sortHeaderActive : styles.sortHeader} onClick={() => handleSort("contact")}>
-              PROVIDER {sortColumn === "contact" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
-            </button>
-            <button type="button" className={sortColumn === "category" ? styles.sortHeaderActive : styles.sortHeader} onClick={() => handleSort("category")}>
-              CATEGORY {sortColumn === "category" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
-            </button>
-            <button type="button" className={sortColumn === "date" ? styles.sortHeaderActive : styles.sortHeader} onClick={() => handleSort("date")}>
-              DATE {sortColumn === "date" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
-            </button>
-            <span />
+            {filtersOpen ? (
+              <div className={styles.toolbarFiltersPopover} role="dialog">
+                <label className={styles.popField}>
+                  <span>Category</span>
+                  <select
+                    value={typeFilter}
+                    onChange={(event) => setTypeFilter(event.target.value as "all" | RecordType)}
+                  >
+                    <option value="all">All</option>
+                    <option value="veterinary">Veterinary</option>
+                    <option value="farrier">Farrier</option>
+                    <option value="bodywork">Bodywork</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <div className={styles.popFieldRow}>
+                  <label className={styles.popField}>
+                    <span>From</span>
+                    <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+                  </label>
+                  <label className={styles.popField}>
+                    <span>To</span>
+                    <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+                  </label>
+                </div>
+                {activeFilterCount > 0 ? (
+                  <button
+                    type="button"
+                    className={styles.popClearBtn}
+                    onClick={() => {
+                      setTypeFilter("all");
+                      setFromDate("");
+                      setToDate("");
+                    }}
+                  >
+                    clear all
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        {activeFilterCount > 0 ? (
+          <div className={styles.filterChips}>
+            {categoryLabel ? (
+              <button type="button" className={styles.filterChip} onClick={() => setTypeFilter("all")}>
+                category: {categoryLabel} <span className={styles.filterChipX}>×</span>
+              </button>
+            ) : null}
+            {dateLabel ? (
+              <button type="button" className={styles.filterChip} onClick={() => { setFromDate(""); setToDate(""); }}>
+                date: {dateLabel} <span className={styles.filterChipX}>×</span>
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className={styles.resultsCount}>
+          {filteredCount === totalCount
+            ? `showing ${filteredCount} ${activeTab} records`
+            : `showing ${filteredCount} of ${totalCount} ${activeTab} records`}
+        </div>
+
+        <section className={styles.recordsCard}>
+          <div className={styles.tableHeader}>
+            <span className={`${styles.colRecord} ${styles.sortableHeader}`} onClick={() => handleSort("record")}>Record{sortArrow("record")}</span>
+            <span className={`${styles.colSubtitle} ${styles.sortableHeader}`} onClick={() => handleSort("detail")}>Contact{sortArrow("detail")}</span>
+            <span className={`${styles.colDate} ${styles.sortableHeader}`} onClick={() => handleSort("date")}>Date{sortArrow("date")}</span>
+            <span className={`${styles.colCategory} ${styles.sortableHeader}`} onClick={() => handleSort("category")}>Category{sortArrow("category")}</span>
           </div>
 
           {sortedRecords.length === 0 ? (
-            <div className={styles.emptyState}>{totalCount === 0 ? "no records yet — log your first record using the button above" : "no records found — try adjusting your filters"}</div>
+            <div className={styles.emptyState}>
+              {totalCount === 0 ? (
+                activeTab === "upcoming" ? (
+                  <>
+                    <div className={styles.emptyTitle}>no upcoming records</div>
+                    <div className={styles.emptySub}>schedule visits using + log record</div>
+                  </>
+                ) : (
+                  <>
+                    <div className={styles.emptyTitle}>no past records</div>
+                    <div className={styles.emptySub}>records will appear here after events occur</div>
+                  </>
+                )
+              ) : (
+                <>
+                  <div className={styles.emptyTitle}>no records found</div>
+                  <div className={styles.emptySub}>try adjusting your filters</div>
+                </>
+              )}
+            </div>
           ) : (
             sortedRecords.map((record) => {
               const expanded = expandedId === record._id;
               const editing = editingRecordId === record._id && editState !== null;
-              const detail = getRecordDetail(record);
               const badgeColors = RECORD_CATEGORY_COLORS[record.type];
+              const dateSoon = activeTab === "upcoming" && daysUntil(record.date) <= 3;
+              const subtitle = getRecordSubtitle(record);
 
               return (
                 <div key={record._id}>
                   <div
-                    className={styles.recordListRow}
+                    className={`${styles.recordRow} ${expanded ? styles.recordRowExpanded : ""}`}
                     onClick={() => {
                       setExpandedId((prev) => (prev === record._id ? null : record._id));
                       setMenuOpenId(null);
@@ -414,46 +544,18 @@ export default function HorseRecordsPage() {
                       setEditState(null);
                     }}
                   >
-                    <div className={styles.recordIcon}>{RECORD_ICONS[record.type]}</div>
-
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className={styles.recordLabel}>{getRecordLabel(record)}</div>
-                      {detail ? <div className={styles.recordSublabel}>{detail}</div> : null}
-                      {record.linkedRecordId ? (
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setExpandedId(record.linkedRecordId || null);
-                            setEditingRecordId(null);
-                            setEditState(null);
-                          }}
-                          style={{
-                            marginTop: 3,
-                            fontSize: 9,
-                            color: record.isUpcoming ? "#9EA2B0" : "#4A5BDB",
-                            background: "transparent",
-                            border: "none",
-                            padding: 0,
-                            cursor: "pointer",
-                            fontFamily: "inherit",
-                          }}
-                        >
-                          {record.isUpcoming
-                            ? `📋 follow-up from: ${formatDateLong(recordById.get(String(record.linkedRecordId))?.date ?? record.date)}`
-                            : `📅 follow-up scheduled: ${formatDateLong(recordById.get(String(record.linkedRecordId))?.date ?? record.date)}`}
-                        </button>
-                      ) : null}
-                    </div>
-
-                    <div className={record.contactName ? styles.recordProvider : styles.recordProviderEmpty}>{record.contactName || "—"}</div>
-
-                    <span className={styles.recordCategoryBadge} style={{ background: badgeColors.bg, color: badgeColors.color }}>
-                      {pretty(record.type)}
+                    <span className={styles.colRecord}>
+                      <span className={styles.recordIcon}>{recordIcon(record.type)}</span>
+                      <span className={styles.recordLabel}>{getRecordLabel(record)}</span>
+                      {activeTab === "upcoming" && record.linkedRecordId ? <span className={styles.followupBadge}>f/u</span> : null}
                     </span>
-
-                    <div className={styles.recordDateCol}>{formatDateLong(record.date)}</div>
-
+                    <span className={styles.colSubtitle}>{subtitle || <span className={styles.muted}>—</span>}</span>
+                    <span className={`${styles.colDate} ${dateSoon ? styles.recordDateSoon : ""}`}>{formatDateShort(record.date)}</span>
+                    <span className={styles.colCategory}>
+                      <span className={styles.categoryBadge} style={{ background: badgeColors.bg, color: badgeColors.color }}>
+                        {prettyType(record.type)}
+                      </span>
+                    </span>
                   </div>
 
                   {expanded ? (
@@ -461,7 +563,16 @@ export default function HorseRecordsPage() {
                       <div className={styles.expandedFields}>
                         {editing ? (
                           <>
-                            <ExpandedInput label={contactLabel(record.type)}>
+                            <ExpandedInput label="TITLE">
+                              <input
+                                className={styles.expandedInput}
+                                value={editState.title}
+                                onClick={(event) => event.stopPropagation()}
+                                onChange={(event) => setEditState({ ...editState, title: event.target.value })}
+                                placeholder="e.g., Spring Vaccinations"
+                              />
+                            </ExpandedInput>
+                            <ExpandedInput label="CONTACT">
                               <div className={styles.contactSearchWrap} ref={editContactDropdownRef}>
                                 <input
                                   className={styles.expandedInput}
@@ -472,13 +583,15 @@ export default function HorseRecordsPage() {
                                   }}
                                   onFocus={() => setEditProviderDropdownOpen(true)}
                                 />
-                                {editProviderDropdownOpen && editState.contactName.trim() && (() => {
+                                {editProviderDropdownOpen && (() => {
+                                  const editCategory = RECORD_TYPE_TO_CATEGORY[editState.type] || "";
+                                  const editPool = editCategory ? allContactsForRecord.filter((c: any) => c.category === editCategory) : allContactsForRecord;
                                   const term = editState.contactName.trim().toLowerCase();
-                                  const matches = allContactsForRecord.filter((c: any) => c.name.toLowerCase().includes(term));
-                                  if (matches.length === 0) return null;
+                                  const matches = term ? editPool.filter((c) => c.name.toLowerCase().includes(term)) : editPool;
+                                  const exactMatch = matches.some((c) => c.name.toLowerCase() === term);
                                   return (
                                     <div className={styles.contactDropdown}>
-                                      {matches.slice(0, 8).map((c: any) => (
+                                      {matches.slice(0, 8).map((c) => (
                                         <button
                                           type="button"
                                           key={c._id}
@@ -491,6 +604,15 @@ export default function HorseRecordsPage() {
                                           {c.name}
                                         </button>
                                       ))}
+                                      {term && !exactMatch ? (
+                                        <button
+                                          type="button"
+                                          className={`${styles.contactDropdownItem} ${styles.contactDropdownAdd}`}
+                                          onClick={() => setEditProviderDropdownOpen(false)}
+                                        >
+                                          + Add &ldquo;{editState.contactName.trim()}&rdquo;
+                                        </button>
+                                      ) : null}
                                     </div>
                                   );
                                 })()}
@@ -504,6 +626,106 @@ export default function HorseRecordsPage() {
                                 onChange={(event) => setEditState({ ...editState, date: event.target.value })}
                               />
                             </ExpandedInput>
+                            <ExpandedInput label="CATEGORY">
+                              <select
+                                className={styles.expandedInput}
+                                value={editState.type}
+                                onChange={(event) => setEditState({ ...editState, type: event.target.value as RecordType, visitType: "", visitTypes: [], serviceType: "", customType: event.target.value === "other" ? editState.customType : "", medications: [], medicationRepeatValue: "", medicationRepeatUnit: "" })}
+                              >
+                                <option value="veterinary">Veterinary</option>
+                                <option value="farrier">Farrier</option>
+                                <option value="bodywork">Bodywork</option>
+                                <option value="other">Other</option>
+                              </select>
+                            </ExpandedInput>
+                            {editState.type === "veterinary" ? (
+                              <>
+                                <ExpandedInput label="SUBCATEGORY">
+                                  <div className={styles.multiSelectContainer} ref={editSubcatDropdownRef}>
+                                    <div
+                                      className={`${styles.multiSelectInput} ${editSubcatDropdownOpen ? styles.multiSelectInputOpen : ""}`}
+                                      onClick={(event) => { event.stopPropagation(); openDropdown(setEditSubcatDropdownOpen); }}
+                                    >
+                                      {editState.visitTypes.length > 0 ? (
+                                        editState.visitTypes.map((vt) => {
+                                          const label = VET_SUBCATEGORY_OPTIONS.find((o) => o.value === vt)?.label ?? vt;
+                                          return (
+                                            <span key={vt} className={styles.horsePill}>
+                                              {label}
+                                              <button type="button" className={styles.horsePillRemove} onClick={(e) => { e.stopPropagation(); setEditState({ ...editState, visitTypes: editState.visitTypes.filter((v) => v !== vt) }); }}>✕</button>
+                                            </span>
+                                          );
+                                        })
+                                      ) : (
+                                        <span className={styles.multiSelectPlaceholder}>select subcategory...</span>
+                                      )}
+                                      <span className={styles.multiSelectCaret}>▼</span>
+                                    </div>
+                                    {editSubcatDropdownOpen ? (
+                                      <div className={styles.multiSelectDropdown}>
+                                        {VET_SUBCATEGORY_OPTIONS.map((opt) => {
+                                          const checked = editState.visitTypes.includes(opt.value);
+                                          return (
+                                            <button type="button" key={opt.value} className={styles.multiSelectOption} onClick={(e) => { e.stopPropagation(); if (dropdownJustOpened.current) return; setEditState({ ...editState, visitTypes: checked ? editState.visitTypes.filter((v) => v !== opt.value) : [...editState.visitTypes, opt.value] }); }}>
+                                              <span className={`${styles.checkbox} ${checked ? styles.checkboxChecked : styles.checkboxUnchecked}`}>✓</span>
+                                              <span>{opt.label}</span>
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </ExpandedInput>
+                                {editState.visitTypes.includes("medication") ? (
+                                  <ExpandedInput label="MEDICATION(S)">
+                                    <div className={styles.chipRow}>
+                                      {MEDICATION_OPTIONS.map((med) => {
+                                        const active = editState.medications.includes(med);
+                                        return (
+                                          <button type="button" key={med} className={`${styles.serviceChip} ${active ? styles.serviceChipActive : ""}`} onClick={(e) => { e.stopPropagation(); setEditState({ ...editState, medications: active ? editState.medications.filter((m) => m !== med) : [...editState.medications, med] }); }}>
+                                            {med}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </ExpandedInput>
+                                ) : null}
+                                {editState.medications.length > 0 ? (
+                                  <ExpandedInput label="REPEAT">
+                                    <div className={styles.repeatRow}>
+                                      <input className={styles.repeatNumberInput} type="number" min="1" value={editState.medicationRepeatValue} onChange={(e) => setEditState({ ...editState, medicationRepeatValue: e.target.value })} placeholder="#" />
+                                      <select className={styles.repeatUnitSelect} value={editState.medicationRepeatUnit} onChange={(e) => setEditState({ ...editState, medicationRepeatUnit: e.target.value as "" | "days" | "weeks" | "months" })}>
+                                        <option value="">select...</option>
+                                        <option value="days">Days</option>
+                                        <option value="weeks">Weeks</option>
+                                        <option value="months">Months</option>
+                                      </select>
+                                    </div>
+                                  </ExpandedInput>
+                                ) : null}
+                                {editState.visitTypes.includes("other") ? (
+                                  <ExpandedInput label="DESCRIBE OTHER">
+                                    <input
+                                      className={styles.expandedInput}
+                                      value={editState.vetOtherDescription}
+                                      onClick={(event) => event.stopPropagation()}
+                                      onChange={(event) => setEditState({ ...editState, vetOtherDescription: event.target.value })}
+                                      placeholder="e.g., Dental, Chiropractic"
+                                    />
+                                  </ExpandedInput>
+                                ) : null}
+                              </>
+                            ) : null}
+                            {editState.type === "other" ? (
+                              <ExpandedInput label="DESCRIBE CATEGORY">
+                                <input
+                                  className={styles.expandedInput}
+                                  value={editState.customType}
+                                  onChange={(event) => setEditState({ ...editState, customType: event.target.value })}
+                                  placeholder="e.g., Dentist, Chiropractor"
+                                />
+                              </ExpandedInput>
+                            ) : null}
                             <ExpandedInput label="NOTES">
                               <textarea
                                 className={styles.expandedTextarea}
@@ -574,16 +796,16 @@ export default function HorseRecordsPage() {
                               </>
                             </ExpandedInput>
                             <ExpandedInput label="LINKED INVOICE">
-                              <div style={{ position: "relative" }}>
+                              <div className={styles.invoiceSearchWrap}>
                                 {editState.billId ? (
-                                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#1a1a2e" }}>
-                                    <span>
+                                  <div className={styles.invoiceSelected}>
+                                    <span className={styles.invoiceSelectedName}>
                                       {(() => {
                                         const linked = allInvoicesForLinking.find((b) => String(b._id) === editState.billId);
                                         return linked ? formatInvoiceName({ contactName: linked.contactName, date: linked.invoiceDate }) : "linked invoice";
                                       })()}
                                     </span>
-                                    <button type="button" style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer", fontSize: 14, padding: 0 }} onClick={() => setEditState({ ...editState, billId: "" })}>✕</button>
+                                    <button type="button" className={styles.invoiceClearBtn} onClick={() => setEditState({ ...editState, billId: "" })}>✕</button>
                                   </div>
                                 ) : (
                                   <>
@@ -595,19 +817,21 @@ export default function HorseRecordsPage() {
                                       placeholder="search invoices to link..."
                                     />
                                     {editInvoiceDropdownOpen && (
-                                      <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", border: "1px solid #e8eaf0", borderRadius: 8, maxHeight: 200, overflowY: "auto", zIndex: 20, marginTop: 4 }}>
+                                      <div className={styles.invoiceDropdown}>
                                         {allInvoicesForLinking
                                           .filter((b) => {
                                             if (!editInvoiceSearch.trim()) return true;
                                             const term = editInvoiceSearch.toLowerCase();
-                                            return b.contactName.toLowerCase().includes(term) || b.invoiceNumber.toLowerCase().includes(term) || b.invoiceDate.includes(term);
+                                            return b.contactName.toLowerCase().includes(term) ||
+                                              b.invoiceNumber.toLowerCase().includes(term) ||
+                                              b.invoiceDate.includes(term);
                                           })
                                           .slice(0, 8)
                                           .map((b) => (
                                             <button
                                               key={String(b._id)}
                                               type="button"
-                                              style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", border: "none", borderBottom: "1px solid #f0f1f5", background: "transparent", cursor: "pointer", fontSize: 11, color: "#1a1a2e" }}
+                                              className={styles.invoiceDropdownItem}
                                               onClick={() => {
                                                 setEditState({ ...editState, billId: String(b._id) });
                                                 setEditInvoiceSearch("");
@@ -622,7 +846,7 @@ export default function HorseRecordsPage() {
                                           const term = editInvoiceSearch.toLowerCase();
                                           return b.contactName.toLowerCase().includes(term) || b.invoiceNumber.toLowerCase().includes(term) || b.invoiceDate.includes(term);
                                         }).length === 0 && (
-                                          <div style={{ padding: "12px", fontSize: 11, color: "#9ea2b0", textAlign: "center" }}>no invoices found</div>
+                                          <div className={styles.invoiceDropdownEmpty}>no invoices found</div>
                                         )}
                                       </div>
                                     )}
@@ -633,15 +857,22 @@ export default function HorseRecordsPage() {
                           </>
                         ) : (
                           <>
-                            <ExpandedField label={contactLabel(record.type)} value={record.contactName} />
-                            <ExpandedField label="DATE" value={formatDateLong(record.date)} />
-                            <ExpandedField label="NOTES" value={record.notes} />
+                            <div className={styles.expandedMetaRow}>
+                              <ExpandedField label="CONTACT" value={record.contactName} />
+                              <ExpandedField label="DATE" value={formatDateLong(record.date)} />
+                            </div>
+                            {record.notes ? (
+                              <div className={styles.expandedNotesBlock}>
+                                <div className={styles.expandedFieldLabel}>NOTES</div>
+                                <div className={styles.expandedNotesText}>{record.notes}</div>
+                              </div>
+                            ) : null}
                             {record.billInfo ? (
-                              <div style={{ minWidth: 120 }}>
-                                <div style={{ fontSize: 9, color: "#9ea2b0", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 4 }}>LINKED INVOICE</div>
+                              <div className={styles.expandedFieldRow}>
+                                <span className={styles.expandedFieldLabel}>LINKED INVOICE</span>
                                 <Link
                                   href={`/invoices/preview/${record.billInfo.billId}`}
-                                  style={{ fontSize: 12, color: "#4A5BDB", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", border: "1px solid rgba(74, 91, 219, 0.2)", borderRadius: 6 }}
+                                  className={styles.invoiceLink}
                                   onClick={(event) => event.stopPropagation()}
                                 >
                                   📄 {formatInvoiceName({ contactName: record.billInfo.contactName, date: record.billInfo.invoiceDate })}
@@ -717,8 +948,17 @@ export default function HorseRecordsPage() {
                               onClick={(event) => {
                                 event.stopPropagation();
                                 setEditingRecordId(record._id);
+                                const remappedType = record.type === "medication" ? "veterinary" : record.type;
+                                const baseVisitTypes = (record.visitTypes?.length ? record.visitTypes : record.visitType ? [record.visitType] : []) as VetSubcategory[];
+                                const visitTypes = record.type === "medication" && !baseVisitTypes.includes("medication" as VetSubcategory)
+                                  ? [...baseVisitTypes, "medication" as VetSubcategory]
+                                  : baseVisitTypes;
                                 setEditState({
-                                  type: record.type as RecordType,
+                                  title: record.title || "",
+                                  type: remappedType,
+                                  visitType: (record.visitType || "") as "" | VetSubcategory,
+                                  visitTypes,
+                                  vetOtherDescription: record.vetOtherDescription || "",
                                   contactName: record.contactName || "",
                                   date: toDateInput(record.date),
                                   nextVisitDate: getLinkedUpcomingDateInput(record),
@@ -727,6 +967,9 @@ export default function HorseRecordsPage() {
                                   customType: record.customType || "",
                                   vaccineName: record.vaccineName || "",
                                   treatmentDescription: record.treatmentDescription || "",
+                                  medications: record.medications || [],
+                                  medicationRepeatValue: record.medicationRepeatValue ? String(record.medicationRepeatValue) : "",
+                                  medicationRepeatUnit: (record.medicationRepeatUnit || "") as "" | "days" | "weeks" | "months",
                                   billId: record.billId ? String(record.billId) : "",
                                 });
                               }}
@@ -764,12 +1007,12 @@ export default function HorseRecordsPage() {
           )}
         </section>
 
-        <div className="ui-footer">OLD_OAK_HORSES // HORSES // {(horse?.name || "HORSE").toUpperCase()} // RECORDS</div>
+        <div className="ui-footer">OLD_OAK_HORSES // HORSES // {horse.name.toUpperCase()} // RECORDS</div>
       </main>
 
       <Modal open={recordToDelete !== null} title="delete record?" onClose={() => setRecordToDelete(null)}>
         <p className={styles.deleteBody}>
-          Are you sure you want to delete "{recordToDelete?.name}"?
+          Are you sure you want to delete &ldquo;{recordToDelete?.name}&rdquo;?
           <br />
           This cannot be undone.
         </p>
@@ -804,109 +1047,69 @@ function ExpandedInput({ label, children }: { label: string; children: React.Rea
   );
 }
 
-function vetSubcategoryLabel(value?: string | null) {
-  if (!value) return null;
-  const labelMap: Record<string, string> = {
-    exam: "Exam", vaccinations: "Vaccinations", vaccination: "Vaccinations",
-    medication: "Medication", joint_injections: "Joint Injections",
-    imaging: "Imaging", lab_work: "Lab Work", shockwave: "Shockwave",
-    sedation: "Sedation", exams_diagnostics: "Exams & Diagnostics",
-    fees: "Fees", treatment: "Treatment", other: "Other",
-  };
-  return labelMap[value] || value.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function getVetVisitTypeLabels(record: { visitType?: string; visitTypes?: string[]; vetOtherDescription?: string }): string[] {
-  const types = record.visitTypes?.length ? record.visitTypes : record.visitType ? [record.visitType] : [];
-  return types.map((t) => {
-    if (t === "other" && record.vetOtherDescription) return record.vetOtherDescription;
-    return vetSubcategoryLabel(t) || t;
-  });
-}
-
 function getRecordSubtype(record: HorseRecord) {
   if (record.type === "veterinary") {
     const labels = getVetVisitTypeLabels(record);
     if (labels.length > 0) return labels.join(", ");
   }
-  if (record.type === "farrier" && record.serviceType) {
-    return record.serviceType;
-  }
-  if (record.type === "other" && record.customType) {
-    return record.customType;
-  }
+  if (record.type === "farrier" && record.serviceType) return record.serviceType;
+  if (record.type === "other" && record.customType) return record.customType;
   return null;
 }
 
+function getRecordSubtitle(record: HorseRecord): string {
+  if (record.contactName) return record.contactName;
+  if (record.type === "medication") {
+    return record.medications?.length ? record.medications.join(", ") : "";
+  }
+  return "";
+}
+
 function getRecordLabel(record: HorseRecord) {
+  if (record.title) return record.title;
   if (record.type === "veterinary") {
     const labels = getVetVisitTypeLabels(record);
     if (labels.length > 0) return labels.join(", ");
     return "Veterinary";
   }
   const subtype = getRecordSubtype(record);
-  if (subtype) return `${pretty(record.type)} — ${subtype}`;
-  return pretty(record.type);
+  if (subtype) return subtype;
+  return prettyType(record.type);
 }
 
-function getRecordDetail(record: HorseRecord): React.ReactNode {
-  if (record.type === "medication") {
-    const meds = record.medications?.length ? record.medications.join(", ") : null;
-    return (
-      <>
-        {meds ? <span className={styles.recordDetailPrimary}>{meds}</span> : null}
-        {record.contactName ? <span className={styles.recordDetailSecondary}>{record.contactName}{record.notes ? ` · ${record.notes}` : ""}</span> : record.notes ? <span className={styles.recordDetailSecondary}>{record.notes}</span> : null}
-      </>
-    );
-  }
-
-  if (record.type === "veterinary") {
-    return (
-      <>
-        {record.contactName ? <span className={styles.recordDetailPrimary}>{record.contactName}</span> : null}
-        {record.notes ? <span className={styles.recordDetailSecondary}>{record.notes}</span> : null}
-      </>
-    );
-  }
-
-  if (record.contactName) return record.contactName;
-  return "";
+function recordIcon(type: RecordType) {
+  if (type === "veterinary") return "🩺";
+  if (type === "medication") return "💊";
+  if (type === "farrier") return "🔧";
+  if (type === "bodywork") return "🦴";
+  return "📋";
 }
 
-function filterByDate(dateValue: number, range: DateRange) {
-  if (range === "all") return true;
-  const now = Date.now();
-  const ms: Record<Exclude<DateRange, "all">, number> = {
-    "7d": 7 * 86400000,
-    "30d": 30 * 86400000,
-    "3m": 90 * 86400000,
-    "6m": 180 * 86400000,
-    "1y": 365 * 86400000,
-  };
-  return dateValue >= now - ms[range];
-}
-
-function pretty(value: string) {
-  return value
-    .replace(/[-_]+/g, " ")
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part[0].toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function contactLabel(type: RecordType) {
-  if (type === "veterinary") return "VETERINARIAN";
-  if (type === "medication") return "ADMINISTERED BY";
-  if (type === "farrier") return "FARRIER";
-  if (type === "bodywork") return "PRACTITIONER";
-  return "CONTACT";
+function prettyType(type: RecordType) {
+  if (type === "bodywork") return "Bodywork";
+  return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
 function formatDateLong(timestamp: number) {
   return new Date(timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function formatDateShort(timestamp: number) {
+  const d = new Date(timestamp);
+  const m = (d.getMonth() + 1).toString().padStart(2, "0");
+  const day = d.getDate().toString().padStart(2, "0");
+  const y = d.getFullYear().toString().slice(2);
+  return `${m}/${day}/${y}`;
+}
+
 function toDateInput(timestamp: number) {
   return new Date(timestamp).toISOString().slice(0, 10);
+}
+
+function daysUntil(timestamp: number) {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const target = new Date(timestamp);
+  target.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - startOfToday.getTime()) / 86400000);
 }
