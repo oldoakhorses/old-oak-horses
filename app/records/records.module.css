@@ -1491,6 +1491,7 @@
   .colCategory {
     grid-column: 1;
     grid-row: 2;
+    padding-left: 22px;
   }
 
   .colHorse {
