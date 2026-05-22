@@ -255,6 +255,7 @@ export default function RecordsPage() {
   const [newContactSaving, setNewContactSaving] = useState(false);
   const [newContactError, setNewContactError] = useState("");
 
+  const contactActionRef = useRef(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropdownJustOpened = useRef(false);
@@ -961,7 +962,7 @@ export default function RecordsPage() {
                                   const matches = term ? editPool.filter((c) => c.name.toLowerCase().includes(term)) : editPool;
                                   const exactMatch = matches.some((c) => c.name.toLowerCase() === term);
                                   return (
-                                    <div className={styles.contactDropdown} onMouseDown={(e) => e.preventDefault()}>
+                                    <div className={styles.contactDropdown}>
                                       {matches.slice(0, 8).map((c) => (
                                         <button
                                           type="button"
@@ -1595,7 +1596,7 @@ export default function RecordsPage() {
                         setContactDropdownOpen(true);
                         setNewContactOpen(false);
                       }}
-                      onFocus={() => { setContactDropdownOpen(true); setNewContactOpen(false); }}
+                      onFocus={() => { if (contactActionRef.current) return; setContactDropdownOpen(true); setNewContactOpen(false); }}
                       placeholder={contactPlaceholder(selectedRecordType)}
                     />
                     {contactDropdownOpen && !newContactOpen && (() => {
@@ -1606,7 +1607,7 @@ export default function RecordsPage() {
                         : contactPool;
                       const exactMatch = matches.some((c) => c.name.toLowerCase() === term);
                       return (
-                        <div className={styles.contactDropdown} onMouseDown={(e) => e.preventDefault()}>
+                        <div className={styles.contactDropdown}>
                           {matches.slice(0, 8).map((c) => (
                             <button
                               type="button"
@@ -1625,6 +1626,8 @@ export default function RecordsPage() {
                               type="button"
                               className={`${styles.contactDropdownItem} ${styles.contactDropdownAdd}`}
                               onClick={() => {
+                                contactActionRef.current = true;
+                                setTimeout(() => { contactActionRef.current = false; }, 400);
                                 setContactDropdownOpen(false);
                                 setNewContactOpen(true);
                                 setNewContactError("");
@@ -1647,6 +1650,8 @@ export default function RecordsPage() {
                               type="button"
                               className={`${styles.contactDropdownItem} ${styles.contactDropdownAdd}`}
                               onClick={() => {
+                                contactActionRef.current = true;
+                                setTimeout(() => { contactActionRef.current = false; }, 400);
                                 setContactDropdownOpen(false);
                                 setNewContactOpen(true);
                                 setNewContactError("");
