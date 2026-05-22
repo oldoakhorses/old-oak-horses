@@ -961,7 +961,7 @@ export default function RecordsPage() {
                                   const matches = term ? editPool.filter((c) => c.name.toLowerCase().includes(term)) : editPool;
                                   const exactMatch = matches.some((c) => c.name.toLowerCase() === term);
                                   return (
-                                    <div className={styles.contactDropdown}>
+                                    <div className={styles.contactDropdown} onMouseDown={(e) => e.preventDefault()}>
                                       {matches.slice(0, 8).map((c) => (
                                         <button
                                           type="button"
@@ -1606,7 +1606,7 @@ export default function RecordsPage() {
                         : contactPool;
                       const exactMatch = matches.some((c) => c.name.toLowerCase() === term);
                       return (
-                        <div className={styles.contactDropdown}>
+                        <div className={styles.contactDropdown} onMouseDown={(e) => e.preventDefault()}>
                           {matches.slice(0, 8).map((c) => (
                             <button
                               type="button"
