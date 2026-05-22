@@ -1457,16 +1457,17 @@
   }
 
   .recordRow {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 6px 12px;
     padding: 14px 18px;
     align-items: center;
   }
 
   .colRecord {
-    flex: 1 1 0;
-    order: 1;
+    grid-column: 1;
+    grid-row: 1;
     min-width: 0;
   }
 
@@ -1475,11 +1476,12 @@
   }
 
   .colDate {
-    order: 2;
+    grid-column: 2;
+    grid-row: 1;
     font-size: 11px;
     color: #9ea2b0;
-    flex-shrink: 0;
-    margin-left: 10px;
+    text-align: right;
+    white-space: nowrap;
   }
 
   .colSubtitle {
@@ -1487,16 +1489,16 @@
   }
 
   .colCategory {
-    order: 3;
-    margin-top: 6px;
+    grid-column: 1;
+    grid-row: 2;
   }
 
   .colHorse {
-    order: 4;
+    grid-column: 2;
+    grid-row: 2;
     font-size: 11px;
-    margin-top: 6px;
-    margin-left: 8px;
     color: #6b7084;
+    text-align: right;
   }
 
   .expandedMetaRow {
