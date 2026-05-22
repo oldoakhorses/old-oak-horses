@@ -1459,27 +1459,27 @@
   .recordRow {
     display: flex;
     flex-wrap: wrap;
-    gap: 0 10px;
+    gap: 0;
     padding: 14px 18px;
     align-items: center;
   }
 
   .colRecord {
-    flex: 1 1 60%;
+    flex: 1 1 0;
     order: 1;
-    font-size: 14px;
+    min-width: 0;
   }
 
   .colRecord .recordLabel {
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .colDate {
     order: 2;
     font-size: 11px;
     color: #9ea2b0;
-    margin-left: auto;
     flex-shrink: 0;
+    margin-left: 10px;
   }
 
   .colSubtitle {
@@ -1488,13 +1488,14 @@
 
   .colCategory {
     order: 3;
-    margin-top: 8px;
+    margin-top: 6px;
   }
 
   .colHorse {
     order: 4;
     font-size: 11px;
-    margin-top: 8px;
+    margin-top: 6px;
+    margin-left: 8px;
     color: #6b7084;
   }
 
