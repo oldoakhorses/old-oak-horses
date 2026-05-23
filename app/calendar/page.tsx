@@ -54,8 +54,9 @@ type ParsedInput = {
   time?: string;
   allDay?: boolean;
   repeatDays?: number;
+  isRecord?: boolean;
+  recordLabel?: string;
   horseName?: string;
-  medication?: string;
 };
 
 function parseInput(raw: string): ParsedInput | null {
@@ -86,22 +87,23 @@ function parseInput(raw: string): ParsedInput | null {
 
   if (!text) return null;
 
-  let horseName: string | undefined;
-  let medication: string | undefined;
-  const forMatch = text.match(/\bfor\s+(.+)$/i);
-  if (forMatch) {
-    horseName = forMatch[1].trim();
-    medication = text.slice(0, forMatch.index).trim();
+  const recMatch = text.match(/^rec:\s*/i);
+  if (recMatch) {
+    text = text.slice(recMatch[0].length).trim();
+    if (!text) return null;
+
+    let horseName: string | undefined;
+    let recordLabel = text;
+    const forMatch = text.match(/\bfor\s+(.+)$/i);
+    if (forMatch) {
+      horseName = forMatch[1].trim();
+      recordLabel = text.slice(0, forMatch.index).trim();
+    }
+
+    return { title: text, time, allDay, repeatDays, isRecord: true, recordLabel, horseName };
   }
 
-  return {
-    title: text,
-    time,
-    allDay,
-    repeatDays,
-    horseName,
-    medication: medication || undefined,
-  };
+  return { title: text, time, allDay, repeatDays };
 }
 
 function parseTime(raw: string): string | null {
@@ -443,40 +445,52 @@ export default function CalendarPage() {
     ) || null;
   }, [activeHorses]);
 
-  const MEDICATION_KEYWORDS = ["aspirin", "bute", "banamine", "equioxx", "previcox", "adequan", "legend", "osphos", "gastrogard", "ulcergard", "omeprazole", "dexamethasone", "robaxin", "dormosedan", "ace", "regumate", "depo", "excel", "succeed", "cosequin", "platinum", "smartpak", "meds", "medication", "supplement"];
+  const MEDICATION_KEYWORDS = ["aspirin", "bute", "banamine", "equioxx", "previcox", "adequan", "legend", "osphos", "gastrogard", "ulcergard", "omeprazole", "dexamethasone", "robaxin", "dormosedan", "ace", "regumate", "depo", "excel", "succeed", "cosequin", "platinum", "smartpak", "meds", "medication", "supplement", "show meds"];
 
   const handleSubmit = async () => {
     const parsed = parseInput(inputValue);
     if (!parsed) return;
 
-    const matchedHorse = parsed.horseName ? findHorse(parsed.horseName) : null;
+    const totalDays = (parsed.repeatDays ?? 0) + 1;
+    const baseDate = new Date(selectedDate);
 
-    if (matchedHorse) {
-      const isMed = parsed.medication
-        ? MEDICATION_KEYWORDS.some((k) => parsed.medication!.toLowerCase().includes(k))
-        : false;
+    if (parsed.isRecord) {
+      const matchedHorse = parsed.horseName ? findHorse(parsed.horseName) : null;
+      const label = parsed.recordLabel || parsed.title;
+      const isMed = MEDICATION_KEYWORDS.some((k) => label.toLowerCase().includes(k));
       const recordType = isMed ? "medication" as const : "other" as const;
-      const title = parsed.medication || parsed.title;
-      const totalDays = (parsed.repeatDays ?? 0) + 1;
-      const baseDate = new Date(selectedDate);
 
-      const promises: Promise<unknown>[] = [];
-      for (let i = 0; i < totalDays; i++) {
-        const d = new Date(baseDate);
-        d.setDate(d.getDate() + i);
-        promises.push(createRecord({
-          horseId: matchedHorse._id,
-          title,
-          type: recordType,
-          date: d.getTime(),
-          medications: isMed && parsed.medication ? [parsed.medication] : undefined,
-          createdBy: user?.id,
-        }));
+      if (matchedHorse) {
+        const promises: Promise<unknown>[] = [];
+        for (let i = 0; i < totalDays; i++) {
+          const d = new Date(baseDate);
+          d.setDate(d.getDate() + i);
+          promises.push(createRecord({
+            horseId: matchedHorse._id,
+            title: label,
+            type: recordType,
+            date: d.getTime(),
+            medications: isMed ? [label] : undefined,
+            createdBy: user?.id,
+          }));
+        }
+        await Promise.all(promises);
+      } else {
+        const promises: Promise<unknown>[] = [];
+        for (let i = 0; i < totalDays; i++) {
+          const d = new Date(baseDate);
+          d.setDate(d.getDate() + i);
+          promises.push(createEvent({
+            title: `rec: ${parsed.title}`,
+            date: toDateStr(d),
+            time: parsed.time,
+            allDay: parsed.allDay,
+            createdBy: user?.id,
+          }));
+        }
+        await Promise.all(promises);
       }
-      await Promise.all(promises);
-    } else if (parsed.repeatDays) {
-      const totalDays = parsed.repeatDays + 1;
-      const baseDate = new Date(selectedDate);
+    } else {
       const promises: Promise<unknown>[] = [];
       for (let i = 0; i < totalDays; i++) {
         const d = new Date(baseDate);
@@ -490,14 +504,6 @@ export default function CalendarPage() {
         }));
       }
       await Promise.all(promises);
-    } else {
-      await createEvent({
-        title: parsed.title,
-        date: selectedStr,
-        time: parsed.time,
-        allDay: parsed.allDay,
-        createdBy: user?.id,
-      });
     }
     setInputValue("");
   };
@@ -686,7 +692,7 @@ export default function CalendarPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleSubmit();
                 }}
-                placeholder="@1pm Lucy rides Carlin"
+                placeholder="@1pm rec: Show Meds for Gaby"
               />
               <button
                 type="button"
@@ -697,7 +703,7 @@ export default function CalendarPage() {
                 +
               </button>
             </div>
-            <div className={styles.inputHint}>@time or @allday · &ldquo;for Horse&rdquo; creates record · (repeat for N days)</div>
+            <div className={styles.inputHint}>rec: creates a record · for Horse tags it · (repeat for N days)</div>
           </div>
         </div>
       </main>
