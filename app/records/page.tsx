@@ -514,8 +514,8 @@ export default function RecordsPage() {
     return typeof payload.storageId === "string" ? payload.storageId : undefined;
   }
 
-  async function onSaveRecord(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function onSaveRecord(event?: FormEvent<HTMLFormElement> | React.MouseEvent) {
+    event?.preventDefault();
     if (!selectedRecordType) {
       setRecordError("Select a record type.");
       return;
@@ -1885,7 +1885,7 @@ export default function RecordsPage() {
             <button type="button" className={styles.recordCancelBtn} onClick={closePanel}>
               cancel
             </button>
-            <button type="submit" form="record-form" className={styles.recordSaveBtn} disabled={recordForm.horseIds.length === 0 || recordSubmitting}>
+            <button type="button" className={styles.recordSaveBtn} disabled={recordForm.horseIds.length === 0 || recordSubmitting} onClick={() => onSaveRecord()}>
               {recordSubmitting ? "saving..." : "save record"}
             </button>
           </div>
