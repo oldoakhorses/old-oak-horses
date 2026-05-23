@@ -1,0 +1,353 @@
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 0 20px 100px;
+}
+
+/* ── Week strip ─────────────────────────── */
+
+.weekStrip {
+  background: var(--color-card);
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  padding: 18px 12px 14px;
+  margin-bottom: 20px;
+}
+
+.weekHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+  margin-bottom: 14px;
+}
+
+.weekTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.weekNav {
+  display: flex;
+  gap: 4px;
+}
+
+.weekNavBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.weekNavBtn:hover {
+  background: var(--color-hover);
+}
+
+.weekDays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0;
+}
+
+.dayCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 0;
+  border-radius: 10px;
+  transition: background 0.15s;
+}
+
+.dayCol:hover {
+  background: var(--color-hover);
+}
+
+.dayLabel {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dayNumber {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  transition: background 0.15s, color 0.15s;
+}
+
+.daySelected .dayNumber {
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.dayToday .dayNumber {
+  border: 1.5px solid var(--color-accent);
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.dayToday.daySelected .dayNumber {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+}
+
+.dayDot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  opacity: 0.5;
+}
+
+.dayDotEmpty {
+  width: 4px;
+  height: 4px;
+}
+
+/* ── Day header ─────────────────────────── */
+
+.dayHeader {
+  margin-bottom: 16px;
+  padding: 0 2px;
+}
+
+.dayHeaderTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.dayHeaderSub {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Events ─────────────────────────────── */
+
+.allDaySection {
+  margin-bottom: 12px;
+}
+
+.allDayLabel {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0 2px;
+  margin-bottom: 6px;
+}
+
+.eventList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.eventCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  transition: background 0.15s;
+}
+
+.eventCard:hover {
+  background: var(--color-hover);
+}
+
+.eventTime {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  min-width: 48px;
+  padding-top: 1px;
+  flex-shrink: 0;
+}
+
+.eventBar {
+  width: 3px;
+  min-height: 18px;
+  border-radius: 2px;
+  background: var(--color-accent);
+  flex-shrink: 0;
+  align-self: stretch;
+}
+
+.eventBarAllDay {
+  background: var(--color-green);
+}
+
+.eventContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.eventTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.3;
+}
+
+.eventDeleteBtn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.eventCard:hover .eventDeleteBtn {
+  opacity: 1;
+}
+
+.eventDeleteBtn:hover {
+  color: var(--color-red);
+}
+
+/* ── Empty state ────────────────────────── */
+
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.emptyIcon {
+  font-size: 28px;
+  margin-bottom: 8px;
+  opacity: 0.6;
+}
+
+/* ── Input bar ──────────────────────────── */
+
+.inputBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--color-card);
+  border-top: 1px solid var(--color-border);
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  z-index: 40;
+}
+
+.inputWrap {
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.input {
+  flex: 1;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-input-bg);
+  padding: 0 14px;
+  font-size: 13px;
+  color: var(--color-text);
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+
+.input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.input:focus {
+  border-color: var(--color-accent);
+}
+
+.inputSendBtn {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  border: none;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.inputSendBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.inputHint {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 0 10px 100px;
+  }
+
+  .weekStrip {
+    border-radius: 12px;
+    padding: 14px 8px 10px;
+  }
+
+  .dayNumber {
+    width: 32px;
+    height: 32px;
+    font-size: 13px;
+  }
+
+  .eventDeleteBtn {
+    opacity: 1;
+  }
+}

@@ -590,6 +590,16 @@ export default defineSchema({
     .index("by_horse", ["horseId"])
     .index("by_bill", ["billId"]),
 
+  calendarEvents: defineTable({
+    title: v.string(),
+    date: v.string(),
+    time: v.optional(v.string()),
+    allDay: v.optional(v.boolean()),
+    createdBy: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_date", ["date"]),
+
   todos: defineTable({
     text: v.string(),
     completed: v.boolean(),
