@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -25,6 +25,8 @@ const RECORD_CATEGORY_COLORS: Record<string, string> = {
   other: "#6b7084",
 };
 
+const SWIPE_THRESHOLD = 60;
+
 function getWeekStart(date: Date): Date {
   const d = new Date(date);
   d.setDate(d.getDate() - d.getDay());
@@ -40,8 +42,7 @@ function toDateStr(d: Date): string {
 }
 
 function tsToDateStr(ts: number): string {
-  const d = new Date(ts);
-  return toDateStr(d);
+  return toDateStr(new Date(ts));
 }
 
 function prettyType(type: string): string {
@@ -94,6 +95,12 @@ function formatTime(t: string): string {
   return min === "00" ? `${h}${suffix}` : `${h}:${min}${suffix}`;
 }
 
+function serializeForEdit(item: AgendaItem): string {
+  if (item.allDay) return `@allday ${item.title}`;
+  if (item.time) return `@${formatTime(item.time)} ${item.title}`;
+  return item.title;
+}
+
 type AgendaItem = {
   id: string;
   kind: "calendar" | "record" | "record-next" | "schedule";
@@ -105,6 +112,121 @@ type AgendaItem = {
   deletable: boolean;
   calendarEventId?: Id<"calendarEvents">;
 };
+
+function SwipeableCard({
+  item,
+  onEdit,
+  onDelete,
+  children,
+}: {
+  item: AgendaItem;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  children: React.ReactNode;
+}) {
+  const innerRef = useRef<HTMLDivElement>(null);
+  const startX = useRef(0);
+  const startY = useRef(0);
+  const currentX = useRef(0);
+  const dragging = useRef(false);
+  const locked = useRef(false);
+  const [offset, setOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+
+  const canSwipe = item.kind === "calendar";
+  const actionWidth = 128;
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!canSwipe) return;
+    startX.current = e.touches[0].clientX;
+    startY.current = e.touches[0].clientY;
+    dragging.current = true;
+    locked.current = false;
+    setIsDragging(true);
+  }, [canSwipe]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!dragging.current) return;
+    const dx = e.touches[0].clientX - startX.current;
+    const dy = e.touches[0].clientY - startY.current;
+
+    if (!locked.current) {
+      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 5) {
+        dragging.current = false;
+        setIsDragging(false);
+        return;
+      }
+      if (Math.abs(dx) > 5) locked.current = true;
+    }
+
+    const base = revealed ? -actionWidth : 0;
+    let next = base + dx;
+    if (next > 0) next = 0;
+    if (next < -actionWidth) next = -actionWidth;
+    currentX.current = dx;
+    setOffset(next);
+  }, [revealed, actionWidth]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!dragging.current && !locked.current) return;
+    dragging.current = false;
+    setIsDragging(false);
+    const dx = currentX.current;
+    if (revealed) {
+      if (dx > SWIPE_THRESHOLD) {
+        setOffset(0);
+        setRevealed(false);
+      } else {
+        setOffset(-actionWidth);
+      }
+    } else {
+      if (dx < -SWIPE_THRESHOLD) {
+        setOffset(-actionWidth);
+        setRevealed(true);
+      } else {
+        setOffset(0);
+      }
+    }
+    currentX.current = 0;
+  }, [revealed, actionWidth]);
+
+  const close = useCallback(() => {
+    setOffset(0);
+    setRevealed(false);
+  }, []);
+
+  return (
+    <div className={styles.swipeOuter}>
+      <div className={styles.swipeActions} style={{ width: actionWidth }}>
+        <button
+          type="button"
+          className={styles.swipeEditBtn}
+          onClick={() => { close(); onEdit?.(); }}
+        >
+          edit
+        </button>
+        <button
+          type="button"
+          className={styles.swipeDeleteBtn}
+          onClick={() => { close(); onDelete?.(); }}
+        >
+          delete
+        </button>
+      </div>
+      <div
+        ref={innerRef}
+        className={`${styles.swipeInner} ${isDragging ? styles.swipeInnerDragging : ""}`}
+        style={{ transform: `translateX(${offset}px)` }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export default function CalendarPage() {
   const { user } = useAuth();
@@ -118,6 +240,8 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState(today);
   const [weekOffset, setWeekOffset] = useState(0);
   const [inputValue, setInputValue] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   const weekStart = useMemo(() => {
     const ws = getWeekStart(today);
@@ -160,6 +284,7 @@ export default function CalendarPage() {
   });
 
   const createEvent = useMutation(api.calendarEvents.create);
+  const updateEvent = useMutation(api.calendarEvents.update);
   const removeEvent = useMutation(api.calendarEvents.remove);
 
   const allItemsByDate = useMemo(() => {
@@ -185,9 +310,8 @@ export default function CalendarPage() {
     if (records) {
       for (const r of records) {
         const dateStr = tsToDateStr(r.date);
-        const ds = weekStartStr <= dateStr && dateStr <= weekEndStr ? dateStr : null;
-        if (ds) {
-          const items = map.get(ds) || [];
+        if (weekStartStr <= dateStr && dateStr <= weekEndStr) {
+          const items = map.get(dateStr) || [];
           const label = r.title || prettyType(r.type);
           items.push({
             id: `rec-${r._id}`,
@@ -197,14 +321,13 @@ export default function CalendarPage() {
             color: RECORD_CATEGORY_COLORS[r.type] || "#6b7084",
             deletable: false,
           });
-          map.set(ds, items);
+          map.set(dateStr, items);
         }
 
         if (r.nextVisitDate) {
           const nextStr = tsToDateStr(r.nextVisitDate);
-          const ns = weekStartStr <= nextStr && nextStr <= weekEndStr ? nextStr : null;
-          if (ns) {
-            const items = map.get(ns) || [];
+          if (weekStartStr <= nextStr && nextStr <= weekEndStr) {
+            const items = map.get(nextStr) || [];
             const label = r.title || prettyType(r.type);
             items.push({
               id: `rec-next-${r._id}`,
@@ -214,7 +337,7 @@ export default function CalendarPage() {
               color: RECORD_CATEGORY_COLORS[r.type] || "#6b7084",
               deletable: false,
             });
-            map.set(ns, items);
+            map.set(nextStr, items);
           }
         }
       }
@@ -287,12 +410,79 @@ export default function CalendarPage() {
     await removeEvent({ id });
   };
 
+  const handleStartEdit = (item: AgendaItem) => {
+    setEditingId(item.id);
+    setEditValue(serializeForEdit(item));
+  };
+
+  const handleSaveEdit = async (item: AgendaItem) => {
+    if (!item.calendarEventId) return;
+    const parsed = parseInput(editValue);
+    if (!parsed) return;
+    await updateEvent({
+      id: item.calendarEventId,
+      title: parsed.title,
+      time: parsed.time,
+      allDay: parsed.allDay ?? false,
+    });
+    setEditingId(null);
+  };
+
   const dayHeaderLabel = useMemo(() => {
     const dow = DAY_NAMES[selectedDate.getDay()];
     const month = MONTH_NAMES[selectedDate.getMonth()];
     const day = selectedDate.getDate();
     return `${dow}, ${month} ${day}`;
   }, [selectedDate]);
+
+  const renderCard = (item: AgendaItem, showTime: boolean) => {
+    if (editingId === item.id) {
+      return (
+        <div key={item.id} className={styles.editRow}>
+          <input
+            className={styles.editInput}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSaveEdit(item); if (e.key === "Escape") setEditingId(null); }}
+            autoFocus
+          />
+          <button type="button" className={styles.editSaveBtn} onClick={() => handleSaveEdit(item)}>save</button>
+          <button type="button" className={styles.editCancelBtn} onClick={() => setEditingId(null)}>✕</button>
+        </div>
+      );
+    }
+
+    const card = (
+      <div className={styles.eventCard}>
+        {showTime && (
+          <span className={styles.eventTime}>
+            {item.time ? formatTime(item.time) : "—"}
+          </span>
+        )}
+        <span className={styles.eventBar} style={{ background: item.color }} />
+        <div className={styles.eventContent}>
+          <span className={styles.eventTitle}>{item.title}</span>
+          {item.subtitle && <span className={styles.eventSubtitle}>{item.subtitle}</span>}
+        </div>
+        {item.kind !== "calendar" && (
+          <span className={styles.eventKindPill}>
+            {item.kind === "record" || item.kind === "record-next" ? "record" : "scheduled"}
+          </span>
+        )}
+      </div>
+    );
+
+    return (
+      <SwipeableCard
+        key={item.id}
+        item={item}
+        onEdit={() => handleStartEdit(item)}
+        onDelete={() => item.calendarEventId && handleDelete(item.calendarEventId)}
+      >
+        {card}
+      </SwipeableCard>
+    );
+  };
 
   return (
     <div className="page-shell">
@@ -373,26 +563,7 @@ export default function CalendarPage() {
             <div className={styles.allDaySection}>
               <div className={styles.allDayLabel}>all day</div>
               <div className={styles.eventList}>
-                {allDayItems.map((item) => (
-                  <div key={item.id} className={styles.eventCard}>
-                    <span className={`${styles.eventBar} ${styles.eventBarAllDay}`} style={{ background: item.color }} />
-                    <div className={styles.eventContent}>
-                      <span className={styles.eventTitle}>{item.title}</span>
-                      {item.subtitle && <span className={styles.eventSubtitle}>{item.subtitle}</span>}
-                    </div>
-                    {item.deletable && item.calendarEventId && (
-                      <button
-                        type="button"
-                        className={styles.eventDeleteBtn}
-                        onClick={() => handleDelete(item.calendarEventId!)}
-                        aria-label="Delete"
-                      >
-                        ✕
-                      </button>
-                    )}
-                    {!item.deletable && <span className={styles.eventKindPill}>{item.kind === "record" || item.kind === "record-next" ? "record" : "scheduled"}</span>}
-                  </div>
-                ))}
+                {allDayItems.map((item) => renderCard(item, false))}
               </div>
             </div>
           )}
@@ -400,30 +571,7 @@ export default function CalendarPage() {
           {/* Timed & untimed items */}
           {timedItems.length > 0 ? (
             <div className={styles.eventList}>
-              {timedItems.map((item) => (
-                <div key={item.id} className={styles.eventCard}>
-                  <span className={styles.eventTime}>
-                    {item.time ? formatTime(item.time) : "—"}
-                  </span>
-                  <span className={styles.eventBar} style={{ background: item.color }} />
-                  <div className={styles.eventContent}>
-                    <span className={styles.eventTitle}>{item.title}</span>
-                    {item.subtitle && <span className={styles.eventSubtitle}>{item.subtitle}</span>}
-                  </div>
-                  {item.deletable && item.calendarEventId ? (
-                    <button
-                      type="button"
-                      className={styles.eventDeleteBtn}
-                      onClick={() => handleDelete(item.calendarEventId!)}
-                      aria-label="Delete"
-                    >
-                      ✕
-                    </button>
-                  ) : !item.deletable ? (
-                    <span className={styles.eventKindPill}>{item.kind === "record" || item.kind === "record-next" ? "record" : "scheduled"}</span>
-                  ) : null}
-                </div>
-              ))}
+              {timedItems.map((item) => renderCard(item, true))}
             </div>
           ) : allDayItems.length === 0 ? (
             <div className={styles.empty}>
@@ -434,7 +582,7 @@ export default function CalendarPage() {
 
           {/* Input bar */}
           <div className={styles.inputBar}>
-            <div className={styles.inputWrap}>
+            <div className={styles.inputRow}>
               <input
                 className={styles.input}
                 value={inputValue}

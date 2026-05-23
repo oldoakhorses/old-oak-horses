@@ -40,6 +40,28 @@ export const create = mutation({
   },
 });
 
+export const update = mutation({
+  args: {
+    id: v.id("calendarEvents"),
+    title: v.optional(v.string()),
+    time: v.optional(v.string()),
+    allDay: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const { id, ...fields } = args;
+    const patch: Record<string, unknown> = {};
+    if (fields.title !== undefined) patch.title = fields.title.trim();
+    if (fields.allDay) {
+      patch.allDay = true;
+      patch.time = undefined;
+    } else if (fields.allDay === false) {
+      patch.allDay = false;
+    }
+    if (fields.time !== undefined && !fields.allDay) patch.time = fields.time;
+    await ctx.db.patch(id, patch);
+  },
+});
+
 export const remove = mutation({
   args: { id: v.id("calendarEvents") },
   handler: async (ctx, args) => {

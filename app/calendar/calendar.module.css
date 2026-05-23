@@ -1,7 +1,7 @@
 .container {
   max-width: 600px;
   margin: 0 auto;
-  padding: 0 20px 100px;
+  padding: 0 20px 120px;
 }
 
 /* ── Week strip ─────────────────────────── */
@@ -169,6 +169,56 @@
   gap: 6px;
 }
 
+/* ── Swipeable card ─────────────────────── */
+
+.swipeOuter {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.swipeActions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.swipeEditBtn,
+.swipeDeleteBtn {
+  width: 64px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.02em;
+}
+
+.swipeEditBtn {
+  background: var(--color-accent);
+}
+
+.swipeDeleteBtn {
+  background: var(--color-red);
+}
+
+.swipeInner {
+  position: relative;
+  z-index: 1;
+  transition: transform 0.25s ease;
+  will-change: transform;
+}
+
+.swipeInnerDragging {
+  transition: none;
+}
+
 .eventCard {
   display: flex;
   align-items: flex-start;
@@ -177,11 +227,6 @@
   border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 12px 14px;
-  transition: background 0.15s;
-}
-
-.eventCard:hover {
-  background: var(--color-hover);
 }
 
 .eventTime {
@@ -240,29 +285,55 @@
   align-self: center;
 }
 
-.eventDeleteBtn {
-  width: 24px;
-  height: 24px;
+/* ── Edit inline ────────────────────────── */
+
+.editRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: var(--color-card);
+  border: 1px solid var(--color-accent);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.editInput {
+  flex: 1;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-input-bg);
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--color-text);
+  outline: none;
+  font-family: inherit;
+}
+
+.editInput:focus {
+  border-color: var(--color-accent);
+}
+
+.editSaveBtn,
+.editCancelBtn {
+  height: 32px;
   border-radius: 6px;
   border: none;
-  background: transparent;
-  color: var(--color-text-muted);
-  font-size: 14px;
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
-  opacity: 0;
-  transition: opacity 0.15s, color 0.15s;
 }
 
-.eventCard:hover .eventDeleteBtn {
-  opacity: 1;
+.editSaveBtn {
+  background: var(--color-accent);
+  color: #fff;
 }
 
-.eventDeleteBtn:hover {
-  color: var(--color-red);
+.editCancelBtn {
+  background: var(--color-tag-bg);
+  color: var(--color-text-secondary);
 }
 
 /* ── Empty state ────────────────────────── */
@@ -289,11 +360,11 @@
   right: 0;
   background: var(--color-card);
   border-top: 1px solid var(--color-border);
-  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  padding: 10px 20px calc(10px + env(safe-area-inset-bottom));
   z-index: 40;
 }
 
-.inputWrap {
+.inputRow {
   max-width: 600px;
   margin: 0 auto;
   display: flex;
@@ -303,7 +374,7 @@
 
 .input {
   flex: 1;
-  height: 42px;
+  height: 44px;
   border-radius: 10px;
   border: 1px solid var(--color-border);
   background: var(--color-input-bg);
@@ -313,6 +384,7 @@
   outline: none;
   font-family: inherit;
   transition: border-color 0.15s;
+  min-width: 0;
 }
 
 .input::placeholder {
@@ -324,13 +396,14 @@
 }
 
 .inputSendBtn {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   border: none;
-  background: var(--color-accent);
+  background: var(--color-text);
   color: #fff;
-  font-size: 18px;
+  font-size: 22px;
+  font-weight: 300;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -340,7 +413,7 @@
 }
 
 .inputSendBtn:disabled {
-  opacity: 0.4;
+  opacity: 0.3;
   cursor: default;
 }
 
@@ -355,7 +428,7 @@
 
 @media (max-width: 640px) {
   .container {
-    padding: 0 10px 100px;
+    padding: 0 10px 120px;
   }
 
   .weekStrip {
@@ -369,7 +442,8 @@
     font-size: 13px;
   }
 
-  .eventDeleteBtn {
-    opacity: 1;
+  .swipeEditBtn,
+  .swipeDeleteBtn {
+    width: 56px;
   }
 }
