@@ -71,12 +71,14 @@ function parseInput(raw: string): ParsedInput | null {
     allDay = true;
     text = text.slice(allDayMatch[0].length).trim();
   } else {
-    const timeMatch = text.match(/^@(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s+/i);
+    const timeMatch = text.match(/^@(\d{1,2}(?:[.:]\d{2})?\s*(?:am|pm)?)\s+/i);
     if (timeMatch) {
-      time = parseTime(timeMatch[1]) || undefined;
+      time = parseTime(timeMatch[1].replace(".", ":")) || undefined;
       text = text.slice(timeMatch[0].length).trim();
     }
   }
+
+  text = text.replace(/^[—–\-]+\s*/, "");
 
   let repeatDays: number | undefined;
   const repeatMatch = text.match(/\(repeat(?:\s+for)?\s+(\d+)\s*days?\)/i);
@@ -447,10 +449,7 @@ export default function CalendarPage() {
 
   const MEDICATION_KEYWORDS = ["aspirin", "bute", "banamine", "equioxx", "previcox", "adequan", "legend", "osphos", "gastrogard", "ulcergard", "omeprazole", "dexamethasone", "robaxin", "dormosedan", "ace", "regumate", "depo", "excel", "succeed", "cosequin", "platinum", "smartpak", "meds", "medication", "supplement", "show meds"];
 
-  const handleSubmit = async () => {
-    const parsed = parseInput(inputValue);
-    if (!parsed) return;
-
+  const submitLine = async (parsed: ParsedInput) => {
     const totalDays = (parsed.repeatDays ?? 0) + 1;
     const baseDate = new Date(selectedDate);
 
@@ -505,6 +504,13 @@ export default function CalendarPage() {
       }
       await Promise.all(promises);
     }
+  };
+
+  const handleSubmit = async () => {
+    const lines = inputValue.split("\n").map((l) => l.trim()).filter(Boolean);
+    const parsed = lines.map(parseInput).filter((p): p is ParsedInput => p !== null);
+    if (parsed.length === 0) return;
+    await Promise.all(parsed.map(submitLine));
     setInputValue("");
   };
 
@@ -685,25 +691,29 @@ export default function CalendarPage() {
           {/* Input bar */}
           <div className={styles.inputBar}>
             <div className={styles.inputRow}>
-              <input
+              <textarea
                 className={styles.input}
                 value={inputValue}
+                rows={inputValue.split("\n").length}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSubmit();
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
                 }}
-                placeholder="@1pm rec: Show Meds for Gaby"
+                placeholder={"@1:30 — Dottie 6th\n@1:45 — Val 15th"}
               />
               <button
                 type="button"
                 className={styles.inputSendBtn}
-                disabled={!parseInput(inputValue)}
+                disabled={!inputValue.split("\n").some((l) => parseInput(l))}
                 onClick={handleSubmit}
               >
                 +
               </button>
             </div>
-            <div className={styles.inputHint}>rec: creates a record · for Horse tags it · (repeat for N days)</div>
+            <div className={styles.inputHint}>multiple lines = multiple items · rec: for records · shift+enter for new line</div>
           </div>
         </div>
       </main>
