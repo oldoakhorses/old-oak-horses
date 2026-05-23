@@ -479,6 +479,28 @@ export const migrateNextVisitToUpcomingRecords = mutation({
   },
 });
 
+export const getByDateRange = query({
+  args: { startTs: v.number(), endTs: v.number() },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db.query("horseRecords").collect();
+    const filtered = rows.filter((r) => {
+      const inRange = r.date >= args.startTs && r.date <= args.endTs;
+      const nextInRange = r.nextVisitDate && r.nextVisitDate >= args.startTs && r.nextVisitDate <= args.endTs;
+      return inRange || nextInRange;
+    });
+    return await Promise.all(
+      filtered.map(async (record) => {
+        const horse = await ctx.db.get(record.horseId);
+        return {
+          ...record,
+          contactName: record.contactName ?? (record as any).providerName,
+          horseName: horse?.name || "Unknown",
+        };
+      })
+    );
+  },
+});
+
 export const getByBill = query({
   args: { billId: v.id("bills") },
   handler: async (ctx, args) => {

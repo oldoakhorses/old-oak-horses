@@ -68,6 +68,32 @@ export const getPastEvents = query({
   }
 });
 
+export const getByDateRange = query({
+  args: { startDate: v.string(), endDate: v.string() },
+  handler: async (ctx, args) => {
+    const events = await ctx.db
+      .query("scheduleEvents")
+      .withIndex("by_date")
+      .filter((q) =>
+        q.and(
+          q.gte(q.field("date"), args.startDate),
+          q.lte(q.field("date"), args.endDate)
+        )
+      )
+      .collect();
+
+    const horseIds = [...new Set(events.map((e) => e.horseId))];
+    const horses = await Promise.all(horseIds.map(async (id) => [id, await ctx.db.get(id)] as const));
+    const horseById = new Map(horses);
+
+    return events.map((event) => ({
+      ...event,
+      horseName: horseById.get(event.horseId)?.name ?? "Unknown horse",
+      contactName: event.contactName ?? (event as any).providerName ?? undefined,
+    }));
+  },
+});
+
 export const getEventsByHorse = query({
   args: { horseId: v.id("horses") },
   handler: async (ctx, args) => {

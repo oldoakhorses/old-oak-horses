@@ -17,6 +17,14 @@ const DAY_NAMES = [
   "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
 ];
 
+const RECORD_CATEGORY_COLORS: Record<string, string> = {
+  veterinary: "#4a5bdb",
+  farrier: "#e5930a",
+  bodywork: "#22c583",
+  medication: "#c44adb",
+  other: "#6b7084",
+};
+
 function getWeekStart(date: Date): Date {
   const d = new Date(date);
   d.setDate(d.getDate() - d.getDay());
@@ -29,6 +37,15 @@ function toDateStr(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function tsToDateStr(ts: number): string {
+  const d = new Date(ts);
+  return toDateStr(d);
+}
+
+function prettyType(type: string): string {
+  return type.replace(/_/g, " ");
 }
 
 function parseInput(raw: string): { title: string; time?: string; allDay?: boolean } | null {
@@ -77,6 +94,18 @@ function formatTime(t: string): string {
   return min === "00" ? `${h}${suffix}` : `${h}:${min}${suffix}`;
 }
 
+type AgendaItem = {
+  id: string;
+  kind: "calendar" | "record" | "record-next" | "schedule";
+  title: string;
+  subtitle?: string;
+  time?: string;
+  allDay?: boolean;
+  color: string;
+  deletable: boolean;
+  calendarEventId?: Id<"calendarEvents">;
+};
+
 export default function CalendarPage() {
   const { user } = useAuth();
   const today = useMemo(() => {
@@ -108,7 +137,24 @@ export default function CalendarPage() {
   const weekEndStr = useMemo(() => toDateStr(weekDays[6]), [weekDays]);
   const selectedStr = useMemo(() => toDateStr(selectedDate), [selectedDate]);
 
-  const events = useQuery(api.calendarEvents.getByDateRange, {
+  const weekStartTs = useMemo(() => weekDays[0].getTime(), [weekDays]);
+  const weekEndTs = useMemo(() => {
+    const end = new Date(weekDays[6]);
+    end.setHours(23, 59, 59, 999);
+    return end.getTime();
+  }, [weekDays]);
+
+  const calendarEvents = useQuery(api.calendarEvents.getByDateRange, {
+    startDate: weekStartStr,
+    endDate: weekEndStr,
+  });
+
+  const records = useQuery(api.horseRecords.getByDateRange, {
+    startTs: weekStartTs,
+    endTs: weekEndTs,
+  });
+
+  const scheduleEvents = useQuery(api.scheduleEvents.getByDateRange, {
     startDate: weekStartStr,
     endDate: weekEndStr,
   });
@@ -116,31 +162,105 @@ export default function CalendarPage() {
   const createEvent = useMutation(api.calendarEvents.create);
   const removeEvent = useMutation(api.calendarEvents.remove);
 
-  const eventsForDay = useMemo(() => {
-    if (!events) return [];
-    return events
-      .filter((e) => e.date === selectedStr)
-      .sort((a, b) => {
-        if (a.allDay && !b.allDay) return -1;
-        if (!a.allDay && b.allDay) return 1;
-        if (a.time && b.time) return a.time.localeCompare(b.time);
-        if (a.time) return -1;
-        if (b.time) return 1;
-        return a.createdAt - b.createdAt;
-      });
-  }, [events, selectedStr]);
+  const allItemsByDate = useMemo(() => {
+    const map = new Map<string, AgendaItem[]>();
+
+    if (calendarEvents) {
+      for (const e of calendarEvents) {
+        const items = map.get(e.date) || [];
+        items.push({
+          id: `cal-${e._id}`,
+          kind: "calendar",
+          title: e.title,
+          time: e.time,
+          allDay: e.allDay,
+          color: "#4a5bdb",
+          deletable: true,
+          calendarEventId: e._id,
+        });
+        map.set(e.date, items);
+      }
+    }
+
+    if (records) {
+      for (const r of records) {
+        const dateStr = tsToDateStr(r.date);
+        const ds = weekStartStr <= dateStr && dateStr <= weekEndStr ? dateStr : null;
+        if (ds) {
+          const items = map.get(ds) || [];
+          const label = r.title || prettyType(r.type);
+          items.push({
+            id: `rec-${r._id}`,
+            kind: "record",
+            title: `${r.horseName} — ${label}`,
+            subtitle: r.contactName || undefined,
+            color: RECORD_CATEGORY_COLORS[r.type] || "#6b7084",
+            deletable: false,
+          });
+          map.set(ds, items);
+        }
+
+        if (r.nextVisitDate) {
+          const nextStr = tsToDateStr(r.nextVisitDate);
+          const ns = weekStartStr <= nextStr && nextStr <= weekEndStr ? nextStr : null;
+          if (ns) {
+            const items = map.get(ns) || [];
+            const label = r.title || prettyType(r.type);
+            items.push({
+              id: `rec-next-${r._id}`,
+              kind: "record-next",
+              title: `${r.horseName} — ${label}`,
+              subtitle: r.contactName ? `next visit · ${r.contactName}` : "next visit",
+              color: RECORD_CATEGORY_COLORS[r.type] || "#6b7084",
+              deletable: false,
+            });
+            map.set(ns, items);
+          }
+        }
+      }
+    }
+
+    if (scheduleEvents) {
+      for (const se of scheduleEvents) {
+        const items = map.get(se.date) || [];
+        items.push({
+          id: `sched-${se._id}`,
+          kind: "schedule",
+          title: `${se.horseName} — ${prettyType(se.type)}`,
+          subtitle: se.contactName || undefined,
+          color: "#e5930a",
+          deletable: false,
+        });
+        map.set(se.date, items);
+      }
+    }
+
+    return map;
+  }, [calendarEvents, records, scheduleEvents, weekStartStr, weekEndStr]);
+
+  const itemsForDay = useMemo(() => {
+    const items = allItemsByDate.get(selectedStr) || [];
+    return items.sort((a, b) => {
+      if (a.allDay && !b.allDay) return -1;
+      if (!a.allDay && b.allDay) return 1;
+      if (a.time && b.time) return a.time.localeCompare(b.time);
+      if (a.time) return -1;
+      if (b.time) return 1;
+      const kindOrder = { "record-next": 0, schedule: 1, record: 2, calendar: 3 };
+      return (kindOrder[a.kind] ?? 3) - (kindOrder[b.kind] ?? 3);
+    });
+  }, [allItemsByDate, selectedStr]);
 
   const eventCountByDate = useMemo(() => {
     const map = new Map<string, number>();
-    if (!events) return map;
-    for (const e of events) {
-      map.set(e.date, (map.get(e.date) || 0) + 1);
+    for (const [date, items] of allItemsByDate) {
+      map.set(date, items.length);
     }
     return map;
-  }, [events]);
+  }, [allItemsByDate]);
 
-  const allDayEvents = eventsForDay.filter((e) => e.allDay);
-  const timedEvents = eventsForDay.filter((e) => !e.allDay);
+  const allDayItems = itemsForDay.filter((e) => e.allDay);
+  const timedItems = itemsForDay.filter((e) => !e.allDay);
 
   const weekMonth = useMemo(() => {
     const m1 = weekDays[0].getMonth();
@@ -248,55 +368,64 @@ export default function CalendarPage() {
             )}
           </div>
 
-          {/* All-day events */}
-          {allDayEvents.length > 0 && (
+          {/* All-day items */}
+          {allDayItems.length > 0 && (
             <div className={styles.allDaySection}>
               <div className={styles.allDayLabel}>all day</div>
               <div className={styles.eventList}>
-                {allDayEvents.map((e) => (
-                  <div key={e._id} className={styles.eventCard}>
-                    <span className={`${styles.eventBar} ${styles.eventBarAllDay}`} />
+                {allDayItems.map((item) => (
+                  <div key={item.id} className={styles.eventCard}>
+                    <span className={`${styles.eventBar} ${styles.eventBarAllDay}`} style={{ background: item.color }} />
                     <div className={styles.eventContent}>
-                      <span className={styles.eventTitle}>{e.title}</span>
+                      <span className={styles.eventTitle}>{item.title}</span>
+                      {item.subtitle && <span className={styles.eventSubtitle}>{item.subtitle}</span>}
                     </div>
-                    <button
-                      type="button"
-                      className={styles.eventDeleteBtn}
-                      onClick={() => handleDelete(e._id)}
-                      aria-label="Delete"
-                    >
-                      ✕
-                    </button>
+                    {item.deletable && item.calendarEventId && (
+                      <button
+                        type="button"
+                        className={styles.eventDeleteBtn}
+                        onClick={() => handleDelete(item.calendarEventId!)}
+                        aria-label="Delete"
+                      >
+                        ✕
+                      </button>
+                    )}
+                    {!item.deletable && <span className={styles.eventKindPill}>{item.kind === "record" || item.kind === "record-next" ? "record" : "scheduled"}</span>}
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Timed & untimed events */}
-          {timedEvents.length > 0 ? (
+          {/* Timed & untimed items */}
+          {timedItems.length > 0 ? (
             <div className={styles.eventList}>
-              {timedEvents.map((e) => (
-                <div key={e._id} className={styles.eventCard}>
+              {timedItems.map((item) => (
+                <div key={item.id} className={styles.eventCard}>
                   <span className={styles.eventTime}>
-                    {e.time ? formatTime(e.time) : "—"}
+                    {item.time ? formatTime(item.time) : "—"}
                   </span>
-                  <span className={styles.eventBar} />
+                  <span className={styles.eventBar} style={{ background: item.color }} />
                   <div className={styles.eventContent}>
-                    <span className={styles.eventTitle}>{e.title}</span>
+                    <span className={styles.eventTitle}>{item.title}</span>
+                    {item.subtitle && <span className={styles.eventSubtitle}>{item.subtitle}</span>}
                   </div>
-                  <button
-                    type="button"
-                    className={styles.eventDeleteBtn}
-                    onClick={() => handleDelete(e._id)}
-                    aria-label="Delete"
-                  >
-                    ✕
-                  </button>
+                  {item.deletable && item.calendarEventId ? (
+                    <button
+                      type="button"
+                      className={styles.eventDeleteBtn}
+                      onClick={() => handleDelete(item.calendarEventId!)}
+                      aria-label="Delete"
+                    >
+                      ✕
+                    </button>
+                  ) : !item.deletable ? (
+                    <span className={styles.eventKindPill}>{item.kind === "record" || item.kind === "record-next" ? "record" : "scheduled"}</span>
+                  ) : null}
                 </div>
               ))}
             </div>
-          ) : allDayEvents.length === 0 ? (
+          ) : allDayItems.length === 0 ? (
             <div className={styles.empty}>
               <div className={styles.emptyIcon}>📅</div>
               <div>no events scheduled</div>
