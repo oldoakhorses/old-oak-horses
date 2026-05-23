@@ -49,24 +49,59 @@ function prettyType(type: string): string {
   return type.replace(/_/g, " ");
 }
 
-function parseInput(raw: string): { title: string; time?: string; allDay?: boolean } | null {
-  const text = raw.trim();
+type ParsedInput = {
+  title: string;
+  time?: string;
+  allDay?: boolean;
+  repeatDays?: number;
+  horseName?: string;
+  medication?: string;
+};
+
+function parseInput(raw: string): ParsedInput | null {
+  let text = raw.trim();
   if (!text) return null;
+
+  let time: string | undefined;
+  let allDay: boolean | undefined;
 
   const allDayMatch = text.match(/^@allday\s+/i);
   if (allDayMatch) {
-    const title = text.slice(allDayMatch[0].length).trim();
-    return title ? { title, allDay: true } : null;
+    allDay = true;
+    text = text.slice(allDayMatch[0].length).trim();
+  } else {
+    const timeMatch = text.match(/^@(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s+/i);
+    if (timeMatch) {
+      time = parseTime(timeMatch[1]) || undefined;
+      text = text.slice(timeMatch[0].length).trim();
+    }
   }
 
-  const timeMatch = text.match(/^@(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s+/i);
-  if (timeMatch) {
-    const title = text.slice(timeMatch[0].length).trim();
-    const parsed = parseTime(timeMatch[1]);
-    return title && parsed ? { title, time: parsed } : null;
+  let repeatDays: number | undefined;
+  const repeatMatch = text.match(/\(repeat(?:\s+for)?\s+(\d+)\s*days?\)/i);
+  if (repeatMatch) {
+    repeatDays = parseInt(repeatMatch[1], 10);
+    text = text.replace(repeatMatch[0], "").trim();
   }
 
-  return { title: text };
+  if (!text) return null;
+
+  let horseName: string | undefined;
+  let medication: string | undefined;
+  const forMatch = text.match(/\bfor\s+(.+)$/i);
+  if (forMatch) {
+    horseName = forMatch[1].trim();
+    medication = text.slice(0, forMatch.index).trim();
+  }
+
+  return {
+    title: text,
+    time,
+    allDay,
+    repeatDays,
+    horseName,
+    medication: medication || undefined,
+  };
 }
 
 function parseTime(raw: string): string | null {
@@ -283,9 +318,12 @@ export default function CalendarPage() {
     endDate: weekEndStr,
   });
 
+  const activeHorses = useQuery(api.horses.getActiveHorses);
+
   const createEvent = useMutation(api.calendarEvents.create);
   const updateEvent = useMutation(api.calendarEvents.update);
   const removeEvent = useMutation(api.calendarEvents.remove);
+  const createRecord = useMutation(api.horseRecords.createHorseRecord);
 
   const allItemsByDate = useMemo(() => {
     const map = new Map<string, AgendaItem[]>();
@@ -393,16 +431,74 @@ export default function CalendarPage() {
     return `${MONTH_NAMES[m1]} – ${MONTH_NAMES[m2]} ${y}`;
   }, [weekDays]);
 
+  const findHorse = useCallback((name: string) => {
+    if (!activeHorses || !name) return null;
+    const lower = name.toLowerCase();
+    return activeHorses.find((h) =>
+      h.name.toLowerCase() === lower ||
+      h.barnName?.toLowerCase() === lower
+    ) || activeHorses.find((h) =>
+      h.name.toLowerCase().includes(lower) ||
+      h.barnName?.toLowerCase().includes(lower)
+    ) || null;
+  }, [activeHorses]);
+
+  const MEDICATION_KEYWORDS = ["aspirin", "bute", "banamine", "equioxx", "previcox", "adequan", "legend", "osphos", "gastrogard", "ulcergard", "omeprazole", "dexamethasone", "robaxin", "dormosedan", "ace", "regumate", "depo", "excel", "succeed", "cosequin", "platinum", "smartpak", "meds", "medication", "supplement"];
+
   const handleSubmit = async () => {
     const parsed = parseInput(inputValue);
     if (!parsed) return;
-    await createEvent({
-      title: parsed.title,
-      date: selectedStr,
-      time: parsed.time,
-      allDay: parsed.allDay,
-      createdBy: user?.id,
-    });
+
+    const matchedHorse = parsed.horseName ? findHorse(parsed.horseName) : null;
+
+    if (matchedHorse) {
+      const isMed = parsed.medication
+        ? MEDICATION_KEYWORDS.some((k) => parsed.medication!.toLowerCase().includes(k))
+        : false;
+      const recordType = isMed ? "medication" as const : "other" as const;
+      const title = parsed.medication || parsed.title;
+      const totalDays = (parsed.repeatDays ?? 0) + 1;
+      const baseDate = new Date(selectedDate);
+
+      const promises: Promise<unknown>[] = [];
+      for (let i = 0; i < totalDays; i++) {
+        const d = new Date(baseDate);
+        d.setDate(d.getDate() + i);
+        promises.push(createRecord({
+          horseId: matchedHorse._id,
+          title,
+          type: recordType,
+          date: d.getTime(),
+          medications: isMed && parsed.medication ? [parsed.medication] : undefined,
+          createdBy: user?.id,
+        }));
+      }
+      await Promise.all(promises);
+    } else if (parsed.repeatDays) {
+      const totalDays = parsed.repeatDays + 1;
+      const baseDate = new Date(selectedDate);
+      const promises: Promise<unknown>[] = [];
+      for (let i = 0; i < totalDays; i++) {
+        const d = new Date(baseDate);
+        d.setDate(d.getDate() + i);
+        promises.push(createEvent({
+          title: parsed.title,
+          date: toDateStr(d),
+          time: parsed.time,
+          allDay: parsed.allDay,
+          createdBy: user?.id,
+        }));
+      }
+      await Promise.all(promises);
+    } else {
+      await createEvent({
+        title: parsed.title,
+        date: selectedStr,
+        time: parsed.time,
+        allDay: parsed.allDay,
+        createdBy: user?.id,
+      });
+    }
     setInputValue("");
   };
 
@@ -601,7 +697,7 @@ export default function CalendarPage() {
                 +
               </button>
             </div>
-            <div className={styles.inputHint}>@time or @allday + description</div>
+            <div className={styles.inputHint}>@time or @allday · &ldquo;for Horse&rdquo; creates record · (repeat for N days)</div>
           </div>
         </div>
       </main>
