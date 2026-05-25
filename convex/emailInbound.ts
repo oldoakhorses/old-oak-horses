@@ -15,14 +15,18 @@ export const processInboundEmail = internalAction({
         name: v.string(),
         contentType: v.string(),
         contentBase64: v.string(),
+        contentLength: v.optional(v.number()),
+        isInline: v.optional(v.boolean()),
       })
     ),
   },
   handler: async (ctx, args) => {
     const supported = args.attachments.filter(
       (a) =>
-        a.contentType === "application/pdf" ||
-        a.contentType.startsWith("image/")
+        !a.isInline &&
+        (a.contentLength ?? a.contentBase64.length) > 15000 &&
+        (a.contentType === "application/pdf" ||
+         a.contentType.startsWith("image/"))
     );
 
     if (supported.length > 0) {

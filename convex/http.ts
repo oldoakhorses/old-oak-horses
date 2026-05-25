@@ -24,6 +24,8 @@ http.route({
       name: string;
       contentType: string;
       contentBase64: string;
+      contentLength: number;
+      isInline: boolean;
     }> = [];
 
     if (Array.isArray(body.Attachments)) {
@@ -33,6 +35,8 @@ http.route({
             name: att.Name,
             contentType: att.ContentType,
             contentBase64: att.Content,
+            contentLength: att.ContentLength ?? 0,
+            isInline: Boolean(att.ContentID),
           });
         }
       }
