@@ -118,7 +118,7 @@ export const parseBillPdf = internalAction({
           }
         ]
       });
-      const extractedTextBlock = textExtractionResponse.content.find((c) => c.type === "text");
+      const extractedTextBlock = textExtractionResponse.content.find((c: any) => c.type === "text");
       const extractedPdfText = extractedTextBlock && extractedTextBlock.type === "text" ? extractedTextBlock.text : "";
       console.log("3. Extracted text length:", extractedPdfText.length);
       console.log("4. Extracted text preview:", extractedPdfText.substring(0, 500));
@@ -167,7 +167,7 @@ export const parseBillPdf = internalAction({
         ]
       });
 
-      const textBlock = response.content.find((c) => c.type === "text");
+      const textBlock = response.content.find((c: any) => c.type === "text");
       if (!textBlock || textBlock.type !== "text") {
         throw new Error("Claude response had no text payload");
       }

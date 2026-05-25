@@ -41,7 +41,7 @@ export const detectReportFromPdf = action({
       ]
     });
 
-    const textBlock = textResponse.content.find((item) => item.type === "text");
+    const textBlock = textResponse.content.find((item: any) => item.type === "text");
     const extractedText = textBlock && textBlock.type === "text" ? textBlock.text ?? "" : "";
     const reportType = detectReportType(extractedText);
     if (reportType !== "bodywork") {
@@ -82,7 +82,7 @@ export const detectReportFromPdf = action({
       ]
     });
 
-    const parseTextBlock = parseResponse.content.find((item) => item.type === "text");
+    const parseTextBlock = parseResponse.content.find((item: any) => item.type === "text");
     const rawJson = parseTextBlock && parseTextBlock.type === "text" ? parseTextBlock.text ?? "" : "";
     const parsed = parseJsonObject(rawJson) as {
       reportDate?: string | null;
