@@ -15,8 +15,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "HorseBilz",
-  description: "Convex bill ingestion dashboard"
+  title: "LDK Team",
+  description: "LDK Team management dashboard"
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
