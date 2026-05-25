@@ -24,7 +24,7 @@ http.route({
       name: string;
       contentType: string;
       contentBase64: string;
-      contentLength: number;
+      contentLength?: number;
       isInline: boolean;
     }> = [];
 
@@ -35,7 +35,9 @@ http.route({
             name: att.Name,
             contentType: att.ContentType,
             contentBase64: att.Content,
-            contentLength: att.ContentLength ?? 0,
+            contentLength: typeof att.ContentLength === "number" && att.ContentLength > 0
+              ? att.ContentLength
+              : undefined,
             isInline: Boolean(att.ContentID),
           });
         }
