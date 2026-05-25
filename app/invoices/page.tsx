@@ -127,14 +127,19 @@ export default function InvoicesPage() {
   const [editingNotes, setEditingNotes] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [tab, setTab] = useState<"approved" | "pending">("approved");
   const hasActiveFilters = categoryFilter !== "all" || horseFilter !== "all" || fromDate || toDate;
 
   const categories = useMemo(() => ["all", ...new Set(rows.map((row) => row.categoryName))], [rows]);
+
+  const approvedCount = useMemo(() => rows.filter((r) => r.isApproved).length, [rows]);
+  const pendingCount = useMemo(() => rows.filter((r) => !r.isApproved).length, [rows]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     const base = rows.filter((row) => {
       const date = getInvoiceDate(row);
+      const tabPass = tab === "approved" ? Boolean(row.isApproved) : !row.isApproved;
       const categoryPass = categoryFilter === "all" || row.categoryName === categoryFilter;
       const assignedHorseIds = Array.isArray(row.assignedHorses) ? row.assignedHorses.map((entry: any) => String(entry.horseId ?? "")).filter(Boolean) : [];
       const horsePass = horseFilter === "all" || assignedHorseIds.includes(horseFilter);
@@ -144,7 +149,7 @@ export default function InvoicesPage() {
         || (row.categoryName ?? "").toLowerCase().includes(q)
         || (getProvider(row)).toLowerCase().includes(q)
         || date.includes(q);
-      return categoryPass && horsePass && fromPass && toPass && searchPass;
+      return tabPass && categoryPass && horsePass && fromPass && toPass && searchPass;
     });
 
     const sorted = [...base];
@@ -179,7 +184,7 @@ export default function InvoicesPage() {
       return sortDirection === "asc" ? cmp : -cmp;
     });
     return sorted;
-  }, [rows, categoryFilter, horseFilter, fromDate, toDate, searchQuery, sortColumn, sortDirection]);
+  }, [rows, tab, categoryFilter, horseFilter, fromDate, toDate, searchQuery, sortColumn, sortDirection]);
 
   function handleSort(col: SortColumn) {
     if (sortColumn === col) {
@@ -234,6 +239,15 @@ export default function InvoicesPage() {
         <div className={styles.header}>
           <div className="ui-label">// Invoices</div>
           <h1 className={styles.title}>Invoices</h1>
+        </div>
+
+        <div className={styles.tabs}>
+          <button type="button" className={`${styles.tab} ${tab === "approved" ? styles.tabActive : ""}`} onClick={() => setTab("approved")}>
+            Approved <span className={styles.tabCount}>{approvedCount}</span>
+          </button>
+          <button type="button" className={`${styles.tab} ${tab === "pending" ? styles.tabActive : ""}`} onClick={() => setTab("pending")}>
+            Pending <span className={styles.tabCount}>{pendingCount}</span>
+          </button>
         </div>
 
         <section className={styles.filterBar}>

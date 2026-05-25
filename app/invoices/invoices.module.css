@@ -8,6 +8,57 @@
   font-weight: 700;
 }
 
+/* ── Tabs ── */
+
+.tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #e8eaf0;
+}
+
+.tab {
+  font-size: 13px;
+  font-weight: 600;
+  color: #9ea2b0;
+  background: transparent;
+  border: none;
+  padding: 10px 20px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: inherit;
+  transition: color 0.15s;
+}
+
+.tab:hover {
+  color: #1a1a2e;
+}
+
+.tabActive {
+  color: #1a1a2e;
+  border-bottom-color: #1a1a2e;
+}
+
+.tabCount {
+  font-size: 10px;
+  font-weight: 700;
+  background: #f2f3f7;
+  color: #9ea2b0;
+  padding: 2px 7px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.tabActive .tabCount {
+  background: #1a1a2e;
+  color: #fff;
+}
+
 /* ── Filter bar ── */
 
 .filterBar {
