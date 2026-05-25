@@ -21,6 +21,19 @@ export const processInboundEmail = internalAction({
     ),
   },
   handler: async (ctx, args) => {
+    console.log("[processInboundEmail]", JSON.stringify({
+      from: args.fromEmail,
+      subject: args.subject,
+      htmlBodyLen: args.htmlBody?.length ?? 0,
+      textBodyLen: args.textBody?.length ?? 0,
+      attachments: args.attachments.map(a => ({
+        name: a.name,
+        type: a.contentType,
+        size: a.contentLength || Math.ceil(a.contentBase64.length * 3 / 4),
+        inline: a.isInline,
+      })),
+    }));
+
     const pdfAttachments = args.attachments.filter(
       (a) =>
         !a.isInline &&
@@ -34,6 +47,13 @@ export const processInboundEmail = internalAction({
         a.contentType.startsWith("image/") &&
         (a.contentLength || Math.ceil(a.contentBase64.length * 3 / 4)) > 10000
     );
+
+    console.log("[processInboundEmail] filters:", {
+      pdfCount: pdfAttachments.length,
+      imageCount: imageAttachments.length,
+      pdfNames: pdfAttachments.map(a => a.name),
+      imageNames: imageAttachments.map(a => a.name),
+    });
 
     let processed = 0;
 
@@ -51,8 +71,6 @@ export const processInboundEmail = internalAction({
       if (!uploadResp.ok) continue;
 
       const { storageId } = (await uploadResp.json()) as { storageId: string };
-      const originalPdfUrl = (await ctx.storage.getUrl(storageId as any)) ?? undefined;
-
       const now = Date.now();
       const dateStr = new Date(now).toISOString().slice(0, 10);
       const ext = (attachment.name.match(/\.[^.]+$/) ?? [""])[0].toLowerCase();
@@ -64,7 +82,6 @@ export const processInboundEmail = internalAction({
         fileName,
         billingPeriod: dateStr.slice(0, 7),
         uploadedAt: now,
-        originalPdfUrl,
       });
 
       await ctx.runMutation(internal.bills.patchBillSource, {
@@ -97,7 +114,6 @@ export const processInboundEmail = internalAction({
         if (!uploadResp.ok) continue;
 
         const { storageId } = (await uploadResp.json()) as { storageId: string };
-        const originalPdfUrl = (await ctx.storage.getUrl(storageId as any)) ?? undefined;
 
         const now = Date.now();
         const dateStr = new Date(now).toISOString().slice(0, 10);
@@ -110,7 +126,6 @@ export const processInboundEmail = internalAction({
           fileName,
           billingPeriod: dateStr.slice(0, 7),
           uploadedAt: now,
-          originalPdfUrl,
         });
 
         await ctx.runMutation(internal.bills.patchBillSource, {
@@ -150,14 +165,12 @@ export const processInboundEmail = internalAction({
     if (!uploadResp.ok) return { processed: 0 };
 
     const { storageId } = (await uploadResp.json()) as { storageId: string };
-    const originalPdfUrl = (await ctx.storage.getUrl(storageId as any)) ?? undefined;
 
     const billId = await ctx.runMutation(internal.bills.createParsingBill, {
       fileId: storageId as any,
       fileName,
       billingPeriod: dateStr.slice(0, 7),
       uploadedAt: now,
-      originalPdfUrl,
     });
 
     await ctx.runMutation(internal.bills.patchBillSource, {

@@ -17,8 +17,8 @@ http.route({
 
     const fromEmail = body.FromFull?.Email ?? body.From ?? "unknown";
     const subject = body.Subject ?? "(no subject)";
-    const htmlBody = body.HtmlBody ?? "";
-    const textBody = body.TextBody ?? "";
+    let htmlBody = body.HtmlBody ?? "";
+    let textBody = body.TextBody ?? "";
 
     const attachments: Array<{
       name: string;
@@ -44,9 +44,28 @@ http.route({
       }
     }
 
+    // Gmail-forwarded emails: the body is just the forwarding wrapper.
+    // Check StrippedTextReply / stripped body for forwarded content,
+    // and also look for the original HTML in the full body after the
+    // "---------- Forwarded message" marker.
+    const isForwarded = /^(Fwd|Fw):/i.test(subject) ||
+      textBody.includes("---------- Forwarded message") ||
+      htmlBody.includes("---------- Forwarded message");
+
+    // Log payload shape for debugging
+    console.log("[postmark-inbound]", JSON.stringify({
+      from: fromEmail,
+      subject,
+      htmlBodyLen: htmlBody.length,
+      textBodyLen: textBody.length,
+      attachmentCount: attachments.length,
+      attachmentTypes: attachments.map(a => `${a.contentType} (${a.name}, inline=${a.isInline})`),
+      isForwarded,
+    }));
+
     await ctx.scheduler.runAfter(0, internal.emailInbound.processInboundEmail, {
       fromEmail,
-      subject,
+      subject: subject.replace(/^(Fwd|Fw):\s*/i, ""),
       htmlBody,
       textBody,
       attachments,
