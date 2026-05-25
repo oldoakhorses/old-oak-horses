@@ -1638,25 +1638,6 @@ export default function InvoicePreviewPage() {
               <div className={styles.cardHeader}>
                 <div className={styles.cardTitle}>invoice details</div>
                 <div className={styles.cardHeaderActions}>
-                  {bill.originalPdfUrl ? (
-                    <a className={styles.pdfButton} href={bill.originalPdfUrl} target="_blank" rel="noreferrer">view original ↗</a>
-                  ) : null}
-                  <input
-                    ref={pdfUploadRef}
-                    type="file"
-                    accept="application/pdf,.pdf"
-                    style={{ display: "none" }}
-                    onChange={onPdfSelected}
-                  />
-                  <button
-                    type="button"
-                    className={styles.changeLink}
-                    onClick={() => pdfUploadRef.current?.click()}
-                    disabled={uploadingPdf}
-                    title={bill.originalPdfUrl ? "Replace the attached PDF" : "Attach a PDF to this invoice"}
-                  >
-                    {uploadingPdf ? "uploading..." : bill.originalPdfUrl ? "replace pdf" : "upload pdf"}
-                  </button>
                   <button
                     type="button"
                     className={styles.changeLink}
@@ -2282,6 +2263,54 @@ export default function InvoicePreviewPage() {
             {error ? <div className={styles.error}>{error}</div> : null}
 
             <div className={styles.footer}>OLD_OAK_HORSES // INVOICES // {isEditing ? "EDIT" : "PREVIEW"}</div>
+          </div>
+
+          <div className={styles.pdfPreviewPanel}>
+            <div className={styles.pdfPreviewHeader}>
+              <div className={styles.pdfPreviewTitle}>Preview</div>
+              <div className={styles.pdfPreviewActions}>
+                {bill.originalPdfUrl ? (
+                  <a href={bill.originalPdfUrl} target="_blank" rel="noreferrer">open in new tab ↗</a>
+                ) : null}
+                <input
+                  ref={pdfUploadRef}
+                  type="file"
+                  accept="application/pdf,.pdf,image/*"
+                  style={{ display: "none" }}
+                  onChange={onPdfSelected}
+                />
+                <button
+                  type="button"
+                  onClick={() => pdfUploadRef.current?.click()}
+                  disabled={uploadingPdf}
+                >
+                  {uploadingPdf ? "uploading..." : bill.originalPdfUrl ? "replace" : "upload pdf"}
+                </button>
+              </div>
+            </div>
+            {bill.originalPdfUrl ? (
+              <iframe
+                className={styles.pdfFrame}
+                src={bill.originalPdfUrl}
+                title="Invoice PDF preview"
+              />
+            ) : (
+              <div className={styles.pdfPlaceholder}>
+                <div className={styles.pdfPlaceholderIcon}>📄</div>
+                <div className={styles.pdfPlaceholderText}>
+                  No PDF attached to this invoice.<br />
+                  Upload one to see a preview here.
+                </div>
+                <button
+                  type="button"
+                  className={styles.pdfUploadBtn}
+                  onClick={() => pdfUploadRef.current?.click()}
+                  disabled={uploadingPdf}
+                >
+                  {uploadingPdf ? "uploading..." : "upload pdf"}
+                </button>
+              </div>
+            )}
           </div>
         </section>
       </main>
