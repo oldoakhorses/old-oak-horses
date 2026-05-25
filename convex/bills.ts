@@ -1753,10 +1753,16 @@ export const patchBillSource = internalMutation({
     createdBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.billId, {
-      source: args.source as any,
+    const bill = await ctx.db.get(args.billId);
+    const patch: Record<string, unknown> = {
+      source: args.source,
       createdBy: args.createdBy,
-    });
+    };
+    if (bill?.fileId && !bill.originalPdfUrl) {
+      const url = await ctx.storage.getUrl(bill.fileId);
+      if (url) patch.originalPdfUrl = url;
+    }
+    await ctx.db.patch(args.billId, patch as any);
   },
 });
 

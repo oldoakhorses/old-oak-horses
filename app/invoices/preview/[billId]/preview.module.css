@@ -3,7 +3,7 @@
   max-width: 1600px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 3fr 2fr;
   gap: 24px;
   align-items: start;
 }
@@ -1242,8 +1242,8 @@
 
 .pdfFrame {
   width: 100%;
-  height: calc(100vh - 120px);
-  min-height: 600px;
+  height: calc(100vh - 140px);
+  min-height: 700px;
   border: none;
   display: block;
   background: #f8f9fb;
