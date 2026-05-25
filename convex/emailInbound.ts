@@ -50,8 +50,9 @@ export const processInboundEmail = internalAction({
 
         const now = Date.now();
         const dateStr = new Date(now).toISOString().slice(0, 10);
+        const ext = (attachment.name.match(/\.[^.]+$/) ?? [""])[0].toLowerCase();
         const cleanName = attachment.name.replace(/\.[^.]+$/, "");
-        const fileName = `Email - ${cleanName} - ${dateStr}`;
+        const fileName = `Email - ${cleanName} - ${dateStr}${ext}`;
 
         const billId = await ctx.runMutation(internal.bills.createParsingBill, {
           fileId: storageId as any,
@@ -83,7 +84,7 @@ export const processInboundEmail = internalAction({
     const now = Date.now();
     const dateStr = new Date(now).toISOString().slice(0, 10);
     const subjectClean = args.subject.replace(/[^a-zA-Z0-9 &\-_.]/g, "").trim().slice(0, 80) || "Email Receipt";
-    const fileName = `Email - ${subjectClean} - ${dateStr}`;
+    const fileName = `Email - ${subjectClean} - ${dateStr}.html`;
 
     const htmlBytes = Buffer.from(bodyContent, "utf-8");
     const htmlBlob = new Blob([htmlBytes], { type: "text/html" });

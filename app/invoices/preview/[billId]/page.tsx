@@ -880,12 +880,13 @@ export default function InvoicePreviewPage() {
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const pdfUploadRef = useRef<HTMLInputElement>(null);
 
-  async function onPdfSelected(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !bill) return;
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-      setError("Please select a PDF file");
+    const allowed = /\.(pdf|png|jpe?g|gif|webp|tiff?|bmp|heic)$/i;
+    if (!allowed.test(file.name)) {
+      setError("Please select a PDF or image file");
       return;
     }
     setError("");
@@ -894,14 +895,14 @@ export default function InvoicePreviewPage() {
       const uploadUrl = await generateUploadUrl();
       const res = await fetch(uploadUrl, {
         method: "POST",
-        headers: { "Content-Type": file.type || "application/pdf" },
+        headers: { "Content-Type": file.type || "application/octet-stream" },
         body: file,
       });
       if (!res.ok) throw new Error("Upload failed");
       const { storageId } = await res.json();
       await attachPdfToBill({ billId, fileId: storageId, fileName: file.name });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to upload PDF");
+      setError(err instanceof Error ? err.message : "Failed to upload file");
     } finally {
       setUploadingPdf(false);
     }
@@ -2277,29 +2278,25 @@ export default function InvoicePreviewPage() {
                   type="file"
                   accept="application/pdf,.pdf,image/*"
                   style={{ display: "none" }}
-                  onChange={onPdfSelected}
+                  onChange={onFileSelected}
                 />
                 <button
                   type="button"
                   onClick={() => pdfUploadRef.current?.click()}
                   disabled={uploadingPdf}
                 >
-                  {uploadingPdf ? "uploading..." : bill.originalPdfUrl ? "replace" : "upload pdf"}
+                  {uploadingPdf ? "uploading..." : bill.originalPdfUrl ? "replace" : "upload file"}
                 </button>
               </div>
             </div>
             {bill.originalPdfUrl ? (
-              <iframe
-                className={styles.pdfFrame}
-                src={bill.originalPdfUrl}
-                title="Invoice PDF preview"
-              />
+              <PreviewContent url={bill.originalPdfUrl} fileName={bill.fileName} />
             ) : (
               <div className={styles.pdfPlaceholder}>
                 <div className={styles.pdfPlaceholderIcon}>📄</div>
                 <div className={styles.pdfPlaceholderText}>
-                  No PDF attached to this invoice.<br />
-                  Upload one to see a preview here.
+                  No document attached to this invoice.<br />
+                  Upload a PDF or image to preview here.
                 </div>
                 <button
                   type="button"
@@ -2307,7 +2304,7 @@ export default function InvoicePreviewPage() {
                   onClick={() => pdfUploadRef.current?.click()}
                   disabled={uploadingPdf}
                 >
-                  {uploadingPdf ? "uploading..." : "upload pdf"}
+                  {uploadingPdf ? "uploading..." : "upload file"}
                 </button>
               </div>
             )}
@@ -2315,6 +2312,32 @@ export default function InvoicePreviewPage() {
         </section>
       </main>
     </div>
+  );
+}
+
+function PreviewContent({ url, fileName }: { url: string; fileName: string }) {
+  const lowerName = fileName.toLowerCase();
+  const isImage = /\.(png|jpe?g|gif|webp|tiff?|bmp|heic)$/.test(lowerName) ||
+    /^image\//.test(lowerName);
+
+  if (isImage) {
+    return (
+      <div className={styles.pdfFrame} style={{ overflow: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16 }}>
+        <img
+          src={url}
+          alt="Invoice attachment"
+          style={{ maxWidth: "100%", height: "auto", borderRadius: 4 }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <iframe
+      className={styles.pdfFrame}
+      src={url}
+      title="Invoice preview"
+    />
   );
 }
 
