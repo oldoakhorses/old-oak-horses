@@ -46,6 +46,7 @@ export const processInboundEmail = internalAction({
         if (!uploadResp.ok) continue;
 
         const { storageId } = (await uploadResp.json()) as { storageId: string };
+        const originalPdfUrl = (await ctx.storage.getUrl(storageId as any)) ?? undefined;
 
         const now = Date.now();
         const dateStr = new Date(now).toISOString().slice(0, 10);
@@ -57,6 +58,7 @@ export const processInboundEmail = internalAction({
           fileName,
           billingPeriod: dateStr.slice(0, 7),
           uploadedAt: now,
+          originalPdfUrl,
         });
 
         await ctx.runMutation(internal.bills.patchBillSource, {
@@ -96,12 +98,14 @@ export const processInboundEmail = internalAction({
     if (!uploadResp.ok) return { processed: 0 };
 
     const { storageId } = (await uploadResp.json()) as { storageId: string };
+    const originalPdfUrl = (await ctx.storage.getUrl(storageId as any)) ?? undefined;
 
     const billId = await ctx.runMutation(internal.bills.createParsingBill, {
       fileId: storageId as any,
       fileName,
       billingPeriod: dateStr.slice(0, 7),
       uploadedAt: now,
+      originalPdfUrl,
     });
 
     await ctx.runMutation(internal.bills.patchBillSource, {
