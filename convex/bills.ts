@@ -1739,6 +1739,27 @@ export const createParsingBill = internalMutation({
   }
 });
 
+export const internalGenerateUploadUrl = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+export const patchBillSource = internalMutation({
+  args: {
+    billId: v.id("bills"),
+    source: v.string(),
+    createdBy: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.billId, {
+      source: args.source as any,
+      createdBy: args.createdBy,
+    });
+  },
+});
+
 export const createManualBill = mutation({
   args: {
     fileId: v.id("_storage"),

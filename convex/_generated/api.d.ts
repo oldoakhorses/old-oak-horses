@@ -21,6 +21,7 @@ import type * as contactMatching from "../contactMatching.js";
 import type * as contacts from "../contacts.js";
 import type * as customSubcategories from "../customSubcategories.js";
 import type * as documents from "../documents.js";
+import type * as emailInbound from "../emailInbound.js";
 import type * as dropbox from "../dropbox.js";
 import type * as dropboxHelpers from "../dropboxHelpers.js";
 import type * as feedPlans from "../feedPlans.js";
@@ -62,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   contacts: typeof contacts;
   customSubcategories: typeof customSubcategories;
   documents: typeof documents;
+  emailInbound: typeof emailInbound;
   dropbox: typeof dropbox;
   dropboxHelpers: typeof dropboxHelpers;
   feedPlans: typeof feedPlans;

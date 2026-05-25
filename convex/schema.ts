@@ -186,7 +186,7 @@ export default defineSchema({
     /** CC transaction that generated this bill (for non-invoice charges) */
     ccTransactionId: v.optional(v.id("ccTransactions")),
     /** How this bill was created */
-    source: v.optional(v.union(v.literal("upload"), v.literal("cc_transaction"))),
+    source: v.optional(v.union(v.literal("upload"), v.literal("cc_transaction"), v.literal("email"))),
     createdBy: v.optional(v.string()),
   })
     .index("by_uploadedAt", ["uploadedAt"])
