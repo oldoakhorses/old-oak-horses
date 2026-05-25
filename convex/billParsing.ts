@@ -496,6 +496,189 @@ export const parseBillNow = action({
   }
 });
 
+export const parseEmailBody = internalAction({
+  args: {
+    billId: v.id("bills"),
+    htmlBody: v.string(),
+    textBody: v.string(),
+    subject: v.string(),
+    fromEmail: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const bill = await ctx.runQuery(internal.bills.getBill, { billId: args.billId });
+    if (!bill) throw new Error("Bill not found");
+
+    try {
+      const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+      if (!anthropicApiKey) throw new Error("ANTHROPIC_API_KEY is not set");
+
+      const emailText = args.textBody.trim()
+        || args.htmlBody.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+            .replace(/<[^>]+>/g, " ")
+            .replace(/&nbsp;/g, " ")
+            .replace(/&amp;/g, "&")
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&#\d+;/g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+
+      if (!emailText) {
+        await ctx.runMutation(internal.bills.markError, {
+          billId: bill._id,
+          errorMessage: "Email had no readable content",
+        });
+        return;
+      }
+
+      const client = new Anthropic({ apiKey: anthropicApiKey });
+
+      const prompt = `You are parsing a receipt or invoice from an email. Extract the following as strict JSON:
+
+{
+  "contact_name": "vendor/merchant name",
+  "invoice_date": "YYYY-MM-DD",
+  "invoice_number": "invoice or transaction number if present",
+  "invoice_total_usd": 0.00,
+  "currency": "USD",
+  "line_items": [
+    {
+      "description": "item description",
+      "quantity": 1,
+      "total_usd": 0.00,
+      "category": "auto-detect category slug"
+    }
+  ],
+  "payment_method": "card type and last 4 digits if shown",
+  "vendorContact": {
+    "vendorName": "business name",
+    "address": "full address if shown",
+    "phone": "phone if shown",
+    "email": "email if shown",
+    "website": "website if shown"
+  }
+}
+
+Valid category slugs: veterinary, farrier, stabling, feed-bedding, horse-transport, bodywork, supplies, travel, admin, dues-registrations, marketing, show-expenses, grooming, riding-training, prize-money, income, equity.
+If the receipt doesn't clearly match a horse-related category, use "supplies" or "admin" as appropriate.
+If only a total is shown with no itemized lines, create a single line item with the total.
+
+Email subject: ${args.subject}
+From: ${args.fromEmail}
+
+Email content:
+${emailText.slice(0, 8000)}
+
+Return strict JSON only.`;
+
+      const response = await client.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2048,
+        temperature: 0,
+        messages: [{ role: "user", content: prompt }],
+      });
+
+      const textBlock = response.content.find((c: any) => c.type === "text");
+      if (!textBlock || textBlock.type !== "text") {
+        throw new Error("No text in Claude response");
+      }
+
+      const parsed = JSON.parse(stripCodeFences(textBlock.text)) as Record<string, unknown>;
+      const normalized = normalizeParsedPayload(parsed);
+      const normalizedResult = ensureUsdAmounts(normalized);
+
+      const [registeredHorses, registeredPeople, dynamicHorseAliases, dynamicPersonAliases] = await Promise.all([
+        ctx.runQuery(internal.bills.getAllHorsesForMatching, {}),
+        ctx.runQuery(internal.bills.getAllPeopleForMatching, {}),
+        ctx.runQuery(internal.bills.getHorseAliasesForMatching, {}),
+        ctx.runQuery(internal.bills.getPersonAliasesForMatching, {}),
+      ]);
+
+      const matched = applyEntityMatching(normalizedResult, registeredHorses, registeredPeople, dynamicHorseAliases, dynamicPersonAliases, {
+        matchHorses: true,
+        matchPeople: true,
+      });
+
+      const lineItemCategories = collectLineItemCategories(matched);
+      const unmatchedHorseNames = collectUnmatchedHorseNames(matched);
+
+      const providerContactPatch = extractVendorContactInfo(matched);
+      const extractedVendorContact = buildExtractedVendorContact(providerContactPatch);
+
+      const extractedProviderName = pickString(matched, [
+        "contact_name", "contactName", "vendor_name", "vendorName",
+      ]);
+
+      let resolvedContactId: string | undefined;
+      let extractedCustomProviderName = extractedProviderName || bill.customProviderName;
+
+      if (extractedProviderName) {
+        const [allContacts, contactAliases] = await Promise.all([
+          ctx.runQuery(api.contacts.getAllContacts, {}),
+          ctx.runQuery(internal.contacts.listContactAliasesForMatching, {}),
+        ]);
+        const allContactRows = (allContacts as any[]).map((c: any) => ({
+          _id: String(c._id),
+          name: c.name,
+          category: c.category,
+          slug: c.slug,
+        }));
+        const result = matchContact(extractedProviderName, allContactRows, contactAliases as any);
+        if (result.matched && result.contactId) {
+          resolvedContactId = result.contactId;
+        }
+      }
+
+      let inferredCategoryId: string | undefined;
+      if (lineItemCategories.length > 0) {
+        const freq = new Map<string, number>();
+        for (const cat of lineItemCategories) freq.set(cat, (freq.get(cat) || 0) + 1);
+        const dominant = [...freq.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+        if (dominant) {
+          const cat = await ctx.runQuery(internal.bills.getCategoryBySlug, { slug: dominant });
+          if (cat) inferredCategoryId = cat._id;
+        }
+      }
+
+      const currencyMeta = extractCurrencyMeta(matched);
+      const billDiscount = pickNumber(matched, ["discount", "professional_discount"]);
+
+      await ctx.runMutation(internal.bills.markDone, {
+        billId: bill._id,
+        extractedData: matched,
+        status: "pending",
+        lineItemCategories: lineItemCategories.length > 0 ? lineItemCategories : undefined,
+        hasUnmatchedHorses: unmatchedHorseNames.length > 0,
+        unmatchedHorseNames,
+        contactId: resolvedContactId as any,
+        customProviderName: extractedCustomProviderName,
+        extractedVendorContact,
+        inferredCategoryId: inferredCategoryId as any,
+        ...currencyMeta,
+        discount: typeof billDiscount === "number" ? round2(billDiscount) : undefined,
+      });
+
+      if (!resolvedContactId && extractedProviderName) {
+        await ctx.runMutation(internal.contacts.upsertContactFromInvoice, {
+          name: extractedProviderName,
+          category: lineItemCategories.length > 0 ? lineItemCategories[0] : "other",
+          companyName: providerContactPatch.fullName ?? extractedProviderName,
+          address: providerContactPatch.address,
+          phone: providerContactPatch.phone,
+          email: providerContactPatch.email,
+          website: providerContactPatch.website,
+          accountNumber: providerContactPatch.accountNumber,
+        });
+      }
+
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to parse email receipt";
+      console.error("[parseEmailBody] Error:", message);
+      await ctx.runMutation(internal.bills.markError, { billId: bill._id, errorMessage: message });
+    }
+  },
+});
+
 function stripCodeFences(text: string) {
   const trimmed = text.trim();
   if (trimmed.startsWith("```") && trimmed.endsWith("```")) {

@@ -17,6 +17,8 @@ http.route({
 
     const fromEmail = body.FromFull?.Email ?? body.From ?? "unknown";
     const subject = body.Subject ?? "(no subject)";
+    const htmlBody = body.HtmlBody ?? "";
+    const textBody = body.TextBody ?? "";
 
     const attachments: Array<{
       name: string;
@@ -36,21 +38,16 @@ http.route({
       }
     }
 
-    if (attachments.length === 0) {
-      return new Response(JSON.stringify({ ok: true, processed: 0 }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
     await ctx.scheduler.runAfter(0, internal.emailInbound.processInboundEmail, {
       fromEmail,
       subject,
+      htmlBody,
+      textBody,
       attachments,
     });
 
     return new Response(
-      JSON.stringify({ ok: true, queued: attachments.length }),
+      JSON.stringify({ ok: true, queued: attachments.length || 1 }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
   }),
