@@ -3,7 +3,7 @@
   max-width: 1600px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 3fr 2fr;
+  grid-template-columns: 1fr 1fr;
   gap: 24px;
   align-items: start;
 }
@@ -125,6 +125,24 @@
   color: #1a1a2e;
   appearance: none;
   outline: none;
+}
+
+/* Native <select> elements have their browser caret stripped by
+   `appearance: none` above. Re-add a small chevron via background-image
+   so dropdowns read as interactive, not as plain text inputs. */
+select.selectCompact,
+select.assignSelect,
+select.categorySelect {
+  padding-right: 22px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10' fill='none' stroke='%239ea2b0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='2,4 5,7 8,4'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  cursor: pointer;
+}
+select.selectCompact:hover,
+select.assignSelect:hover,
+select.categorySelect:hover {
+  border-color: #c9ccd6;
 }
 
 .inputCompact {
@@ -250,6 +268,14 @@
   padding: 16px 22px;
   margin-bottom: 0;
   border-bottom: 1px solid #e8eaf0;
+}
+
+.headerToggleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .modeToggle {

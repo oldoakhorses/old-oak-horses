@@ -1791,24 +1791,11 @@ export default function InvoicePreviewPage() {
             <div className={styles.lineItemsCard}>
               <div className={styles.cardHeader}>
                 <div>
-                  <div className={styles.cardTitle}>line items & assignment</div>
+                  <div className={styles.cardTitle}>line items</div>
                   <div className={styles.cardMeta}>{lineItems.length} items · {formatUsd(total)}</div>
                 </div>
                 {requiresAssignment ? (
-                  <div className={styles.modeToggle}>
-                    <button type="button" className={mode === "line" ? styles.modeToggleActive : styles.modeToggleInactive} onClick={() => setMode("line")}>by line item</button>
-                    <button type="button" className={mode === "whole" ? styles.modeToggleActive : styles.modeToggleInactive} onClick={() => setMode("whole")}>split whole invoice</button>
-                  </div>
-                ) : null}
-              </div>
-
-              {requiresAssignment ? (
-                <div className={styles.assignTypeWrap}>
-                  <div className={`${styles.assignTypeBar} ${assignType === "horse" ? styles.assignTypeBarHorse : styles.assignTypeBarPerson}`}>
-                    <div className={styles.assignTypeText}>
-                      {assignType === "horse" ? "🐴 assigning to " : "👤 assigning to "}
-                      <strong>{assignType === "horse" ? "horses" : "people"}</strong>
-                    </div>
+                  <div className={styles.headerToggleRow}>
                     <div className={styles.entityToggle}>
                       <button
                         type="button"
@@ -1825,9 +1812,13 @@ export default function InvoicePreviewPage() {
                         👤 people
                       </button>
                     </div>
+                    <div className={styles.modeToggle}>
+                      <button type="button" className={mode === "line" ? styles.modeToggleActive : styles.modeToggleInactive} onClick={() => setMode("line")}>by line item</button>
+                      <button type="button" className={mode === "whole" ? styles.modeToggleActive : styles.modeToggleInactive} onClick={() => setMode("whole")}>split whole invoice</button>
+                    </div>
                   </div>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
 
               {mode === "line" || !requiresAssignment ? (
                 <>
