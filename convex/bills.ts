@@ -2926,6 +2926,68 @@ export const deleteBill = mutation({
   }
 });
 
+/** Append a manually-entered line item to a bill's extractedData. Used
+ *  when the parser pulled no line items off the invoice (image upload,
+ *  partial parse) and the user needs to enter them by hand. Bumps
+ *  invoice_total_usd by the new line's amount so the totals stay in sync. */
+export const addLineItem = mutation({
+  args: {
+    billId: v.id("bills"),
+    description: v.string(),
+    amount: v.number(),
+    category: v.optional(v.string()),
+    subcategory: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+    const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+    const lineItems = getLineItems(extracted).map((row) => ({ ...(row as Record<string, unknown>) }));
+
+    const cleanDescription = args.description.trim() || `Line item ${lineItems.length + 1}`;
+    const roundedAmount = Math.round(args.amount * 100) / 100;
+
+    const newLineItem: Record<string, unknown> = {
+      description: cleanDescription,
+      quantity: 1,
+      total_usd: roundedAmount,
+      amount: roundedAmount,
+      amount_original: roundedAmount,
+      confirmed: true,
+      confidence: "manual",
+    };
+    if (args.category) newLineItem.category = args.category;
+    if (args.subcategory) newLineItem.subcategory = args.subcategory;
+
+    const nextLineItems = [...lineItems, newLineItem];
+
+    const currentTotal = Number(extracted.invoice_total_usd ?? extracted.invoiceTotalUsd ?? extracted.total ?? 0);
+    const summedTotal = Math.round(
+      nextLineItems.reduce((sum, row) => sum + (Number((row as any).total_usd ?? (row as any).amount ?? 0) || 0), 0) * 100
+    ) / 100;
+    // If the existing total looks right (within a penny of the prior sum
+    // before adding), keep the consistent updated total. Otherwise trust
+    // the freshly summed total.
+    const priorSummed = Math.round(
+      lineItems.reduce((sum, row) => sum + (Number((row as any).total_usd ?? (row as any).amount ?? 0) || 0), 0) * 100
+    ) / 100;
+    const nextTotal = Math.abs(currentTotal - priorSummed) < 0.02 && currentTotal > 0
+      ? Math.round((currentTotal + roundedAmount) * 100) / 100
+      : summedTotal;
+
+    await ctx.db.patch(args.billId, {
+      extractedData: {
+        ...extracted,
+        line_items: nextLineItems,
+        invoice_total_usd: nextTotal,
+        invoiceTotalUsd: nextTotal,
+        total: nextTotal,
+      },
+    });
+    return args.billId;
+  }
+});
+
 /** Permanently remove a single line item from a bill's extractedData.
  *  Also decrements invoice_total_usd by the removed item's amount so the
  *  displayed total stays consistent with the remaining line items. Note:

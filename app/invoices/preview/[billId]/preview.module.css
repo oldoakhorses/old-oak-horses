@@ -646,6 +646,54 @@
   border-color: #e5484d;
 }
 
+.addLineButton {
+  display: block;
+  width: calc(100% - 44px);
+  margin: 8px 22px 14px;
+  padding: 10px 14px;
+  border: 1px dashed #d0d2d8;
+  border-radius: 6px;
+  background: transparent;
+  color: #6b7084;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.1s, color 0.1s, background 0.1s;
+}
+.addLineButton:hover {
+  border-color: #4a5bdb;
+  color: #4a5bdb;
+  background: rgba(74, 91, 219, 0.04);
+}
+
+.addLineForm {
+  display: grid;
+  grid-template-columns: 1fr 110px auto auto;
+  gap: 8px;
+  padding: 12px 22px;
+  align-items: center;
+  background: rgba(74, 91, 219, 0.04);
+  border-top: 1px solid #f0f1f5;
+}
+.addLineDesc,
+.addLineAmount {
+  font-size: 12px;
+  padding: 8px 10px;
+  border: 1px solid #d0d2d8;
+  border-radius: 4px;
+  background: #fff;
+  color: #1a1a2e;
+}
+.addLineDesc:focus,
+.addLineAmount:focus {
+  outline: none;
+  border-color: #4a5bdb;
+}
+.addLineAmount {
+  text-align: right;
+}
+
 .costBreakdown {
   padding: 14px 22px;
   background: #fafafc;

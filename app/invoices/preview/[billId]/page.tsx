@@ -266,6 +266,14 @@ export default function InvoicePreviewPage() {
   const [reparsing, setReparsing] = useState(false);
   const [error, setError] = useState("");
 
+  // Inline "add line item" form state. Used when the parser pulled no line
+  // items off the invoice (especially common with image uploads) so the
+  // user can enter them by hand.
+  const [showAddLineItem, setShowAddLineItem] = useState(false);
+  const [addingLineItem, setAddingLineItem] = useState(false);
+  const [newLineItemDesc, setNewLineItemDesc] = useState("");
+  const [newLineItemAmount, setNewLineItemAmount] = useState("");
+
   const [contactEdit, setContactEdit] = useState(false);
   const [savingContact, setSavingContact] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
@@ -304,6 +312,7 @@ export default function InvoicePreviewPage() {
   const approveBill = useMutation(api.bills.approveBill);
   const deleteBill = useMutation(api.bills.deleteBill);
   const deleteLineItem = useMutation(api.bills.deleteLineItem);
+  const addLineItem = useMutation(api.bills.addLineItem);
   const updateBillNotes = useMutation(api.bills.updateBillNotes);
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
@@ -1034,6 +1043,32 @@ export default function InvoicePreviewPage() {
       setError(err instanceof Error ? err.message : "Failed to save contact");
     } finally {
       setSavingContact(false);
+    }
+  }
+
+  async function onAddLineItem() {
+    if (!bill) return;
+    const amountNum = Number.parseFloat(newLineItemAmount);
+    if (!Number.isFinite(amountNum)) {
+      setError("Enter a valid amount");
+      return;
+    }
+    setAddingLineItem(true);
+    setError("");
+    try {
+      await addLineItem({
+        billId,
+        description: newLineItemDesc.trim(),
+        amount: amountNum,
+        category: categorySlug || undefined,
+      });
+      setNewLineItemDesc("");
+      setNewLineItemAmount("");
+      setShowAddLineItem(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add line item");
+    } finally {
+      setAddingLineItem(false);
     }
   }
 
@@ -1798,6 +1833,49 @@ export default function InvoicePreviewPage() {
                         </div>
                       ))
                     : lineItems.map((line, index) => renderLineRow(line, index))}
+
+                  {showAddLineItem ? (
+                    <div className={styles.addLineForm}>
+                      <input
+                        className={styles.addLineDesc}
+                        value={newLineItemDesc}
+                        onChange={(e) => setNewLineItemDesc(e.target.value)}
+                        placeholder="description..."
+                        autoFocus
+                      />
+                      <input
+                        className={styles.addLineAmount}
+                        type="number"
+                        step="0.01"
+                        value={newLineItemAmount}
+                        onChange={(e) => setNewLineItemAmount(e.target.value)}
+                        placeholder="0.00"
+                      />
+                      <button
+                        type="button"
+                        className="ui-button-outlined"
+                        onClick={() => { setShowAddLineItem(false); setNewLineItemDesc(""); setNewLineItemAmount(""); }}
+                      >
+                        cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="ui-button-filled"
+                        disabled={addingLineItem || !newLineItemAmount.trim()}
+                        onClick={() => void onAddLineItem()}
+                      >
+                        {addingLineItem ? "adding..." : "add"}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.addLineButton}
+                      onClick={() => setShowAddLineItem(true)}
+                    >
+                      + add line item
+                    </button>
+                  )}
 
                   {costBreakdown.length > 0 || businessGeneralTotal > 0 ? (
                     <div className={styles.costBreakdown}>
