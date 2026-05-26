@@ -1435,6 +1435,12 @@ export const getById = query({
   handler: async (ctx, args) => {
     const bill = await ctx.db.get(args.billId);
     if (!bill) return null;
+
+    let originalPdfUrl = bill.originalPdfUrl;
+    if (!originalPdfUrl && bill.fileId) {
+      originalPdfUrl = await ctx.storage.getUrl(bill.fileId) ?? undefined;
+    }
+
     const resolved = await resolveContactForBill(ctx, bill as any);
     const vendor = null;
     const category = bill.categoryId ? await ctx.db.get(bill.categoryId) : null;
@@ -1447,6 +1453,7 @@ export const getById = query({
     const evc2 = bill.extractedVendorContact ?? (bill as any).extractedProviderContact;
     return {
       ...bill,
+      originalPdfUrl,
       vendor,
       category,
       extractedVendorContact: evc2 ? {
