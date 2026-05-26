@@ -31,8 +31,10 @@ jobs:
         run: npm ci
 
       - name: Deploy to Convex
+        # Set the CONVEX_DEPLOY_KEY repository secret to the FULL deploy key
+        # as Convex generates it, e.g. "prod:fabulous-mastiff-759|<token>".
+        # Get one from: https://dashboard.convex.dev → project fabulous-mastiff-759
+        # → Settings → Deploy Keys → Generate Production Deploy Key
         env:
-          CONVEX_DEPLOY_KEY_TOKEN: ${{ secrets.CONVEX_DEPLOY_KEY_TOKEN }}
-        run: |
-          export CONVEX_DEPLOY_KEY="prod:fabulous-mastiff-759|${CONVEX_DEPLOY_KEY_TOKEN}"
-          npx convex deploy --yes
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: npx convex deploy --yes
