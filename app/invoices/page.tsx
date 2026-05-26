@@ -356,7 +356,7 @@ export default function InvoicesPage() {
                   >
                     {displayName}
                     {row.source === "cc_transaction" && <span className={styles.ccBadge}>CC</span>}
-                    {row.source === "email" && <span className={styles.ccBadge}>EMAIL</span>}
+                    {row.source === "email" && <span className={styles.ccBadge}>E</span>}
                   </a>
                   <span className={styles.colDate}>{formatDate(date)}</span>
                   <span className={styles.colContact}>{contact}</span>
