@@ -1782,13 +1782,13 @@ export const patchBillSource = internalMutation({
 
 export const createManualBill = mutation({
   args: {
-    fileId: v.id("_storage"),
+    fileId: v.optional(v.id("_storage")),
     fileName: v.string(),
     createdBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const url = await ctx.storage.getUrl(args.fileId);
+    const url = args.fileId ? await ctx.storage.getUrl(args.fileId) : undefined;
     const billId = await ctx.db.insert("bills", {
       fileId: args.fileId,
       fileName: args.fileName,

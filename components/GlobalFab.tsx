@@ -740,38 +740,16 @@ export default function GlobalFab() {
   }
 
   async function onCreateManualInvoice() {
-    const name = manualInvoiceName.trim() || "Manual Invoice";
     setManualInvoiceCreating(true);
     setInvoiceError("");
     try {
-      let fileId: Id<"_storage"> | undefined;
-      if (manualReceiptFile) {
-        const uploadUrl = await generateUploadUrl();
-        const res = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "Content-Type": manualReceiptFile.type },
-          body: manualReceiptFile,
-        });
-        if (!res.ok) throw new Error("Failed to upload receipt");
-        const payload = await res.json();
-        fileId = payload.storageId as Id<"_storage">;
-      }
-
-      if (fileId) {
-        const billId = await createManualBill({ fileId, fileName: name, createdBy: user?.name });
-        closePanel();
-        router.push(`/invoices/preview/${billId}?manual=1`);
-      } else {
-        const uploadUrl = await generateUploadUrl();
-        const emptyBlob = new Blob([], { type: "application/octet-stream" });
-        const res = await fetch(uploadUrl, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: emptyBlob });
-        if (!res.ok) throw new Error("Failed to create invoice");
-        const payload = await res.json();
-        const storageId = payload.storageId as Id<"_storage">;
-        const billId = await createManualBill({ fileId: storageId, fileName: name, createdBy: user?.name });
-        closePanel();
-        router.push(`/invoices/preview/${billId}?manual=1`);
-      }
+      // No name prompt, no file upload — straight to the preview page with a
+      // blank bill. The user can fill in name/date/contact/line items and
+      // attach a PDF or photo from the preview page's "upload pdf" button.
+      const placeholderName = `Manual Invoice - ${new Date().toISOString().slice(0, 10)}`;
+      const billId = await createManualBill({ fileName: placeholderName, createdBy: user?.name });
+      closePanel();
+      router.push(`/invoices/preview/${billId}?manual=1`);
     } catch (error) {
       setInvoiceError(error instanceof Error ? error.message : "Failed to create invoice");
     } finally {
@@ -1106,122 +1084,72 @@ export default function GlobalFab() {
           )
         ) : panelMode === "invoice" ? (
           <div className={styles.recordPanelBody}>
-            <div className={styles.invoiceModeTabs}>
-              <button
-                type="button"
-                className={invoiceMode === "upload" ? styles.invoiceModeTabActive : styles.invoiceModeTab}
-                onClick={() => setInvoiceMode("upload")}
-              >
-                upload file
-              </button>
-              <button
-                type="button"
-                className={invoiceMode === "manual" ? styles.invoiceModeTabActive : styles.invoiceModeTab}
-                onClick={() => setInvoiceMode("manual")}
-              >
-                create manually
-              </button>
+            <div
+              className={`${styles.docDropzone} ${invoiceDragOver ? styles.docDropzoneDragover : ""}`}
+              onClick={() => invoiceFileInputRef.current?.click()}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setInvoiceDragOver(true);
+              }}
+              onDragLeave={(event) => {
+                event.preventDefault();
+                setInvoiceDragOver(false);
+              }}
+              onDrop={handleInvoiceDrop}
+            >
+              <input
+                ref={invoiceFileInputRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.heic,.webp"
+                className={styles.fileInput}
+                onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                  const file = event.target.files?.[0] ?? null;
+                  setInvoiceFile(file);
+                  if (file) {
+                    void processInvoiceUpload(file);
+                  } else {
+                    setInvoiceStage("idle");
+                    setInvoiceStatusMessage("");
+                  }
+                }}
+              />
+              {!invoiceFile ? (
+                <>
+                  <div className={styles.docDropzoneIcon}>📄</div>
+                  <div className={styles.docDropzoneTitle}>drop invoice here</div>
+                  <div className={styles.docDropzoneBrowse}>or click to browse</div>
+                  <div className={styles.docDropzoneTypes}>PDF or photo — max 10MB</div>
+                </>
+              ) : (
+                <>
+                  <div className={styles.docDropzoneCheck}>✓ {invoiceFile.name}</div>
+                  <div className={styles.docDropzoneSize}>{formatFileSize(invoiceFile.size)}</div>
+                </>
+              )}
             </div>
 
-            {invoiceMode === "upload" ? (
-              <>
-                <div
-                  className={`${styles.docDropzone} ${invoiceDragOver ? styles.docDropzoneDragover : ""}`}
-                  onClick={() => invoiceFileInputRef.current?.click()}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setInvoiceDragOver(true);
-                  }}
-                  onDragLeave={(event) => {
-                    event.preventDefault();
-                    setInvoiceDragOver(false);
-                  }}
-                  onDrop={handleInvoiceDrop}
-                >
-                  <input
-                    ref={invoiceFileInputRef}
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,.heic,.webp"
-                    className={styles.fileInput}
-                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                      const file = event.target.files?.[0] ?? null;
-                      setInvoiceFile(file);
-                      if (file) {
-                        void processInvoiceUpload(file);
-                      } else {
-                        setInvoiceStage("idle");
-                        setInvoiceStatusMessage("");
-                      }
-                    }}
-                  />
-                  {!invoiceFile ? (
-                    <>
-                      <div className={styles.docDropzoneIcon}>📄</div>
-                      <div className={styles.docDropzoneTitle}>drop invoice here</div>
-                      <div className={styles.docDropzoneBrowse}>or click to browse</div>
-                      <div className={styles.docDropzoneTypes}>PDF or photo — max 10MB</div>
-                    </>
-                  ) : (
-                    <>
-                      <div className={styles.docDropzoneCheck}>✓ {invoiceFile.name}</div>
-                      <div className={styles.docDropzoneSize}>{formatFileSize(invoiceFile.size)}</div>
-                    </>
-                  )}
+            {invoiceStage !== "idle" && invoiceFile ? (
+              <div className={styles.processingWrap}>
+                {invoiceStage !== "redirecting" ? <div className={styles.spinner} /> : null}
+                <div className={styles.processingFile}>✓ {invoiceFile.name}</div>
+                <div className={styles.processingSub}>{formatFileSize(invoiceFile.size)}</div>
+                <div className={styles.processingTitle}>
+                  {invoiceStatusMessage || "uploading..."}
                 </div>
-
-                {invoiceStage !== "idle" && invoiceFile ? (
-                  <div className={styles.processingWrap}>
-                    {invoiceStage !== "redirecting" ? <div className={styles.spinner} /> : null}
-                    <div className={styles.processingFile}>✓ {invoiceFile.name}</div>
-                    <div className={styles.processingSub}>{formatFileSize(invoiceFile.size)}</div>
-                    <div className={styles.processingTitle}>
-                      {invoiceStatusMessage || "uploading..."}
-                    </div>
-                    <div className={styles.processingSub}>this may take a moment</div>
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <div className={styles.manualInvoiceForm}>
-                <div className={styles.manualField}>
-                  <label className={styles.manualFieldLabel}>INVOICE NAME</label>
-                  <input
-                    className={styles.recordInput}
-                    value={manualInvoiceName}
-                    onChange={(e) => setManualInvoiceName(e.target.value)}
-                    placeholder="e.g. Vet visit - May 2026"
-                  />
-                </div>
-                <div className={styles.manualField}>
-                  <label className={styles.manualFieldLabel}>ATTACH RECEIPT (optional)</label>
-                  <div
-                    className={styles.manualReceiptZone}
-                    onClick={() => manualReceiptRef.current?.click()}
-                  >
-                    <input
-                      ref={manualReceiptRef}
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png,.heic,.webp"
-                      style={{ display: "none" }}
-                      onChange={(e) => setManualReceiptFile(e.target.files?.[0] ?? null)}
-                    />
-                    {manualReceiptFile ? (
-                      <span className={styles.manualReceiptName}>✓ {manualReceiptFile.name}</span>
-                    ) : (
-                      <span className={styles.manualReceiptPlaceholder}>click to attach PDF or photo</span>
-                    )}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className={styles.manualCreateBtn}
-                  onClick={onCreateManualInvoice}
-                  disabled={manualInvoiceCreating}
-                >
-                  {manualInvoiceCreating ? "creating..." : "create invoice"}
-                </button>
+                <div className={styles.processingSub}>this may take a moment</div>
               </div>
-            )}
+            ) : null}
+
+            {/* Secondary action: skip the upload and go straight to a blank
+                invoice — PDF/photo can still be attached from the preview page. */}
+            <button
+              type="button"
+              className={styles.createBlankInvoiceLink}
+              onClick={onCreateManualInvoice}
+              disabled={manualInvoiceCreating || invoiceStage !== "idle"}
+            >
+              {manualInvoiceCreating ? "creating blank invoice..." : "or create blank invoice →"}
+            </button>
 
             {invoiceError ? <p className={styles.recordError}>{invoiceError}</p> : null}
           </div>
