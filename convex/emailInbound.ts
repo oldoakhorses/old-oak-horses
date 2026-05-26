@@ -107,7 +107,6 @@ export const processInboundEmail = internalAction({
 
     const pdfAttachments = allAttachments.filter(
       (a) =>
-        !a.isInline &&
         a.contentType === "application/pdf" &&
         (a.contentLength || Math.ceil(a.contentBase64.length * 3 / 4)) > 5000
     );
