@@ -7,7 +7,10 @@ const locationValue = v.union(
   v.literal("ocala"),
   v.literal("la"),
   v.literal("eu"),
-  v.literal("can")
+  v.literal("can"),
+  v.literal("ca"),
+  v.literal("us"),
+  v.literal("ky")
 );
 
 function trimOrUndefined(value?: string) {
@@ -24,6 +27,9 @@ function normalizeLocation(value?: string) {
   if (normalized === "la") return "la" as const;
   if (normalized === "eu") return "eu" as const;
   if (normalized === "can" || normalized === "canada") return "can" as const;
+  if (normalized === "ca" || normalized === "california") return "ca" as const;
+  if (normalized === "us" || normalized === "usa") return "us" as const;
+  if (normalized === "ky" || normalized === "kentucky") return "ky" as const;
   return undefined;
 }
 

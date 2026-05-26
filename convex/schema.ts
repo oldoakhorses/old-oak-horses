@@ -241,7 +241,10 @@ export default defineSchema({
         v.literal("ocala"),
         v.literal("la"),
         v.literal("eu"),
-        v.literal("can")
+        v.literal("can"),
+        v.literal("ca"),
+        v.literal("us"),
+        v.literal("ky")
       )
     ),
     phone: v.optional(v.string()),

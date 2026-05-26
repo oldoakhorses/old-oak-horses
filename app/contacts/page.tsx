@@ -9,7 +9,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import NavBar from "@/components/NavBar";
 import styles from "./contacts.module.css";
 
-type LocationValue = "all" | "wellington" | "thermal" | "ocala" | "la" | "eu" | "can";
+type LocationValue = "all" | "wellington" | "thermal" | "ocala" | "la" | "eu" | "can" | "ca" | "us" | "ky";
 type SortColumn = "name" | "location" | "category" | null;
 type SortDirection = "asc" | "desc";
 
@@ -49,6 +49,9 @@ const LOCATION_LABELS: Record<Exclude<LocationValue, "all">, string> = {
   la: "LA",
   eu: "EU",
   can: "CAN",
+  ca: "CA",
+  us: "US",
+  ky: "KY",
 };
 
 const CATEGORY_COLORS: Record<string, { bg: string; color: string; label: string }> = {
@@ -73,6 +76,9 @@ const LOCATION_COLORS: Record<Exclude<LocationValue, "all">, { bg: string; color
   la: { bg: "rgba(236,72,153,0.08)", color: "#EC4899" },
   eu: { bg: "rgba(167,139,250,0.08)", color: "#A78BFA" },
   can: { bg: "rgba(20,184,166,0.08)", color: "#14B8A6" },
+  ca: { bg: "rgba(99,102,241,0.08)", color: "#6366F1" },
+  us: { bg: "rgba(59,130,246,0.08)", color: "#3B82F6" },
+  ky: { bg: "rgba(132,204,22,0.08)", color: "#84CC16" },
 };
 
 const EMPTY_FORM: ContactFormState = {
@@ -188,7 +194,7 @@ export default function ContactsPage() {
         name: form.name,
         companyName: form.companyName || undefined,
         category: form.category,
-        location: form.location === "all" ? undefined : (form.location as "wellington" | "thermal" | "ocala" | "la" | "eu" | "can"),
+        location: form.location === "all" ? undefined : (form.location as "wellington" | "thermal" | "ocala" | "la" | "eu" | "can" | "ca" | "us" | "ky"),
         phone: form.phone || undefined,
         email: form.email || undefined,
         address: form.address || undefined,
@@ -277,6 +283,9 @@ export default function ContactsPage() {
               <option value="la">LA</option>
               <option value="eu">EU</option>
               <option value="can">CAN</option>
+              <option value="ca">CA</option>
+              <option value="us">US</option>
+              <option value="ky">KY</option>
             </select>
           </label>
           <label>
@@ -334,6 +343,9 @@ export default function ContactsPage() {
                     <option value="la">LA</option>
                     <option value="eu">EU</option>
                     <option value="can">CAN</option>
+                    <option value="ca">CA</option>
+                    <option value="us">US</option>
+                    <option value="ky">KY</option>
                   </select>
                 </Field>
               </div>
