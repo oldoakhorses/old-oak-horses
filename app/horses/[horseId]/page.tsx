@@ -52,6 +52,7 @@ type FormState = {
   sex: "" | "gelding" | "mare" | "stallion";
   usefNumber: string;
   feiNumber: string;
+  microchip: string;
   owner: string;
   ownerId: string;
 };
@@ -134,6 +135,7 @@ export default function HorseProfilePage() {
     sex: "",
     usefNumber: "",
     feiNumber: "",
+    microchip: "",
     owner: "",
     ownerId: "",
   });
@@ -148,6 +150,7 @@ export default function HorseProfilePage() {
       sex: horse.sex ?? "",
       usefNumber: horse.usefNumber ?? "",
       feiNumber: horse.feiNumber ?? "",
+      microchip: (horse as any).microchip ?? "",
       owner: horse.owner ?? "",
       ownerId: (horse as Record<string, unknown>).ownerId ? String((horse as Record<string, unknown>).ownerId) : "",
     });
@@ -199,6 +202,7 @@ export default function HorseProfilePage() {
         sex: form.sex || undefined,
         usefNumber: form.usefNumber || undefined,
         feiNumber: form.feiNumber || undefined,
+        microchip: form.microchip || undefined,
         owner: form.owner || undefined,
         prizeMoney: undefined,
       });
@@ -318,6 +322,9 @@ export default function HorseProfilePage() {
             </Field>
             <Field label="FEI #" value={horse.feiNumber || "—"} editing={isEditing}>
               <input value={form.feiNumber} onChange={(event) => setForm((prev) => ({ ...prev, feiNumber: event.target.value }))} />
+            </Field>
+            <Field label="MICROCHIP" value={(horse as any).microchip || "—"} editing={isEditing}>
+              <input value={form.microchip} onChange={(event) => setForm((prev) => ({ ...prev, microchip: event.target.value }))} />
             </Field>
             {!isTeam && (
               <Field label="PRIZE MONEY" value={(prizeMoneyData?.total ?? 0) > 0 ? formatUsd(prizeMoneyData!.total) : "—"} editing={false}>

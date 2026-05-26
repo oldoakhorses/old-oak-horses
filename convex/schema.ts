@@ -201,6 +201,7 @@ export default defineSchema({
     sex: v.optional(v.union(v.literal("gelding"), v.literal("mare"), v.literal("stallion"))),
     usefNumber: v.optional(v.string()),
     feiNumber: v.optional(v.string()),
+    microchip: v.optional(v.string()),
     owner: v.optional(v.string()),
     prizeMoney: v.optional(v.number()),
     ownerId: v.optional(v.id("owners")),
