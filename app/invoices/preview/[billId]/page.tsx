@@ -1037,6 +1037,57 @@ export default function InvoicePreviewPage() {
     }
   }
 
+  /** Save the combined 4-field details card (name + date + invoice# + contact)
+   *  in one go. Contact is resolved against existing contacts by name; a new
+   *  contact is created if no match. */
+  async function onSaveCombinedDetails() {
+    if (!bill) return;
+    setSavingDetails(true);
+    setSavingContact(true);
+    setError("");
+    try {
+      // 1. Resolve contact (existing → reuse, otherwise create)
+      const trimmedName = (contactSearch || contactForm.name || "").trim();
+      let contactId = selectedContactId ?? undefined;
+      if (!contactId && trimmedName) {
+        const existing = allContacts.find(
+          (c) => c.name.trim().toLowerCase() === trimmedName.toLowerCase()
+        );
+        if (existing) {
+          contactId = existing._id;
+        } else {
+          contactId = await createContact({
+            name: trimmedName,
+            category: categorySlug || "other",
+          });
+        }
+        setSelectedContactId(contactId ?? null);
+      }
+
+      await updateBillContact({
+        billId,
+        contactId,
+        extractedVendorContact: { vendorName: trimmedName || undefined },
+      });
+
+      // 2. Save invoice details (only the 3 editable invoice fields).
+      await updatePreviewFields({
+        billId,
+        invoiceName: details.invoiceName || undefined,
+        invoiceNumber: details.invoiceNumber || undefined,
+        invoiceDate: details.invoiceDate || undefined,
+      });
+
+      setDetailsEdit(false);
+      setShowContactSuggestions(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSavingDetails(false);
+      setSavingContact(false);
+    }
+  }
+
   async function onSaveDetails() {
     if (!bill) return;
     setSavingDetails(true);
@@ -1533,116 +1584,6 @@ export default function InvoicePreviewPage() {
 
         <section className={styles.previewLayout}>
           <div className={styles.previewDetails}>
-            <div className={styles.card}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div className={styles.label} style={{ marginBottom: 0 }}>CONTACT</div>
-                {!contactEdit && (
-                  <button type="button" className={styles.changeLink} onClick={openContactEdit} title="Edit contact">
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M11.5 1.5l3 3L5 14H2v-3L11.5 1.5z" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-
-              <div style={{ position: "relative", marginTop: 6 }}>
-                <input
-                  className={styles.inputCompact}
-                  value={contactEdit ? contactSearch : contactName}
-                  onChange={(e) => {
-                    setContactSearch(e.target.value);
-                    setContactForm((p) => ({ ...p, name: e.target.value }));
-                    setSelectedContactId(null);
-                    setShowContactSuggestions(true);
-                  }}
-                  onFocus={() => {
-                    if (!contactEdit) openContactEdit();
-                    setShowContactSuggestions(true);
-                  }}
-                  placeholder="search or type contact name..."
-                  autoComplete="off"
-                  readOnly={!contactEdit}
-                />
-                {contactEdit && showContactSuggestions && contactSuggestions.length > 0 && (
-                  <div className={styles.contactSuggestions}>
-                    {contactSuggestions.map((c) => (
-                      <button
-                        key={String(c._id)}
-                        type="button"
-                        className={styles.contactSuggestionItem}
-                        onMouseDown={(e) => { e.preventDefault(); selectExistingContact(c); }}
-                      >
-                        <span className={styles.contactSuggestionName}>{c.name}</span>
-                        {c.email ? <span className={styles.contactSuggestionMeta}>{c.email}</span> : null}
-                        {c.category ? <span className={styles.contactSuggestionMeta}>{c.category}</span> : null}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {selectedContactId && (
-                  <div style={{ fontSize: 9, color: "#22C583", marginTop: 2 }}>✓ linked to existing contact</div>
-                )}
-              </div>
-
-              {contactEdit ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-                  <div>
-                    <div className={styles.label}>COMPANY NAME</div>
-                    <input className={styles.inputCompact} value={contactForm.companyName} onChange={(e) => setContactForm((p) => ({ ...p, companyName: e.target.value }))} />
-                  </div>
-                  <div>
-                    <div className={styles.label}>PHONE</div>
-                    <input className={styles.inputCompact} value={contactForm.phone} onChange={(e) => setContactForm((p) => ({ ...p, phone: e.target.value }))} />
-                  </div>
-                  <div>
-                    <div className={styles.label}>EMAIL</div>
-                    <input className={styles.inputCompact} value={contactForm.email} onChange={(e) => setContactForm((p) => ({ ...p, email: e.target.value }))} />
-                  </div>
-                  <div>
-                    <div className={styles.label}>ADDRESS</div>
-                    <input className={styles.inputCompact} value={contactForm.address} onChange={(e) => setContactForm((p) => ({ ...p, address: e.target.value }))} />
-                  </div>
-                  <div>
-                    <div className={styles.label}>WEBSITE</div>
-                    <input className={styles.inputCompact} value={contactForm.website} onChange={(e) => setContactForm((p) => ({ ...p, website: e.target.value }))} />
-                  </div>
-                  <div>
-                    <div className={styles.label}>ACCOUNT #</div>
-                    <input className={styles.inputCompact} value={contactForm.accountNumber} onChange={(e) => setContactForm((p) => ({ ...p, accountNumber: e.target.value }))} />
-                  </div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                    <button type="button" className={styles.changeLink} onClick={() => { setContactEdit(false); setShowContactSuggestions(false); }}>cancel</button>
-                    <button type="button" className={styles.changeLink} style={{ fontWeight: 600 }} disabled={savingContact} onClick={() => void onSaveContact()}>
-                      {savingContact ? "saving..." : "save"}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {bill?.extractedVendorContact ? (
-                    <div className={styles.contactDetailsGrid}>
-                      {bill.extractedVendorContact.phone ? (
-                        <div><span className={styles.label}>PHONE</span><span className={styles.value}>{bill.extractedVendorContact.phone}</span></div>
-                      ) : null}
-                      {bill.extractedVendorContact.email ? (
-                        <div><span className={styles.label}>EMAIL</span><span className={styles.value}>{bill.extractedVendorContact.email}</span></div>
-                      ) : null}
-                      {bill.extractedVendorContact.address ? (
-                        <div><span className={styles.label}>ADDRESS</span><span className={styles.value}>{bill.extractedVendorContact.address}</span></div>
-                      ) : null}
-                      {bill.extractedVendorContact.website ? (
-                        <div><span className={styles.label}>WEBSITE</span><span className={styles.value}>{bill.extractedVendorContact.website}</span></div>
-                      ) : null}
-                      {bill.extractedVendorContact.accountNumber ? (
-                        <div><span className={styles.label}>ACCOUNT</span><span className={styles.value}>{bill.extractedVendorContact.accountNumber}</span></div>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </>
-              )}
-
-            </div>
-
             {reparsing && isParsing ? (
               <div className={styles.card} style={{ background: "rgba(74,91,219,0.06)", borderColor: "#4A5BDB", textAlign: "center", padding: "20px 16px" }}>
                 <div style={{ fontSize: 11, letterSpacing: "0.05em", marginBottom: 6, color: "#4A5BDB" }}>⏳</div>
@@ -1650,6 +1591,7 @@ export default function InvoicePreviewPage() {
               </div>
             ) : null}
 
+            {/* Combined contact + invoice details. Edit toggles all four fields together. */}
             <div className={styles.detailsCard}>
               <div className={styles.cardHeader}>
                 <div className={styles.cardTitle}>invoice details</div>
@@ -1668,12 +1610,14 @@ export default function InvoicePreviewPage() {
                       type="button"
                       className={styles.changeLink}
                       onClick={() => {
-                        // Seed invoiceName with the currently displayed value so a
-                        // bare "save" persists the visible name (not blank).
+                        // Seed editable fields with currently visible values so a bare
+                        // "save" persists what the user can see (not blanks).
                         setDetails((prev) => ({
                           ...prev,
-                          invoiceName: prev.invoiceName || displayInvoiceName,
+                          invoiceName: prev.invoiceName || "",
                         }));
+                        setContactSearch(contactName !== "Unknown" ? contactName : "");
+                        setContactForm((p) => ({ ...p, name: contactName !== "Unknown" ? contactName : "" }));
                         setDetailsEdit(true);
                       }}
                       title="Edit details"
@@ -1686,47 +1630,97 @@ export default function InvoicePreviewPage() {
 
               {detailsEdit ? (
                 <>
-                  <div className={styles.detailsGrid}>
-                    <InputField label="INVOICE NAME" value={details.invoiceName || displayInvoiceName} onChange={(value) => setDetails((prev) => ({ ...prev, invoiceName: value }))} />
-                    <InputField label="INVOICE #" value={details.invoiceNumber} onChange={(value) => setDetails((prev) => ({ ...prev, invoiceNumber: value }))} />
-                    <InputField label="DATE" value={details.invoiceDate} onChange={(value) => setDetails((prev) => ({ ...prev, invoiceDate: value }))} />
-                    <InputField label="DUE DATE" value={details.dueDate} onChange={(value) => setDetails((prev) => ({ ...prev, dueDate: value }))} />
-                    <InputField label="TERMS" value={details.terms} onChange={(value) => setDetails((prev) => ({ ...prev, terms: value }))} />
-                    <InputField label="SHIP DATE" value={details.shipDate} onChange={(value) => setDetails((prev) => ({ ...prev, shipDate: value }))} />
-                    <InputField label="TRANSACTION ID" value={details.transactionId} onChange={(value) => setDetails((prev) => ({ ...prev, transactionId: value }))} />
-                    <InputField label="CUSTOMER ID" value={details.customerId} onChange={(value) => setDetails((prev) => ({ ...prev, customerId: value }))} />
-                    <InputField label="TOTAL" value={details.totalUsd} onChange={(value) => setDetails((prev) => ({ ...prev, totalUsd: value }))} />
+                  <div className={styles.detailsStack}>
+                    {/* 1. Invoice Name (required, blank by default) */}
+                    <div>
+                      <div className={styles.label}>INVOICE NAME *</div>
+                      <input
+                        className={styles.inputCompact}
+                        value={details.invoiceName}
+                        onChange={(e) => setDetails((prev) => ({ ...prev, invoiceName: e.target.value }))}
+                        placeholder="e.g. Hagyard Pharmacy — Apr 27, 2026"
+                      />
+                    </div>
+
+                    {/* 2. Invoice Date (required, pre-populated) */}
+                    <div>
+                      <div className={styles.label}>INVOICE DATE *</div>
+                      <input
+                        type="date"
+                        className={styles.inputCompact}
+                        value={toIsoDateInputValue(details.invoiceDate)}
+                        onChange={(e) => setDetails((prev) => ({ ...prev, invoiceDate: e.target.value }))}
+                      />
+                    </div>
+
+                    {/* 3. Invoice # (optional, pre-populated) */}
+                    <div>
+                      <div className={styles.label}>INVOICE #</div>
+                      <input
+                        className={styles.inputCompact}
+                        value={details.invoiceNumber}
+                        onChange={(e) => setDetails((prev) => ({ ...prev, invoiceNumber: e.target.value }))}
+                      />
+                    </div>
+
+                    {/* 4. Contact (required, pre-populated, typeahead) */}
+                    <div style={{ position: "relative" }}>
+                      <div className={styles.label}>CONTACT *</div>
+                      <input
+                        className={styles.inputCompact}
+                        value={contactSearch}
+                        onChange={(e) => {
+                          setContactSearch(e.target.value);
+                          setContactForm((p) => ({ ...p, name: e.target.value }));
+                          setSelectedContactId(null);
+                          setShowContactSuggestions(true);
+                        }}
+                        onFocus={() => setShowContactSuggestions(true)}
+                        placeholder="search or type contact name..."
+                        autoComplete="off"
+                      />
+                      {showContactSuggestions && contactSuggestions.length > 0 && (
+                        <div className={styles.contactSuggestions}>
+                          {contactSuggestions.map((c) => (
+                            <button
+                              key={String(c._id)}
+                              type="button"
+                              className={styles.contactSuggestionItem}
+                              onMouseDown={(e) => { e.preventDefault(); selectExistingContact(c); }}
+                            >
+                              <span className={styles.contactSuggestionName}>{c.name}</span>
+                              {c.email ? <span className={styles.contactSuggestionMeta}>{c.email}</span> : null}
+                              {c.category ? <span className={styles.contactSuggestionMeta}>{c.category}</span> : null}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {selectedContactId && (
+                        <div style={{ fontSize: 9, color: "#22C583", marginTop: 2 }}>✓ linked to existing contact</div>
+                      )}
+                    </div>
                   </div>
 
-                  {(categorySlug === "horse-transport" || details.origin || details.destination) ? (
-                    <div className={styles.detailsGrid} style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #F0F1F5" }}>
-                      <InputField label="ORIGIN" value={details.origin} onChange={(value) => setDetails((prev) => ({ ...prev, origin: value }))} />
-                      <InputField label="DESTINATION" value={details.destination} onChange={(value) => setDetails((prev) => ({ ...prev, destination: value }))} />
-                    </div>
-                  ) : null}
-
                   <div className={styles.rowActions}>
-                    <button type="button" className="ui-button-outlined" onClick={() => setDetailsEdit(false)}>cancel</button>
-                    <button type="button" className="ui-button-filled" disabled={savingDetails} onClick={() => void onSaveDetails()}>{savingDetails ? "saving..." : "save"}</button>
+                    <button type="button" className="ui-button-outlined" onClick={() => { setDetailsEdit(false); setShowContactSuggestions(false); }}>cancel</button>
+                    <button
+                      type="button"
+                      className="ui-button-filled"
+                      disabled={savingDetails || savingContact || !details.invoiceName.trim() || !details.invoiceDate.trim() || !contactSearch.trim()}
+                      onClick={() => void onSaveCombinedDetails()}
+                    >
+                      {savingDetails || savingContact ? "saving..." : "save"}
+                    </button>
                   </div>
                 </>
               ) : (
                 <>
-                  <div className={styles.detailsRow}>
+                  <div className={styles.detailsStack}>
                     <DisplayField label="INVOICE NAME" value={details.invoiceName || displayInvoiceName} />
+                    <DisplayField label="INVOICE DATE" value={formatDate(details.invoiceDate)} />
                     <DisplayField label="INVOICE #" value={details.invoiceNumber || "—"} />
-                    <DisplayField label="DATE" value={formatDate(details.invoiceDate)} />
-                    {details.dueDate ? <DisplayField label="DUE DATE" value={formatDate(details.dueDate)} /> : null}
-                    {details.shipDate ? <DisplayField label="SHIP DATE" value={formatDate(details.shipDate)} /> : null}
-                    {details.terms ? <DisplayField label="TERMS" value={details.terms || "—"} /> : null}
+                    <DisplayField label="CONTACT" value={contactName !== "Unknown" ? contactName : "—"} />
                   </div>
-
-                  {categorySlug === "horse-transport" ? (
-                    <div className={styles.detailsRowSeparated}>
-                      <DisplayField label="ORIGIN" value={details.origin || "—"} />
-                      <DisplayField label="DESTINATION" value={details.destination || "—"} />
-                    </div>
-                  ) : null}
 
                   <div className={styles.totalBlock}>
                     <div className={styles.label}>TOTAL</div>
@@ -2377,6 +2371,20 @@ function InputField({ label, value, onChange }: { label: string; value: string; 
 function getLineItems(extracted: Record<string, unknown>) {
   const value = extracted.line_items ?? extracted.lineItems;
   return Array.isArray(value) ? (value as ParsedLine[]) : [];
+}
+
+/** Coerce a parsed date string (any common shape) to "YYYY-MM-DD" so it
+ *  works as the value of an <input type="date">. Returns "" if unparseable. */
+function toIsoDateInputValue(value: string): string {
+  if (!value) return "";
+  // Already ISO yyyy-mm-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const yyyy = parsed.getFullYear();
+  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
+  const dd = String(parsed.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function getLineAmount(line: ParsedLine) {

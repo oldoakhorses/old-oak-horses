@@ -209,6 +209,12 @@
   gap: 12px 20px;
 }
 
+.detailsStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .detailsRow {
   display: flex;
   gap: 28px;
