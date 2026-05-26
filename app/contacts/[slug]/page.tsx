@@ -52,11 +52,16 @@ export default function ContactDetailPage() {
   const searchParams = useSearchParams();
   const slug = params.slug;
 
-  // Try slug lookup first, fall back to ID lookup
+  // Try slug lookup first, fall back to ID lookup when the URL param is
+  // shaped like a Convex ID (32 lowercase alphanumeric chars). Without
+  // the shape check, deleting a contact would make contactBySlug return
+  // null, triggering this fallback with a slug like "hagyard-pharmacy"
+  // — which Convex rejects as an invalid ID, crashing the page.
+  const looksLikeConvexId = typeof slug === "string" && /^[a-z0-9]{32}$/.test(slug);
   const contactBySlug = useQuery(api.contacts.getContactBySlug, { slug });
   const contactById = useQuery(
     api.contacts.getContactById,
-    contactBySlug === null ? { id: slug as any } : "skip"
+    contactBySlug === null && looksLikeConvexId ? { id: slug as any } : "skip"
   );
   const contact = contactBySlug ?? contactById;
   const bills = useQuery(
