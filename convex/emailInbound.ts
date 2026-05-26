@@ -57,9 +57,13 @@ export const processInboundEmail = internalAction({
       imageNames: imageAttachments.map(a => a.name),
     });
 
-    let processed = 0;
-
-    for (const attachment of pdfAttachments) {
+    /** Upload one attachment as a new bill and schedule parsing. Returns
+     *  the billId on success or throws so the caller can decide whether
+     *  to continue with the next attachment. */
+    async function createBillFromAttachment(
+      attachment: typeof pdfAttachments[number],
+      indexLabel: string
+    ): Promise<string> {
       const bytes = Buffer.from(attachment.contentBase64, "base64");
       const blob = new Blob([bytes], { type: attachment.contentType });
 
@@ -69,8 +73,9 @@ export const processInboundEmail = internalAction({
         headers: { "Content-Type": attachment.contentType },
         body: blob,
       });
-
-      if (!uploadResp.ok) continue;
+      if (!uploadResp.ok) {
+        throw new Error(`upload failed: HTTP ${uploadResp.status}`);
+      }
 
       const { storageId } = (await uploadResp.json()) as { storageId: string };
       const now = Date.now();
@@ -96,54 +101,51 @@ export const processInboundEmail = internalAction({
         billId: billId as any,
       });
 
-      processed += 1;
+      console.log(`[processInboundEmail] ✓ created bill ${indexLabel} (${attachment.name}) → ${String(billId)}`);
+      return String(billId);
     }
 
-    if (processed > 0) return { processed };
+    let processed = 0;
+    const failures: Array<{ name: string; reason: string }> = [];
 
-    if (imageAttachments.length > 0) {
-      for (const attachment of imageAttachments) {
-        const bytes = Buffer.from(attachment.contentBase64, "base64");
-        const blob = new Blob([bytes], { type: attachment.contentType });
-
-        const uploadUrl = await ctx.runMutation(internal.bills.internalGenerateUploadUrl, {});
-        const uploadResp = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "Content-Type": attachment.contentType },
-          body: blob,
-        });
-
-        if (!uploadResp.ok) continue;
-
-        const { storageId } = (await uploadResp.json()) as { storageId: string };
-
-        const now = Date.now();
-        const dateStr = new Date(now).toISOString().slice(0, 10);
-        const ext = (attachment.name.match(/\.[^.]+$/) ?? [""])[0].toLowerCase();
-        const cleanName = attachment.name.replace(/\.[^.]+$/, "");
-        const fileName = `Email - ${cleanName} - ${dateStr}${ext}`;
-
-        const billId = await ctx.runMutation(internal.bills.createParsingBill, {
-          fileId: storageId as any,
-          fileName,
-          billingPeriod: dateStr.slice(0, 7),
-          uploadedAt: now,
-        });
-
-        await ctx.runMutation(internal.bills.patchBillSource, {
-          billId: billId as any,
-          source: "email",
-          createdBy: args.fromEmail,
-        });
-
-        await ctx.scheduler.runAfter(0, internal.billParsing.parseBillPdf, {
-          billId: billId as any,
-        });
-
+    // Each PDF attachment becomes its own bill. Wrapped in try/catch so one
+    // bad attachment (corrupt PDF, upload glitch, etc.) doesn't drop the rest.
+    for (let i = 0; i < pdfAttachments.length; i++) {
+      const attachment = pdfAttachments[i];
+      try {
+        await createBillFromAttachment(attachment, `PDF ${i + 1}/${pdfAttachments.length}`);
         processed += 1;
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        console.error(`[processInboundEmail] ✗ PDF ${i + 1}/${pdfAttachments.length} (${attachment.name}) failed: ${reason}`);
+        failures.push({ name: attachment.name, reason });
+      }
+    }
+
+    if (processed > 0) {
+      console.log(`[processInboundEmail] done: ${processed} bill(s) created from PDFs, ${failures.length} failed`);
+      return { processed, failed: failures.length };
+    }
+
+    // Fall through to images only when no PDF produced a bill — images are
+    // usually decorative (logos, signatures) and would generate noise.
+    if (imageAttachments.length > 0) {
+      for (let i = 0; i < imageAttachments.length; i++) {
+        const attachment = imageAttachments[i];
+        try {
+          await createBillFromAttachment(attachment, `IMG ${i + 1}/${imageAttachments.length}`);
+          processed += 1;
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          console.error(`[processInboundEmail] ✗ IMG ${i + 1}/${imageAttachments.length} (${attachment.name}) failed: ${reason}`);
+          failures.push({ name: attachment.name, reason });
+        }
       }
 
-      if (processed > 0) return { processed };
+      if (processed > 0) {
+        console.log(`[processInboundEmail] done: ${processed} bill(s) created from images, ${failures.length} failed`);
+        return { processed, failed: failures.length };
+      }
     }
 
     const bodyContent = htmlBody || textBody || "";
