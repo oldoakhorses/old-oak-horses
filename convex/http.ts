@@ -28,9 +28,23 @@ http.route({
       isInline: boolean;
     }> = [];
 
+    const droppedAttachments: Array<{
+      name?: string;
+      contentType?: string;
+      contentLength?: number;
+      hasContent: boolean;
+      hasContentType: boolean;
+      hasName: boolean;
+      hasContentID: boolean;
+      reason: string;
+    }> = [];
+
     if (Array.isArray(body.Attachments)) {
       for (const att of body.Attachments) {
-        if (att.Content && att.ContentType && att.Name) {
+        const hasContent = typeof att.Content === "string" && att.Content.length > 0;
+        const hasContentType = typeof att.ContentType === "string" && att.ContentType.length > 0;
+        const hasName = typeof att.Name === "string" && att.Name.length > 0;
+        if (hasContent && hasContentType && hasName) {
           attachments.push({
             name: att.Name,
             contentType: att.ContentType,
@@ -39,6 +53,26 @@ http.route({
               ? att.ContentLength
               : undefined,
             isInline: Boolean(att.ContentID),
+          });
+        } else {
+          // Diagnostic: log dropped attachments. The most common cause is a
+          // missing `Content` field — Postmark omits attachment content in
+          // some forwarded-email paths, especially CID-embedded inline
+          // attachments. Knowing this lets us decide whether to fetch the
+          // attachment separately via the Postmark API.
+          droppedAttachments.push({
+            name: typeof att.Name === "string" ? att.Name : undefined,
+            contentType: typeof att.ContentType === "string" ? att.ContentType : undefined,
+            contentLength: typeof att.ContentLength === "number" ? att.ContentLength : undefined,
+            hasContent,
+            hasContentType,
+            hasName,
+            hasContentID: Boolean(att.ContentID),
+            reason: !hasContent
+              ? "missing Content (base64 body) — Postmark did not include attachment bytes"
+              : !hasContentType
+                ? "missing ContentType"
+                : "missing Name",
           });
         }
       }
@@ -58,8 +92,11 @@ http.route({
       subject,
       htmlBodyLen: htmlBody.length,
       textBodyLen: textBody.length,
-      attachmentCount: attachments.length,
+      rawAttachmentCount: Array.isArray(body.Attachments) ? body.Attachments.length : 0,
+      keptAttachmentCount: attachments.length,
+      droppedAttachmentCount: droppedAttachments.length,
       attachmentTypes: attachments.map(a => `${a.contentType} (${a.name}, inline=${a.isInline})`),
+      droppedAttachments,
       isForwarded,
     }));
 
