@@ -80,6 +80,13 @@ export const generateUploadUrl = mutation(async (ctx) => {
   return await ctx.storage.generateUploadUrl();
 });
 
+export const getStorageUrl = query({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, args) => {
+    return await ctx.storage.getUrl(args.storageId);
+  },
+});
+
 /**
  * Attach a PDF storage file to an existing bill.
  * Used by CC-statement-generated invoices (which lack a source PDF) so the

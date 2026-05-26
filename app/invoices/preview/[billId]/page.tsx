@@ -223,6 +223,11 @@ export default function InvoicePreviewPage() {
   const isManualEntry = searchParams.get("manual") === "1";
 
   const bill = useQuery(api.bills.getById, { billId });
+  const storageUrl = useQuery(
+    api.bills.getStorageUrl,
+    bill?.fileId && !bill?.originalPdfUrl ? { storageId: bill.fileId } : "skip"
+  );
+  const previewUrl = bill?.originalPdfUrl || storageUrl || undefined;
   const linkedRecords = useQuery(api.horseRecords.getByBill, { billId }) ?? [];
   const categories = useQuery(api.categories.getAllCategories) ?? [];
   const horses = useQuery(api.horses.getActiveHorses) ?? [];
@@ -2270,8 +2275,8 @@ export default function InvoicePreviewPage() {
             <div className={styles.pdfPreviewHeader}>
               <div className={styles.pdfPreviewTitle}>Preview</div>
               <div className={styles.pdfPreviewActions}>
-                {bill.originalPdfUrl ? (
-                  <a href={bill.originalPdfUrl} target="_blank" rel="noreferrer">open in new tab ↗</a>
+                {previewUrl ? (
+                  <a href={previewUrl} target="_blank" rel="noreferrer">open in new tab ↗</a>
                 ) : null}
                 <input
                   ref={pdfUploadRef}
@@ -2285,12 +2290,12 @@ export default function InvoicePreviewPage() {
                   onClick={() => pdfUploadRef.current?.click()}
                   disabled={uploadingPdf}
                 >
-                  {uploadingPdf ? "uploading..." : bill.originalPdfUrl ? "replace" : "upload file"}
+                  {uploadingPdf ? "uploading..." : previewUrl ? "replace" : "upload file"}
                 </button>
               </div>
             </div>
-            {bill.originalPdfUrl ? (
-              <PreviewContent url={bill.originalPdfUrl} fileName={bill.fileName} />
+            {previewUrl ? (
+              <PreviewContent url={previewUrl} fileName={bill.fileName} />
             ) : (
               <div className={styles.pdfPlaceholder}>
                 <div className={styles.pdfPlaceholderIcon}>📄</div>
