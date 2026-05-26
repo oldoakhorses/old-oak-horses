@@ -365,6 +365,16 @@ export default function InvoicePreviewPage() {
       totalUsd: String(getTotal(extracted, lineItems))
     });
 
+    // Initialize the always-editable contact field so the dirty check doesn't
+    // mark the form as having unsaved changes on first load.
+    const initialContactName = String(
+      bill.extractedVendorContact?.vendorName || bill.contactName || bill.customProviderName || ""
+    );
+    setContactSearch(initialContactName);
+    setContactForm((p) => ({ ...p, name: initialContactName }));
+    setSelectedContactId(bill.contactId ?? null);
+    setShowContactSuggestions(false);
+
     setAssignType((bill.assignType as AssignType | undefined) ?? (requiresPerson ? "person" : "horse"));
 
     const nextLineStates: Record<number, LineState> = {};
@@ -1576,6 +1586,28 @@ export default function InvoicePreviewPage() {
 
   const isParsing = bill && (bill.status === "parsing" || bill.status === "uploading");
 
+  // True when any of the 4 always-editable detail fields differs from the
+  // bill's persisted values. Drives whether the cancel/save buttons are
+  // visible on the always-editable invoice details card.
+  const detailsDirty = useMemo(() => {
+    if (!bill) return false;
+    const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+    const savedInvoiceName = String(bill.invoiceName ?? "");
+    const savedInvoiceNumber = String((extracted as any).invoice_number ?? (extracted as any).invoiceNumber ?? "");
+    const savedInvoiceDate = String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "");
+    const savedContactName = String(
+      bill.extractedVendorContact?.vendorName || bill.contactName || bill.customProviderName || ""
+    );
+    return (
+      details.invoiceName !== savedInvoiceName ||
+      details.invoiceNumber !== savedInvoiceNumber ||
+      details.invoiceDate !== savedInvoiceDate ||
+      contactSearch !== savedContactName ||
+      // contact link changed (e.g. user picked a different existing contact)
+      String(selectedContactId ?? "") !== String(bill.contactId ?? "")
+    );
+  }, [bill, details.invoiceName, details.invoiceNumber, details.invoiceDate, contactSearch, selectedContactId]);
+
   useEffect(() => {
     if (bill && bill.status !== "parsing" && bill.status !== "uploading" && reparsing) {
       setReparsing(false);
@@ -1626,7 +1658,9 @@ export default function InvoicePreviewPage() {
               </div>
             ) : null}
 
-            {/* Combined contact + invoice details. Edit toggles all four fields together. */}
+            {/* Combined contact + invoice details. Always-editable inline form —
+                no view/edit toggle. Save + cancel only appear when there are
+                unsaved changes vs the bill's current values. */}
             <div className={styles.detailsCard}>
               <div className={styles.cardHeader}>
                 <div className={styles.cardTitle}>invoice details</div>
@@ -1640,129 +1674,118 @@ export default function InvoicePreviewPage() {
                   >
                     {reparsing || isParsing ? "re-parsing..." : "re-parse"}
                   </button>
-                  {!detailsEdit ? (
-                    <button
-                      type="button"
-                      className={styles.changeLink}
-                      onClick={() => {
-                        // Seed editable fields with currently visible values so a bare
-                        // "save" persists what the user can see (not blanks).
-                        setDetails((prev) => ({
-                          ...prev,
-                          invoiceName: prev.invoiceName || "",
-                        }));
-                        setContactSearch(contactName !== "Unknown" ? contactName : "");
-                        setContactForm((p) => ({ ...p, name: contactName !== "Unknown" ? contactName : "" }));
-                        setDetailsEdit(true);
-                      }}
-                      title="Edit details"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11.5 1.5l3 3L5 14H2v-3L11.5 1.5z" /></svg>
-                    </button>
-                  ) : null}
                 </div>
               </div>
 
-              {detailsEdit ? (
-                <>
-                  <div className={styles.detailsStack}>
-                    {/* 1. Invoice Name (required, blank by default) */}
-                    <div>
-                      <div className={styles.label}>INVOICE NAME *</div>
-                      <input
-                        className={styles.inputCompact}
-                        value={details.invoiceName}
-                        onChange={(e) => setDetails((prev) => ({ ...prev, invoiceName: e.target.value }))}
-                        placeholder="e.g. Hagyard Pharmacy — Apr 27, 2026"
-                      />
+              <div className={styles.detailsStack}>
+                {/* 1. Invoice Name (required, blank by default — no autofill on upload/email) */}
+                <div>
+                  <div className={styles.label}>INVOICE NAME *</div>
+                  <input
+                    className={styles.inputCompact}
+                    value={details.invoiceName}
+                    onChange={(e) => setDetails((prev) => ({ ...prev, invoiceName: e.target.value }))}
+                    placeholder="e.g. Hagyard Pharmacy — Apr 27, 2026"
+                  />
+                </div>
+
+                {/* 2. Invoice Date (required, pre-populated) */}
+                <div>
+                  <div className={styles.label}>INVOICE DATE *</div>
+                  <input
+                    type="date"
+                    className={styles.inputCompact}
+                    value={toIsoDateInputValue(details.invoiceDate)}
+                    onChange={(e) => setDetails((prev) => ({ ...prev, invoiceDate: e.target.value }))}
+                  />
+                </div>
+
+                {/* 3. Invoice # (optional, pre-populated) */}
+                <div>
+                  <div className={styles.label}>INVOICE #</div>
+                  <input
+                    className={styles.inputCompact}
+                    value={details.invoiceNumber}
+                    onChange={(e) => setDetails((prev) => ({ ...prev, invoiceNumber: e.target.value }))}
+                  />
+                </div>
+
+                {/* 4. Contact (required, pre-populated, typeahead) */}
+                <div style={{ position: "relative" }}>
+                  <div className={styles.label}>CONTACT *</div>
+                  <input
+                    className={styles.inputCompact}
+                    value={contactSearch}
+                    onChange={(e) => {
+                      setContactSearch(e.target.value);
+                      setContactForm((p) => ({ ...p, name: e.target.value }));
+                      setSelectedContactId(null);
+                      setShowContactSuggestions(true);
+                    }}
+                    onFocus={() => setShowContactSuggestions(true)}
+                    placeholder="search or type contact name..."
+                    autoComplete="off"
+                  />
+                  {showContactSuggestions && contactSuggestions.length > 0 && (
+                    <div className={styles.contactSuggestions}>
+                      {contactSuggestions.map((c) => (
+                        <button
+                          key={String(c._id)}
+                          type="button"
+                          className={styles.contactSuggestionItem}
+                          onMouseDown={(e) => { e.preventDefault(); selectExistingContact(c); }}
+                        >
+                          <span className={styles.contactSuggestionName}>{c.name}</span>
+                          {c.email ? <span className={styles.contactSuggestionMeta}>{c.email}</span> : null}
+                          {c.category ? <span className={styles.contactSuggestionMeta}>{c.category}</span> : null}
+                        </button>
+                      ))}
                     </div>
+                  )}
+                  {selectedContactId && (
+                    <div style={{ fontSize: 9, color: "#22C583", marginTop: 2 }}>✓ linked to existing contact</div>
+                  )}
+                </div>
+              </div>
 
-                    {/* 2. Invoice Date (required, pre-populated) */}
-                    <div>
-                      <div className={styles.label}>INVOICE DATE *</div>
-                      <input
-                        type="date"
-                        className={styles.inputCompact}
-                        value={toIsoDateInputValue(details.invoiceDate)}
-                        onChange={(e) => setDetails((prev) => ({ ...prev, invoiceDate: e.target.value }))}
-                      />
-                    </div>
+              {detailsDirty ? (
+                <div className={styles.rowActions}>
+                  <button
+                    type="button"
+                    className="ui-button-outlined"
+                    onClick={() => {
+                      // Revert local form state to what's on the bill.
+                      const extracted = (bill?.extractedData ?? {}) as Record<string, unknown>;
+                      setDetails((prev) => ({
+                        ...prev,
+                        invoiceName: String(bill?.invoiceName ?? ""),
+                        invoiceNumber: String((extracted as any).invoice_number ?? (extracted as any).invoiceNumber ?? ""),
+                        invoiceDate: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? ""),
+                      }));
+                      const billContactName = bill?.extractedVendorContact?.vendorName || (bill?.contactName ?? bill?.customProviderName ?? "");
+                      setContactSearch(billContactName);
+                      setContactForm((p) => ({ ...p, name: billContactName }));
+                      setSelectedContactId(bill?.contactId ?? null);
+                      setShowContactSuggestions(false);
+                    }}
+                  >
+                    cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-button-filled"
+                    disabled={savingDetails || savingContact || !details.invoiceName.trim() || !details.invoiceDate.trim() || !contactSearch.trim()}
+                    onClick={() => void onSaveCombinedDetails()}
+                  >
+                    {savingDetails || savingContact ? "saving..." : "save"}
+                  </button>
+                </div>
+              ) : null}
 
-                    {/* 3. Invoice # (optional, pre-populated) */}
-                    <div>
-                      <div className={styles.label}>INVOICE #</div>
-                      <input
-                        className={styles.inputCompact}
-                        value={details.invoiceNumber}
-                        onChange={(e) => setDetails((prev) => ({ ...prev, invoiceNumber: e.target.value }))}
-                      />
-                    </div>
-
-                    {/* 4. Contact (required, pre-populated, typeahead) */}
-                    <div style={{ position: "relative" }}>
-                      <div className={styles.label}>CONTACT *</div>
-                      <input
-                        className={styles.inputCompact}
-                        value={contactSearch}
-                        onChange={(e) => {
-                          setContactSearch(e.target.value);
-                          setContactForm((p) => ({ ...p, name: e.target.value }));
-                          setSelectedContactId(null);
-                          setShowContactSuggestions(true);
-                        }}
-                        onFocus={() => setShowContactSuggestions(true)}
-                        placeholder="search or type contact name..."
-                        autoComplete="off"
-                      />
-                      {showContactSuggestions && contactSuggestions.length > 0 && (
-                        <div className={styles.contactSuggestions}>
-                          {contactSuggestions.map((c) => (
-                            <button
-                              key={String(c._id)}
-                              type="button"
-                              className={styles.contactSuggestionItem}
-                              onMouseDown={(e) => { e.preventDefault(); selectExistingContact(c); }}
-                            >
-                              <span className={styles.contactSuggestionName}>{c.name}</span>
-                              {c.email ? <span className={styles.contactSuggestionMeta}>{c.email}</span> : null}
-                              {c.category ? <span className={styles.contactSuggestionMeta}>{c.category}</span> : null}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {selectedContactId && (
-                        <div style={{ fontSize: 9, color: "#22C583", marginTop: 2 }}>✓ linked to existing contact</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className={styles.rowActions}>
-                    <button type="button" className="ui-button-outlined" onClick={() => { setDetailsEdit(false); setShowContactSuggestions(false); }}>cancel</button>
-                    <button
-                      type="button"
-                      className="ui-button-filled"
-                      disabled={savingDetails || savingContact || !details.invoiceName.trim() || !details.invoiceDate.trim() || !contactSearch.trim()}
-                      onClick={() => void onSaveCombinedDetails()}
-                    >
-                      {savingDetails || savingContact ? "saving..." : "save"}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className={styles.detailsStack}>
-                    <DisplayField label="INVOICE NAME" value={details.invoiceName || displayInvoiceName} />
-                    <DisplayField label="INVOICE DATE" value={formatDate(details.invoiceDate)} />
-                    <DisplayField label="INVOICE #" value={details.invoiceNumber || "—"} />
-                    <DisplayField label="CONTACT" value={contactName !== "Unknown" ? contactName : "—"} />
-                  </div>
-
-                  <div className={styles.totalBlock}>
-                    <div className={styles.label}>TOTAL</div>
-                    <div className={styles.totalValue}>{formatUsd(Number(details.totalUsd || total))}</div>
-                  </div>
-                </>
-              )}
+              <div className={styles.totalBlock}>
+                <div className={styles.label}>TOTAL</div>
+                <div className={styles.totalValue}>{formatUsd(Number(details.totalUsd || total))}</div>
+              </div>
             </div>
 
             <div className={styles.lineItemsCard}>
