@@ -340,7 +340,7 @@
 .lineHeader,
 .lineRow {
   display: grid;
-  grid-template-columns: 1fr 180px 140px 90px 28px;
+  grid-template-columns: 1fr 180px 140px 90px 54px;
   padding: 6px 22px;
   align-items: center;
   gap: 8px;
@@ -348,7 +348,7 @@
 
 .lineHeaderVet,
 .lineRowVet {
-  grid-template-columns: 1fr 170px 140px 110px 90px 28px;
+  grid-template-columns: 1fr 170px 140px 110px 90px 54px;
 }
 
 .lineHeader {
@@ -610,6 +610,34 @@
 
 .confirmCheckUnchecked {
   color: transparent;
+}
+
+.lineActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: end;
+}
+
+.deleteLineBtn {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  border: 1.5px solid rgba(229, 72, 77, 0.4);
+  background: rgba(229, 72, 77, 0.08);
+  color: #e5484d;
+  line-height: 1;
+  padding: 0;
+}
+.deleteLineBtn:hover {
+  background: rgba(229, 72, 77, 0.18);
+  border-color: #e5484d;
 }
 
 .costBreakdown {

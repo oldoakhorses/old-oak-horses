@@ -303,6 +303,7 @@ export default function InvoicePreviewPage() {
   const saveDuesAssignments = useMutation(api.bills.saveDuesAssignments);
   const approveBill = useMutation(api.bills.approveBill);
   const deleteBill = useMutation(api.bills.deleteBill);
+  const deleteLineItem = useMutation(api.bills.deleteLineItem);
   const updateBillNotes = useMutation(api.bills.updateBillNotes);
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
@@ -853,14 +854,27 @@ export default function InvoicePreviewPage() {
 
         <div className={styles.lineAmount}>{formatUsd(amount)}</div>
 
-        <button
-          type="button"
-          className={`${styles.confirmCheck} ${row.confirmed ? styles.confirmCheckChecked : styles.confirmCheckUnchecked}`}
-          onClick={() => setLineStates((prev) => ({ ...prev, [index]: { ...row, confirmed: !row.confirmed } }))}
-          aria-label="confirm line"
-        >
-          ✓
-        </button>
+        <div className={styles.lineActions}>
+          <button
+            type="button"
+            className={`${styles.confirmCheck} ${row.confirmed ? styles.confirmCheckChecked : styles.confirmCheckUnchecked}`}
+            onClick={() => setLineStates((prev) => ({ ...prev, [index]: { ...row, confirmed: !row.confirmed } }))}
+            aria-label={row.confirmed ? "uncheck line" : "check line"}
+          >
+            ✓
+          </button>
+          {!row.confirmed ? (
+            <button
+              type="button"
+              className={styles.deleteLineBtn}
+              onClick={() => void deleteLineItem({ billId, lineItemIndex: index })}
+              aria-label="delete line item"
+              title="Remove this line item from the invoice"
+            >
+              ✕
+            </button>
+          ) : null}
+        </div>
       </div>
     );
   }

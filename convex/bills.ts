@@ -2926,6 +2926,53 @@ export const deleteBill = mutation({
   }
 });
 
+/** Permanently remove a single line item from a bill's extractedData.
+ *  Also decrements invoice_total_usd by the removed item's amount so the
+ *  displayed total stays consistent with the remaining line items. Note:
+ *  re-parsing the bill will restore all line items from the original PDF. */
+export const deleteLineItem = mutation({
+  args: {
+    billId: v.id("bills"),
+    lineItemIndex: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+    const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+    const lineItems = getLineItems(extracted).map((row) => ({ ...(row as Record<string, unknown>) }));
+    if (args.lineItemIndex < 0 || args.lineItemIndex >= lineItems.length) {
+      throw new Error("Line item index out of range");
+    }
+
+    const removed = lineItems[args.lineItemIndex] as Record<string, unknown>;
+    const removedAmount = Number(removed.total_usd ?? removed.amount ?? 0) || 0;
+
+    const nextLineItems = lineItems.filter((_, i) => i !== args.lineItemIndex);
+
+    // Recalculate invoice_total_usd: prefer subtracting the deleted amount
+    // from the existing total (preserves any tax/shipping breakdowns), but
+    // fall back to summing remaining line items if the existing total is
+    // missing or inconsistent.
+    const currentTotal = Number(extracted.invoice_total_usd ?? extracted.invoiceTotalUsd ?? extracted.total ?? 0);
+    const adjustedTotal = Math.max(0, Math.round((currentTotal - removedAmount) * 100) / 100);
+    const summedTotal = Math.round(
+      nextLineItems.reduce((sum, row) => sum + (Number((row as any).total_usd ?? (row as any).amount ?? 0) || 0), 0) * 100
+    ) / 100;
+    const nextTotal = currentTotal > 0 ? adjustedTotal : summedTotal;
+
+    await ctx.db.patch(args.billId, {
+      extractedData: {
+        ...extracted,
+        line_items: nextLineItems,
+        invoice_total_usd: nextTotal,
+        invoiceTotalUsd: nextTotal,
+        total: nextTotal,
+      },
+    });
+    return args.billId;
+  }
+});
+
 export const setLineItemConfirmedCategory = mutation({
   args: {
     billId: v.id("bills"),
