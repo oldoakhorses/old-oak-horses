@@ -3,45 +3,6 @@
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { simpleParser } from "mailparser";
-
-type Attachment = {
-  name: string;
-  contentType: string;
-  contentBase64: string;
-  contentLength?: number;
-  isInline?: boolean;
-};
-
-async function extractFromEml(emlBase64: string): Promise<{
-  attachments: Attachment[];
-  htmlBody: string;
-  textBody: string;
-  subject: string;
-}> {
-  const buffer = Buffer.from(emlBase64, "base64");
-  const parsed = await simpleParser(buffer);
-  const attachments: Attachment[] = [];
-
-  if (parsed.attachments) {
-    for (const att of parsed.attachments) {
-      attachments.push({
-        name: att.filename || "attachment",
-        contentType: att.contentType,
-        contentBase64: att.content.toString("base64"),
-        contentLength: att.size,
-        isInline: att.contentDisposition === "inline",
-      });
-    }
-  }
-
-  return {
-    attachments,
-    htmlBody: parsed.html || "",
-    textBody: parsed.text || "",
-    subject: parsed.subject || "",
-  };
-}
 
 export const processInboundEmail = internalAction({
   args: {
@@ -73,45 +34,16 @@ export const processInboundEmail = internalAction({
       })),
     }));
 
-    let allAttachments = [...args.attachments];
-    let htmlBody = args.htmlBody || "";
-    let textBody = args.textBody || "";
+    const htmlBody = args.htmlBody || "";
+    const textBody = args.textBody || "";
 
-    const emlAttachments = args.attachments.filter(
-      (a) => a.contentType === "message/rfc822" || a.name.toLowerCase().endsWith(".eml")
-    );
-
-    if (emlAttachments.length > 0) {
-      console.log("[processInboundEmail] Found .eml attachments, extracting inner content");
-      for (const eml of emlAttachments) {
-        try {
-          const extracted = await extractFromEml(eml.contentBase64);
-          console.log("[processInboundEmail] Extracted from .eml:", {
-            innerAttachments: extracted.attachments.map(a => `${a.contentType} (${a.name})`),
-            innerHtmlLen: extracted.htmlBody.length,
-            innerTextLen: extracted.textBody.length,
-          });
-          allAttachments = allAttachments.filter(a => a !== eml);
-          allAttachments.push(...extracted.attachments);
-          if (extracted.htmlBody && extracted.htmlBody.length > htmlBody.length) {
-            htmlBody = extracted.htmlBody;
-          }
-          if (extracted.textBody && extracted.textBody.length > textBody.length) {
-            textBody = extracted.textBody;
-          }
-        } catch (err) {
-          console.error("[processInboundEmail] Failed to parse .eml:", err);
-        }
-      }
-    }
-
-    const pdfAttachments = allAttachments.filter(
+    const pdfAttachments = args.attachments.filter(
       (a) =>
         a.contentType === "application/pdf" &&
         (a.contentLength || Math.ceil(a.contentBase64.length * 3 / 4)) > 5000
     );
 
-    const imageAttachments = allAttachments.filter(
+    const imageAttachments = args.attachments.filter(
       (a) =>
         !a.isInline &&
         a.contentType.startsWith("image/") &&
