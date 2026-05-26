@@ -11,7 +11,7 @@ import NavBar from "@/components/NavBar";
 import { formatInvoiceFileName, formatInvoiceName } from "@/lib/formatInvoiceName";
 import styles from "./invoices.module.css";
 
-type SortColumn = "name" | "date" | "contact" | "category" | "horses" | "amount";
+type SortColumn = "name" | "date" | "contact" | "category" | "amount";
 type SortDirection = "asc" | "desc";
 
 /** Clean up raw CC descriptions and ALL-CAPS names into readable abbreviated titles */
@@ -174,12 +174,6 @@ export default function InvoicesPage() {
         case "category":
           cmp = (a.categoryName ?? "").localeCompare(b.categoryName ?? "");
           break;
-        case "horses": {
-          const aH = Array.isArray(a.assignedHorses) ? a.assignedHorses.map((e: any) => e.horseName).join(", ") : "";
-          const bH = Array.isArray(b.assignedHorses) ? b.assignedHorses.map((e: any) => e.horseName).join(", ") : "";
-          cmp = aH.localeCompare(bH);
-          break;
-        }
       }
       return sortDirection === "asc" ? cmp : -cmp;
     });
@@ -321,7 +315,6 @@ export default function InvoicesPage() {
             <span className={`${styles.colDate} ${styles.sortableHeader}`} onClick={() => handleSort("date")}>Date{sortArrow("date")}</span>
             <span className={`${styles.colContact} ${styles.sortableHeader}`} onClick={() => handleSort("contact")}>Contact{sortArrow("contact")}</span>
             <span className={`${styles.colCategory} ${styles.sortableHeader}`} onClick={() => handleSort("category")}>Category{sortArrow("category")}</span>
-            <span className={`${styles.colHorses} ${styles.sortableHeader}`} onClick={() => handleSort("horses")}>Horses{sortArrow("horses")}</span>
             <span className={`${styles.colAmount} ${styles.sortableHeader}`} onClick={() => handleSort("amount")}>Amount{sortArrow("amount")}</span>
             <span className={styles.colMenu} />
           </div>
@@ -340,7 +333,6 @@ export default function InvoicesPage() {
             const url = getInvoiceUrl(row);
             const rowId = String(row._id);
             const isExpanded = expandedId === rowId;
-            const assignedHorses = Array.isArray(row.assignedHorses) ? row.assignedHorses.map((entry: any) => entry.horseName).filter(Boolean) : [];
             const contact = getProvider(row);
             const displayName = abbreviateInvoiceName(row.invoiceName || formatInvoiceName({ contactName: contact }));
             return (
@@ -372,9 +364,6 @@ export default function InvoicesPage() {
                     <span className={styles.categoryBadge} style={{ background: categoryColor.bg, color: categoryColor.color }}>
                       {categoryColor.label}
                     </span>
-                  </span>
-                  <span className={styles.colHorses}>
-                    {assignedHorses.length > 0 ? assignedHorses.join(", ") : <span className={styles.muted}>—</span>}
                   </span>
                   <span className={`${styles.colAmount} ${styles.amountCol}`} style={total >= 0 ? { color: "#16A34A" } : undefined}>{formatUsd(total)}</span>
                   <div className={`${styles.colMenu} ${styles.menuWrap}`} onClick={(e) => e.stopPropagation()}>

@@ -171,7 +171,7 @@
 
 .tableHeader {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) 72px minmax(0, 1.2fr) 120px minmax(0, 1fr) 100px 36px;
+  grid-template-columns: minmax(0, 2fr) 72px minmax(0, 1.2fr) 120px 100px 36px;
   gap: 8px;
   padding: 10px 18px;
   border-bottom: 1px solid #e8eaf0;
@@ -198,7 +198,6 @@
 .colDate { white-space: nowrap; }
 .colContact { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .colCategory { }
-.colHorses { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: #6b7084; }
 .colAmount { text-align: right; white-space: nowrap; }
 .colMenu { width: 36px; flex-shrink: 0; }
 
@@ -246,7 +245,7 @@
 
 .invoiceRow {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) 72px minmax(0, 1.2fr) 120px minmax(0, 1fr) 100px 36px;
+  grid-template-columns: minmax(0, 2fr) 72px minmax(0, 1.2fr) 120px 100px 36px;
   gap: 8px;
   align-items: center;
   padding: 12px 18px;
@@ -592,8 +591,7 @@
   .colDate { order: 3; font-size: 11px; color: #9ea2b0; }
   .colContact { order: 4; font-size: 11px; color: #9ea2b0; }
   .colCategory { order: 5; }
-  .colHorses { order: 6; font-size: 10px; }
-  .colMenu { order: 7; position: absolute; right: 18px; top: 12px; }
+  .colMenu { order: 6; position: absolute; right: 18px; top: 12px; }
 
   .invoiceRow {
     position: relative;
