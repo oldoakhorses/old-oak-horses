@@ -223,11 +223,7 @@ export default function InvoicePreviewPage() {
   const isManualEntry = searchParams.get("manual") === "1";
 
   const bill = useQuery(api.bills.getById, { billId });
-  const storageUrl = useQuery(
-    api.bills.getStorageUrl,
-    bill?.fileId && !bill?.originalPdfUrl ? { storageId: bill.fileId } : "skip"
-  );
-  const previewUrl = bill?.originalPdfUrl || storageUrl || undefined;
+  const previewUrl = bill?.originalPdfUrl || undefined;
   const linkedRecords = useQuery(api.horseRecords.getByBill, { billId }) ?? [];
   const categories = useQuery(api.categories.getAllCategories) ?? [];
   const horses = useQuery(api.horses.getActiveHorses) ?? [];
