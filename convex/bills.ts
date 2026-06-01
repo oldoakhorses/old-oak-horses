@@ -3037,6 +3037,95 @@ export const deleteLineItem = mutation({
   }
 });
 
+/** Manually convert a bill's visible amounts from a non-USD source currency
+ *  to USD. Use case: parser couldn't tell the invoice was in CAD/EUR/GBP
+ *  (e.g. the PDF only shows "$" with no "CAD" code) so amounts landed at
+ *  face value as USD. The user picks the actual source currency and we
+ *  multiply through using the rate table.
+ *
+ *  Each call interprets the CURRENT visible amounts as being in the picked
+ *  currency. Picking USD is a no-op. Successive calls apply successive
+ *  conversions — re-parse the bill to reset to the original PDF values. */
+const BILL_USD_EXCHANGE_RATES: Record<string, number> = {
+  CAD: 0.72,
+  EUR: 1.08,
+  GBP: 1.26,
+  USD: 1,
+};
+
+export const convertBillCurrency = mutation({
+  args: {
+    billId: v.id("bills"),
+    fromCurrency: v.union(v.literal("USD"), v.literal("CAD"), v.literal("EUR"), v.literal("GBP")),
+  },
+  handler: async (ctx, args) => {
+    if (args.fromCurrency === "USD") {
+      // No-op but record the override so the UI shows the picked currency.
+      await ctx.db.patch(args.billId, {
+        originalCurrency: "USD",
+        exchangeRate: 1,
+      });
+      return args.billId;
+    }
+
+    const rate = BILL_USD_EXCHANGE_RATES[args.fromCurrency];
+    if (!rate) throw new Error(`No exchange rate for ${args.fromCurrency}`);
+
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+    const extracted = ((bill.extractedData ?? {}) as Record<string, unknown>);
+    const lineItems = getLineItems(extracted).map((row) => ({ ...(row as Record<string, unknown>) }));
+
+    // Multiply each line item's amount fields through.
+    const convertedLineItems = lineItems.map((row) => {
+      const sourceAmount =
+        typeof row.total_usd === "number" ? row.total_usd :
+        typeof row.amount === "number" ? row.amount :
+        typeof row.total === "number" ? (row.total as number) :
+        0;
+      const converted = Math.round(sourceAmount * rate * 100) / 100;
+      return {
+        ...row,
+        amount_original: Math.round(sourceAmount * 100) / 100,
+        originalAmount: Math.round(sourceAmount * 100) / 100,
+        total_usd: converted,
+        amount_usd: converted,
+        amount: converted,
+      };
+    });
+
+    // Convert invoice_total_usd. Use the existing total when set, else sum
+    // the (pre-conversion) line item amounts.
+    const currentTotal =
+      typeof extracted.invoice_total_usd === "number" ? (extracted.invoice_total_usd as number) :
+      typeof extracted.invoiceTotalUsd === "number" ? (extracted.invoiceTotalUsd as number) :
+      typeof extracted.total === "number" ? (extracted.total as number) :
+      lineItems.reduce((sum, row) => sum + (typeof row.total_usd === "number" ? (row.total_usd as number) : 0), 0);
+    const originalTotal = Math.round(currentTotal * 100) / 100;
+    const convertedTotal = Math.round(currentTotal * rate * 100) / 100;
+
+    await ctx.db.patch(args.billId, {
+      originalCurrency: args.fromCurrency,
+      originalTotal,
+      exchangeRate: rate,
+      extractedData: {
+        ...extracted,
+        line_items: convertedLineItems,
+        invoice_total_usd: convertedTotal,
+        invoiceTotalUsd: convertedTotal,
+        total: convertedTotal,
+        original_currency: args.fromCurrency,
+        originalCurrency: args.fromCurrency,
+        original_total: originalTotal,
+        originalTotal,
+        exchange_rate: rate,
+        exchangeRate: rate,
+      },
+    });
+    return args.billId;
+  }
+});
+
 export const setLineItemConfirmedCategory = mutation({
   args: {
     billId: v.id("bills"),

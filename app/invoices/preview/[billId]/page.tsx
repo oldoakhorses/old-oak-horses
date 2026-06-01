@@ -274,6 +274,13 @@ export default function InvoicePreviewPage() {
   const [newLineItemDesc, setNewLineItemDesc] = useState("");
   const [newLineItemAmount, setNewLineItemAmount] = useState("");
 
+  // Manual currency-override picker. Used when the parser didn't detect the
+  // source currency (e.g. a CAD invoice that just shows "$" with no "CAD"
+  // code). Picking a non-USD value multiplies every amount on the bill
+  // through the rate to land in USD.
+  const [convertFromCurrency, setConvertFromCurrency] = useState<"USD" | "CAD" | "EUR" | "GBP">("USD");
+  const [convertingCurrency, setConvertingCurrency] = useState(false);
+
   const [contactEdit, setContactEdit] = useState(false);
   const [savingContact, setSavingContact] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
@@ -313,6 +320,7 @@ export default function InvoicePreviewPage() {
   const deleteBill = useMutation(api.bills.deleteBill);
   const deleteLineItem = useMutation(api.bills.deleteLineItem);
   const addLineItem = useMutation(api.bills.addLineItem);
+  const convertBillCurrency = useMutation(api.bills.convertBillCurrency);
   const updateBillNotes = useMutation(api.bills.updateBillNotes);
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
@@ -1056,6 +1064,23 @@ export default function InvoicePreviewPage() {
     }
   }
 
+  async function onConvertCurrency() {
+    if (!bill) return;
+    if (convertFromCurrency === "USD" && (bill as any).originalCurrency !== undefined && (bill as any).originalCurrency !== "USD") {
+      // No-op safeguard — picking USD when the bill was already marked USD
+      // does nothing useful. Skip silently.
+    }
+    setConvertingCurrency(true);
+    setError("");
+    try {
+      await convertBillCurrency({ billId, fromCurrency: convertFromCurrency });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to convert currency");
+    } finally {
+      setConvertingCurrency(false);
+    }
+  }
+
   async function onAddLineItem() {
     if (!bill) return;
     const amountNum = Number.parseFloat(newLineItemAmount);
@@ -1785,6 +1810,50 @@ export default function InvoicePreviewPage() {
               <div className={styles.totalBlock}>
                 <div className={styles.label}>TOTAL</div>
                 <div className={styles.totalValue}>{formatUsd(Number(details.totalUsd || total))}</div>
+              </div>
+
+              {/* Manual currency override. Use when the PDF doesn't make it
+                  clear what currency it's in (common with CAD invoices that
+                  only show "$"). Picking CAD/EUR/GBP multiplies every amount
+                  on the bill by the rate to land in USD. Re-parse the bill
+                  to reset to the parsed values. */}
+              <div className={styles.currencyOverride}>
+                <div className={styles.currencyOverrideHeader}>
+                  <span className={styles.label}>CONVERT TO USD FROM</span>
+                  {(bill as any)?.originalCurrency && (bill as any).originalCurrency !== "USD" ? (
+                    <span className={styles.currencyAppliedTag}>
+                      converted from {(bill as any).originalCurrency}
+                      {typeof (bill as any).exchangeRate === "number"
+                        ? ` @ ${(bill as any).exchangeRate}`
+                        : ""}
+                    </span>
+                  ) : null}
+                </div>
+                <div className={styles.currencyOverrideRow}>
+                  <select
+                    className={styles.inputCompact}
+                    value={convertFromCurrency}
+                    onChange={(e) => setConvertFromCurrency(e.target.value as "USD" | "CAD" | "EUR" | "GBP")}
+                  >
+                    <option value="USD">USD (no conversion)</option>
+                    <option value="CAD">CAD (Canadian Dollar)</option>
+                    <option value="EUR">EUR (Euro)</option>
+                    <option value="GBP">GBP (British Pound)</option>
+                  </select>
+                  <button
+                    type="button"
+                    className="ui-button-filled"
+                    disabled={convertingCurrency || convertFromCurrency === "USD"}
+                    onClick={() => void onConvertCurrency()}
+                    title={
+                      convertFromCurrency === "USD"
+                        ? "Pick a source currency first"
+                        : `Multiply every amount on this bill by the ${convertFromCurrency}→USD rate.`
+                    }
+                  >
+                    {convertingCurrency ? "converting..." : "convert"}
+                  </button>
+                </div>
               </div>
 
               {bill?.createdBy ? (
