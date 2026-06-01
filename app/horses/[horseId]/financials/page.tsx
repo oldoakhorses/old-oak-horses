@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { formatInvoiceName, toIsoDateString } from "@/lib/formatInvoiceName";
+import { formatInvoiceDate, formatInvoiceName, toIsoDateString } from "@/lib/formatInvoiceName";
 import NavBar from "@/components/NavBar";
 import { useAuth } from "@/contexts/AuthContext";
 import styles from "./financials.module.css";
@@ -129,14 +129,19 @@ export default function FinancialsPage() {
               <Link key={row._id} href={row.href} className={styles.invoiceRow}>
                 <div className={styles.invoiceLeft}>
                   <span className={row.status === "approved" ? styles.dotApproved : styles.dotPending} />
-                  <span className={styles.invoiceLabel}>
-                    {formatInvoiceName({
-                      invoiceName: row.invoiceName,
-                      category: row.category,
-                      contactName: row.contactName,
-                      date: toIsoDateString(row.date || ""),
-                    })}
-                  </span>
+                  <div className={styles.invoiceLabelBlock}>
+                    <span className={styles.invoiceLabel}>
+                      {formatInvoiceName({
+                        invoiceName: row.invoiceName,
+                        category: row.category,
+                        contactName: row.contactName,
+                        date: toIsoDateString(row.date || ""),
+                      })}
+                    </span>
+                    {row.date ? (
+                      <span className={styles.invoiceMeta}>{formatInvoiceDate(row.date) ?? ""}</span>
+                    ) : null}
+                  </div>
                 </div>
                 <span className={styles.invoiceAmount}>{formatUsd(row.amount)}</span>
               </Link>

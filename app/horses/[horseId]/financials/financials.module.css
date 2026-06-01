@@ -174,9 +174,20 @@
   background: #d0d2d8;
 }
 
+.invoiceLabelBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .invoiceLabel {
   font-size: 12px;
   color: #1a1a2e;
+}
+
+.invoiceMeta {
+  font-size: 10px;
+  color: #9ea2b0;
 }
 
 .invoiceAmount {
