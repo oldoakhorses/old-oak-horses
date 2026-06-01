@@ -260,6 +260,25 @@ select.categorySelect:hover {
   color: #1a1a2e;
 }
 
+.createdByRow {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f1f5;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.createdByLabel {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #9ea2b0;
+}
+.createdByValue {
+  font-size: 11px;
+  color: #1a1a2e;
+}
+
 .lineItemsCard {
   padding: 0;
 }

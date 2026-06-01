@@ -1786,6 +1786,13 @@ export default function InvoicePreviewPage() {
                 <div className={styles.label}>TOTAL</div>
                 <div className={styles.totalValue}>{formatUsd(Number(details.totalUsd || total))}</div>
               </div>
+
+              {bill?.createdBy ? (
+                <div className={styles.createdByRow}>
+                  <span className={styles.createdByLabel}>CREATED BY</span>
+                  <span className={styles.createdByValue}>{bill.createdBy}</span>
+                </div>
+              ) : null}
             </div>
 
             <div className={styles.lineItemsCard}>

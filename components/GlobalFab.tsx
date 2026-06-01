@@ -726,6 +726,7 @@ export default function GlobalFab() {
         setInvoiceStage("parsing");
         const result = await parseUploadedInvoice({
           fileStorageId: storageId,
+          createdBy: user?.name,
         });
         setInvoiceStatusMessage("redirecting...");
         setInvoiceStage("redirecting");

@@ -1729,7 +1729,8 @@ export const createParsingBill = internalMutation({
     marketingSubcategory: v.optional(v.string()),
     adminSubcategory: v.optional(v.string()),
     duesSubcategory: v.optional(v.string()),
-    groomingSubcategory: v.optional(v.string())
+    groomingSubcategory: v.optional(v.string()),
+    createdBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("bills", {
@@ -1748,7 +1749,8 @@ export const createParsingBill = internalMutation({
       marketingSubcategory: args.marketingSubcategory,
       adminSubcategory: args.adminSubcategory,
       duesSubcategory: args.duesSubcategory,
-      groomingSubcategory: args.groomingSubcategory
+      groomingSubcategory: args.groomingSubcategory,
+      createdBy: args.createdBy?.trim() || undefined,
     });
   }
 });

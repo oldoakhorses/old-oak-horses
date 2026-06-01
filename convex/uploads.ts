@@ -17,6 +17,7 @@ export const parseUploadedInvoice: any = action({
     adminSubcategory: v.optional(v.string()),
     duesSubcategory: v.optional(v.string()),
     uploadedAt: v.optional(v.number()),
+    createdBy: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{ billId: Id<"bills">; fileName: string; redirectPath: string; listPath: string }> => {
     const category = args.categoryId
@@ -50,6 +51,7 @@ export const parseUploadedInvoice: any = action({
       originalPdfUrl,
       adminSubcategory: isAdminCategory ? args.adminSubcategory || undefined : undefined,
       duesSubcategory: isDuesCategory ? args.duesSubcategory || undefined : undefined,
+      createdBy: args.createdBy,
     })) as Id<"bills">;
 
     await ctx.scheduler.runAfter(0, internal.billParsing.parseBillPdf, { billId });

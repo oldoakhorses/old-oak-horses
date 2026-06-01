@@ -8,6 +8,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
+import { useAuth } from "@/contexts/AuthContext";
 import styles from "./dashboard.module.css";
 
 type RecordType = "veterinary" | "medication" | "farrier" | "bodywork" | "other";
@@ -123,6 +124,7 @@ const RECORD_TYPE_TO_CATEGORY: Record<RecordType, string> = {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const [showHorseModal, setShowHorseModal] = useState(false);
   const [horseForm, setHorseForm] = useState<HorseFormState>(initialHorseForm);
@@ -479,6 +481,7 @@ export default function DashboardPage() {
       setInvoiceStage("parsing");
       const result = await parseUploadedInvoice({
         fileStorageId: storageId,
+        createdBy: user?.name,
       });
       console.log("2. Bill created, parse scheduled:", result);
 
