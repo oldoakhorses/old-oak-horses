@@ -900,8 +900,13 @@ function detectCurrencyFromText(text: string): string | undefined {
   if (!text) return undefined;
   // amount = digits with optional thousands and a decimal portion
   const amount = "[\\d,]+(?:\\.[\\d]{2,})?";
+  // Allow common currency symbols ($, £, €, ¥) and whitespace between the
+  // code and the amount so formats like "CAD$100.00", "CAD $100.00", and
+  // "$100.00 CAD" all match. Without this the regex misses Canadian
+  // invoices that quote a leading "CAD" followed by a "$" sign.
+  const gap = "[\\s$£€¥]*";
   const codeAdjacent = (code: string) => {
-    const re = new RegExp(`(?:\\b${code}\\b\\s*${amount}|${amount}\\s*\\b${code}\\b)`, "i");
+    const re = new RegExp(`(?:\\b${code}\\b${gap}${amount}|${amount}${gap}\\b${code}\\b)`, "i");
     return re.test(text);
   };
   const symbolAdjacent = (sym: string) => {
@@ -912,7 +917,9 @@ function detectCurrencyFromText(text: string): string | undefined {
   // Order matters: check symbols before generic codes to avoid mismatches.
   if (codeAdjacent("EUR") || symbolAdjacent("€")) return "EUR";
   if (codeAdjacent("GBP") || symbolAdjacent("£")) return "GBP";
-  if (codeAdjacent("CAD") || symbolAdjacent("C$")) return "CAD";
+  // Accept "CAD" (ISO) and "CDN" (common Canadian alias) as CAD signals,
+  // plus the "C$" prefix symbol used on Canadian receipts.
+  if (codeAdjacent("CAD") || codeAdjacent("CDN") || symbolAdjacent("C$")) return "CAD";
   return undefined;
 }
 
