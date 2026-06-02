@@ -1430,3 +1430,128 @@
   gap: 8px;
   margin-top: 8px;
 }
+
+/* ───── Owners + Shared-with cards (multi-owner & team-access) ───── */
+.profileHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+.cardSectionTitle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #1a1a2e;
+  margin: 0;
+}
+.noOwnerBadge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+  text-transform: uppercase;
+}
+.ownerList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.ownerRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #fafafc;
+  border: 1px solid #f0f1f5;
+  border-radius: 8px;
+}
+.ownerName {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a1a2e;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ownerShare {
+  font-size: 11px;
+  color: #6b7084;
+}
+.ownerRemoveBtn {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid rgba(229, 72, 77, 0.3);
+  background: rgba(229, 72, 77, 0.05);
+  color: #e5484d;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.ownerRemoveBtn:hover {
+  background: rgba(229, 72, 77, 0.15);
+  border-color: #e5484d;
+}
+.ownerAddRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid #f0f1f5;
+}
+.ownerSelect {
+  flex: 1;
+  font-size: 12px;
+  padding: 8px 10px;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  background: #fff;
+  color: #1a1a2e;
+  min-width: 0;
+}
+.ownerShareInput {
+  width: 80px;
+  font-size: 12px;
+  padding: 8px 10px;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  background: #fff;
+  color: #1a1a2e;
+}
+.btnAddInline {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btnAddInline:disabled {
+  background: #e8eaf0;
+  color: #9ea2b0;
+  cursor: not-allowed;
+}
+.btnAddInline:hover:not(:disabled) {
+  background: #2a2a4e;
+}
+.emptyHint {
+  font-size: 11px;
+  color: #9ea2b0;
+  padding: 12px 0;
+  text-align: center;
+}

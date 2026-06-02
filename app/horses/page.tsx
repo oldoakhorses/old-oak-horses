@@ -37,11 +37,20 @@ const EMPTY_FORM: HorseFormState = {
 export default function HorsesPage() {
   const { user } = useAuth();
   const isOwnerRole = user?.role === "owner";
+  const isTeamRole = user?.role === "team";
   const ownerIdForFilter = isOwnerRole && user?.ownerId ? (user.ownerId as Id<"owners">) : undefined;
 
-  const allHorses = useQuery(api.horses.getAllHorses, isOwnerRole ? "skip" : {}) ?? [];
+  // Three sources depending on viewer role:
+  //  - admin / no role           → all horses
+  //  - owner role with ownerId   → horses owned by them
+  //  - team role                 → only horses explicitly shared with them
+  const allHorses = useQuery(api.horses.getAllHorses, isOwnerRole || isTeamRole ? "skip" : {}) ?? [];
   const ownerHorses = useQuery(api.horses.getHorsesByOwner, ownerIdForFilter ? { ownerId: ownerIdForFilter } : "skip") ?? [];
-  const horses = isOwnerRole ? ownerHorses : allHorses;
+  const sharedHorses = useQuery(
+    api.horseAccess.listSharedForUser,
+    isTeamRole && user?.id ? { userId: user.id as Id<"users"> } : "skip",
+  ) ?? [];
+  const horses = isOwnerRole ? ownerHorses : isTeamRole ? sharedHorses : allHorses;
 
   const owners = useQuery(api.owners.list) ?? [];
   const createHorse = useMutation(api.horses.createHorse);

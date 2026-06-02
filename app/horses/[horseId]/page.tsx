@@ -106,6 +106,22 @@ export default function HorseProfilePage() {
   const documents = useQuery(api.documents.listByHorse, horseId ? { horseId } : "skip") ?? [];
   const ownersList = useQuery(api.owners.list) ?? [];
 
+  // Multi-owner + team-access lookups
+  const horseOwners = useQuery(api.horseOwnerships.listForHorse, horseId ? { horseId } : "skip") ?? [];
+  const horseAccessList = useQuery(api.horseAccess.listForHorse, horseId ? { horseId } : "skip") ?? [];
+  const grantableUsers = useQuery(api.horseAccess.listGrantableUsers) ?? [];
+  const addHorseOwner = useMutation(api.horseOwnerships.addOwner);
+  const removeHorseOwner = useMutation(api.horseOwnerships.removeOwner);
+  const grantHorseAccess = useMutation(api.horseAccess.grant);
+  const revokeHorseAccess = useMutation(api.horseAccess.revoke);
+
+  const isAdmin = user?.role === "admin";
+
+  // Local form state for the two new admin cards on the profile.
+  const [newOwnerId, setNewOwnerId] = useState<string>("");
+  const [newOwnerSharePct, setNewOwnerSharePct] = useState<string>("");
+  const [newAccessUserId, setNewAccessUserId] = useState<string>("");
+
   const updateHorseProfile = useMutation(api.horses.updateHorseProfile);
   const assignHorseToOwner = useMutation(api.owners.assignHorseToOwner);
   const deleteHorse = useMutation(api.horses.deleteHorse);
@@ -370,6 +386,145 @@ export default function HorseProfilePage() {
             </div>
           ) : null}
         </section>
+
+        {/* OWNERS — multi-owner list. Admin can add/remove; team-role users
+            see read-only. A bright "no owner assigned" warning shows when
+            the list is empty. */}
+        <section className={styles.profileCard}>
+          <div className={styles.profileHeaderRow}>
+            <h2 className={styles.cardSectionTitle}>OWNERS</h2>
+            {horseOwners.length === 0 ? (
+              <span className={styles.noOwnerBadge}>no owner assigned</span>
+            ) : null}
+          </div>
+          {horseOwners.length > 0 ? (
+            <div className={styles.ownerList}>
+              {horseOwners.map((o) => (
+                <div key={String(o._id)} className={styles.ownerRow}>
+                  <span className={styles.ownerName}>{o.ownerName}</span>
+                  <span className={styles.ownerShare}>
+                    {typeof o.sharePct === "number"
+                      ? `${o.sharePct}%`
+                      : `${o.effectiveSharePct.toFixed(1)}% (equal split)`}
+                  </span>
+                  {isAdmin ? (
+                    <button
+                      type="button"
+                      className={styles.ownerRemoveBtn}
+                      onClick={() => void removeHorseOwner({ horseId, ownerId: o.ownerId })}
+                      title="Remove this owner"
+                    >
+                      ✕
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {isAdmin ? (
+            <div className={styles.ownerAddRow}>
+              <select
+                className={styles.ownerSelect}
+                value={newOwnerId}
+                onChange={(e) => setNewOwnerId(e.target.value)}
+              >
+                <option value="">— pick an owner —</option>
+                {ownersList
+                  .filter((o) => !horseOwners.some((ho) => String(ho.ownerId) === String(o._id)))
+                  .map((o) => (
+                    <option key={o._id} value={String(o._id)}>{o.name}</option>
+                  ))}
+              </select>
+              <input
+                className={styles.ownerShareInput}
+                type="number"
+                placeholder="share %"
+                min={0}
+                max={100}
+                value={newOwnerSharePct}
+                onChange={(e) => setNewOwnerSharePct(e.target.value)}
+              />
+              <button
+                type="button"
+                className={styles.btnAddInline}
+                disabled={!newOwnerId}
+                onClick={async () => {
+                  const sharePct = newOwnerSharePct.trim() ? Number(newOwnerSharePct) : undefined;
+                  await addHorseOwner({
+                    horseId,
+                    ownerId: newOwnerId as Id<"owners">,
+                    sharePct: Number.isFinite(sharePct) ? sharePct : undefined,
+                  });
+                  setNewOwnerId("");
+                  setNewOwnerSharePct("");
+                }}
+              >
+                + add owner
+              </button>
+            </div>
+          ) : null}
+        </section>
+
+        {/* SHARED WITH — admin-only management of team-role users' access
+            to this horse. Hidden entirely for team-role viewers. */}
+        {isAdmin ? (
+          <section className={styles.profileCard}>
+            <div className={styles.profileHeaderRow}>
+              <h2 className={styles.cardSectionTitle}>SHARED WITH</h2>
+            </div>
+            {horseAccessList.length > 0 ? (
+              <div className={styles.ownerList}>
+                {horseAccessList.map((a) => (
+                  <div key={String(a._id)} className={styles.ownerRow}>
+                    <span className={styles.ownerName}>{a.userName}</span>
+                    {a.userEmail ? <span className={styles.ownerShare}>{a.userEmail}</span> : null}
+                    <button
+                      type="button"
+                      className={styles.ownerRemoveBtn}
+                      onClick={() => void revokeHorseAccess({ horseId, userId: a.userId })}
+                      title="Revoke access"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className={styles.emptyHint}>no team members have access yet</div>
+            )}
+            <div className={styles.ownerAddRow}>
+              <select
+                className={styles.ownerSelect}
+                value={newAccessUserId}
+                onChange={(e) => setNewAccessUserId(e.target.value)}
+              >
+                <option value="">— pick a team member —</option>
+                {grantableUsers
+                  .filter((u) => !horseAccessList.some((a) => String(a.userId) === String(u._id)))
+                  .map((u) => (
+                    <option key={u._id} value={String(u._id)}>
+                      {u.name}{u.email ? ` (${u.email})` : ""}
+                    </option>
+                  ))}
+              </select>
+              <button
+                type="button"
+                className={styles.btnAddInline}
+                disabled={!newAccessUserId}
+                onClick={async () => {
+                  await grantHorseAccess({
+                    horseId,
+                    userId: newAccessUserId as Id<"users">,
+                    grantedBy: (user?.id as Id<"users">) ?? undefined,
+                  });
+                  setNewAccessUserId("");
+                }}
+              >
+                + share
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         {!isTeam && (
           <Link href={`/horses/${horse._id}/financials`} className={styles.financialsBlock}>
