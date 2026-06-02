@@ -228,9 +228,13 @@ export default function MedsPage() {
           ) : (
             medRecords.map((r: any) => {
               const horse = horseById.get(String(r.horseId));
-              const medName = Array.isArray(r.medications) && r.medications.length > 0
-                ? r.medications[0]
-                : "—";
+              // Migrated records (promoted from type=veterinary visitType="medication")
+              // may not have a medications array — fall back to the record title,
+              // treatmentDescription, or the human-friendly placeholder.
+              const medName =
+                Array.isArray(r.medications) && r.medications.length > 0
+                  ? r.medications[0]
+                  : (r.title?.trim() || (r as any).treatmentDescription?.trim() || "—");
               const repeatLabel =
                 r.medicationRepeatValue && r.medicationRepeatUnit
                   ? `every ${r.medicationRepeatValue} ${r.medicationRepeatUnit}`

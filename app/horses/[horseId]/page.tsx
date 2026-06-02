@@ -584,10 +584,13 @@ export default function HorseProfilePage() {
           ) : (
             <div className={styles.ownerList}>
               {horseMeds.slice(0, 5).map((m) => {
+                // Fall back to title / treatmentDescription for migrated records
+                // that came from the legacy vet "medication" subcategory and lack
+                // a populated medications array.
                 const medName =
                   Array.isArray((m as any).medications) && (m as any).medications.length > 0
                     ? (m as any).medications[0]
-                    : "—";
+                    : ((m as any).title?.trim() || (m as any).treatmentDescription?.trim() || "—");
                 const dateLabel = new Date((m as any).date).toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",

@@ -22,7 +22,6 @@ type VetSubcategory =
 // vetSubcategoryLabel below.
 const VET_SUBCATEGORY_OPTIONS: Array<{ value: VetSubcategory; label: string }> = [
   { value: "vaccinations", label: "Vaccinations" },
-  { value: "medication", label: "Medication" },
   { value: "joint_injections", label: "Joint Injections" },
   { value: "imaging", label: "Imaging" },
   { value: "lab_work", label: "Lab Work" },
@@ -42,6 +41,7 @@ function vetSubcategoryLabel(value?: string | null) {
   // Legacy values no longer in the picker — render under the merged label.
   if (value === "exam") return "Exams & Diagnostics";
   if (value === "fees") return "Fees";
+  if (value === "medication") return "Medication";
   return value.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 

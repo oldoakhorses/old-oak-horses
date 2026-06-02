@@ -44,7 +44,6 @@ type VetSubcategory =
 // Diagnostics" / "Fees"). "blood_test" is new.
 const VET_VISIT_TYPE_OPTIONS: Array<{ value: VetSubcategory; label: string }> = [
   { value: "vaccinations", label: "Vaccinations" },
-  { value: "medication", label: "Medication" },
   { value: "joint_injections", label: "Joint Injections" },
   { value: "imaging", label: "Imaging" },
   { value: "lab_work", label: "Lab Work" },

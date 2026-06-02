@@ -447,6 +447,44 @@ export const deleteHorseRecord = mutation({
   }
 });
 
+/** One-shot migration: any record currently classified as type="veterinary"
+ *  with the legacy "medication" subcategory (either singular visitType
+ *  or inside the visitTypes array) is promoted to type="medication" so
+ *  it shows on the /meds page. visitType is cleared on promotion and
+ *  "medication" is filtered out of any visitTypes array; if that leaves
+ *  the array empty, the field is unset.
+ *  Idempotent — re-running finds nothing left to migrate. */
+export const migrateVetMedicationToMedicationRecords = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const records = await ctx.db.query("horseRecords").collect();
+    let promoted = 0;
+    for (const r of records) {
+      if (r.type !== "veterinary") continue;
+      const hasMedSingular = r.visitType === "medication";
+      const visitTypesArr = Array.isArray(r.visitTypes) ? r.visitTypes : [];
+      const hasMedInArray = visitTypesArr.includes("medication");
+      if (!hasMedSingular && !hasMedInArray) continue;
+
+      const remaining = visitTypesArr.filter((t) => t !== "medication");
+      const patch: Record<string, unknown> = {
+        type: "medication",
+        // Clear the now-redundant subcategory fields. If there were
+        // co-tagged visit types (e.g. ["vaccinations","medication"]),
+        // they're preserved on visitTypes so the record still carries
+        // that context for inspection — but the top-level type is now
+        // medication, so it lands on /meds.
+        visitType: undefined,
+      };
+      if (remaining.length === 0) patch.visitTypes = undefined;
+      else patch.visitTypes = remaining;
+      await ctx.db.patch(r._id, patch as any);
+      promoted += 1;
+    }
+    return { totalRecords: records.length, promoted };
+  }
+});
+
 /** One-shot migration: rewrite the legacy "exam" vet subcategory to
  *  "exams_diagnostics" on existing horseRecords (both the singular
  *  visitType and inside the visitTypes array). Idempotent; safe to
