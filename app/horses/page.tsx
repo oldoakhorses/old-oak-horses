@@ -93,6 +93,12 @@ export default function HorsesPage() {
       setFormError("name is required");
       return;
     }
+    // Every new horse must have an owner (or create one inline). Enforces
+    // the "horses are owned by an entity" rule before the row even lands.
+    if (!form.ownerSelection || (form.ownerSelection === "__other" && !form.newOwnerName.trim())) {
+      setFormError("owner is required — pick an existing owner or create a new one");
+      return;
+    }
 
     setFormError("");
     setIsSubmitting(true);

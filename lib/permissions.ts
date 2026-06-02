@@ -10,12 +10,18 @@ const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/records": ["admin", "owner", "team"],
   "/team": ["admin", "team"],
   "/accounts": ["admin", "owner", "team"],
+  // Admin-only sub-route — must come BEFORE the broader /accounts rule
+  // wins in the match loop (sorted by length descending below).
+  "/accounts/users": ["admin"],
 };
 
 export function canAccessRoute(role: UserRole, pathname: string): boolean {
   if (role === "admin") return true;
 
-  for (const [route, allowedRoles] of Object.entries(ROUTE_PERMISSIONS)) {
+  // Sort routes by path length descending so more-specific rules (e.g.
+  // /accounts/users) win over their broader parents (e.g. /accounts).
+  const sortedRoutes = Object.entries(ROUTE_PERMISSIONS).sort((a, b) => b[0].length - a[0].length);
+  for (const [route, allowedRoles] of sortedRoutes) {
     if (pathname === route || pathname.startsWith(`${route}/`)) {
       return allowedRoles.includes(role);
     }

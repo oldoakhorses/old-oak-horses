@@ -99,7 +99,10 @@ export default function HorseProfilePage() {
   const horseId = params?.horseId as Id<"horses">;
   const startsInEditMode = searchParams.get("edit") === "1";
 
-  const horse = useQuery(api.horses.getHorseById, horseId ? { horseId } : "skip");
+  const horse = useQuery(
+    api.horses.getHorseById,
+    horseId ? { horseId, viewerUserId: user?.id ? (user.id as Id<"users">) : undefined } : "skip",
+  );
   const recordCounts = useQuery(api.horses.getHorseRecordCounts, horseId ? { horseId } : "skip");
   const prizeMoneyData = useQuery(api.incomeEntries.getHorsePrizeMoney, horseId ? { horseId } : "skip");
   const recordsAll = (useQuery(api.horseRecords.getAllByHorse, horseId ? { horseId } : "skip") as HorseRecord[] | undefined) ?? [];

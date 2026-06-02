@@ -260,6 +260,10 @@ export default function DashboardPage() {
       setFormError("Name is required.");
       return;
     }
+    if (!horseForm.owner.trim()) {
+      setFormError("Owner is required — every horse must be attached to an owner.");
+      return;
+    }
 
     setFormError("");
     setIsSubmitting(true);

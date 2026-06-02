@@ -36,9 +36,26 @@ export const getHorsesByOwner = query({
 });
 
 export const getHorseById = query({
-  args: { horseId: v.id("horses") },
+  args: { horseId: v.id("horses"), viewerUserId: v.optional(v.id("users")) },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.horseId);
+    const horse = await ctx.db.get(args.horseId);
+    if (!horse) return null;
+    // Access guard: team-role users can only see horses explicitly shared
+    // with them via the horseAccess table. Admin/owner roles (and anonymous
+    // callers without a viewerUserId) skip the check.
+    if (args.viewerUserId) {
+      const viewer = await ctx.db.get(args.viewerUserId);
+      if (viewer?.role === "team") {
+        const grant = await ctx.db
+          .query("horseAccess")
+          .withIndex("by_horse_user", (q) =>
+            q.eq("horseId", args.horseId).eq("userId", args.viewerUserId!),
+          )
+          .first();
+        if (!grant) return null;
+      }
+    }
+    return horse;
   }
 });
 
@@ -68,8 +85,25 @@ export const createHorse = mutation({
       });
       ownerName = args.newOwnerName.trim();
     }
+    // Fall-through: caller provided a free-text owner name but no ownerId
+    // (e.g. dashboard quick-add). Resolve by case-insensitive name match;
+    // create the owner entity if it doesn't exist so every horse has a
+    // real owner row and a horseOwnerships seed.
+    if (!ownerId && ownerName) {
+      const existing = await ctx.db.query("owners").collect();
+      const match = existing.find((o) => o.name.trim().toLowerCase() === ownerName!.toLowerCase());
+      if (match) {
+        ownerId = match._id;
+      } else {
+        ownerId = await ctx.db.insert("owners", {
+          name: ownerName,
+          isActive: true,
+          createdAt: Date.now(),
+        });
+      }
+    }
 
-    return await ctx.db.insert("horses", {
+    const horseId = await ctx.db.insert("horses", {
       name: args.name.trim(),
       barnName: args.barnName?.trim() || undefined,
       yearOfBirth: args.yearOfBirth,
@@ -82,6 +116,18 @@ export const createHorse = mutation({
       status: "active",
       createdAt: Date.now()
     });
+    // Seed horseOwnerships so the new multi-owner system has a row from
+    // day one. The legacy horses.ownerId stays in sync via the same
+    // mutation, but this is the source of truth going forward.
+    if (ownerId) {
+      await ctx.db.insert("horseOwnerships", {
+        horseId,
+        ownerId,
+        sharePct: undefined,
+        createdAt: Date.now(),
+      });
+    }
+    return horseId;
   }
 });
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -14,6 +15,11 @@ export default function AccountPage() {
   const userId = user?.id as Id<"users"> | undefined;
 
   const profile = useQuery(api.users.getProfile, userId ? { userId } : "skip");
+  // Shared horses — visible to every signed-in user as a read-only list.
+  const sharedHorses = useQuery(
+    api.horseAccess.listSharedForUser,
+    userId ? { userId } : "skip",
+  ) ?? [];
   const updateProfile = useMutation(api.users.updateProfile);
   const resetPasscode = useMutation(api.users.resetPasscode);
   const generateUploadUrl = useMutation(api.users.generateUploadUrl);
@@ -217,6 +223,50 @@ export default function AccountPage() {
                 <span className={styles.fieldValue}>{profile.role ?? "—"}</span>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Shared horses — the team-member counterpart to the SHARED WITH
+            card on each horse profile. Same access table, different angle. */}
+        <section className={styles.profileCard}>
+          <div className={styles.fields}>
+            <div className={styles.fieldRow}>
+              <div className={styles.fieldLabel}>SHARED HORSES</div>
+              <div className={styles.fieldValueRow} style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+                {sharedHorses.length === 0 ? (
+                  <span className={styles.fieldValue} style={{ color: "#9ea2b0" }}>
+                    {profile.role === "team"
+                      ? "no horses shared with you yet — ask an admin"
+                      : "you have full horse access via your role"}
+                  </span>
+                ) : (
+                  sharedHorses.map((h) => (
+                    <Link
+                      key={String(h._id)}
+                      href={`/horses/${h._id}`}
+                      className={styles.fieldValue}
+                      style={{ textDecoration: "none", color: "#4a5bdb" }}
+                    >
+                      🐴 {h.name}
+                    </Link>
+                  ))
+                )}
+              </div>
+            </div>
+            {profile.role === "admin" ? (
+              <div className={styles.fieldRow}>
+                <div className={styles.fieldLabel}>MANAGE</div>
+                <div className={styles.fieldValueRow}>
+                  <Link
+                    href="/accounts/users"
+                    className={styles.fieldValue}
+                    style={{ textDecoration: "none", color: "#4a5bdb" }}
+                  >
+                    manage team-user horse access →
+                  </Link>
+                </div>
+              </div>
+            ) : null}
           </div>
         </section>
 
