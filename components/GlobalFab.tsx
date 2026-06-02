@@ -1743,6 +1743,17 @@ export default function GlobalFab() {
             <span className={styles.fabMenuIcon}>📋</span>
             <span className={styles.fabMenuLabel}>log record</span>
           </button>
+          <button
+            type="button"
+            className={styles.fabMenuItem}
+            onClick={() => {
+              setFabMenuOpen(false);
+              router.push("/meds?new=1");
+            }}
+          >
+            <span className={styles.fabMenuIcon}>💊</span>
+            <span className={styles.fabMenuLabel}>record meds</span>
+          </button>
           <button type="button" className={styles.fabMenuItem} onClick={() => handleFabOptionClick("invoice")}>
             <span className={styles.fabMenuIcon}>📄</span>
             <span className={styles.fabMenuLabel}>upload invoice</span>

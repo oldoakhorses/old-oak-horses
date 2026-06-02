@@ -75,7 +75,10 @@ export default function MedsPage() {
   const searchParams = useSearchParams();
   // Honor /meds?horse=<id> from deep links (e.g. the horse profile's
   // "+ log med" button). Auto-opens the modal with the horse pre-selected.
+  // Also honor /meds?new=1 (used by the global FAB's "record meds" item)
+  // which auto-opens the modal without a horse pre-selection.
   const prefilledHorseId = searchParams?.get("horse") ?? null;
+  const autoOpenNew = searchParams?.get("new") === "1";
 
   // Active horses for the picker. Team users only see horses they've been
   // granted access to (mirrors the rule on the /horses page).
@@ -118,14 +121,18 @@ export default function MedsPage() {
     setShowAdd(true);
   }
 
-  // Auto-open the modal with the horse pre-selected when the user lands
-  // on /meds?horse=<id> from a horse profile button. Runs once on mount.
+  // Auto-open the modal in two cases:
+  //  - /meds?horse=<id> → pre-selects that horse (deep link from horse profile)
+  //  - /meds?new=1      → opens with no horse pre-selected (FAB shortcut)
+  // Runs once when the horse list is ready.
   useEffect(() => {
     if (prefilledHorseId && horseById.has(prefilledHorseId)) {
       openAdd(prefilledHorseId);
+    } else if (autoOpenNew) {
+      openAdd();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefilledHorseId, horses.length]);
+  }, [prefilledHorseId, autoOpenNew, horses.length]);
 
   function toggleHorse(horseId: string) {
     setForm((p) => ({
