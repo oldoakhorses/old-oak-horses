@@ -376,9 +376,7 @@ export default function HorseRecordsPage() {
           { label: horse.name, href: `/horses/${horse._id}` },
           { label: "records", current: true },
         ]}
-        actions={[
-          { label: "+ log record", href: `/dashboard?panel=record&horseId=${horse._id}` },
-        ]}
+        actions={[]}
       />
 
       <main className="page-main">
@@ -510,7 +508,7 @@ export default function HorseRecordsPage() {
                 activeTab === "upcoming" ? (
                   <>
                     <div className={styles.emptyTitle}>no upcoming records</div>
-                    <div className={styles.emptySub}>schedule visits using + log record</div>
+                    <div className={styles.emptySub}>schedule visits from the dashboard</div>
                   </>
                 ) : (
                   <>
