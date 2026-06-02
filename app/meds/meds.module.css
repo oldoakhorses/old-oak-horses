@@ -1,0 +1,163 @@
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.title {
+  margin: 8px 0 0;
+  font-size: 36px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.addButton {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  cursor: pointer;
+}
+.addButton:hover { background: #2a2a4e; }
+
+.list {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 160px 120px 80px 80px;
+  padding: 14px 22px;
+  align-items: center;
+  border-bottom: 1px solid #f0f1f5;
+  gap: 12px;
+}
+.row:last-child { border-bottom: none; }
+.row:hover { background: #fafafc; }
+
+.header {
+  display: grid;
+  grid-template-columns: 1fr 160px 120px 80px 80px;
+  padding: 12px 22px;
+  font-size: 9px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e8eaf0;
+  background: #fafafc;
+  gap: 12px;
+}
+
+.medName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+.metaTitle { font-size: 11px; color: #6b7084; margin-top: 2px; }
+
+.horses { font-size: 11px; color: #6b7084; }
+.date { font-size: 11px; color: #6b7084; }
+.repeatBadge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(34,197,131,0.08);
+  color: #22c583;
+  text-transform: uppercase;
+}
+.createdBy { font-size: 10px; color: #9ea2b0; text-align: right; }
+
+.empty {
+  padding: 60px 22px;
+  text-align: center;
+  font-size: 12px;
+  color: #9ea2b0;
+}
+
+/* ───── Modal form ───── */
+.form { display: grid; gap: 14px; }
+.field { display: flex; flex-direction: column; }
+.fieldLabel {
+  font-size: 10px;
+  color: #9ea2b0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.fieldHint { font-size: 9px; color: #9ea2b0; margin-top: 4px; }
+.input {
+  font-size: 12px;
+  padding: 10px 14px;
+  background: #f2f3f7;
+  border: 1px solid #e8eaf0;
+  border-radius: 6px;
+  color: #1a1a2e;
+}
+.textarea { min-height: 70px; resize: vertical; font-family: inherit; }
+
+.horseChips { display: flex; flex-wrap: wrap; gap: 6px; }
+.horseChip,
+.horseChipActive {
+  font-size: 11px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  border: 1px solid #e8eaf0;
+  background: #fff;
+  color: #1a1a2e;
+}
+.horseChipActive {
+  background: #1a1a2e;
+  color: #fff;
+  border-color: #1a1a2e;
+  font-weight: 600;
+}
+
+.medGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.medOption,
+.medOptionActive {
+  font-size: 11px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid #e8eaf0;
+  background: #fff;
+  color: #1a1a2e;
+  text-align: center;
+  text-transform: capitalize;
+}
+.medOptionActive {
+  background: rgba(34,197,131,0.08);
+  border-color: #22c583;
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.repeatRow {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+}
+.repeatCheckbox { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #6b7084; cursor: pointer; }
+
+.error { margin: 0; font-size: 11px; color: #e5484d; }
+
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+@media (max-width: 720px) {
+  .row, .header { grid-template-columns: 1fr; gap: 4px; padding: 14px 18px; }
+  .header { display: none; }
+  .createdBy { text-align: left; }
+  .medGrid { grid-template-columns: repeat(2, 1fr); }
+}

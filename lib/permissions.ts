@@ -8,6 +8,7 @@ const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard": ["admin", "team"],
   "/horses": ["admin", "owner", "team"],
   "/records": ["admin", "owner", "team"],
+  "/meds": ["admin", "owner", "team"],
   "/team": ["admin", "team"],
   "/accounts": ["admin", "owner", "team"],
   // Admin-only sub-route — must come BEFORE the broader /accounts rule
@@ -42,6 +43,7 @@ export function getNavSections(role: UserRole) {
       items: [
         { label: "horses", href: "/horses", icon: "🐴" },
         { label: "records", href: "/records", icon: "📋" },
+        { label: "meds", href: "/meds", icon: "💊" },
         { label: "team", href: "/team", icon: "🧑‍🤝‍🧑" },
       ],
     },
