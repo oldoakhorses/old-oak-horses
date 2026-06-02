@@ -703,7 +703,7 @@ export default function RecordsPage() {
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: "records", current: true },
         ]}
 
@@ -1338,7 +1338,7 @@ export default function RecordsPage() {
           )}
         </section>
 
-        <div className="ui-footer">OLD_OAK_HORSES // RECORDS</div>
+        <div className="ui-footer">TEAM_LDK // RECORDS</div>
       </main>
 
       <div className={`${styles.panelOverlay} ${panelOpen ? styles.panelOverlayOpen : ""}`} onClick={closePanel} />

@@ -218,7 +218,7 @@ export default function InvoicesPage() {
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: "invoices", current: true },
         ]}
         actions={[

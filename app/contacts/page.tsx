@@ -225,7 +225,7 @@ export default function ContactsPage() {
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: "contacts", current: true },
         ]}
         actions={[
@@ -470,7 +470,7 @@ export default function ContactsPage() {
             })
           )}
         </section>
-        <div className="ui-footer">OLD_OAK_HORSES // CONTACTS</div>
+        <div className="ui-footer">TEAM_LDK // CONTACTS</div>
       </main>
     </div>
   );

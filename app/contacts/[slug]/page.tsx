@@ -166,7 +166,7 @@ export default function ContactDetailPage() {
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: "contacts", href: "/contacts" },
           { label: contact.name, current: true },
         ]}

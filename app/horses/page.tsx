@@ -116,7 +116,7 @@ export default function HorsesPage() {
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: "horses", current: true },
         ]}
         actions={[
@@ -231,7 +231,7 @@ export default function HorsesPage() {
           {filtered.length === 0 ? <div className={styles.empty}>no horses found</div> : null}
         </section>
 
-        <div className="ui-footer">OLD_OAK_HORSES // HORSES</div>
+        <div className="ui-footer">TEAM_LDK // HORSES</div>
       </main>
 
       <Modal open={showAddModal} title="add horse" onClose={() => setShowAddModal(false)}>

@@ -50,7 +50,7 @@ export default function SplashPage() {
       <div className={styles.splashOverlay} />
 
       <div className={styles.splashContent}>
-        <h1 className={styles.splashTitle}>old oak horses</h1>
+        <h1 className={styles.splashTitle}>team ldk</h1>
         <button type="button" className={styles.splashEnter} onClick={() => router.push("/login")}>
           enter
         </button>

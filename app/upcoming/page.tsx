@@ -8,7 +8,7 @@ export default function UpcomingPage() {
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: "upcoming", current: true },
         ]}
 

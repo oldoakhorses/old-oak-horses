@@ -57,7 +57,7 @@ export default function BizOverviewPage() {
       <div className="page-shell">
         <NavBar
           items={[
-            { label: "old-oak-horses", href: "/dashboard", brand: true },
+            { label: "team-ldk", href: "/dashboard", brand: true },
             { label: "biz_overview", current: true }
           ]}
           actions={[{ label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" }]}
@@ -70,7 +70,7 @@ export default function BizOverviewPage() {
             <p className={styles.emptyText}>No invoices found for this period.</p>
             <Link href="/dashboard" className="ui-button-outlined">go to dashboard</Link>
           </section>
-          <div className="ui-footer">OLD_OAK_HORSES // BIZ_OVERVIEW</div>
+          <div className="ui-footer">TEAM_LDK // BIZ_OVERVIEW</div>
         </main>
       </div>
     );
@@ -80,7 +80,7 @@ export default function BizOverviewPage() {
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: "biz_overview", current: true }
         ]}
         actions={[{ label: "upload invoices", href: "/dashboard?panel=invoice", variant: "outlined" }]}
@@ -325,7 +325,7 @@ export default function BizOverviewPage() {
           ) : null}
         </section>
 
-        <div className="ui-footer">OLD_OAK_HORSES // BIZ_OVERVIEW</div>
+        <div className="ui-footer">TEAM_LDK // BIZ_OVERVIEW</div>
       </main>
     </div>
   );

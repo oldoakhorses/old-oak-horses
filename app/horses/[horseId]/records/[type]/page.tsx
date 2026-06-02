@@ -73,7 +73,7 @@ export default function HorseRecordTypePage() {
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: "horses", href: "/horses" },
           { label: horse.name, href: `/horses/${horse._id}` },
           { label: "records", href: `/horses/${horse._id}/records` },
@@ -119,7 +119,7 @@ export default function HorseRecordTypePage() {
           )}
         </section>
 
-        <div className="ui-footer">OLD_OAK_HORSES // {horse.name.toUpperCase()} // {meta.label.toUpperCase()}</div>
+        <div className="ui-footer">TEAM_LDK // {horse.name.toUpperCase()} // {meta.label.toUpperCase()}</div>
       </main>
     </div>
   );

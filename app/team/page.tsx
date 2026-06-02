@@ -144,7 +144,7 @@ export default function TeamPage() {
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: "team", current: true },
         ]}
         actions={[
@@ -259,7 +259,7 @@ export default function TeamPage() {
           {filtered.length === 0 ? <div className={styles.empty}>no team members found</div> : null}
         </section>
 
-        <div className="ui-footer">OLD_OAK_HORSES // TEAM</div>
+        <div className="ui-footer">TEAM_LDK // TEAM</div>
       </main>
 
       <Modal

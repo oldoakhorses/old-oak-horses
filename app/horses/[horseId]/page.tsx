@@ -235,7 +235,7 @@ export default function HorseProfilePage() {
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: "horses", href: "/horses" },
           { label: horse.name, current: true },
         ]}
@@ -465,7 +465,7 @@ export default function HorseProfilePage() {
           )}
         </section>
 
-        <div className="ui-footer">OLD_OAK_HORSES // HORSES // {horse.name.toUpperCase()}</div>
+        <div className="ui-footer">TEAM_LDK // HORSES // {horse.name.toUpperCase()}</div>
       </main>
 
       <Modal open={documentToDelete !== null} title="delete document?" onClose={() => setDocumentToDelete(null)}>

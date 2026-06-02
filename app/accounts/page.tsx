@@ -104,7 +104,7 @@ export default function AccountPage() {
   if (!user || !profile) {
     return (
       <div className="page-shell">
-        <NavBar items={[{ label: "old-oak-horses", href: "/dashboard", brand: true }, { label: "account", current: true }]} actions={[]} />
+        <NavBar items={[{ label: "team-ldk", href: "/dashboard", brand: true }, { label: "account", current: true }]} actions={[]} />
         <main className="page-main">
           <div className={styles.empty}>loading...</div>
         </main>
@@ -116,7 +116,7 @@ export default function AccountPage() {
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: "account", current: true },
         ]}
         actions={[]}
@@ -220,7 +220,7 @@ export default function AccountPage() {
           </div>
         </section>
 
-        <div className="ui-footer">OLD_OAK_HORSES // ACCOUNT</div>
+        <div className="ui-footer">TEAM_LDK // ACCOUNT</div>
       </main>
 
       <Modal

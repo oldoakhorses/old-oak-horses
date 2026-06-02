@@ -371,7 +371,7 @@ export default function HorseRecordsPage() {
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: "horses", href: "/horses" },
           { label: horse.name, href: `/horses/${horse._id}` },
           { label: "records", current: true },
@@ -1007,7 +1007,7 @@ export default function HorseRecordsPage() {
           )}
         </section>
 
-        <div className="ui-footer">OLD_OAK_HORSES // HORSES // {horse.name.toUpperCase()} // RECORDS</div>
+        <div className="ui-footer">TEAM_LDK // HORSES // {horse.name.toUpperCase()} // RECORDS</div>
       </main>
 
       <Modal open={recordToDelete !== null} title="delete record?" onClose={() => setRecordToDelete(null)}>

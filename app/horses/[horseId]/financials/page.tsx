@@ -71,7 +71,7 @@ export default function FinancialsPage() {
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: "horses", href: "/horses" },
           { label: horse.name, href: `/horses/${horse._id}` },
           { label: "financials", current: true },
@@ -206,7 +206,7 @@ export default function FinancialsPage() {
           )}
         </section>
 
-        <div className="ui-footer">OLD_OAK_HORSES // HORSES // {horse.name.toUpperCase()} // FINANCIALS</div>
+        <div className="ui-footer">TEAM_LDK // HORSES // {horse.name.toUpperCase()} // FINANCIALS</div>
       </main>
     </div>
   );

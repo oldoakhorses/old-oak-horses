@@ -1665,7 +1665,7 @@ export default function InvoicePreviewPage() {
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: "invoices", href: "/invoices" },
           { label: isEditing ? "edit" : "preview", current: true }
         ]}
@@ -2440,7 +2440,7 @@ export default function InvoicePreviewPage() {
 
             {error ? <div className={styles.error}>{error}</div> : null}
 
-            <div className={styles.footer}>OLD_OAK_HORSES // INVOICES // {isEditing ? "EDIT" : "PREVIEW"}</div>
+            <div className={styles.footer}>TEAM_LDK // INVOICES // {isEditing ? "EDIT" : "PREVIEW"}</div>
           </div>
 
           <div className={styles.pdfPreviewPanel}>

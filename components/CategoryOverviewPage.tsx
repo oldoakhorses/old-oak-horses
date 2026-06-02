@@ -202,7 +202,7 @@ export default function CategoryOverviewPage({
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: categorySlug, current: true },
         ]}
         actions={[
@@ -290,7 +290,7 @@ export default function CategoryOverviewPage({
 
         <InvoiceList title="all_invoices" items={invoiceList} showProviderTag searchPlaceholder="search invoices..." />
 
-        <div className="ui-footer">OLD_OAK_HORSES // {categorySlug.toUpperCase()}</div>
+        <div className="ui-footer">TEAM_LDK // {categorySlug.toUpperCase()}</div>
       </main>
     </div>
   );

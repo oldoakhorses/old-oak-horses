@@ -596,7 +596,7 @@ export default function CalendarPage() {
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: "calendar", current: true },
         ]}
       />

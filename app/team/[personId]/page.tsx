@@ -170,7 +170,7 @@ export default function TeamProfilePage() {
       <div className="page-shell">
         <NavBar
           items={[
-            { label: "old-oak-horses", href: "/dashboard", brand: true },
+            { label: "team-ldk", href: "/dashboard", brand: true },
             { label: "team", href: "/team" },
             { label: "...", current: true },
           ]}
@@ -187,7 +187,7 @@ export default function TeamProfilePage() {
       <div className="page-shell">
         <NavBar
           items={[
-            { label: "old-oak-horses", href: "/dashboard", brand: true },
+            { label: "team-ldk", href: "/dashboard", brand: true },
             { label: "team", href: "/team" },
             { label: "not found", current: true },
           ]}
@@ -208,7 +208,7 @@ export default function TeamProfilePage() {
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: "team", href: "/team" },
           { label: person.name, current: true },
         ]}
@@ -471,7 +471,7 @@ export default function TeamProfilePage() {
           )}
         </section>
 
-        <div className="ui-footer">OLD_OAK_HORSES // TEAM // {person.name.toUpperCase()}</div>
+        <div className="ui-footer">TEAM_LDK // TEAM // {person.name.toUpperCase()}</div>
       </main>
 
       <Modal

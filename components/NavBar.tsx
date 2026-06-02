@@ -78,7 +78,7 @@ export default function NavBar({
         <div className={styles.sidebarHeader}>
           <div className={styles.sidebarBrand}>
             <div className={styles.sidebarBrandIcon}><span>O</span></div>
-            <span className={styles.sidebarBrandName}>old_oak_horses</span>
+            <span className={styles.sidebarBrandName}>team_ldk</span>
           </div>
           <button type="button" className={styles.closeBtn} onClick={() => setMenuOpen(false)}>
             ✕
@@ -111,7 +111,7 @@ export default function NavBar({
           <button type="button" className={styles.sidebarSignOut} onClick={onSignOut}>
             sign out
           </button>
-          <div className={styles.sidebarCopyright}>OLD_OAK_HORSES // 2026</div>
+          <div className={styles.sidebarCopyright}>TEAM_LDK // 2026</div>
         </div>
       </aside>
 

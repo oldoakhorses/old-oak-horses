@@ -62,8 +62,8 @@ export default function LoginPage() {
         </button>
 
         <div className={styles.brand}>
-          <div className={styles.brandIcon}>O</div>
-          <div className={styles.brandName}>old_oak_horses</div>
+          <div className={styles.brandIcon}>T</div>
+          <div className={styles.brandName}>team_ldk</div>
         </div>
 
         <div className={styles.header}>
@@ -124,7 +124,7 @@ export default function LoginPage() {
         </a>
       </div>
 
-      <div className={styles.loginFooter}>OLD_OAK_HORSES // BILL MANAGEMENT</div>
+      <div className={styles.loginFooter}>TEAM_LDK // BILL MANAGEMENT</div>
     </div>
   );
 }

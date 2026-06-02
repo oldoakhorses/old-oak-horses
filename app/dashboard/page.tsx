@@ -609,7 +609,7 @@ export default function DashboardPage() {
     <div className="page-shell">
       <NavBar
         items={[
-          { label: "old-oak-horses", href: "/dashboard", brand: true },
+          { label: "team-ldk", href: "/dashboard", brand: true },
           { label: "dashboard", current: true },
         ]}
 
@@ -815,7 +815,7 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <div className="ui-footer">OLD_OAK_HORSES // DASHBOARD</div>
+        <div className="ui-footer">TEAM_LDK // DASHBOARD</div>
       </main>
 
       <Modal open={showHorseModal} title="add horse" onClose={() => setShowHorseModal(false)}>
