@@ -109,6 +109,16 @@ export default function HorseProfilePage() {
   const documents = useQuery(api.documents.listByHorse, horseId ? { horseId } : "skip") ?? [];
   const ownersList = useQuery(api.owners.list) ?? [];
 
+  // Recent medications logged for this horse (newest first).
+  const horseRecordsForThis = useQuery(api.horseRecords.getAllByHorse, horseId ? { horseId } : "skip") ?? [];
+  const horseMeds = useMemo(
+    () =>
+      [...horseRecordsForThis]
+        .filter((r: any) => r.type === "medication")
+        .sort((a: any, b: any) => (b.date ?? 0) - (a.date ?? 0)),
+    [horseRecordsForThis],
+  );
+
   // Multi-owner + team-access lookups
   const horseOwners = useQuery(api.horseOwnerships.listForHorse, horseId ? { horseId } : "skip") ?? [];
   const horseAccessList = useQuery(api.horseAccess.listForHorse, horseId ? { horseId } : "skip") ?? [];
@@ -528,6 +538,76 @@ export default function HorseProfilePage() {
             </div>
           </section>
         ) : null}
+
+        {/* MEDS — most recent medications logged for this horse, with a
+            quick action to log a new one (links to /meds with the horse
+            pre-selected via ?horse=<id>). */}
+        <section className={styles.profileCard}>
+          <div className={styles.profileHeaderRow}>
+            <h2 className={styles.cardSectionTitle}>MEDS</h2>
+            <div style={{ display: "flex", gap: 8 }}>
+              <Link
+                href={`/meds?horse=${horse._id}`}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: "6px 12px",
+                  borderRadius: 6,
+                  background: "#1a1a2e",
+                  color: "#fff",
+                  textDecoration: "none",
+                }}
+              >
+                + log med
+              </Link>
+              <Link
+                href="/meds"
+                style={{
+                  fontSize: 11,
+                  fontWeight: 500,
+                  padding: "6px 12px",
+                  borderRadius: 6,
+                  border: "1px solid #e8eaf0",
+                  color: "#4a5bdb",
+                  textDecoration: "none",
+                  background: "#fff",
+                }}
+              >
+                view all →
+              </Link>
+            </div>
+          </div>
+          {horseMeds.length === 0 ? (
+            <div style={{ fontSize: 11, color: "#9ea2b0", padding: "8px 0" }}>
+              no meds logged yet
+            </div>
+          ) : (
+            <div className={styles.ownerList}>
+              {horseMeds.slice(0, 5).map((m) => {
+                const medName =
+                  Array.isArray((m as any).medications) && (m as any).medications.length > 0
+                    ? (m as any).medications[0]
+                    : "—";
+                const dateLabel = new Date((m as any).date).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                });
+                const repeat =
+                  (m as any).medicationRepeatValue && (m as any).medicationRepeatUnit
+                    ? `every ${(m as any).medicationRepeatValue} ${(m as any).medicationRepeatUnit}`
+                    : null;
+                return (
+                  <div key={String((m as any)._id)} className={styles.ownerRow}>
+                    <span className={styles.ownerName}>💊 {medName}</span>
+                    {repeat ? <span className={styles.ownerShare}>{repeat}</span> : null}
+                    <span className={styles.ownerShare}>{dateLabel}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
         {!isTeam && (
           <Link href={`/horses/${horse._id}/financials`} className={styles.financialsBlock}>

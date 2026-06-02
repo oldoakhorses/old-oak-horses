@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -71,6 +72,10 @@ const EMPTY_FORM: FormState = {
 export default function MedsPage() {
   const { user } = useAuth();
   const isTeamRole = user?.role === "team";
+  const searchParams = useSearchParams();
+  // Honor /meds?horse=<id> from deep links (e.g. the horse profile's
+  // "+ log med" button). Auto-opens the modal with the horse pre-selected.
+  const prefilledHorseId = searchParams?.get("horse") ?? null;
 
   // Active horses for the picker. Team users only see horses they've been
   // granted access to (mirrors the rule on the /horses page).
@@ -103,11 +108,24 @@ export default function MedsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
-  function openAdd() {
-    setForm({ ...EMPTY_FORM, date: todayIso() });
+  function openAdd(presetHorseId?: string) {
+    setForm({
+      ...EMPTY_FORM,
+      date: todayIso(),
+      horseIds: presetHorseId ? [presetHorseId] : [],
+    });
     setFormError("");
     setShowAdd(true);
   }
+
+  // Auto-open the modal with the horse pre-selected when the user lands
+  // on /meds?horse=<id> from a horse profile button. Runs once on mount.
+  useEffect(() => {
+    if (prefilledHorseId && horseById.has(prefilledHorseId)) {
+      openAdd(prefilledHorseId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefilledHorseId, horses.length]);
 
   function toggleHorse(horseId: string) {
     setForm((p) => ({
@@ -185,7 +203,7 @@ export default function MedsPage() {
             <div className="ui-label">// MEDS</div>
             <h1 className={styles.title}>meds</h1>
           </div>
-          <button type="button" className={styles.addButton} onClick={openAdd}>
+          <button type="button" className={styles.addButton} onClick={() => openAdd()}>
             + log med
           </button>
         </section>
