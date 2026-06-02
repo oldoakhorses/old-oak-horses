@@ -23,21 +23,25 @@ type VetSubcategory =
   | "sedation"
   | "fees"
   | "lab_work"
+  | "blood_test"
   | "exam"
   | "imaging"
   | "other";
 
+// "exam" and "fees" intentionally not offered as new selections — legacy
+// values are still in the type union so old records still validate, and
+// vetSubcategoryLabel() below renders them as "Exams & Diagnostics" / "Fees"
+// when found on existing data.
 const VET_SUBCATEGORY_OPTIONS: Array<{ value: VetSubcategory; label: string }> = [
-  { value: "exam", label: "Exam" },
   { value: "vaccinations", label: "Vaccinations" },
   { value: "medication", label: "Medication" },
   { value: "joint_injections", label: "Joint Injections" },
   { value: "imaging", label: "Imaging" },
   { value: "lab_work", label: "Lab Work" },
+  { value: "blood_test", label: "Blood Test" },
   { value: "shockwave", label: "Shockwave" },
   { value: "sedation", label: "Sedation" },
   { value: "exams_diagnostics", label: "Exams & Diagnostics" },
-  { value: "fees", label: "Fees" },
   { value: "other", label: "Other" },
 ];
 
@@ -47,6 +51,10 @@ function vetSubcategoryLabel(value?: string | null) {
   if (found) return found.label;
   if (value === "vaccination") return "Vaccinations";
   if (value === "treatment") return "Treatment";
+  // Legacy values no longer offered in the picker — display as the merged
+  // current value so old records read consistently.
+  if (value === "exam") return "Exams & Diagnostics";
+  if (value === "fees") return "Fees";
   return value.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 

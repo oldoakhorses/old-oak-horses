@@ -308,6 +308,7 @@ export default defineSchema({
       v.literal("sedation"),
       v.literal("fees"),
       v.literal("lab_work"),
+      v.literal("blood_test"),
       v.literal("exam"),
       v.literal("imaging"),
       v.literal("other")

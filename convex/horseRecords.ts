@@ -34,6 +34,7 @@ export const createHorseRecord = mutation({
       v.literal("sedation"),
       v.literal("fees"),
       v.literal("lab_work"),
+      v.literal("blood_test"),
       v.literal("exam"),
       v.literal("imaging"),
       v.literal("other")
@@ -259,6 +260,7 @@ export const updateHorseRecord = mutation({
       v.literal("sedation"),
       v.literal("fees"),
       v.literal("lab_work"),
+      v.literal("blood_test"),
       v.literal("exam"),
       v.literal("imaging"),
       v.literal("other")
@@ -327,6 +329,7 @@ export const updateRecordWithNextVisit = mutation({
       v.literal("sedation"),
       v.literal("fees"),
       v.literal("lab_work"),
+      v.literal("blood_test"),
       v.literal("exam"),
       v.literal("imaging"),
       v.literal("other")
@@ -441,6 +444,34 @@ export const deleteHorseRecord = mutation({
 
     await ctx.db.delete(args.recordId);
     return args.recordId;
+  }
+});
+
+/** One-shot migration: rewrite the legacy "exam" vet subcategory to
+ *  "exams_diagnostics" on existing horseRecords (both the singular
+ *  visitType and inside the visitTypes array). Idempotent; safe to
+ *  re-run. Returns a count of records touched. */
+export const migrateExamToExamsDiagnostics = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const records = await ctx.db.query("horseRecords").collect();
+    let updated = 0;
+    for (const r of records) {
+      const patch: Record<string, unknown> = {};
+      if (r.visitType === "exam") {
+        patch.visitType = "exams_diagnostics";
+      }
+      if (Array.isArray(r.visitTypes) && r.visitTypes.includes("exam")) {
+        const replaced = r.visitTypes.map((t) => (t === "exam" ? "exams_diagnostics" : t));
+        // Dedupe in case the record already contained exams_diagnostics too
+        patch.visitTypes = Array.from(new Set(replaced));
+      }
+      if (Object.keys(patch).length > 0) {
+        await ctx.db.patch(r._id, patch as any);
+        updated += 1;
+      }
+    }
+    return { totalRecords: records.length, updated };
   }
 });
 

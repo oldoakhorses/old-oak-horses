@@ -34,21 +34,24 @@ type VetSubcategory =
   | "sedation"
   | "fees"
   | "lab_work"
+  | "blood_test"
   | "exam"
   | "imaging"
   | "other";
 
+// "exam" and "fees" intentionally dropped from new selections — legacy
+// records keep them on the type union (display falls back to "Exams &
+// Diagnostics" / "Fees"). "blood_test" is new.
 const VET_VISIT_TYPE_OPTIONS: Array<{ value: VetSubcategory; label: string }> = [
-  { value: "exam", label: "Exam" },
   { value: "vaccinations", label: "Vaccinations" },
   { value: "medication", label: "Medication" },
   { value: "joint_injections", label: "Joint Injections" },
   { value: "imaging", label: "Imaging" },
   { value: "lab_work", label: "Lab Work" },
+  { value: "blood_test", label: "Blood Test" },
   { value: "shockwave", label: "Shockwave" },
   { value: "sedation", label: "Sedation" },
   { value: "exams_diagnostics", label: "Exams & Diagnostics" },
-  { value: "fees", label: "Fees" },
   { value: "other", label: "Other" },
 ];
 

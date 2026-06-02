@@ -980,11 +980,12 @@ const VISIT_TYPE_LABELS: Record<string, string> = {
   treatment: "Treatment",
   medication: "Medication",
   joint_injections: "Joint Injections",
-  exams_diagnostics: "Exam",
+  exams_diagnostics: "Exams & Diagnostics",
   shockwave: "Shockwave",
   sedation: "Sedation",
   fees: "Fees",
   lab_work: "Lab Work",
+  blood_test: "Blood Test",
   other: "Other",
 };
 
