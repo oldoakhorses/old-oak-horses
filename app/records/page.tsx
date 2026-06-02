@@ -259,7 +259,13 @@ export default function RecordsPage() {
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
   const subcatDropdownRef = useRef<HTMLDivElement | null>(null);
   const [newContactOpen, setNewContactOpen] = useState(false);
+  // Tracks which surface launched the new-contact popup so the save
+  // handler knows whether to write the picked name back into the
+  // new-record form or into the in-progress edit row.
+  const [newContactTarget, setNewContactTarget] = useState<"new" | "edit">("new");
   const [newContactForm, setNewContactForm] = useState({ name: "", companyName: "", phone: "", email: "", category: "", location: "", notes: "" });
+  const [newContactSavingForEdit, setNewContactSavingForEdit] = useState(false);
+  const [newContactErrorForEdit, setNewContactErrorForEdit] = useState("");
   const [newContactSaving, setNewContactSaving] = useState(false);
   const [newContactError, setNewContactError] = useState("");
 
@@ -988,7 +994,23 @@ export default function RecordsPage() {
                                         <button
                                           type="button"
                                           className={`${styles.contactDropdownItem} ${styles.contactDropdownAdd}`}
-                                          onClick={() => setEditProviderDropdownOpen(false)}
+                                          onClick={() => {
+                                            // Open the top-level new-contact popup pre-filled with the typed
+                                            // name. On save the chosen name flows back into the edit row.
+                                            setEditProviderDropdownOpen(false);
+                                            setNewContactTarget("edit");
+                                            setNewContactErrorForEdit("");
+                                            setNewContactForm({
+                                              name: editState!.contactName.trim(),
+                                              companyName: "",
+                                              phone: "",
+                                              email: "",
+                                              category: RECORD_TYPE_TO_CATEGORY[editState!.type] || "",
+                                              location: "",
+                                              notes: "",
+                                            });
+                                            setNewContactOpen(true);
+                                          }}
                                         >
                                           + Add &ldquo;{editState.contactName.trim()}&rdquo;
                                         </button>
@@ -1637,6 +1659,7 @@ export default function RecordsPage() {
                                 contactActionRef.current = true;
                                 setTimeout(() => { contactActionRef.current = false; }, 400);
                                 setContactDropdownOpen(false);
+                                setNewContactTarget("new");
                                 setNewContactOpen(true);
                                 setNewContactError("");
                                 setNewContactForm({
@@ -1661,6 +1684,7 @@ export default function RecordsPage() {
                                 contactActionRef.current = true;
                                 setTimeout(() => { contactActionRef.current = false; }, 400);
                                 setContactDropdownOpen(false);
+                                setNewContactTarget("new");
                                 setNewContactOpen(true);
                                 setNewContactError("");
                                 setNewContactForm({ name: "", companyName: "", phone: "", email: "", category: recordProviderCategory || "", location: "", notes: "" });
@@ -1674,7 +1698,7 @@ export default function RecordsPage() {
                     })()}
                   </div>
                 </RecordField>
-                {newContactOpen ? (
+                {newContactOpen && newContactTarget === "new" ? (
                   <div className={styles.newContactCard}>
                     <div className={styles.newContactCardTitle}>+ new contact</div>
                     <div className={styles.newContactGrid}>
@@ -1899,6 +1923,116 @@ export default function RecordsPage() {
           </div>
         ) : null}
       </aside>
+
+      {/* Top-level popup launched by the edit row's "+ Add" contact button.
+          Same fields as the inline new-contact card used by the new-record
+          panel; the save handler writes the resulting name into editState
+          instead of recordForm. */}
+      <Modal
+        open={newContactOpen && newContactTarget === "edit"}
+        title="add contact"
+        onClose={() => {
+          if (newContactSavingForEdit) return;
+          setNewContactOpen(false);
+          setNewContactErrorForEdit("");
+        }}
+      >
+        <div className={styles.newContactGrid}>
+          <label className={styles.newContactField}>
+            <span className={styles.newContactLabel}>NAME *</span>
+            <input className={styles.recordInput} value={newContactForm.name} onChange={(e) => setNewContactForm((p) => ({ ...p, name: e.target.value }))} />
+          </label>
+          <label className={styles.newContactField}>
+            <span className={styles.newContactLabel}>COMPANY</span>
+            <input className={styles.recordInput} value={newContactForm.companyName} onChange={(e) => setNewContactForm((p) => ({ ...p, companyName: e.target.value }))} />
+          </label>
+          <label className={styles.newContactField}>
+            <span className={styles.newContactLabel}>PHONE</span>
+            <input className={styles.recordInput} value={newContactForm.phone} onChange={(e) => setNewContactForm((p) => ({ ...p, phone: e.target.value }))} />
+          </label>
+          <label className={styles.newContactField}>
+            <span className={styles.newContactLabel}>EMAIL</span>
+            <input className={styles.recordInput} type="email" value={newContactForm.email} onChange={(e) => setNewContactForm((p) => ({ ...p, email: e.target.value }))} />
+          </label>
+          <label className={styles.newContactField}>
+            <span className={styles.newContactLabel}>CATEGORY</span>
+            <select className={styles.recordInput} value={newContactForm.category} onChange={(e) => setNewContactForm((p) => ({ ...p, category: e.target.value }))}>
+              <option value="">select...</option>
+              <option value="veterinary">Veterinary</option>
+              <option value="farrier">Farrier</option>
+              <option value="bodywork">Bodywork</option>
+              <option value="stabling">Stabling</option>
+              <option value="travel">Travel</option>
+              <option value="supplies">Supplies</option>
+              <option value="admin">Admin</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label className={styles.newContactField}>
+            <span className={styles.newContactLabel}>LOCATION</span>
+            <select className={styles.recordInput} value={newContactForm.location} onChange={(e) => setNewContactForm((p) => ({ ...p, location: e.target.value }))}>
+              <option value="">select...</option>
+              <option value="wellington">Wellington</option>
+              <option value="thermal">Thermal</option>
+              <option value="ocala">Ocala</option>
+              <option value="la">LA</option>
+              <option value="eu">EU</option>
+              <option value="can">CAN</option>
+            </select>
+          </label>
+        </div>
+        <label className={styles.newContactField} style={{ marginTop: 8 }}>
+          <span className={styles.newContactLabel}>NOTES</span>
+          <textarea className={styles.recordTextarea} rows={2} value={newContactForm.notes} onChange={(e) => setNewContactForm((p) => ({ ...p, notes: e.target.value }))} />
+        </label>
+        {newContactErrorForEdit ? <p className={styles.recordError}>{newContactErrorForEdit}</p> : null}
+        <div className={styles.newContactActions}>
+          <button
+            type="button"
+            className={styles.newContactCancelBtn}
+            onClick={() => {
+              setNewContactOpen(false);
+              setNewContactErrorForEdit("");
+            }}
+          >
+            cancel
+          </button>
+          <button
+            type="button"
+            className={styles.newContactSaveBtn}
+            disabled={newContactSavingForEdit}
+            onClick={async () => {
+              if (!newContactForm.name.trim()) {
+                setNewContactErrorForEdit("Name is required.");
+                return;
+              }
+              setNewContactSavingForEdit(true);
+              setNewContactErrorForEdit("");
+              try {
+                await createContact({
+                  name: newContactForm.name.trim(),
+                  companyName: newContactForm.companyName.trim() || undefined,
+                  category: newContactForm.category || "other",
+                  location: newContactForm.location
+                    ? (newContactForm.location as "wellington" | "thermal" | "ocala" | "la" | "eu" | "can")
+                    : undefined,
+                  phone: newContactForm.phone.trim() || undefined,
+                  email: newContactForm.email.trim() || undefined,
+                  notes: newContactForm.notes.trim() || undefined,
+                });
+                setEditState((prev) => (prev ? { ...prev, contactName: newContactForm.name.trim() } : prev));
+                setNewContactOpen(false);
+              } catch (err) {
+                setNewContactErrorForEdit(err instanceof Error ? err.message : "Failed to create contact");
+              } finally {
+                setNewContactSavingForEdit(false);
+              }
+            }}
+          >
+            {newContactSavingForEdit ? "saving..." : "save contact"}
+          </button>
+        </div>
+      </Modal>
 
       <Modal open={recordToDelete !== null} title="delete record?" onClose={() => setRecordToDelete(null)}>
         <p className={styles.deleteBody}>
