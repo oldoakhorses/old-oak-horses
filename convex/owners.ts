@@ -18,22 +18,61 @@ export const getById = query({
 export const getOwnerHorses = query({
   args: { ownerId: v.id("owners") },
   handler: async (ctx, args) => {
+    // Source of truth is horseOwnerships (supports multi-owner). Fall back
+    // to the legacy horses.ownerId pointer for horses that haven't been
+    // backfilled yet so this query stays correct during the migration.
+    const ownerships = await ctx.db
+      .query("horseOwnerships")
+      .withIndex("by_owner", (q) => q.eq("ownerId", args.ownerId))
+      .collect();
+    const horseIdsFromOwnerships = new Set(ownerships.map((o) => String(o.horseId)));
     const allHorses = await ctx.db.query("horses").collect();
-    return allHorses
-      .filter((h) => h.ownerId === args.ownerId)
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const result = allHorses.filter(
+      (h) => horseIdsFromOwnerships.has(String(h._id)) || h.ownerId === args.ownerId,
+    );
+    return result.sort((a, b) => a.name.localeCompare(b.name));
   },
 });
 
 export const getOwnerSpendSummary = query({
   args: { ownerId: v.id("owners") },
   handler: async (ctx, args) => {
+    // Build the set of horses this owner has a stake in (and the effective
+    // share % per horse) by reading horseOwnerships, falling back to the
+    // legacy horses.ownerId for horses not yet backfilled. Multi-owner
+    // horses split each line-item amount by this owner's share so two
+    // 50/50 owners each see their half of every expense.
+    const ownerships = await ctx.db
+      .query("horseOwnerships")
+      .withIndex("by_owner", (q) => q.eq("ownerId", args.ownerId))
+      .collect();
     const allHorses = await ctx.db.query("horses").collect();
-    const ownerHorses = allHorses.filter((h) => h.ownerId === args.ownerId);
+
+    const ownerShareByHorseId = new Map<string, number>(); // horseId → fraction (0-1)
+    for (const o of ownerships) {
+      // Pull all co-owners of this horse to compute the equal-split fallback.
+      const co = await ctx.db
+        .query("horseOwnerships")
+        .withIndex("by_horse", (q) => q.eq("horseId", o.horseId))
+        .collect();
+      const declaredTotal = co.reduce((sum, r) => sum + (typeof r.sharePct === "number" ? r.sharePct : 0), 0);
+      const nullCount = co.filter((r) => typeof r.sharePct !== "number").length;
+      const equalShare = nullCount > 0 ? Math.max(0, 100 - declaredTotal) / nullCount : 0;
+      const pct = typeof o.sharePct === "number" ? o.sharePct : equalShare;
+      ownerShareByHorseId.set(String(o.horseId), pct / 100);
+    }
+    // Legacy-only horses: full share to the legacy owner.
+    for (const h of allHorses) {
+      if (h.ownerId === args.ownerId && !ownerShareByHorseId.has(String(h._id))) {
+        ownerShareByHorseId.set(String(h._id), 1);
+      }
+    }
+    const ownerHorses = allHorses.filter((h) => ownerShareByHorseId.has(String(h._id)));
     if (ownerHorses.length === 0) return { totalSpend: 0, thisMonth: 0, lastMonth: 0, byCategory: [], byHorse: [] };
 
     const ownerHorseIds = new Set(ownerHorses.map((h) => String(h._id)));
     const ownerHorseNames = new Map(ownerHorses.map((h) => [String(h._id), h.name]));
+    const shareFor = (horseId: string) => ownerShareByHorseId.get(horseId) ?? 0;
 
     const activeHorses = allHorses.filter((h) => h.status === "active" && !h.isSold);
     const activeHorseCount = activeHorses.length;
@@ -62,7 +101,8 @@ export const getOwnerSpendSummary = query({
         for (const row of assigned) {
           const horseId = String(row.horseId ?? "");
           if (ownerHorseIds.has(horseId)) {
-            const amt = typeof row.amount === "number" ? row.amount : 0;
+            const fullAmt = typeof row.amount === "number" ? row.amount : 0;
+            const amt = fullAmt * shareFor(horseId);
             billAmount += amt;
             const curr = horseTotals.get(horseId) ?? { name: row.horseName ?? "Unknown", amount: 0, invoiceCount: 0 };
             curr.amount += amt;
@@ -77,7 +117,8 @@ export const getOwnerSpendSummary = query({
           for (const sp of s.splits ?? []) {
             const horseId = String(sp.horseId ?? "");
             if (ownerHorseIds.has(horseId)) {
-              const amt = typeof sp.amount === "number" ? sp.amount : 0;
+              const fullAmt = typeof sp.amount === "number" ? sp.amount : 0;
+              const amt = fullAmt * shareFor(horseId);
               billAmount += amt;
               const curr = horseTotals.get(horseId) ?? { name: sp.horseName ?? "Unknown", amount: 0, invoiceCount: 0 };
               curr.amount += amt;
@@ -94,7 +135,8 @@ export const getOwnerSpendSummary = query({
             const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
             const lineItems = Array.isArray(extracted.line_items) ? extracted.line_items : [];
             const item = lineItems[row.lineItemIndex] as Record<string, unknown> | undefined;
-            const amt = item ? numericVal(item.total_usd ?? item.amount_usd ?? item.total) : 0;
+            const fullAmt = item ? numericVal(item.total_usd ?? item.amount_usd ?? item.total) : 0;
+            const amt = fullAmt * shareFor(horseId);
             billAmount += amt;
             const curr = horseTotals.get(horseId) ?? { name: row.horseName ?? "Unknown", amount: 0, invoiceCount: 0 };
             curr.amount += amt;

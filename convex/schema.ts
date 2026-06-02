@@ -369,6 +369,38 @@ export default defineSchema({
     .index("by_role", ["role"])
     .index("by_active", ["isActive"]),
 
+  /**
+   * Many-to-many join: a horse can be co-owned by multiple owners, an
+   * owner can own multiple horses. sharePct is 0-100; if absent, expenses
+   * are split equally among all current co-owners of the horse.
+   * The legacy horses.ownerId field is kept as a denormalized "primary
+   * owner" pointer but horseOwnerships is the source of truth.
+   */
+  horseOwnerships: defineTable({
+    horseId: v.id("horses"),
+    ownerId: v.id("owners"),
+    sharePct: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_horse", ["horseId"])
+    .index("by_owner", ["ownerId"])
+    .index("by_horse_owner", ["horseId", "ownerId"]),
+
+  /**
+   * Per-horse access grants for team-role users. Admins and owner-role
+   * users see all horses by default; team users see only horses they
+   * appear in this table for.
+   */
+  horseAccess: defineTable({
+    horseId: v.id("horses"),
+    userId: v.id("users"),
+    grantedBy: v.optional(v.id("users")),
+    createdAt: v.number(),
+  })
+    .index("by_horse", ["horseId"])
+    .index("by_user", ["userId"])
+    .index("by_horse_user", ["horseId", "userId"]),
+
   horseAliases: defineTable({
     alias: v.string(),
     horseName: v.string(),
