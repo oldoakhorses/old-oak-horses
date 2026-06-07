@@ -517,6 +517,77 @@ export const assignTransaction = mutation({
   },
 });
 
+/** After a transaction is approved, copy its assignment shape onto any
+ *  other unapproved, still-unassigned transactions in the same statement
+ *  whose descriptions share enough keywords. The split is recomputed for
+ *  each sibling's own amount (even split across the picked entities).
+ *
+ *  Guards:
+ *    - skip siblings that are already approved
+ *    - skip siblings that already have an assignType set (never clobber
+ *      the user's earlier work)
+ *    - require at least 2 overlapping keywords AND >= 50% match ratio
+ *      (same threshold uploadStatement uses for learned-rule matches) */
+async function propagateApprovedAssignmentToSiblings(
+  ctx: any,
+  approved: {
+    _id: Id<"ccTransactions">;
+    statementId: Id<"ccStatements">;
+    description: string;
+    assignType?: string;
+    assignedHorses?: { horseId: Id<"horses">; horseName: string; amount: number }[];
+    assignedPeople?: { personId: Id<"people">; personName: string; role?: string; amount: number }[];
+    category?: string;
+    subcategory?: string;
+  }
+) {
+  if (!approved.assignType || approved.assignType === "ignore") return;
+  const keywords = extractKeywords(approved.description);
+  if (keywords.length === 0) return;
+  const keySet = new Set(keywords);
+
+  const siblings = await ctx.db
+    .query("ccTransactions")
+    .withIndex("by_statement", (q: any) => q.eq("statementId", approved.statementId))
+    .collect();
+
+  for (const sib of siblings) {
+    if (String(sib._id) === String(approved._id)) continue;
+    if (sib.isApproved) continue;
+    if (sib.assignType) continue; // preserve any prior manual assignment
+
+    const sibKeywords = extractKeywords(sib.description);
+    const overlap = sibKeywords.filter((k: string) => keySet.has(k)).length;
+    const matchRatio = overlap / keywords.length;
+    if (overlap < 2 || matchRatio < 0.5) continue;
+
+    const absAmount = Math.abs(sib.amount);
+    const patch: Record<string, unknown> = {
+      assignType: approved.assignType,
+      category: approved.category,
+      subcategory: approved.subcategory,
+    };
+    if (approved.assignType === "horse" && approved.assignedHorses && approved.assignedHorses.length > 0) {
+      const per = round2(absAmount / approved.assignedHorses.length);
+      patch.assignedHorses = approved.assignedHorses.map((h) => ({
+        horseId: h.horseId,
+        horseName: h.horseName,
+        amount: per,
+      }));
+    }
+    if (approved.assignType === "person" && approved.assignedPeople && approved.assignedPeople.length > 0) {
+      const per = round2(absAmount / approved.assignedPeople.length);
+      patch.assignedPeople = approved.assignedPeople.map((p) => ({
+        personId: p.personId,
+        personName: p.personName,
+        role: p.role,
+        amount: per,
+      }));
+    }
+    await ctx.db.patch(sib._id, patch as any);
+  }
+}
+
 /** Save or update a learned rule from a manual transaction assignment */
 async function saveTransactionRule(
   ctx: any,
@@ -730,6 +801,12 @@ export const approveTransaction = mutation({
     if (!txn) return;
 
     if (args.approved) {
+      // Once an assigned txn is approved, treat its assignment as a
+      // confirmed pattern and push the same suggestion onto any other
+      // unapproved, still-unassigned txns in the same statement whose
+      // descriptions share enough keywords.
+      await propagateApprovedAssignmentToSiblings(ctx, txn as any);
+
       // Create a bill if there's no matched invoice and this isn't ignored
       if (!txn.matchedBillId && txn.assignType && txn.assignType !== "ignore") {
         // Check if bill already generated (re-approval case)
