@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -122,6 +122,20 @@ export default function MedsPage() {
   // modal title, the save handler branch, and whether the delete button
   // is shown.
   const [editingRecordId, setEditingRecordId] = useState<Id<"horseRecords"> | null>(null);
+  // Open-state + outside-click handling for the horse multi-select dropdown.
+  const [horseDropdownOpen, setHorseDropdownOpen] = useState(false);
+  const horseDropdownRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!horseDropdownOpen) return;
+    function onDocClick(e: MouseEvent) {
+      if (!horseDropdownRef.current) return;
+      if (!horseDropdownRef.current.contains(e.target as Node)) {
+        setHorseDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [horseDropdownOpen]);
 
   function openAdd(presetHorseId?: string) {
     setEditingRecordId(null);
@@ -385,29 +399,78 @@ export default function MedsPage() {
                   ? "no horses shared with you yet — ask an admin"
                   : "no active horses found"}
               </span>
-            ) : (
+            ) : editingRecordId ? (
+              // Edit mode: horse is locked. Render the existing selection as
+              // a single read-only chip so it's clear which record we're on.
               <div className={styles.horseChips}>
-                {horses.map((h) => {
-                  const active = form.horseIds.includes(String(h._id));
-                  // In edit mode the horse can't be changed (one record per
-                  // horse); only the active chip is rendered, others hidden.
-                  if (editingRecordId && !active) return null;
-                  return (
-                    <button
+                {horses
+                  .filter((h) => form.horseIds.includes(String(h._id)))
+                  .map((h) => (
+                    <span
                       key={String(h._id)}
-                      type="button"
-                      className={active ? styles.horseChipActive : styles.horseChip}
-                      onClick={() => {
-                        if (editingRecordId) return;
-                        toggleHorse(String(h._id));
-                      }}
-                      disabled={Boolean(editingRecordId)}
-                      style={editingRecordId ? { cursor: "default", opacity: 0.9 } : undefined}
+                      className={styles.horseChipActive}
+                      style={{ cursor: "default", opacity: 0.9 }}
                     >
                       🐴 {h.name}
-                    </button>
-                  );
-                })}
+                    </span>
+                  ))}
+              </div>
+            ) : (
+              // Create mode: multi-select dropdown. Clicking the trigger
+              // toggles the menu; each row inside is a checkbox-style entry.
+              <div className={styles.horseDropdown} ref={horseDropdownRef}>
+                <button
+                  type="button"
+                  className={styles.horseDropdownTrigger}
+                  onClick={() => setHorseDropdownOpen((open) => !open)}
+                >
+                  <span>
+                    {form.horseIds.length === 0
+                      ? "select horses..."
+                      : form.horseIds.length === 1
+                        ? `🐴 ${horseById.get(form.horseIds[0])?.name ?? "Unknown"}`
+                        : `🐴 ${form.horseIds.length} horses selected`}
+                  </span>
+                  <span className={styles.horseDropdownCaret}>{horseDropdownOpen ? "▴" : "▾"}</span>
+                </button>
+                {horseDropdownOpen ? (
+                  <div className={styles.horseDropdownMenu}>
+                    <div className={styles.horseDropdownToolbar}>
+                      <button
+                        type="button"
+                        className={styles.horseDropdownToolbarBtn}
+                        onClick={() =>
+                          setForm((p) => ({ ...p, horseIds: horses.map((h) => String(h._id)) }))
+                        }
+                      >
+                        select all
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.horseDropdownToolbarBtn}
+                        onClick={() => setForm((p) => ({ ...p, horseIds: [] }))}
+                      >
+                        clear
+                      </button>
+                    </div>
+                    {horses.map((h) => {
+                      const active = form.horseIds.includes(String(h._id));
+                      return (
+                        <button
+                          key={String(h._id)}
+                          type="button"
+                          className={styles.horseDropdownItem}
+                          onClick={() => toggleHorse(String(h._id))}
+                        >
+                          <span className={styles.horseDropdownCheckbox}>
+                            {active ? "☑" : "☐"}
+                          </span>
+                          <span>🐴 {h.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </div>
             )}
             <span className={styles.fieldHint}>category is automatically set to medication</span>
