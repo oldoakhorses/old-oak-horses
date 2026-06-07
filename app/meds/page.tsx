@@ -50,6 +50,20 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Display helper: capitalize the first letter of each comma-separated
+ *  entry so "adequan, legend" reads as "Adequan, Legend" without touching
+ *  the lowercase storage. Whitespace and other characters are preserved. */
+function displayMedName(value: string): string {
+  return value
+    .split(",")
+    .map((part) => {
+      const s = part.trim();
+      if (!s) return s;
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    })
+    .join(", ");
+}
+
 function formatDate(timestamp: number) {
   if (!timestamp) return "—";
   return new Date(timestamp).toLocaleDateString("en-US", {
@@ -335,10 +349,11 @@ export default function MedsPage() {
               // a comma; migrated records (promoted from type=veterinary
               // visitType="medication") may not have a medications array,
               // so fall back to the record title / treatmentDescription.
-              const medName =
+              const rawMedName =
                 Array.isArray(r.medications) && r.medications.length > 0
                   ? r.medications.join(", ")
                   : (r.title?.trim() || (r as any).treatmentDescription?.trim() || "—");
+              const medName = rawMedName === "—" ? rawMedName : displayMedName(rawMedName);
               const repeatLabel =
                 r.medicationRepeatValue && r.medicationRepeatUnit
                   ? `every ${r.medicationRepeatValue} ${r.medicationRepeatUnit}`
@@ -490,7 +505,7 @@ export default function MedsPage() {
                     className={active ? styles.medOptionActive : styles.medOption}
                     onClick={() => toggleMedication(med)}
                   >
-                    {med}
+                    {displayMedName(med)}
                   </button>
                 );
               })}
