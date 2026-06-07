@@ -8,6 +8,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import NavBar from "@/components/NavBar";
 import Modal from "@/components/Modal";
+import { useOrgArgs } from "@/lib/useOrgArgs";
 import styles from "./reconcile.module.css";
 
 const CONFIDENCE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
@@ -121,7 +122,8 @@ export default function StatementReconcilePage() {
 
   const stmt = useQuery(api.ccReconcile.getStatement, rawId ? { statementId } : "skip");
   const matchableBills = useQuery(api.ccReconcile.getMatchableBills) ?? [];
-  const horses = useQuery(api.horses.getAllHorses, {}) ?? [];
+  const orgArgs = useOrgArgs();
+  const horses = useQuery(api.horses.getAllHorses, orgArgs) ?? [];
   // Include inactive team members too — historical CC charges often need to
   // be assigned to someone who's since left. listAll returns everyone; we
   // re-sort active-first, then by role, then by name so the picker reads

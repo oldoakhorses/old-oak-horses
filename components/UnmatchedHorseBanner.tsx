@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { useOrgArgs } from "@/lib/useOrgArgs";
 import styles from "./UnmatchedHorseBanner.module.css";
 
 type Props = {
@@ -13,7 +14,8 @@ type Props = {
 };
 
 export default function UnmatchedHorseBanner({ billId, unmatchedNames, onResolved }: Props) {
-  const horses = useQuery(api.horses.getActiveHorses, {}) ?? [];
+  const orgArgs = useOrgArgs();
+  const horses = useQuery(api.horses.getActiveHorses, orgArgs) ?? [];
   const resolveUnmatchedHorse = useMutation(api.bills.resolveUnmatchedHorse);
   const addHorseAndResolveUnmatched = useMutation(api.bills.addHorseAndResolveUnmatched);
 

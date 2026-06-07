@@ -9,6 +9,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
 import { formatInvoiceName } from "@/lib/formatInvoiceName";
+import { useOrgArgs } from "@/lib/useOrgArgs";
 import styles from "./preview.module.css";
 
 type RecordType = "veterinary" | "medication" | "farrier" | "bodywork" | "other";
@@ -226,7 +227,8 @@ export default function InvoicePreviewPage() {
   const previewUrl = bill?.originalPdfUrl || undefined;
   const linkedRecords = useQuery(api.horseRecords.getByBill, { billId }) ?? [];
   const categories = useQuery(api.categories.getAllCategories) ?? [];
-  const horses = useQuery(api.horses.getActiveHorses, {}) ?? [];
+  const orgArgs = useOrgArgs();
+  const horses = useQuery(api.horses.getActiveHorses, orgArgs) ?? [];
   const people = useQuery(api.people.getAllPeople) ?? [];
 
   const [vendorEdit, setVendorEdit] = useState(false);

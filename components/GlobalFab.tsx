@@ -7,6 +7,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { formatInvoiceName } from "@/lib/formatInvoiceName";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrgArgs } from "@/lib/useOrgArgs";
 import styles from "@/app/dashboard/dashboard.module.css";
 
 type RecordType = "veterinary" | "medication" | "farrier" | "bodywork" | "other";
@@ -267,7 +268,8 @@ export default function GlobalFab() {
   const documentFileInputRef = useRef<HTMLInputElement | null>(null);
   const invoiceFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const activeHorses = useQuery(api.horses.getActiveHorses, {}) ?? [];
+  const orgArgs = useOrgArgs();
+  const activeHorses = useQuery(api.horses.getActiveHorses, orgArgs) ?? [];
   const activePeople = useQuery(api.people.getAllPeople) ?? [];
   const categories = useQuery(api.categories.getAllCategories) ?? [];
   const recordProviderCategory = selectedRecordType ? RECORD_TYPE_TO_CATEGORY[selectedRecordType] : "";

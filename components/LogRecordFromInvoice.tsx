@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Modal from "@/components/Modal";
+import { useOrgArgs } from "@/lib/useOrgArgs";
 import styles from "./LogRecordFromInvoice.module.css";
 
 type RecordType = "veterinary" | "medication" | "farrier" | "bodywork" | "other";
@@ -60,7 +61,8 @@ export default function LogRecordFromInvoice({
   assignedHorses?: AssignedHorse[];
   lineItems?: LineItemForNotes[];
 }) {
-  const horses = useQuery(api.horses.getActiveHorses, {}) ?? [];
+  const orgArgs = useOrgArgs();
+  const horses = useQuery(api.horses.getActiveHorses, orgArgs) ?? [];
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
 

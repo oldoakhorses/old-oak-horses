@@ -2,6 +2,7 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { useOrgArgs } from "@/lib/useOrgArgs";
 import styles from "./HorseSelect.module.css";
 
 interface HorseSelectProps {
@@ -19,7 +20,8 @@ export default function HorseSelect({
   showSplitOption = false,
   splitValue = "__split__"
 }: HorseSelectProps) {
-  const horses = useQuery(api.horses.getActiveHorses, {}) ?? [];
+  const orgArgs = useOrgArgs();
+  const horses = useQuery(api.horses.getActiveHorses, orgArgs) ?? [];
   const className = [
     styles.select,
     compact ? styles.compact : "",
