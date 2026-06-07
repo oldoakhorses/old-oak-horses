@@ -71,7 +71,10 @@ export default function NavBar({
     if (!profileMenuOpen) return;
     const onClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
-      if (target?.closest(`.${styles.profileMenu}`) || target?.closest(`.${styles.profileBtn}`)) return;
+      if (
+        target?.closest(`.${styles.profileMenu}`) ||
+        target?.closest(`.${styles.orgTrigger}`)
+      ) return;
       setProfileMenuOpen(false);
     };
     document.addEventListener("mousedown", onClick);
@@ -150,15 +153,36 @@ export default function NavBar({
           <div className={styles.profileWrap}>
             <button
               type="button"
-              className={styles.profileBtn}
-              aria-label="Account"
+              className={styles.orgTrigger}
+              aria-label="Switch business"
               onClick={() => setProfileMenuOpen((v) => !v)}
             >
-              {profile?.profilePhotoUrl ? (
-                <img src={profile.profilePhotoUrl} alt="" className={styles.profileImg} />
-              ) : (
-                <span className={styles.profileInitial}>{user?.email?.[0]?.toUpperCase() || "U"}</span>
-              )}
+              <span className={styles.orgTriggerBadge}>
+                {activeOrg
+                  ? activeOrg.name
+                      .split(" ")
+                      .map((w: string) => w[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()
+                  : "ALL"}
+              </span>
+              <span className={styles.orgTriggerName}>
+                {activeOrg ? activeOrg.name : "All horses"}
+              </span>
+              <svg
+                className={`${styles.orgTriggerCaret} ${profileMenuOpen ? styles.orgTriggerCaretOpen : ""}`}
+                width="10"
+                height="10"
+                viewBox="0 0 10 10"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M2.5 4l2.5 2.5L7.5 4" />
+              </svg>
             </button>
 
             {profileMenuOpen && (
