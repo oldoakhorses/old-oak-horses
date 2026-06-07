@@ -2059,8 +2059,192 @@ export const markDone = internalMutation({
     }
 
     await ctx.db.patch(args.billId, patch);
+
+    // After parser output is written, apply any learned overrides for this
+    // vendor. Safe to ignore failures — rule application is best-effort and
+    // must never block the parsing pipeline.
+    try {
+      await applyBillRule(ctx, args.billId);
+    } catch (err) {
+      console.error("applyBillRule failed", err);
+    }
   }
 });
+
+/** Lowercase, strip business suffixes — so "Deel" and "Deel Inc." share a rule. */
+function normalizeVendorKey(name: string | undefined | null): string {
+  if (!name) return "";
+  return name
+    .toLowerCase()
+    .replace(/[.,]/g, "")
+    .replace(/\s+(inc|llc|ltd|corp|co|company|gmbh|limited|sa|sas|ag)\s*$/i, "")
+    .trim();
+}
+
+/** Pick the parsed vendor name off a bill, tolerating the legacy field. */
+function vendorNameFromBill(bill: any): string | undefined {
+  return (
+    bill?.extractedVendorContact?.vendorName ??
+    bill?.extractedProviderContact?.providerName ??
+    bill?.customProviderName ??
+    undefined
+  );
+}
+
+/**
+ * Save (upsert) a learned rule from an approval. Captures whichever fields
+ * the user populated. Empty/undefined fields on the bill don't clear an
+ * existing rule's value — we only patch what we have data for, so later
+ * approvals keep enriching the row.
+ */
+async function saveBillRule(ctx: any, bill: any): Promise<void> {
+  const vendor = vendorNameFromBill(bill);
+  const key = normalizeVendorKey(vendor);
+  if (!key) return;
+
+  // Resolve denormalized names for nicer rule-application later.
+  let contactName: string | undefined;
+  if (bill.contactId) {
+    const c = await ctx.db.get(bill.contactId);
+    contactName = c?.name;
+  }
+  let categorySlug: string | undefined;
+  if (bill.categoryId) {
+    const cat = await ctx.db.get(bill.categoryId);
+    categorySlug = cat?.slug;
+  }
+
+  const existing = await ctx.db
+    .query("billRules")
+    .withIndex("by_vendorKey", (q: any) => q.eq("vendorKey", key))
+    .first();
+
+  const now = Date.now();
+  const patch: Record<string, unknown> = {
+    vendorDisplay: vendor,
+    lastSeen: now,
+  };
+  if (bill.invoiceName) patch.invoiceName = bill.invoiceName;
+  if (bill.contactId) {
+    patch.contactId = bill.contactId;
+    if (contactName) patch.contactName = contactName;
+  }
+  if (bill.categoryId) {
+    patch.categoryId = bill.categoryId;
+    if (categorySlug) patch.categorySlug = categorySlug;
+  }
+  if (bill.assignType) patch.assignType = bill.assignType;
+  if (bill.assignType === "horse" && Array.isArray(bill.assignedHorses) && bill.assignedHorses.length > 0) {
+    patch.assignedHorses = bill.assignedHorses.map((h: any) => ({
+      horseId: h.horseId,
+      horseName: h.horseName,
+      amount: h.amount,
+    }));
+  }
+  if (bill.assignType === "person" && Array.isArray(bill.assignedPeople) && bill.assignedPeople.length > 0) {
+    patch.assignedPeople = bill.assignedPeople.map((p: any) => ({
+      personId: p.personId,
+      personName: p.personName,
+      amount: p.amount,
+    }));
+  }
+
+  if (existing) {
+    await ctx.db.patch(existing._id, { ...patch, count: (existing.count ?? 0) + 1 });
+  } else {
+    await ctx.db.insert("billRules", {
+      vendorKey: key,
+      count: 1,
+      createdAt: now,
+      ...(patch as any),
+    });
+  }
+}
+
+/**
+ * Apply any learned rule for this bill's parsed vendor. Only fills empty
+ * fields — never overwrites a value the user has already set. Amounts on
+ * the saved assignment are redistributed proportionally to the new bill's
+ * total (even split across entities).
+ */
+async function applyBillRule(ctx: any, billId: Id<"bills">): Promise<void> {
+  const bill = await ctx.db.get(billId);
+  if (!bill) return;
+  const vendor = vendorNameFromBill(bill);
+  const key = normalizeVendorKey(vendor);
+  if (!key) return;
+
+  const rule = await ctx.db
+    .query("billRules")
+    .withIndex("by_vendorKey", (q: any) => q.eq("vendorKey", key))
+    .first();
+  if (!rule) return;
+
+  const patch: Record<string, unknown> = {};
+
+  // Bill display name — the user's example case (Deel → Charlotte Pay).
+  if (!bill.invoiceName && rule.invoiceName) {
+    patch.invoiceName = rule.invoiceName;
+  }
+
+  // Contact override
+  if (!bill.contactId && rule.contactId) {
+    const contact = await ctx.db.get(rule.contactId);
+    if (contact) patch.contactId = rule.contactId;
+  }
+
+  // Category override
+  if (!bill.categoryId && rule.categoryId) {
+    const cat = await ctx.db.get(rule.categoryId);
+    if (cat) patch.categoryId = rule.categoryId;
+  }
+
+  // Assignment shape — only fill if nothing is assigned yet.
+  if (!bill.assignType && rule.assignType) {
+    const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+    const totalRaw = (extracted as any).invoice_total_usd ?? (extracted as any).invoiceTotalUsd ?? (extracted as any).total;
+    const total = typeof totalRaw === "number" && Number.isFinite(totalRaw) ? Math.abs(totalRaw) : 0;
+
+    if (rule.assignType === "horse" && rule.assignedHorses && rule.assignedHorses.length > 0) {
+      // Confirm horses still exist + active
+      const alive: any[] = [];
+      for (const h of rule.assignedHorses) {
+        const horse = await ctx.db.get(h.horseId);
+        if (horse) alive.push(h);
+      }
+      if (alive.length > 0) {
+        const per = total > 0 ? Math.round((total / alive.length) * 100) / 100 : 0;
+        patch.assignType = "horse";
+        patch.assignedHorses = alive.map((h) => ({
+          horseId: h.horseId,
+          horseName: h.horseName,
+          amount: per,
+        }));
+        patch.assignMode = "whole";
+      }
+    } else if (rule.assignType === "person" && rule.assignedPeople && rule.assignedPeople.length > 0) {
+      const alive: any[] = [];
+      for (const p of rule.assignedPeople) {
+        const person = await ctx.db.get(p.personId);
+        if (person) alive.push(p);
+      }
+      if (alive.length > 0) {
+        const per = total > 0 ? Math.round((total / alive.length) * 100) / 100 : 0;
+        patch.assignType = "person";
+        patch.assignedPeople = alive.map((p) => ({
+          personId: p.personId,
+          personName: p.personName,
+          amount: per,
+        }));
+        patch.assignMode = "whole";
+      }
+    }
+  }
+
+  if (Object.keys(patch).length > 0) {
+    await ctx.db.patch(billId, patch);
+  }
+}
 
 export const markError = internalMutation({
   args: { billId: v.id("bills"), errorMessage: v.string() },
@@ -2571,6 +2755,16 @@ async function approveBillById(ctx: any, billId: Id<"bills">) {
     approvedAt: Date.now(),
     status: "done"
   });
+
+  // Learn from this approval: upsert a vendor rule keyed by the parsed
+  // vendor name. Future bills from the same vendor will pre-populate
+  // their invoiceName / contact / category / assignment from this rule.
+  try {
+    const finalBill = await ctx.db.get(billId);
+    if (finalBill) await saveBillRule(ctx, finalBill);
+  } catch (err) {
+    console.error("saveBillRule failed", err);
+  }
 
   // Auto-insert charges into any existing draft owner invoices that cover
   // this bill's period, so drafts stay in sync as bills are approved.

@@ -198,6 +198,50 @@ export default defineSchema({
     .index("by_category", ["categoryId"])
     .index("by_ccTransaction", ["ccTransactionId"]),
 
+  /**
+   * Learned overrides for parsed bills, keyed by normalized vendor name
+   * (e.g. parser extracted "Deel Inc." → key "deel"). When a user approves
+   * a bill, we upsert a row here capturing whatever they overrode
+   * (invoiceName, contactId, categoryId, assignment shape). The next time
+   * a bill is parsed from the same vendor, applyBillRule pre-populates
+   * those same fields onto the new bill — but only if the field is still
+   * empty, so a user's manual edits are never overwritten.
+   */
+  billRules: defineTable({
+    /** Normalized lookup key — lowercased, business suffixes stripped. */
+    vendorKey: v.string(),
+    /** Last-seen display version of the vendor name, for debugging/UI. */
+    vendorDisplay: v.optional(v.string()),
+    invoiceName: v.optional(v.string()),
+    contactId: v.optional(v.id("contacts")),
+    contactName: v.optional(v.string()),
+    categoryId: v.optional(v.id("categories")),
+    categorySlug: v.optional(v.string()),
+    assignType: v.optional(v.union(v.literal("horse"), v.literal("person"))),
+    assignedHorses: v.optional(
+      v.array(
+        v.object({
+          horseId: v.id("horses"),
+          horseName: v.string(),
+          amount: v.number()
+        })
+      )
+    ),
+    assignedPeople: v.optional(
+      v.array(
+        v.object({
+          personId: v.id("people"),
+          personName: v.optional(v.string()),
+          amount: v.number()
+        })
+      )
+    ),
+    /** Reinforcement counter — bumped on every approval. */
+    count: v.number(),
+    lastSeen: v.number(),
+    createdAt: v.number()
+  }).index("by_vendorKey", ["vendorKey"]),
+
   horses: defineTable({
     name: v.string(),
     barnName: v.optional(v.string()),
