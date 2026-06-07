@@ -447,6 +447,59 @@ export const deleteHorseRecord = mutation({
   }
 });
 
+/** One-shot migration: collapse `title` and `medications` on every
+ *  medication record so the joined medications string acts as the
+ *  record's title. Three cases per record:
+ *    1) Both medications and title set →
+ *       overwrite title = medications.join(", ").
+ *    2) Only title set (no medications array) →
+ *       promote the title into a single-element medications array
+ *       (the legacy vet→medication migration left these), then sync
+ *       title = medications.join(", ") so future reads are consistent.
+ *    3) Only medications set (no title) →
+ *       set title = medications.join(", ").
+ *  Idempotent — re-running finds the data already consistent. */
+export const migrateMedTitleToMedications = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const records = await ctx.db.query("horseRecords").collect();
+    let updated = 0;
+    for (const r of records) {
+      if (r.type !== "medication") continue;
+      const meds = Array.isArray(r.medications) ? r.medications.filter(Boolean) : [];
+      const title = (r.title ?? "").trim();
+
+      let nextMedications: string[] | undefined = meds;
+      let nextTitle: string | undefined = title || undefined;
+
+      if (meds.length > 0) {
+        // Cases 1 + 3: medications is the source of truth.
+        nextTitle = meds.join(", ");
+      } else if (title) {
+        // Case 2: lift the title into the medications array (split on
+        // comma so a comma-separated title becomes multiple entries).
+        nextMedications = title.split(",").map((s) => s.trim()).filter(Boolean);
+        nextTitle = nextMedications.join(", ");
+      } else {
+        continue; // nothing to do
+      }
+
+      // Skip records that are already consistent.
+      const sameMeds =
+        (meds.length === nextMedications.length) &&
+        meds.every((m, i) => m === nextMedications![i]);
+      if (sameMeds && (r.title ?? undefined) === nextTitle) continue;
+
+      await ctx.db.patch(r._id, {
+        title: nextTitle,
+        medications: nextMedications && nextMedications.length > 0 ? nextMedications : undefined,
+      } as any);
+      updated += 1;
+    }
+    return { totalRecords: records.length, updated };
+  }
+});
+
 /** One-shot migration: any record currently classified as type="veterinary"
  *  with the legacy "medication" subcategory (either singular visitType
  *  or inside the visitTypes array) is promoted to type="medication" so

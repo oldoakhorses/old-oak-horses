@@ -33,10 +33,10 @@ const MEDICATION_OPTIONS = [
 type RepeatUnit = "" | "days" | "weeks" | "months";
 
 type FormState = {
-  title: string;
   horseIds: string[];
   // Multi-select: any subset of MEDICATION_OPTIONS may be picked. If "other"
-  // is included the free-text in medicationOther is appended on save.
+  // is included the free-text in medicationOther is appended on save. The
+  // joined medications string also becomes the record's title.
   medications: string[];
   medicationOther: string;
   date: string; // YYYY-MM-DD
@@ -60,7 +60,6 @@ function formatDate(timestamp: number) {
 }
 
 const EMPTY_FORM: FormState = {
-  title: "",
   horseIds: [],
   medications: [],
   medicationOther: "",
@@ -147,7 +146,6 @@ export default function MedsPage() {
     const matchedTiles = storedMeds.filter((m) => predetermined.includes(m));
     const customs = storedMeds.filter((m) => !predetermined.includes(m));
     setForm({
-      title: record.title ?? "",
       horseIds: [String(record.horseId)],
       medications: customs.length > 0 ? [...matchedTiles, "other"] : matchedTiles,
       medicationOther: customs.join(", "),
@@ -195,7 +193,6 @@ export default function MedsPage() {
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form.title.trim()) return setFormError("title is required");
     if (form.horseIds.length === 0) return setFormError("select at least one horse");
     if (form.medications.length === 0) return setFormError("pick at least one medication");
     if (form.medications.includes("other") && !form.medicationOther.trim())
@@ -230,12 +227,17 @@ export default function MedsPage() {
           ? (form.repeatUnit as "days" | "weeks" | "months")
           : undefined;
 
+      // Title field was removed from the form — the medications array IS
+      // the title now. Store the joined string so anywhere that still reads
+      // `title` (e.g. legacy display fallbacks) shows the right thing.
+      const derivedTitle = medsToSave.join(", ") || undefined;
+
       if (editingRecordId) {
         // Edit: patch the existing record. We don't change horseId here —
         // moving a med record to a different horse is a separate action.
         await updateHorseRecord({
           recordId: editingRecordId,
-          title: form.title.trim() || undefined,
+          title: derivedTitle,
           date: dateMs,
           medications: medsToSave,
           medicationRepeatValue: repeatValue,
@@ -247,7 +249,7 @@ export default function MedsPage() {
         for (const horseId of form.horseIds) {
           await createHorseRecord({
             horseId: horseId as Id<"horses">,
-            title: form.title.trim() || undefined,
+            title: derivedTitle,
             type: "medication",
             date: dateMs,
             medications: medsToSave,
@@ -341,7 +343,9 @@ export default function MedsPage() {
                 >
                   <div>
                     <div className={styles.medName}>{medName}</div>
-                    {r.title ? <div className={styles.metaTitle}>{r.title}</div> : null}
+                    {/* title used to render here as a subline; it now matches
+                        medName after the title→medications sync, so we drop
+                        it to avoid duplicate labels. */}
                   </div>
                   <div className={styles.horses}>
                     {horse ? (
@@ -369,18 +373,10 @@ export default function MedsPage() {
         }}
       >
         <form className={styles.form} onSubmit={onSubmit}>
-          {/* 1. Title */}
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>TITLE *</span>
-            <input
-              className={styles.input}
-              value={form.title}
-              onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
-              placeholder="e.g. Bute for soundness, gastroguard 1mo"
-            />
-          </label>
+          {/* Title field removed — the joined medications string is now
+              the record's title both on save and in any UI that reads it. */}
 
-          {/* 2. Horses (multi) */}
+          {/* 1. Horses (multi) */}
           <div className={styles.field}>
             <span className={styles.fieldLabel}>HORSES *</span>
             {horses.length === 0 ? (
