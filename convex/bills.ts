@@ -193,19 +193,25 @@ export const listForLinking = query(async (ctx) => {
 });
 
 export const listAll = query({
-  args: { organizationId: v.optional(v.id("organizations")) },
+  args: { ownerId: v.optional(v.id("owners")) },
   handler: async (ctx, args) => {
   let bills = await ctx.db.query("bills").withIndex("by_uploadedAt").order("desc").collect();
 
-  // Org filter: include a bill only if it references at least one horse
-  // belonging to the active org. Person-only and unassigned bills are
-  // hidden in filtered views since they don't tie to a specific org.
-  if (args.organizationId) {
-    const orgHorses = await ctx.db
-      .query("horses")
-      .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId!))
+  // Owner filter: include a bill only if it references at least one horse
+  // owned by the picked owner. Person-only and unassigned bills are hidden
+  // in filtered views since they don't tie to a specific owner.
+  if (args.ownerId) {
+    const allowed = new Set<string>();
+    const allHorses = await ctx.db.query("horses").collect();
+    for (const h of allHorses) {
+      if (h.ownerId && String(h.ownerId) === String(args.ownerId)) allowed.add(String(h._id));
+    }
+    const links = await ctx.db
+      .query("horseOwnerships")
+      .withIndex("by_owner", (q: any) => q.eq("ownerId", args.ownerId!))
       .collect();
-    const allowed = new Set(orgHorses.map((h) => String(h._id)));
+    for (const link of links) allowed.add(String(link.horseId));
+
     bills = bills.filter((bill) => {
       const horseIds: string[] = [];
       for (const h of bill.assignedHorses ?? []) horseIds.push(String(h.horseId));

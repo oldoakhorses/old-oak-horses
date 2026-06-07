@@ -192,16 +192,22 @@ export const getUpcoming = query({
 });
 
 export const getAll = query({
-  args: { organizationId: v.optional(v.id("organizations")) },
+  args: { ownerId: v.optional(v.id("owners")) },
   handler: async (ctx, args) => {
     let rows = await ctx.db.query("horseRecords").collect();
-    // Filter by org by checking the parent horse's organizationId.
-    if (args.organizationId) {
-      const orgHorses = await ctx.db
-        .query("horses")
-        .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId!))
+    // Filter by owner: include records whose parent horse is owned by the
+    // picked owner (either via horse.ownerId or the horseOwnerships join).
+    if (args.ownerId) {
+      const allowed = new Set<string>();
+      const allHorses = await ctx.db.query("horses").collect();
+      for (const h of allHorses) {
+        if (h.ownerId && String(h.ownerId) === String(args.ownerId)) allowed.add(String(h._id));
+      }
+      const links = await ctx.db
+        .query("horseOwnerships")
+        .withIndex("by_owner", (q: any) => q.eq("ownerId", args.ownerId!))
         .collect();
-      const allowed = new Set(orgHorses.map((h) => String(h._id)));
+      for (const link of links) allowed.add(String(link.horseId));
       rows = rows.filter((r) => allowed.has(String(r.horseId)));
     }
     return await Promise.all(

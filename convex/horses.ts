@@ -1,42 +1,64 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 
-/** Drop horses whose organizationId doesn't match the active org filter.
- *  Pass undefined to skip filtering (the "All horses" view). */
-function filterByOrg<T extends { organizationId?: any }>(
-  rows: T[],
-  organizationId: string | undefined,
-): T[] {
-  if (!organizationId) return rows;
-  return rows.filter((h) => String(h.organizationId ?? "") === organizationId);
+/** Compute the set of horse IDs visible under a given owner — combining the
+ *  canonical horse.ownerId plus any extra owners in the horseOwnerships
+ *  join table (multi-owner horses). Pass undefined to skip filtering. */
+async function horseIdsForOwner(
+  ctx: any,
+  ownerId: Id<"owners"> | undefined,
+): Promise<Set<string> | null> {
+  if (!ownerId) return null;
+  const set = new Set<string>();
+  // Primary ownership via horse.ownerId
+  const primary = await ctx.db.query("horses").collect();
+  for (const h of primary) {
+    if (h.ownerId && String(h.ownerId) === String(ownerId)) set.add(String(h._id));
+  }
+  // Extra co-owners via the join table
+  const links = await ctx.db
+    .query("horseOwnerships")
+    .withIndex("by_owner", (q: any) => q.eq("ownerId", ownerId))
+    .collect();
+  for (const link of links) set.add(String(link.horseId));
+  return set;
+}
+
+function filterByIdSet<T extends { _id: any }>(rows: T[], allowed: Set<string> | null): T[] {
+  if (!allowed) return rows;
+  return rows.filter((h) => allowed.has(String(h._id)));
 }
 
 export const getActiveHorses = query({
-  args: { organizationId: v.optional(v.id("organizations")) },
+  args: { ownerId: v.optional(v.id("owners")) },
   handler: async (ctx, args) => {
     const rows = await ctx.db
       .query("horses")
       .withIndex("by_status_name", (q) => q.eq("status", "active"))
       .collect();
-    return filterByOrg(rows, args.organizationId ? String(args.organizationId) : undefined);
+    const allowed = await horseIdsForOwner(ctx, args.ownerId);
+    return filterByIdSet(rows, allowed);
   }
 });
 
 export const getInactiveHorses = query({
-  args: { organizationId: v.optional(v.id("organizations")) },
+  args: { ownerId: v.optional(v.id("owners")) },
   handler: async (ctx, args) => {
     const horses = await ctx.db.query("horses").collect();
     const inactive = horses.filter((horse) => horse.status !== "active" || horse.isSold);
-    const filtered = filterByOrg(inactive, args.organizationId ? String(args.organizationId) : undefined);
+    const allowed = await horseIdsForOwner(ctx, args.ownerId);
+    const filtered = filterByIdSet(inactive, allowed);
     return filtered.sort((a, b) => b.createdAt - a.createdAt);
   }
 });
 
 export const getAllHorses = query({
-  args: { organizationId: v.optional(v.id("organizations")) },
+  args: { ownerId: v.optional(v.id("owners")) },
   handler: async (ctx, args) => {
     const rows = await ctx.db.query("horses").withIndex("by_name").collect();
-    return filterByOrg(rows, args.organizationId ? String(args.organizationId) : undefined);
+    const allowed = await horseIdsForOwner(ctx, args.ownerId);
+    return filterByIdSet(rows, allowed);
   }
 });
 

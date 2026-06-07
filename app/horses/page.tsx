@@ -277,13 +277,14 @@ export default function HorsesPage() {
             </label>
           </div>
           <label className={styles.field}>
-            <span className={styles.fieldLabel}>OWNER</span>
+            <span className={styles.fieldLabel}>OWNER *</span>
             <select
               className={styles.input}
               value={form.ownerSelection}
               onChange={(e) => setForm((p) => ({ ...p, ownerSelection: e.target.value, newOwnerName: "" }))}
+              required
             >
-              <option value="">-- select owner --</option>
+              <option value="">-- select owner (required) --</option>
               {owners.filter((o) => o.isActive).map((o) => (
                 <option key={String(o._id)} value={String(o._id)}>{o.name}</option>
               ))}

@@ -40,7 +40,19 @@ export default function NavBar({
 
   const navSections = useMemo(() => getNavSections(user?.role), [user?.role]);
   const profile = useQuery(api.users.getProfile, user?.id ? { userId: user.id as Id<"users"> } : "skip");
-  const orgs = useQuery(api.organizations.listForUser, user?.id ? { userId: user.id as Id<"users"> } : "skip") ?? [];
+  // Owners *are* the orgs. Filter to active owners and (for owner-role
+  // users) restrict the dropdown to just the one they're tied to.
+  const allOwners = useQuery(api.owners.list) ?? [];
+  const orgs = useMemo(
+    () => {
+      const active = allOwners.filter((o: any) => o.isActive !== false);
+      if (user?.role === "owner" && user?.ownerId) {
+        return active.filter((o: any) => String(o._id) === user.ownerId);
+      }
+      return active;
+    },
+    [allOwners, user?.role, user?.ownerId],
+  );
   const activeOrg = activeOrgId ? orgs.find((o: any) => String(o._id) === activeOrgId) : undefined;
 
   useEffect(() => {

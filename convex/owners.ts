@@ -308,3 +308,63 @@ function numericVal(value: unknown) {
 function round2(value: number) {
   return Math.round(value * 100) / 100;
 }
+
+/**
+ * One-off: ensure every horse has a primary ownerId set. Maps any
+ * stale `horse.owner` string to an owner row by case-insensitive name
+ * match. Horses with no resolvable owner are left untouched (caller
+ * needs to fix them by hand). Idempotent.
+ *
+ *   npx convex run --prod owners:backfillHorseOwners
+ */
+export const backfillHorseOwners = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const owners = await ctx.db.query("owners").collect();
+    const byNameKey = new Map<string, typeof owners[number]>();
+    for (const o of owners) {
+      const key = o.name.toLowerCase().replace(/\s*(llc|inc|ltd|corp)\.?\s*$/i, "").trim();
+      if (!byNameKey.has(key)) byNameKey.set(key, o);
+      // Also index by full name in case the suffix-stripped key collides.
+      byNameKey.set(o.name.toLowerCase().trim(), o);
+    }
+
+    const horses = await ctx.db.query("horses").collect();
+    let assigned = 0;
+    let alreadyOwned = 0;
+    const orphans: { id: string; name: string; owner?: string }[] = [];
+
+    for (const horse of horses) {
+      if (horse.ownerId) {
+        alreadyOwned++;
+        continue;
+      }
+      const rawOwner = (horse.owner ?? "").toLowerCase().trim();
+      if (!rawOwner) {
+        orphans.push({ id: String(horse._id), name: horse.name });
+        continue;
+      }
+      const key = rawOwner.replace(/\s*(llc|inc|ltd|corp)\.?\s*$/i, "").trim();
+      const match = byNameKey.get(key) ?? byNameKey.get(rawOwner);
+      if (match) {
+        await ctx.db.patch(horse._id, { ownerId: match._id });
+        assigned++;
+      } else {
+        orphans.push({ id: String(horse._id), name: horse.name, owner: horse.owner });
+      }
+    }
+
+    return { assigned, alreadyOwned, orphans };
+  },
+});
+
+/** Convenience query for status checks during the rollout. */
+export const listOrphanedHorses = query({
+  args: {},
+  handler: async (ctx) => {
+    const horses = await ctx.db.query("horses").collect();
+    return horses
+      .filter((h) => !h.ownerId)
+      .map((h) => ({ id: String(h._id), name: h.name, owner: h.owner, status: h.status }));
+  },
+});
