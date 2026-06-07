@@ -122,7 +122,20 @@ export default function StatementReconcilePage() {
   const stmt = useQuery(api.ccReconcile.getStatement, rawId ? { statementId } : "skip");
   const matchableBills = useQuery(api.ccReconcile.getMatchableBills) ?? [];
   const horses = useQuery(api.horses.getAllHorses) ?? [];
-  const people = useQuery(api.people.getAllPeople) ?? [];
+  // Include inactive team members too — historical CC charges often need to
+  // be assigned to someone who's since left. listAll returns everyone; we
+  // re-sort active-first, then by role, then by name so the picker reads
+  // the same as before with inactive folks at the bottom.
+  const peopleRaw = useQuery(api.people.listAll) ?? [];
+  const people = useMemo(
+    () =>
+      [...peopleRaw].sort((a, b) => {
+        if (Boolean(a.isActive) !== Boolean(b.isActive)) return a.isActive ? -1 : 1;
+        if (a.role !== b.role) return a.role.localeCompare(b.role);
+        return a.name.localeCompare(b.name);
+      }),
+    [peopleRaw],
+  );
 
   const updateMatch = useMutation(api.ccReconcile.updateTransactionMatch);
   const assignTxn = useMutation(api.ccReconcile.assignTransaction);
@@ -689,8 +702,13 @@ export default function StatementReconcilePage() {
                     className={styles.horsePick}
                     onClick={() => addPerson(p._id, p.name, p.role)}
                     disabled={selectedPeople.some((s) => String(s.personId) === String(p._id))}
+                    title={p.isActive === false ? "inactive team member" : undefined}
+                    style={p.isActive === false ? { opacity: 0.6 } : undefined}
                   >
-                    👤 {p.name} <span style={{ fontSize: 9, color: "#9ea2b0" }}>({p.role})</span>
+                    👤 {p.name}{" "}
+                    <span style={{ fontSize: 9, color: "#9ea2b0" }}>
+                      ({p.role}{p.isActive === false ? " · inactive" : ""})
+                    </span>
                   </button>
                 ))}
               </div>
