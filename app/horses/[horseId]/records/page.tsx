@@ -128,7 +128,10 @@ export default function HorseRecordsPage() {
   const horseId = params?.horseId as Id<"horses">;
 
   const horse = useQuery(api.horses.getHorseById, horseId ? { horseId } : "skip");
-  const allRecords = (useQuery(api.horseRecords.getAllByHorse, horseId ? { horseId } : "skip") as HorseRecord[] | undefined) ?? [];
+  // Medications live on /meds (and the horse profile's MEDS tile), so we
+  // filter them out of the per-horse records page to avoid duplication.
+  const allRecordsRaw = (useQuery(api.horseRecords.getAllByHorse, horseId ? { horseId } : "skip") as HorseRecord[] | undefined) ?? [];
+  const allRecords = useMemo(() => allRecordsRaw.filter((r) => r.type !== "medication"), [allRecordsRaw]);
 
   const allInvoicesForLinking = useQuery(api.bills.listForLinking) ?? [];
   const allContactsForRecord = useQuery(api.contacts.getAllContacts) ?? [];

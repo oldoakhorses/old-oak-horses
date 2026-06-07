@@ -191,13 +191,20 @@ export default function HorseProfilePage() {
     return d.getTime();
   }, []);
 
+  // Medication records get their own MEDS tile, so the records-block counts
+  // here exclude them — otherwise the "{n} past" subtitle on the records
+  // tile would double-count rows that also show up under MEDS.
+  const recordsNonMed = useMemo(
+    () => recordsAll.filter((r) => (r as any).type !== "medication"),
+    [recordsAll],
+  );
   const pastRecordCount = useMemo(
-    () => recordsAll.filter((r) => r.date <= todayEnd).length,
-    [recordsAll, todayEnd],
+    () => recordsNonMed.filter((r) => r.date <= todayEnd).length,
+    [recordsNonMed, todayEnd],
   );
   const upcomingRecordCount = useMemo(
-    () => recordsAll.filter((r) => r.date > todayEnd).length,
-    [recordsAll, todayEnd],
+    () => recordsNonMed.filter((r) => r.date > todayEnd).length,
+    [recordsNonMed, todayEnd],
   );
 
   if (horse === undefined) {

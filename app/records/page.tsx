@@ -213,7 +213,10 @@ function createInitialRecordForm(): RecordFormState {
 
 export default function RecordsPage() {
   const { user } = useAuth();
-  const allRecords = (useQuery(api.horseRecords.getAll) as GlobalRecord[] | undefined) ?? [];
+  // Medication records live on /meds; filter them out of the records page
+  // so the two surfaces don't double-show the same data.
+  const allRecordsRaw = (useQuery(api.horseRecords.getAll) as GlobalRecord[] | undefined) ?? [];
+  const allRecords = useMemo(() => allRecordsRaw.filter((r) => r.type !== "medication"), [allRecordsRaw]);
   const activeHorses = useQuery(api.horses.getActiveHorses) ?? [];
 
   const [activeTab, setActiveTab] = useState<Tab>("past");
