@@ -490,7 +490,18 @@ export default function StatementReconcilePage() {
                         <button
                           type="button"
                           className={styles.btnApprove}
-                          onClick={(e) => { e.stopPropagation(); approveTxn({ transactionId: txn._id, approved: true }); }}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await approveTxn({ transactionId: txn._id, approved: true });
+                            } catch (err) {
+                              // Surface backend failures (e.g. schema
+                              // validator rejections from a malformed
+                              // bill insert) instead of swallowing them.
+                              alert(`Failed to approve: ${err instanceof Error ? err.message : String(err)}`);
+                              console.error("approveTransaction failed", err);
+                            }
+                          }}
                         >
                           approve
                         </button>
@@ -499,7 +510,15 @@ export default function StatementReconcilePage() {
                         <button
                           type="button"
                           className={styles.btnUnapprove}
-                          onClick={(e) => { e.stopPropagation(); approveTxn({ transactionId: txn._id, approved: false }); }}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await approveTxn({ transactionId: txn._id, approved: false });
+                            } catch (err) {
+                              alert(`Failed to unapprove: ${err instanceof Error ? err.message : String(err)}`);
+                              console.error("approveTransaction failed", err);
+                            }
+                          }}
                         >
                           unapprove
                         </button>

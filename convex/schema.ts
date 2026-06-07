@@ -81,6 +81,10 @@ export default defineSchema({
       v.array(
         v.object({
           personId: v.id("people"),
+          // Denormalized name so we can render the bill without an
+          // extra join. Optional to keep existing rows valid; new rows
+          // (e.g. from createBillFromTransaction in ccReconcile) write it.
+          personName: v.optional(v.string()),
           amount: v.number()
         })
       )
