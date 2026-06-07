@@ -20,6 +20,11 @@
   flex: 1;
 }
 
+.profileWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
 .profileBtn {
   width: 38px;
   height: 38px;
@@ -31,6 +36,123 @@
   flex-shrink: 0;
   text-decoration: none;
   overflow: hidden;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.profileBtn:focus-visible {
+  outline: 2px solid #4a5bdb;
+  outline-offset: 2px;
+}
+
+/* Stripe-style dropdown */
+.profileMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 280px;
+  background: #fff;
+  border: 1px solid #e6e7ed;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  padding: 8px;
+  z-index: 100;
+}
+
+.profileMenuActive {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 12px 8px;
+}
+
+.profileMenuActiveBadge {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #f0f1f5;
+  color: #1a1a2e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.profileMenuActiveName {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+  text-align: center;
+}
+
+.profileMenuDivider {
+  height: 1px;
+  background: #eef0f3;
+  margin: 6px 0;
+}
+
+.profileMenuRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #1a1a2e;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.12s ease;
+}
+
+.profileMenuRow:hover {
+  background: #f5f6f9;
+}
+
+.profileMenuRow:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.profileMenuRowBadge {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: #f0f1f5;
+  color: #1a1a2e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.profileMenuRowIcon {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7084;
+  flex-shrink: 0;
+}
+
+.profileMenuRowName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profileImg {

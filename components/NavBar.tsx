@@ -33,20 +33,46 @@ export default function NavBar({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { logout, user } = useAuth();
+  const { logout, user, activeOrgId, setActiveOrgId } = useAuth();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   const navSections = useMemo(() => getNavSections(user?.role), [user?.role]);
   const profile = useQuery(api.users.getProfile, user?.id ? { userId: user.id as Id<"users"> } : "skip");
+  const orgs = useQuery(api.organizations.listForUser, user?.id ? { userId: user.id as Id<"users"> } : "skip") ?? [];
+  const activeOrg = activeOrgId ? orgs.find((o: any) => String(o._id) === activeOrgId) : undefined;
+
+  // Auto-pick the first org if none is selected and the user has at
+  // least one available. Stripe always shows you in *some* org context.
+  useEffect(() => {
+    if (!activeOrgId && orgs.length > 0) {
+      setActiveOrgId(String(orgs[0]._id));
+    }
+  }, [activeOrgId, orgs, setActiveOrgId]);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMenuOpen(false);
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        setProfileMenuOpen(false);
+      }
     };
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
   }, []);
+
+  // Close the profile menu on outside click.
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest(`.${styles.profileMenu}`) || target?.closest(`.${styles.profileBtn}`)) return;
+      setProfileMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [profileMenuOpen]);
 
   const onSignOut = async () => {
     if (isSigningOut) return;
@@ -117,13 +143,101 @@ export default function NavBar({
 
       <nav className={styles.nav}>
         <div className={styles.left}>
-          <Link href="/accounts" className={styles.profileBtn} aria-label="Account">
-            {profile?.profilePhotoUrl ? (
-              <img src={profile.profilePhotoUrl} alt="" className={styles.profileImg} />
-            ) : (
-              <span className={styles.profileInitial}>{user?.email?.[0]?.toUpperCase() || "U"}</span>
+          <div className={styles.profileWrap}>
+            <button
+              type="button"
+              className={styles.profileBtn}
+              aria-label="Account"
+              onClick={() => setProfileMenuOpen((v) => !v)}
+            >
+              {profile?.profilePhotoUrl ? (
+                <img src={profile.profilePhotoUrl} alt="" className={styles.profileImg} />
+              ) : (
+                <span className={styles.profileInitial}>{user?.email?.[0]?.toUpperCase() || "U"}</span>
+              )}
+            </button>
+
+            {profileMenuOpen && (
+              <div className={styles.profileMenu} role="menu">
+                {/* Active org card */}
+                {activeOrg && (
+                  <div className={styles.profileMenuActive}>
+                    <div className={styles.profileMenuActiveBadge}>
+                      {activeOrg.name
+                        .split(" ")
+                        .map((w: string) => w[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()}
+                    </div>
+                    <div className={styles.profileMenuActiveName}>{activeOrg.name}</div>
+                  </div>
+                )}
+
+                <div className={styles.profileMenuDivider} />
+
+                {/* Other orgs */}
+                {orgs
+                  .filter((o: any) => String(o._id) !== activeOrgId)
+                  .map((o: any) => (
+                    <button
+                      key={o._id}
+                      type="button"
+                      className={styles.profileMenuRow}
+                      onClick={() => {
+                        setActiveOrgId(String(o._id));
+                        setProfileMenuOpen(false);
+                      }}
+                    >
+                      <div className={styles.profileMenuRowBadge}>
+                        {o.name
+                          .split(" ")
+                          .map((w: string) => w[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase()}
+                      </div>
+                      <span className={styles.profileMenuRowName}>{o.name}</span>
+                    </button>
+                  ))}
+
+                <div className={styles.profileMenuDivider} />
+
+                {/* User identity row */}
+                <Link
+                  href="/accounts"
+                  className={styles.profileMenuRow}
+                  onClick={() => setProfileMenuOpen(false)}
+                >
+                  <div className={styles.profileMenuRowIcon}>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="8" cy="6" r="3" />
+                      <path d="M2.5 14c0-3 2.5-5 5.5-5s5.5 2 5.5 5" />
+                    </svg>
+                  </div>
+                  <span className={styles.profileMenuRowName}>
+                    {profile?.name || user?.name || user?.email || "Account"}
+                  </span>
+                </Link>
+
+                <button
+                  type="button"
+                  className={styles.profileMenuRow}
+                  onClick={onSignOut}
+                  disabled={isSigningOut}
+                >
+                  <div className={styles.profileMenuRowIcon}>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10 11l3-3-3-3M13 8H6M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h5" />
+                    </svg>
+                  </div>
+                  <span className={styles.profileMenuRowName}>
+                    {isSigningOut ? "signing out..." : "sign out"}
+                  </span>
+                </button>
+              </div>
             )}
-          </Link>
+          </div>
 
           <Link href="/dashboard" className={styles.homeBtn}>
             <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

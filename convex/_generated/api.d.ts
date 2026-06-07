@@ -38,6 +38,7 @@ import type * as matchPerson from "../matchPerson.js";
 import type * as migrations_backfillCreatedBy from "../migrations/backfillCreatedBy.js";
 import type * as migrations_migrateNextVisitDate from "../migrations/migrateNextVisitDate.js";
 import type * as migrations_migrateProviderToContact from "../migrations/migrateProviderToContact.js";
+import type * as organizations from "../organizations.js";
 import type * as owners from "../owners.js";
 import type * as people from "../people.js";
 import type * as personAliases from "../personAliases.js";
@@ -84,6 +85,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/backfillCreatedBy": typeof migrations_backfillCreatedBy;
   "migrations/migrateNextVisitDate": typeof migrations_migrateNextVisitDate;
   "migrations/migrateProviderToContact": typeof migrations_migrateProviderToContact;
+  organizations: typeof organizations;
   owners: typeof owners;
   people: typeof people;
   personAliases: typeof personAliases;

@@ -242,7 +242,36 @@ export default defineSchema({
     createdAt: v.number()
   }).index("by_vendorKey", ["vendorKey"]),
 
+  /**
+   * Multi-org partitioning. Every horse belongs to exactly one org; each
+   * user can be a member of many. Activated by an "active org" stored in
+   * the user's session — when set, all horse/bill/record/med/document
+   * queries filter to that org. Owner/admin roles see all orgs.
+   */
+  organizations: defineTable({
+    name: v.string(),
+    slug: v.string(),
+    isActive: v.optional(v.boolean()),
+    createdAt: v.number(),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_name", ["name"]),
+
+  /** Join table: which users can see which orgs. */
+  userOrganizations: defineTable({
+    userId: v.id("users"),
+    organizationId: v.id("organizations"),
+    /** Per-org role (optional) — falls back to the user's global role. */
+    role: v.optional(v.union(v.literal("admin"), v.literal("member"))),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_org", ["organizationId"])
+    .index("by_user_org", ["userId", "organizationId"]),
+
   horses: defineTable({
+    /** Owning organization. Optional until backfill completes. */
+    organizationId: v.optional(v.id("organizations")),
     name: v.string(),
     barnName: v.optional(v.string()),
     yearOfBirth: v.optional(v.number()),
@@ -264,7 +293,8 @@ export default defineSchema({
   })
     .index("by_name", ["name"])
     .index("by_status", ["status"])
-    .index("by_status_name", ["status", "name"]),
+    .index("by_status_name", ["status", "name"])
+    .index("by_organization", ["organizationId"]),
 
   contacts: defineTable({
     name: v.string(),

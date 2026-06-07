@@ -18,6 +18,9 @@ type AuthContextValue = {
   isAuthenticated: boolean;
   isLoading: boolean;
   user: User | null;
+  /** Currently-selected org for filtering. null = "All orgs" / not yet picked. */
+  activeOrgId: string | null;
+  setActiveOrgId: (orgId: string | null) => void;
   login: (token: string, user: User) => void;
   logout: () => void;
 };
@@ -25,14 +28,26 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const TOKEN_KEY = "session_token";
+const ACTIVE_ORG_KEY = "active_org_id";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [hasCheckedStorage, setHasCheckedStorage] = useState(false);
+  const [activeOrgId, setActiveOrgIdState] = useState<string | null>(null);
 
   useEffect(() => {
     setToken(localStorage.getItem(TOKEN_KEY));
+    setActiveOrgIdState(localStorage.getItem(ACTIVE_ORG_KEY));
     setHasCheckedStorage(true);
+  }, []);
+
+  const setActiveOrgId = useCallback((orgId: string | null) => {
+    if (orgId) {
+      localStorage.setItem(ACTIVE_ORG_KEY, orgId);
+    } else {
+      localStorage.removeItem(ACTIVE_ORG_KEY);
+    }
+    setActiveOrgIdState(orgId);
   }, []);
 
   const sessionUser = useQuery(
@@ -63,7 +78,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     const t = localStorage.getItem(TOKEN_KEY);
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(ACTIVE_ORG_KEY);
     setToken(null);
+    setActiveOrgIdState(null);
     if (t) {
       try {
         await logoutMutation({ token: t });
@@ -74,8 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [logoutMutation]);
 
   const value = useMemo(
-    () => ({ isAuthenticated, isLoading, user, login, logout }),
-    [isAuthenticated, isLoading, user, login, logout]
+    () => ({ isAuthenticated, isLoading, user, activeOrgId, setActiveOrgId, login, logout }),
+    [isAuthenticated, isLoading, user, activeOrgId, setActiveOrgId, login, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
