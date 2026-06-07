@@ -110,17 +110,47 @@ export default function MedsPage() {
   const filteredHorseName = prefilledHorseId ? horseById.get(prefilledHorseId)?.name : null;
 
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);
+  const updateHorseRecord = useMutation(api.horseRecords.updateHorseRecord);
+  const deleteHorseRecord = useMutation(api.horseRecords.deleteHorseRecord);
 
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  // null = create mode, an Id = editing that existing record. Drives the
+  // modal title, the save handler branch, and whether the delete button
+  // is shown.
+  const [editingRecordId, setEditingRecordId] = useState<Id<"horseRecords"> | null>(null);
 
   function openAdd(presetHorseId?: string) {
+    setEditingRecordId(null);
     setForm({
       ...EMPTY_FORM,
       date: todayIso(),
       horseIds: presetHorseId ? [presetHorseId] : [],
+    });
+    setFormError("");
+    setShowAdd(true);
+  }
+
+  /** Open the modal in edit mode for an existing medication record. The
+   *  form is pre-filled from the record's stored fields; on save we call
+   *  updateHorseRecord with the same id so it patches the existing row. */
+  function openEdit(record: any) {
+    setEditingRecordId(record._id);
+    const meds = Array.isArray(record.medications) ? record.medications : [];
+    const firstMed = meds[0] ?? "";
+    const isPredetermined = (MEDICATION_OPTIONS as readonly string[]).includes(firstMed);
+    setForm({
+      title: record.title ?? "",
+      horseIds: [String(record.horseId)],
+      medication: isPredetermined ? firstMed : firstMed ? "other" : "",
+      medicationOther: isPredetermined ? "" : firstMed,
+      date: record.date ? new Date(record.date).toISOString().slice(0, 10) : todayIso(),
+      repeatEnabled: Boolean(record.medicationRepeatValue && record.medicationRepeatUnit),
+      repeatValue: record.medicationRepeatValue ? String(record.medicationRepeatValue) : "",
+      repeatUnit: (record.medicationRepeatUnit as RepeatUnit | undefined) ?? "",
+      notes: record.notes ?? "",
     });
     setFormError("");
     setShowAdd(true);
@@ -176,21 +206,37 @@ export default function MedsPage() {
           ? (form.repeatUnit as "days" | "weeks" | "months")
           : undefined;
 
-      for (const horseId of form.horseIds) {
-        await createHorseRecord({
-          horseId: horseId as Id<"horses">,
+      if (editingRecordId) {
+        // Edit: patch the existing record. We don't change horseId here —
+        // moving a med record to a different horse is a separate action.
+        await updateHorseRecord({
+          recordId: editingRecordId,
           title: form.title.trim() || undefined,
-          type: "medication",
           date: dateMs,
           medications: [medName],
           medicationRepeatValue: repeatValue,
           medicationRepeatUnit: repeatUnit,
           notes: form.notes.trim() || undefined,
-          createdBy: user?.name,
         });
+      } else {
+        // Create: one record per selected horse.
+        for (const horseId of form.horseIds) {
+          await createHorseRecord({
+            horseId: horseId as Id<"horses">,
+            title: form.title.trim() || undefined,
+            type: "medication",
+            date: dateMs,
+            medications: [medName],
+            medicationRepeatValue: repeatValue,
+            medicationRepeatUnit: repeatUnit,
+            notes: form.notes.trim() || undefined,
+            createdBy: user?.name,
+          });
+        }
       }
 
       setShowAdd(false);
+      setEditingRecordId(null);
       setForm(EMPTY_FORM);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "failed to save");
@@ -257,7 +303,17 @@ export default function MedsPage() {
                   ? `every ${r.medicationRepeatValue} ${r.medicationRepeatUnit}`
                   : null;
               return (
-                <div key={String(r._id)} className={styles.row}>
+                <div
+                  key={String(r._id)}
+                  className={styles.row}
+                  onClick={(e) => {
+                    // Don't intercept clicks on the horse link.
+                    const target = e.target as HTMLElement;
+                    if (target.closest("a")) return;
+                    openEdit(r);
+                  }}
+                  style={{ cursor: "pointer" }}
+                >
                   <div>
                     <div className={styles.medName}>{medName}</div>
                     {r.title ? <div className={styles.metaTitle}>{r.title}</div> : null}
@@ -279,7 +335,14 @@ export default function MedsPage() {
         </section>
       </main>
 
-      <Modal open={showAdd} title="log a medication" onClose={() => setShowAdd(false)}>
+      <Modal
+        open={showAdd}
+        title={editingRecordId ? "edit medication" : "log a medication"}
+        onClose={() => {
+          setShowAdd(false);
+          setEditingRecordId(null);
+        }}
+      >
         <form className={styles.form} onSubmit={onSubmit}>
           {/* 1. Title */}
           <label className={styles.field}>
@@ -305,12 +368,20 @@ export default function MedsPage() {
               <div className={styles.horseChips}>
                 {horses.map((h) => {
                   const active = form.horseIds.includes(String(h._id));
+                  // In edit mode the horse can't be changed (one record per
+                  // horse); only the active chip is rendered, others hidden.
+                  if (editingRecordId && !active) return null;
                   return (
                     <button
                       key={String(h._id)}
                       type="button"
                       className={active ? styles.horseChipActive : styles.horseChip}
-                      onClick={() => toggleHorse(String(h._id))}
+                      onClick={() => {
+                        if (editingRecordId) return;
+                        toggleHorse(String(h._id));
+                      }}
+                      disabled={Boolean(editingRecordId)}
+                      style={editingRecordId ? { cursor: "default", opacity: 0.9 } : undefined}
                     >
                       🐴 {h.name}
                     </button>
@@ -418,13 +489,60 @@ export default function MedsPage() {
 
           {formError ? <p className={styles.error}>{formError}</p> : null}
 
-          <div className={styles.actions}>
-            <button type="button" className="ui-button-outlined" onClick={() => setShowAdd(false)}>
-              cancel
-            </button>
-            <button type="submit" className="ui-button-filled" disabled={isSaving}>
-              {isSaving ? "saving..." : "log med"}
-            </button>
+          <div className={styles.actions} style={{ justifyContent: "space-between" }}>
+            {/* Delete only appears when editing; lives on the left so the
+                primary save/cancel buttons keep their familiar position. */}
+            {editingRecordId ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!editingRecordId) return;
+                  if (!confirm("Delete this medication record? This cannot be undone.")) return;
+                  setIsSaving(true);
+                  try {
+                    await deleteHorseRecord({ recordId: editingRecordId });
+                    setShowAdd(false);
+                    setEditingRecordId(null);
+                  } catch (err) {
+                    setFormError(err instanceof Error ? err.message : "failed to delete");
+                  } finally {
+                    setIsSaving(false);
+                  }
+                }}
+                disabled={isSaving}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: "10px 16px",
+                  borderRadius: 6,
+                  border: "1px solid rgba(229,72,77,0.3)",
+                  background: "rgba(229,72,77,0.05)",
+                  color: "#e5484d",
+                  cursor: isSaving ? "not-allowed" : "pointer",
+                }}
+              >
+                delete
+              </button>
+            ) : <span />}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                className="ui-button-outlined"
+                onClick={() => {
+                  setShowAdd(false);
+                  setEditingRecordId(null);
+                }}
+              >
+                cancel
+              </button>
+              <button type="submit" className="ui-button-filled" disabled={isSaving}>
+                {isSaving
+                  ? "saving..."
+                  : editingRecordId
+                    ? "save changes"
+                    : "log med"}
+              </button>
+            </div>
           </div>
         </form>
       </Modal>
