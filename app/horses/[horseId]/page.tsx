@@ -539,78 +539,22 @@ export default function HorseProfilePage() {
           </section>
         ) : null}
 
-        {/* MEDS — most recent medications logged for this horse, with a
-            quick action to log a new one (links to /meds with the horse
-            pre-selected via ?horse=<id>). */}
-        <section className={styles.profileCard}>
-          <div className={styles.profileHeaderRow}>
-            <h2 className={styles.cardSectionTitle}>MEDS</h2>
-            <div style={{ display: "flex", gap: 8 }}>
-              <Link
-                href={`/meds?horse=${horse._id}`}
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  padding: "6px 12px",
-                  borderRadius: 6,
-                  background: "#1a1a2e",
-                  color: "#fff",
-                  textDecoration: "none",
-                }}
-              >
-                + log med
-              </Link>
-              <Link
-                href="/meds"
-                style={{
-                  fontSize: 11,
-                  fontWeight: 500,
-                  padding: "6px 12px",
-                  borderRadius: 6,
-                  border: "1px solid #e8eaf0",
-                  color: "#4a5bdb",
-                  textDecoration: "none",
-                  background: "#fff",
-                }}
-              >
-                view all →
-              </Link>
+        {/* MEDS — link tile matching the financials/records pattern.
+            Routes to /meds?horse=<id> which filters the global meds list
+            to this horse. The "+ log med" button on /meds (and the
+            global FAB) handle adding new entries. */}
+        <Link href={`/meds?horse=${horse._id}`} className={styles.financialsBlock}>
+          <div className={styles.financialsBlockLeft}>
+            <span className={styles.financialsBlockIcon}>💊</span>
+            <div>
+              <div className={styles.financialsBlockTitle}>meds</div>
+              <div className={styles.financialsBlockSub}>
+                {horseMeds.length === 0 ? "no meds logged" : `${horseMeds.length} logged`}
+              </div>
             </div>
           </div>
-          {horseMeds.length === 0 ? (
-            <div style={{ fontSize: 11, color: "#9ea2b0", padding: "8px 0" }}>
-              no meds logged yet
-            </div>
-          ) : (
-            <div className={styles.ownerList}>
-              {horseMeds.slice(0, 5).map((m) => {
-                // Fall back to title / treatmentDescription for migrated records
-                // that came from the legacy vet "medication" subcategory and lack
-                // a populated medications array.
-                const medName =
-                  Array.isArray((m as any).medications) && (m as any).medications.length > 0
-                    ? (m as any).medications[0]
-                    : ((m as any).title?.trim() || (m as any).treatmentDescription?.trim() || "—");
-                const dateLabel = new Date((m as any).date).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                });
-                const repeat =
-                  (m as any).medicationRepeatValue && (m as any).medicationRepeatUnit
-                    ? `every ${(m as any).medicationRepeatValue} ${(m as any).medicationRepeatUnit}`
-                    : null;
-                return (
-                  <div key={String((m as any)._id)} className={styles.ownerRow}>
-                    <span className={styles.ownerName}>💊 {medName}</span>
-                    {repeat ? <span className={styles.ownerShare}>{repeat}</span> : null}
-                    <span className={styles.ownerShare}>{dateLabel}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
+          <span className={styles.financialsBlockArrow}>→</span>
+        </Link>
 
         {!isTeam && (
           <Link href={`/horses/${horse._id}/financials`} className={styles.financialsBlock}>

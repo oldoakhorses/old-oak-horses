@@ -98,11 +98,16 @@ export default function MedsPage() {
     () =>
       allRecords
         .filter((r: any) => r.type === "medication")
+        // If the URL specifies ?horse=<id>, slice the list to just that horse.
+        .filter((r: any) => !prefilledHorseId || String(r.horseId) === prefilledHorseId)
         // For team users, only show meds for horses they can access.
         .filter((r: any) => !isTeamRole || horseById.has(String(r.horseId)))
         .sort((a: any, b: any) => (b.date ?? 0) - (a.date ?? 0)),
-    [allRecords, isTeamRole, horseById],
+    [allRecords, isTeamRole, horseById, prefilledHorseId],
   );
+
+  // Friendly subtitle when the list is sliced to a single horse.
+  const filteredHorseName = prefilledHorseId ? horseById.get(prefilledHorseId)?.name : null;
 
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);
 
@@ -121,14 +126,15 @@ export default function MedsPage() {
     setShowAdd(true);
   }
 
-  // Auto-open the modal in two cases:
-  //  - /meds?horse=<id> → pre-selects that horse (deep link from horse profile)
-  //  - /meds?new=1      → opens with no horse pre-selected (FAB shortcut)
-  // Runs once when the horse list is ready.
+  // Auto-open the modal only when /meds?new=1 is present in the URL.
+  // ?horse=<id> alone just filters the list (used by the horse-profile
+  // MEDS link tile). To open the modal pre-selected for a horse, combine:
+  // /meds?horse=<id>&new=1.
   useEffect(() => {
+    if (!autoOpenNew) return;
     if (prefilledHorseId && horseById.has(prefilledHorseId)) {
       openAdd(prefilledHorseId);
-    } else if (autoOpenNew) {
+    } else {
       openAdd();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -207,10 +213,21 @@ export default function MedsPage() {
 
         <section className={styles.headerRow}>
           <div>
-            <div className="ui-label">// MEDS</div>
-            <h1 className={styles.title}>meds</h1>
+            <div className="ui-label">// MEDS{filteredHorseName ? ` // ${filteredHorseName.toUpperCase()}` : ""}</div>
+            <h1 className={styles.title}>
+              {filteredHorseName ? `${filteredHorseName}'s meds` : "meds"}
+            </h1>
+            {filteredHorseName ? (
+              <Link href="/meds" style={{ fontSize: 11, color: "#4a5bdb", textDecoration: "none" }}>
+                ← show all meds
+              </Link>
+            ) : null}
           </div>
-          <button type="button" className={styles.addButton} onClick={() => openAdd()}>
+          <button
+            type="button"
+            className={styles.addButton}
+            onClick={() => openAdd(prefilledHorseId ?? undefined)}
+          >
             + log med
           </button>
         </section>
