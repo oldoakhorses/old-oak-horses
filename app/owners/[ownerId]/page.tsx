@@ -44,7 +44,7 @@ export default function OwnerDetailPage() {
   const owner = useQuery(api.owners.getById, { ownerId });
   const ownerHorses = useQuery(api.owners.getOwnerHorses, { ownerId });
   const spend = useQuery(api.owners.getOwnerSpendSummary, { ownerId });
-  const allHorses = useQuery(api.horses.getAllHorses) ?? [];
+  const allHorses = useQuery(api.horses.getAllHorses, {}) ?? [];
   const assignHorse = useMutation(api.owners.assignHorseToOwner);
   const updateOwner = useMutation(api.owners.update);
 

@@ -267,7 +267,7 @@ export default function GlobalFab() {
   const documentFileInputRef = useRef<HTMLInputElement | null>(null);
   const invoiceFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const activeHorses = useQuery(api.horses.getActiveHorses) ?? [];
+  const activeHorses = useQuery(api.horses.getActiveHorses, {}) ?? [];
   const activePeople = useQuery(api.people.getAllPeople) ?? [];
   const categories = useQuery(api.categories.getAllCategories) ?? [];
   const recordProviderCategory = selectedRecordType ? RECORD_TYPE_TO_CATEGORY[selectedRecordType] : "";

@@ -9,6 +9,7 @@ import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
 import { formatInvoiceName } from "@/lib/formatInvoiceName";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrgArgs } from "@/lib/useOrgArgs";
 import styles from "./records.module.css";
 
 type RecordType = "veterinary" | "medication" | "farrier" | "bodywork" | "other";
@@ -215,9 +216,10 @@ export default function RecordsPage() {
   const { user } = useAuth();
   // Medication records live on /meds; filter them out of the records page
   // so the two surfaces don't double-show the same data.
-  const allRecordsRaw = (useQuery(api.horseRecords.getAll) as GlobalRecord[] | undefined) ?? [];
+  const orgArgs = useOrgArgs();
+  const allRecordsRaw = (useQuery(api.horseRecords.getAll, orgArgs) as GlobalRecord[] | undefined) ?? [];
   const allRecords = useMemo(() => allRecordsRaw.filter((r) => r.type !== "medication"), [allRecordsRaw]);
-  const activeHorses = useQuery(api.horses.getActiveHorses) ?? [];
+  const activeHorses = useQuery(api.horses.getActiveHorses, orgArgs) ?? [];
 
   const [activeTab, setActiveTab] = useState<Tab>("past");
   const [search, setSearch] = useState("");

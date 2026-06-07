@@ -9,6 +9,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrgArgs } from "@/lib/useOrgArgs";
 import styles from "./dashboard.module.css";
 
 type RecordType = "veterinary" | "medication" | "farrier" | "bodywork" | "other";
@@ -161,7 +162,8 @@ export default function DashboardPage() {
   const invoiceFileInputRef = useRef<HTMLInputElement | null>(null);
   const initializedFromQueryRef = useRef(false);
 
-  const activeHorses = useQuery(api.horses.getActiveHorses) ?? [];
+  const orgArgs = useOrgArgs();
+  const activeHorses = useQuery(api.horses.getActiveHorses, orgArgs) ?? [];
   const categories = useQuery(api.categories.getAllCategories) ?? [];
   const upcomingRecords = useQuery(api.horseRecords.getUpcoming) ?? [];
   const recordProviderCategory = selectedRecordType ? RECORD_TYPE_TO_CATEGORY[selectedRecordType] : "";

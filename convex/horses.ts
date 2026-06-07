@@ -1,29 +1,42 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
+/** Drop horses whose organizationId doesn't match the active org filter.
+ *  Pass undefined to skip filtering (the "All horses" view). */
+function filterByOrg<T extends { organizationId?: any }>(
+  rows: T[],
+  organizationId: string | undefined,
+): T[] {
+  if (!organizationId) return rows;
+  return rows.filter((h) => String(h.organizationId ?? "") === organizationId);
+}
+
 export const getActiveHorses = query({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db
+  args: { organizationId: v.optional(v.id("organizations")) },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
       .query("horses")
       .withIndex("by_status_name", (q) => q.eq("status", "active"))
       .collect();
+    return filterByOrg(rows, args.organizationId ? String(args.organizationId) : undefined);
   }
 });
 
 export const getInactiveHorses = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { organizationId: v.optional(v.id("organizations")) },
+  handler: async (ctx, args) => {
     const horses = await ctx.db.query("horses").collect();
     const inactive = horses.filter((horse) => horse.status !== "active" || horse.isSold);
-    return inactive.sort((a, b) => b.createdAt - a.createdAt);
+    const filtered = filterByOrg(inactive, args.organizationId ? String(args.organizationId) : undefined);
+    return filtered.sort((a, b) => b.createdAt - a.createdAt);
   }
 });
 
 export const getAllHorses = query({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db.query("horses").withIndex("by_name").collect();
+  args: { organizationId: v.optional(v.id("organizations")) },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db.query("horses").withIndex("by_name").collect();
+    return filterByOrg(rows, args.organizationId ? String(args.organizationId) : undefined);
   }
 });
 

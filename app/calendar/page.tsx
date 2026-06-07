@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import NavBar from "@/components/NavBar";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrgArgs } from "@/lib/useOrgArgs";
 import styles from "./calendar.module.css";
 
 const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"] as const;
@@ -322,7 +323,8 @@ export default function CalendarPage() {
     endDate: weekEndStr,
   });
 
-  const activeHorses = useQuery(api.horses.getActiveHorses);
+  const orgArgs = useOrgArgs();
+  const activeHorses = useQuery(api.horses.getActiveHorses, orgArgs);
 
   const createEvent = useMutation(api.calendarEvents.create);
   const updateEvent = useMutation(api.calendarEvents.update);

@@ -43,14 +43,6 @@ export default function NavBar({
   const orgs = useQuery(api.organizations.listForUser, user?.id ? { userId: user.id as Id<"users"> } : "skip") ?? [];
   const activeOrg = activeOrgId ? orgs.find((o: any) => String(o._id) === activeOrgId) : undefined;
 
-  // Auto-pick the first org if none is selected and the user has at
-  // least one available. Stripe always shows you in *some* org context.
-  useEffect(() => {
-    if (!activeOrgId && orgs.length > 0) {
-      setActiveOrgId(String(orgs[0]._id));
-    }
-  }, [activeOrgId, orgs, setActiveOrgId]);
-
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -159,22 +151,39 @@ export default function NavBar({
 
             {profileMenuOpen && (
               <div className={styles.profileMenu} role="menu">
-                {/* Active org card */}
-                {activeOrg && (
-                  <div className={styles.profileMenuActive}>
-                    <div className={styles.profileMenuActiveBadge}>
-                      {activeOrg.name
-                        .split(" ")
-                        .map((w: string) => w[0])
-                        .join("")
-                        .slice(0, 2)
-                        .toUpperCase()}
-                    </div>
-                    <div className={styles.profileMenuActiveName}>{activeOrg.name}</div>
+                {/* Active card — either current org, or "all" if no org picked */}
+                <div className={styles.profileMenuActive}>
+                  <div className={styles.profileMenuActiveBadge}>
+                    {activeOrg
+                      ? activeOrg.name
+                          .split(" ")
+                          .map((w: string) => w[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase()
+                      : "ALL"}
                   </div>
-                )}
+                  <div className={styles.profileMenuActiveName}>
+                    {activeOrg ? activeOrg.name : "All horses"}
+                  </div>
+                </div>
 
                 <div className={styles.profileMenuDivider} />
+
+                {/* "All horses" row — only shown when filtered into an org */}
+                {activeOrg && (
+                  <button
+                    type="button"
+                    className={styles.profileMenuRow}
+                    onClick={() => {
+                      setActiveOrgId(null);
+                      setProfileMenuOpen(false);
+                    }}
+                  >
+                    <div className={styles.profileMenuRowBadge}>ALL</div>
+                    <span className={styles.profileMenuRowName}>All horses</span>
+                  </button>
+                )}
 
                 {/* Other orgs */}
                 {orgs

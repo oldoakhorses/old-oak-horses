@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrgArgs } from "@/lib/useOrgArgs";
 import NavBar from "@/components/NavBar";
 import { formatInvoiceFileName, formatInvoiceName } from "@/lib/formatInvoiceName";
 import styles from "./invoices.module.css";
@@ -106,7 +107,8 @@ export default function InvoicesPage() {
   const isOwnerRole = user?.role === "owner";
   const ownerIdForFilter = isOwnerRole && user?.ownerId ? (user.ownerId as Id<"owners">) : undefined;
 
-  const allRows = useQuery(api.bills.listAll, isOwnerRole ? "skip" : {}) ?? [];
+  const orgArgs = useOrgArgs();
+  const allRows = useQuery(api.bills.listAll, isOwnerRole ? "skip" : orgArgs) ?? [];
   const ownerRows = useQuery(api.bills.listByOwner, ownerIdForFilter ? { ownerId: ownerIdForFilter } : "skip") ?? [];
   const rows = isOwnerRole ? ownerRows : allRows;
 
@@ -117,7 +119,7 @@ export default function InvoicesPage() {
   const [horseFilter, setHorseFilter] = useState<string>("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const activeHorses = useQuery(api.horses.getActiveHorses) ?? [];
+  const activeHorses = useQuery(api.horses.getActiveHorses, orgArgs) ?? [];
   const [sortColumn, setSortColumn] = useState<SortColumn>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);

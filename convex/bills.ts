@@ -192,8 +192,28 @@ export const listForLinking = query(async (ctx) => {
   });
 });
 
-export const listAll = query(async (ctx) => {
-  const bills = await ctx.db.query("bills").withIndex("by_uploadedAt").order("desc").collect();
+export const listAll = query({
+  args: { organizationId: v.optional(v.id("organizations")) },
+  handler: async (ctx, args) => {
+  let bills = await ctx.db.query("bills").withIndex("by_uploadedAt").order("desc").collect();
+
+  // Org filter: include a bill only if it references at least one horse
+  // belonging to the active org. Person-only and unassigned bills are
+  // hidden in filtered views since they don't tie to a specific org.
+  if (args.organizationId) {
+    const orgHorses = await ctx.db
+      .query("horses")
+      .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId!))
+      .collect();
+    const allowed = new Set(orgHorses.map((h) => String(h._id)));
+    bills = bills.filter((bill) => {
+      const horseIds: string[] = [];
+      for (const h of bill.assignedHorses ?? []) horseIds.push(String(h.horseId));
+      for (const h of bill.horseAssignments ?? []) if (h.horseId) horseIds.push(String(h.horseId));
+      for (const s of bill.splitLineItems ?? []) for (const sp of s.splits ?? []) horseIds.push(String(sp.horseId));
+      return horseIds.some((id) => allowed.has(id));
+    });
+  }
 
   const contactResolved = await batchResolveContacts(ctx, bills as any);
 
@@ -219,6 +239,7 @@ export const listAll = query(async (ctx) => {
       lineItemCategories: lineItemCats,
     };
   });
+  },
 });
 
 export const listByOwner = query({

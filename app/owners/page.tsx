@@ -10,7 +10,7 @@ import styles from "./owners.module.css";
 
 export default function OwnersPage() {
   const owners = useQuery(api.owners.list) ?? [];
-  const horses = useQuery(api.horses.getAllHorses) ?? [];
+  const horses = useQuery(api.horses.getAllHorses, {}) ?? [];
   const createOwner = useMutation(api.owners.create);
 
   const [showAdd, setShowAdd] = useState(false);

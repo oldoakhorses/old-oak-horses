@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrgArgs } from "@/lib/useOrgArgs";
 import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
 import styles from "./meds.module.css";
@@ -97,9 +98,10 @@ export default function MedsPage() {
 
   // Active horses for the picker. Team users only see horses they've been
   // granted access to (mirrors the rule on the /horses page).
+  const orgArgs = useOrgArgs();
   const allHorses = useQuery(
     api.horses.getActiveHorses,
-    !isTeamRole ? {} : "skip",
+    !isTeamRole ? orgArgs : "skip",
   ) ?? [];
   const sharedHorses = useQuery(
     api.horseAccess.listSharedForUser,
@@ -108,7 +110,7 @@ export default function MedsPage() {
   const horses = isTeamRole ? sharedHorses : allHorses;
   const horseById = useMemo(() => new Map(horses.map((h) => [String(h._id), h])), [horses]);
 
-  const allRecords = useQuery(api.horseRecords.getAll) ?? [];
+  const allRecords = useQuery(api.horseRecords.getAll, orgArgs) ?? [];
   const medRecords = useMemo(
     () =>
       allRecords

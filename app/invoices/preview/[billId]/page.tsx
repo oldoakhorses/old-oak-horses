@@ -226,7 +226,7 @@ export default function InvoicePreviewPage() {
   const previewUrl = bill?.originalPdfUrl || undefined;
   const linkedRecords = useQuery(api.horseRecords.getByBill, { billId }) ?? [];
   const categories = useQuery(api.categories.getAllCategories) ?? [];
-  const horses = useQuery(api.horses.getActiveHorses) ?? [];
+  const horses = useQuery(api.horses.getActiveHorses, {}) ?? [];
   const people = useQuery(api.people.getAllPeople) ?? [];
 
   const [vendorEdit, setVendorEdit] = useState(false);

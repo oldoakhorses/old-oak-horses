@@ -6,6 +6,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrgArgs } from "@/lib/useOrgArgs";
 import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
 import styles from "./horses.module.css";
@@ -44,7 +45,8 @@ export default function HorsesPage() {
   //  - admin / no role           → all horses
   //  - owner role with ownerId   → horses owned by them
   //  - team role                 → only horses explicitly shared with them
-  const allHorses = useQuery(api.horses.getAllHorses, isOwnerRole || isTeamRole ? "skip" : {}) ?? [];
+  const orgArgs = useOrgArgs();
+  const allHorses = useQuery(api.horses.getAllHorses, isOwnerRole || isTeamRole ? "skip" : orgArgs) ?? [];
   const ownerHorses = useQuery(api.horses.getHorsesByOwner, ownerIdForFilter ? { ownerId: ownerIdForFilter } : "skip") ?? [];
   const sharedHorses = useQuery(
     api.horseAccess.listSharedForUser,

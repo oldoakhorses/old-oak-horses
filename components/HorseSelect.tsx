@@ -19,7 +19,7 @@ export default function HorseSelect({
   showSplitOption = false,
   splitValue = "__split__"
 }: HorseSelectProps) {
-  const horses = useQuery(api.horses.getActiveHorses) ?? [];
+  const horses = useQuery(api.horses.getActiveHorses, {}) ?? [];
   const className = [
     styles.select,
     compact ? styles.compact : "",

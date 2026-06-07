@@ -121,7 +121,7 @@ export default function StatementReconcilePage() {
 
   const stmt = useQuery(api.ccReconcile.getStatement, rawId ? { statementId } : "skip");
   const matchableBills = useQuery(api.ccReconcile.getMatchableBills) ?? [];
-  const horses = useQuery(api.horses.getAllHorses) ?? [];
+  const horses = useQuery(api.horses.getAllHorses, {}) ?? [];
   // Include inactive team members too — historical CC charges often need to
   // be assigned to someone who's since left. listAll returns everyone; we
   // re-sort active-first, then by role, then by name so the picker reads

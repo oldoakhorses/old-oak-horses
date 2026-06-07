@@ -192,9 +192,18 @@ export const getUpcoming = query({
 });
 
 export const getAll = query({
-  args: {},
-  handler: async (ctx) => {
-    const rows = await ctx.db.query("horseRecords").collect();
+  args: { organizationId: v.optional(v.id("organizations")) },
+  handler: async (ctx, args) => {
+    let rows = await ctx.db.query("horseRecords").collect();
+    // Filter by org by checking the parent horse's organizationId.
+    if (args.organizationId) {
+      const orgHorses = await ctx.db
+        .query("horses")
+        .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId!))
+        .collect();
+      const allowed = new Set(orgHorses.map((h) => String(h._id)));
+      rows = rows.filter((r) => allowed.has(String(r.horseId)));
+    }
     return await Promise.all(
       rows.map(async (record) => {
         const horse = await ctx.db.get(record.horseId);

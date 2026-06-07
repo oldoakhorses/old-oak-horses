@@ -33,7 +33,7 @@ const SUBCATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function ReportsPage() {
-  const bills: any[] = useQuery(api.bills.listAll) ?? [];
+  const bills: any[] = useQuery(api.bills.listAll, {}) ?? [];
   const [selectedBillId, setSelectedBillId] = useState<string>("");
 
   const vetBills = useMemo(

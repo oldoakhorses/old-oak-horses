@@ -13,7 +13,7 @@ type Props = {
 };
 
 export default function UnmatchedHorseBanner({ billId, unmatchedNames, onResolved }: Props) {
-  const horses = useQuery(api.horses.getActiveHorses) ?? [];
+  const horses = useQuery(api.horses.getActiveHorses, {}) ?? [];
   const resolveUnmatchedHorse = useMutation(api.bills.resolveUnmatchedHorse);
   const addHorseAndResolveUnmatched = useMutation(api.bills.addHorseAndResolveUnmatched);
 

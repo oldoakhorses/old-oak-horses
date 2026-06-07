@@ -79,7 +79,7 @@ export default function OwnerInvoiceDetailPage() {
 
   const invoice = useQuery(api.billing.getOwnerInvoice, { ownerInvoiceId });
   const availableCharges = useQuery(api.billing.getAvailableCharges, { ownerInvoiceId });
-  const horses = useQuery(api.horses.getAllHorses) ?? [];
+  const horses = useQuery(api.horses.getAllHorses, {}) ?? [];
   const approveItem = useMutation(api.billing.approveLineItem);
   const approveAll = useMutation(api.billing.approveAllLineItems);
   const updateStatus = useMutation(api.billing.updateOwnerInvoiceStatus);

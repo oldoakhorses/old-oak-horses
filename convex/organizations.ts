@@ -14,6 +14,20 @@ function slugify(name: string): string {
 
 /* ---------------------------------------------------------------- queries */
 
+/** Returns the set of horse _id strings that belong to the given org. Bills,
+ *  records, meds, and documents are filtered against this set so a single
+ *  org pick cascades across the whole app. */
+export const listHorseIdsForOrg = query({
+  args: { organizationId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    const horses = await ctx.db
+      .query("horses")
+      .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
+      .collect();
+    return horses.map((h) => String(h._id));
+  },
+});
+
 /** All orgs (admin view — for management UI). */
 export const listAll = query({
   args: {},

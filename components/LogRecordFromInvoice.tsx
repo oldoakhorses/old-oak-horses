@@ -60,7 +60,7 @@ export default function LogRecordFromInvoice({
   assignedHorses?: AssignedHorse[];
   lineItems?: LineItemForNotes[];
 }) {
-  const horses = useQuery(api.horses.getActiveHorses) ?? [];
+  const horses = useQuery(api.horses.getActiveHorses, {}) ?? [];
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
 
