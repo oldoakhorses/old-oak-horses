@@ -81,11 +81,9 @@ const SUBCATEGORY_OPTIONS: Record<string, Array<{ value: string; label: string }
     { value: "rider-registrations", label: "Rider Registrations" },
     { value: "memberships", label: "Memberships" },
   ],
-  grooming: [
-    { value: "rider", label: "Rider" },
-    { value: "groom", label: "Groom" },
-    { value: "freelance", label: "Freelance" },
-  ],
+  // Grooming category no longer offers subcategories (was Rider / Groom /
+  // Freelance). Removed per product request — leave existing data in
+  // bills.groomingSubcategory alone, just don't offer the picker anymore.
   marketing: [
     { value: "vip-tickets", label: "VIP Tickets" },
     { value: "photography", label: "Photography" },
