@@ -35,7 +35,9 @@ type RepeatUnit = "" | "days" | "weeks" | "months";
 type FormState = {
   title: string;
   horseIds: string[];
-  medication: string; // one of MEDICATION_OPTIONS or "" if not picked
+  // Multi-select: any subset of MEDICATION_OPTIONS may be picked. If "other"
+  // is included the free-text in medicationOther is appended on save.
+  medications: string[];
   medicationOther: string;
   date: string; // YYYY-MM-DD
   repeatEnabled: boolean;
@@ -60,7 +62,7 @@ function formatDate(timestamp: number) {
 const EMPTY_FORM: FormState = {
   title: "",
   horseIds: [],
-  medication: "",
+  medications: [],
   medicationOther: "",
   date: todayIso(),
   repeatEnabled: false,
@@ -138,14 +140,17 @@ export default function MedsPage() {
    *  updateHorseRecord with the same id so it patches the existing row. */
   function openEdit(record: any) {
     setEditingRecordId(record._id);
-    const meds = Array.isArray(record.medications) ? record.medications : [];
-    const firstMed = meds[0] ?? "";
-    const isPredetermined = (MEDICATION_OPTIONS as readonly string[]).includes(firstMed);
+    const storedMeds: string[] = Array.isArray(record.medications) ? record.medications : [];
+    const predetermined = (MEDICATION_OPTIONS as readonly string[]).filter((opt) => opt !== "other");
+    // Split stored values: anything matching a predetermined tile stays as
+    // a selected tile; the rest become "other" + free text.
+    const matchedTiles = storedMeds.filter((m) => predetermined.includes(m));
+    const customs = storedMeds.filter((m) => !predetermined.includes(m));
     setForm({
       title: record.title ?? "",
       horseIds: [String(record.horseId)],
-      medication: isPredetermined ? firstMed : firstMed ? "other" : "",
-      medicationOther: isPredetermined ? "" : firstMed,
+      medications: customs.length > 0 ? [...matchedTiles, "other"] : matchedTiles,
+      medicationOther: customs.join(", "),
       date: record.date ? new Date(record.date).toISOString().slice(0, 10) : todayIso(),
       repeatEnabled: Boolean(record.medicationRepeatValue && record.medicationRepeatUnit),
       repeatValue: record.medicationRepeatValue ? String(record.medicationRepeatValue) : "",
@@ -154,6 +159,15 @@ export default function MedsPage() {
     });
     setFormError("");
     setShowAdd(true);
+  }
+
+  function toggleMedication(med: string) {
+    setForm((p) => ({
+      ...p,
+      medications: p.medications.includes(med)
+        ? p.medications.filter((m) => m !== med)
+        : [...p.medications, med],
+    }));
   }
 
   // Auto-open the modal only when /meds?new=1 is present in the URL.
@@ -183,8 +197,8 @@ export default function MedsPage() {
     event.preventDefault();
     if (!form.title.trim()) return setFormError("title is required");
     if (form.horseIds.length === 0) return setFormError("select at least one horse");
-    if (!form.medication) return setFormError("pick a medication");
-    if (form.medication === "other" && !form.medicationOther.trim())
+    if (form.medications.length === 0) return setFormError("pick at least one medication");
+    if (form.medications.includes("other") && !form.medicationOther.trim())
       return setFormError("describe the medication (other)");
     if (!form.date) return setFormError("date is required");
     if (form.repeatEnabled) {
@@ -196,9 +210,19 @@ export default function MedsPage() {
     setFormError("");
     setIsSaving(true);
     try {
-      // Title carries the human label; medications array carries the canonical
-      // value (free-text for "other"). One record per selected horse.
-      const medName = form.medication === "other" ? form.medicationOther.trim() : form.medication;
+      // Collect the picked medications. Predetermined tiles pass through
+      // verbatim; "other" gets replaced by the free-text entries (comma- or
+      // newline-separated). Resulting array is what we persist.
+      const otherEntries = form.medications.includes("other")
+        ? form.medicationOther
+            .split(/[,\n]/)
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
+      const medsToSave: string[] = [
+        ...form.medications.filter((m) => m !== "other"),
+        ...otherEntries,
+      ];
       const dateMs = new Date(form.date).getTime();
       const repeatValue = form.repeatEnabled ? Number(form.repeatValue) : undefined;
       const repeatUnit =
@@ -213,7 +237,7 @@ export default function MedsPage() {
           recordId: editingRecordId,
           title: form.title.trim() || undefined,
           date: dateMs,
-          medications: [medName],
+          medications: medsToSave,
           medicationRepeatValue: repeatValue,
           medicationRepeatUnit: repeatUnit,
           notes: form.notes.trim() || undefined,
@@ -226,7 +250,7 @@ export default function MedsPage() {
             title: form.title.trim() || undefined,
             type: "medication",
             date: dateMs,
-            medications: [medName],
+            medications: medsToSave,
             medicationRepeatValue: repeatValue,
             medicationRepeatUnit: repeatUnit,
             notes: form.notes.trim() || undefined,
@@ -291,12 +315,13 @@ export default function MedsPage() {
           ) : (
             medRecords.map((r: any) => {
               const horse = horseById.get(String(r.horseId));
-              // Migrated records (promoted from type=veterinary visitType="medication")
-              // may not have a medications array — fall back to the record title,
-              // treatmentDescription, or the human-friendly placeholder.
+              // Records can now carry multiple medications. Join them with
+              // a comma; migrated records (promoted from type=veterinary
+              // visitType="medication") may not have a medications array,
+              // so fall back to the record title / treatmentDescription.
               const medName =
                 Array.isArray(r.medications) && r.medications.length > 0
-                  ? r.medications[0]
+                  ? r.medications.join(", ")
                   : (r.title?.trim() || (r as any).treatmentDescription?.trim() || "—");
               const repeatLabel =
                 r.medicationRepeatValue && r.medicationRepeatUnit
@@ -392,30 +417,35 @@ export default function MedsPage() {
             <span className={styles.fieldHint}>category is automatically set to medication</span>
           </div>
 
-          {/* 4. Medication picker (3 enforces category=meds at the data layer) */}
+          {/* 4. Medications (multi-select). Tiles toggle on/off; "other"
+              reveals a free-text input that accepts comma-separated names. */}
           <div className={styles.field}>
-            <span className={styles.fieldLabel}>MEDICATION *</span>
+            <span className={styles.fieldLabel}>MEDICATIONS *</span>
             <div className={styles.medGrid}>
-              {MEDICATION_OPTIONS.map((med) => (
-                <button
-                  key={med}
-                  type="button"
-                  className={form.medication === med ? styles.medOptionActive : styles.medOption}
-                  onClick={() => setForm((p) => ({ ...p, medication: med }))}
-                >
-                  {med}
-                </button>
-              ))}
+              {MEDICATION_OPTIONS.map((med) => {
+                const active = form.medications.includes(med);
+                return (
+                  <button
+                    key={med}
+                    type="button"
+                    className={active ? styles.medOptionActive : styles.medOption}
+                    onClick={() => toggleMedication(med)}
+                  >
+                    {med}
+                  </button>
+                );
+              })}
             </div>
-            {form.medication === "other" ? (
+            {form.medications.includes("other") ? (
               <input
                 className={styles.input}
                 style={{ marginTop: 8 }}
                 value={form.medicationOther}
                 onChange={(e) => setForm((p) => ({ ...p, medicationOther: e.target.value }))}
-                placeholder="medication name (other)"
+                placeholder="medication name(s) — separate multiple with commas"
               />
             ) : null}
+            <span className={styles.fieldHint}>tap multiple to log them all in one record</span>
           </div>
 
           {/* 5. Date */}
