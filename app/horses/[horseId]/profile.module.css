@@ -838,10 +838,95 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 
 .docCardIcon {
   font-size: 28px;
+}
+
+.docCardEditBtn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1a1a2e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  padding: 0;
+}
+
+.docCard:hover .docCardEditBtn {
+  opacity: 1;
+}
+
+.docCardEditBtn:hover {
+  transform: scale(1.08);
+}
+
+/* Edit modal layout */
+.docEditForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.docEditLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7084;
+}
+
+.docEditInput {
+  font-size: 14px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #1a1a2e;
+  padding: 10px 12px;
+  border: 1px solid #e6e7ed;
+  border-radius: 8px;
+  background: #fff;
+  outline: none;
+}
+
+.docEditInput:focus {
+  border-color: #4a5bdb;
+}
+
+.docEditTextarea {
+  font-size: 14px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #1a1a2e;
+  padding: 10px 12px;
+  border: 1px solid #e6e7ed;
+  border-radius: 8px;
+  background: #fff;
+  outline: none;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.docEditTextarea:focus {
+  border-color: #4a5bdb;
 }
 
 .docCardBody {

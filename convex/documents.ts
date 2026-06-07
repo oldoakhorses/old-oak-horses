@@ -86,6 +86,35 @@ export const getFileUrl = query({
   },
 });
 
+export const updateDocument = mutation({
+  args: {
+    documentId: v.id("documents"),
+    name: v.optional(v.string()),
+    tag: v.optional(DOCUMENT_TAG_VALIDATOR),
+    documentDate: v.optional(v.number()),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const doc = await ctx.db.get(args.documentId);
+    if (!doc) throw new Error("Document not found");
+
+    const patch: Record<string, unknown> = {};
+    if (args.name !== undefined) {
+      const trimmed = args.name.trim();
+      if (!trimmed) throw new Error("Title cannot be empty");
+      patch.name = trimmed;
+    }
+    if (args.tag !== undefined) patch.tag = args.tag;
+    if (args.documentDate !== undefined) patch.documentDate = args.documentDate;
+    if (args.notes !== undefined) patch.notes = args.notes.trim() || undefined;
+
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(args.documentId, patch);
+    }
+    return args.documentId;
+  },
+});
+
 export const deleteDocument = mutation({
   args: { documentId: v.id("documents") },
   handler: async (ctx, args) => {

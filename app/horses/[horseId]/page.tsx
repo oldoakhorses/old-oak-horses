@@ -141,12 +141,23 @@ export default function HorseProfilePage() {
   const transferOwnership = useMutation(api.horses.transferOwnership);
   const router = useRouter();
   const deleteDocument = useMutation(api.documents.deleteDocument);
+  const updateDocument = useMutation(api.documents.updateDocument);
 
   const [isEditing, setIsEditing] = useState(startsInEditMode);
   const [isSaving, setIsSaving] = useState(false);
   const [docSearch, setDocSearch] = useState("");
   const [documentToDelete, setDocumentToDelete] = useState<{ id: Id<"documents">; name: string } | null>(null);
   const [isDeletingDocument, setIsDeletingDocument] = useState(false);
+  // Inline editing for a single document — opens a modal pre-filled
+  // with the chosen doc's values; null means closed.
+  const [docToEdit, setDocToEdit] = useState<{
+    id: Id<"documents">;
+    name: string;
+    tag: DocumentTag;
+    documentDate: string;
+    notes: string;
+  } | null>(null);
+  const [isSavingDoc, setIsSavingDoc] = useState(false);
 
   // Transfer ownership state
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -264,6 +275,32 @@ export default function HorseProfilePage() {
       setDocumentToDelete(null);
     } finally {
       setIsDeletingDocument(false);
+    }
+  }
+
+  async function onSaveDocumentEdit() {
+    if (!docToEdit) return;
+    if (!docToEdit.name.trim()) {
+      alert("Title cannot be empty");
+      return;
+    }
+    setIsSavingDoc(true);
+    try {
+      const dateMs = docToEdit.documentDate
+        ? new Date(`${docToEdit.documentDate}T00:00:00`).getTime()
+        : undefined;
+      await updateDocument({
+        documentId: docToEdit.id,
+        name: docToEdit.name,
+        tag: docToEdit.tag,
+        documentDate: Number.isFinite(dateMs) ? (dateMs as number) : undefined,
+        notes: docToEdit.notes,
+      });
+      setDocToEdit(null);
+    } catch (err: any) {
+      alert(`Failed to save: ${err?.message ?? err}`);
+    } finally {
+      setIsSavingDoc(false);
     }
   }
 
@@ -642,6 +679,25 @@ export default function HorseProfilePage() {
                     >
                       <div className={styles.docCardTop}>
                         <span className={styles.docCardIcon}>📄</span>
+                        <button
+                          type="button"
+                          className={styles.docCardEditBtn}
+                          aria-label="Edit document"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const dateMs = doc.documentDate ?? doc.uploadedAt;
+                            const dateStr = new Date(dateMs).toISOString().slice(0, 10);
+                            setDocToEdit({
+                              id: doc._id,
+                              name: doc.name,
+                              tag: doc.tag,
+                              documentDate: dateStr,
+                              notes: doc.notes ?? "",
+                            });
+                          }}
+                        >
+                          ✏️
+                        </button>
                       </div>
                       <div className={styles.docCardBody}>
                         <div className={styles.docCardName}>{doc.name}</div>
@@ -674,6 +730,72 @@ export default function HorseProfilePage() {
             {isDeletingDocument ? "deleting..." : "yes, delete"}
           </button>
         </div>
+      </Modal>
+
+      <Modal open={docToEdit !== null} title="edit document" onClose={() => setDocToEdit(null)}>
+        {docToEdit && (
+          <div className={styles.docEditForm}>
+            <label className={styles.docEditLabel}>
+              <span>title</span>
+              <input
+                className={styles.docEditInput}
+                type="text"
+                value={docToEdit.name}
+                onChange={(e) => setDocToEdit({ ...docToEdit, name: e.target.value })}
+              />
+            </label>
+
+            <label className={styles.docEditLabel}>
+              <span>tag</span>
+              <select
+                className={styles.docEditInput}
+                value={docToEdit.tag}
+                onChange={(e) => setDocToEdit({ ...docToEdit, tag: e.target.value as DocumentTag })}
+              >
+                {(Object.keys(TAG_LABELS) as DocumentTag[]).map((t) => (
+                  <option key={t} value={t}>
+                    {TAG_LABELS[t]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className={styles.docEditLabel}>
+              <span>date</span>
+              <input
+                className={styles.docEditInput}
+                type="date"
+                value={docToEdit.documentDate}
+                onChange={(e) => setDocToEdit({ ...docToEdit, documentDate: e.target.value })}
+              />
+            </label>
+
+            <label className={styles.docEditLabel}>
+              <span>notes</span>
+              <textarea
+                className={styles.docEditTextarea}
+                rows={4}
+                value={docToEdit.notes}
+                onChange={(e) => setDocToEdit({ ...docToEdit, notes: e.target.value })}
+                placeholder="optional notes..."
+              />
+            </label>
+
+            <div className={styles.deleteActions}>
+              <button type="button" className="ui-button-outlined" onClick={() => setDocToEdit(null)}>
+                cancel
+              </button>
+              <button
+                type="button"
+                className="ui-button-filled"
+                onClick={onSaveDocumentEdit}
+                disabled={isSavingDoc}
+              >
+                {isSavingDoc ? "saving..." : "save"}
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Transfer Ownership Modal */}
