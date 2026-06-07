@@ -2071,14 +2071,29 @@ export const markDone = internalMutation({
   }
 });
 
-/** Lowercase, strip business suffixes — so "Deel" and "Deel Inc." share a rule. */
+/** Lowercase, strip business suffixes — so "Deel" and "Deel Inc." share a rule.
+ *  Also strips trailing transaction-ID-style tokens (6+ alphanumeric, with at
+ *  least one letter AND one digit) so CC-sourced descriptions like
+ *  "Zelle Payment to Chuy Jpm99cj1aujs" key the same as
+ *  "Zelle Payment to Chuy Abc12def345" — both become "zelle payment to chuy". */
 function normalizeVendorKey(name: string | undefined | null): string {
   if (!name) return "";
-  return name
+  let s = name
     .toLowerCase()
     .replace(/[.,]/g, "")
-    .replace(/\s+(inc|llc|ltd|corp|co|company|gmbh|limited|sa|sas|ag)\s*$/i, "")
     .trim();
+  // Strip one or more trailing tokens that look like transaction IDs.
+  // A token qualifies if it's >=6 alphanumeric chars and has both a
+  // letter and a digit. Loop because some descriptions trail with
+  // multiple such tokens (e.g. "...Web Id: 12345 Abc99cj1aujs").
+  for (let i = 0; i < 3; i++) {
+    const next = s.replace(/\s+(?=[a-z0-9]*\d)(?=[a-z0-9]*[a-z])[a-z0-9]{6,}$/i, "").trim();
+    if (next === s) break;
+    s = next;
+  }
+  // Then strip a trailing business suffix.
+  s = s.replace(/\s+(inc|llc|ltd|corp|co|company|gmbh|limited|sa|sas|ag)$/i, "").trim();
+  return s;
 }
 
 /** Pick the parsed vendor name off a bill, tolerating the legacy field. */
@@ -2254,6 +2269,85 @@ export const markError = internalMutation({
       errorMessage: args.errorMessage
     });
   }
+});
+
+/**
+ * One-off: rename existing "Zelle Payment to Chuy ..." bills to "Chuey Pay"
+ * and "Zelle Payment to Juan Hernandez ..." bills to "Juan Pay", and seed
+ * the matching billRules so future CC bills auto-rename. Idempotent —
+ * safe to run multiple times.
+ *
+ * Run with:
+ *   npx convex run --prod bills:applyZellePayRenameRules
+ */
+export const applyZellePayRenameRules = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const rules: { matchPrefix: string; newName: string; vendorKey: string }[] = [
+      {
+        matchPrefix: "zelle payment to chuy",
+        newName: "Chuey Pay",
+        vendorKey: "zelle payment to chuy",
+      },
+      {
+        matchPrefix: "zelle payment to juan hernandez",
+        newName: "Juan Pay",
+        vendorKey: "zelle payment to juan hernandez",
+      },
+    ];
+
+    let billsUpdated = 0;
+    let rulesUpserted = 0;
+    const now = Date.now();
+
+    // 1. Upsert the rules so future CC bills get auto-renamed at creation.
+    for (const r of rules) {
+      const existing = await ctx.db
+        .query("billRules")
+        .withIndex("by_vendorKey", (q) => q.eq("vendorKey", r.vendorKey))
+        .first();
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          invoiceName: r.newName,
+          vendorDisplay: r.matchPrefix,
+          lastSeen: now,
+        });
+      } else {
+        await ctx.db.insert("billRules", {
+          vendorKey: r.vendorKey,
+          vendorDisplay: r.matchPrefix,
+          invoiceName: r.newName,
+          count: 1,
+          createdAt: now,
+          lastSeen: now,
+        });
+      }
+      rulesUpserted++;
+    }
+
+    // 2. Backfill existing bills. Match against either invoiceName,
+    //    customProviderName, or fileName since the displayed bold name
+    //    falls back across all three.
+    const allBills = await ctx.db.query("bills").collect();
+    for (const bill of allBills) {
+      const candidates = [
+        String(bill.invoiceName ?? ""),
+        String((bill as any).customProviderName ?? ""),
+        String(bill.fileName ?? ""),
+      ].map((s) => s.toLowerCase());
+
+      for (const r of rules) {
+        if (bill.invoiceName === r.newName) break; // already renamed
+        if (candidates.some((c) => c.includes(r.matchPrefix))) {
+          await ctx.db.patch(bill._id, { invoiceName: r.newName });
+          billsUpdated++;
+          break;
+        }
+      }
+    }
+
+    return { billsUpdated, rulesUpserted };
+  },
 });
 
 export const savePersonAssignment = mutation({
@@ -2652,6 +2746,19 @@ export const updatePreviewFields = mutation({
     }
 
     await ctx.db.patch(args.billId, { extractedData: next });
+
+    // If the user renamed the bill, learn a rule keyed by this vendor so
+    // future bills from the same vendor get the same display name. Only
+    // fires when invoiceName was the field that changed.
+    if (args.invoiceName !== undefined) {
+      try {
+        const refreshed = await ctx.db.get(args.billId);
+        if (refreshed) await saveBillRule(ctx, refreshed);
+      } catch (err) {
+        console.error("saveBillRule (on rename) failed", err);
+      }
+    }
+
     return args.billId;
   }
 });

@@ -787,7 +787,61 @@ async function createBillFromTransaction(
       : {}),
   });
 
+  // Apply any learned vendor-rule overrides (e.g. invoiceName rename) so
+  // newly-created CC bills land with the same display name and assignment
+  // shape as previously-approved bills from the same vendor.
+  try {
+    await applyBillRuleAction(ctx, billId);
+  } catch (err) {
+    console.error("applyBillRule (from CC bill creation) failed", err);
+  }
+
   return billId;
+}
+
+/** Calls the rule-application helper exported on bills.ts via internal API. */
+async function applyBillRuleAction(ctx: any, billId: Id<"bills">) {
+  // Inline the logic by reading the bill, looking up rule, patching fields.
+  const bill = await ctx.db.get(billId);
+  if (!bill) return;
+
+  // Recompute the normalized key — must match bills.ts normalizeVendorKey.
+  const vendor =
+    bill?.extractedVendorContact?.vendorName ??
+    bill?.extractedProviderContact?.providerName ??
+    bill?.customProviderName ??
+    bill?.invoiceName ??
+    "";
+  if (!vendor) return;
+  let key = String(vendor).toLowerCase().replace(/[.,]/g, "").trim();
+  for (let i = 0; i < 3; i++) {
+    const next = key.replace(/\s+(?=[a-z0-9]*\d)(?=[a-z0-9]*[a-z])[a-z0-9]{6,}$/i, "").trim();
+    if (next === key) break;
+    key = next;
+  }
+  key = key.replace(/\s+(inc|llc|ltd|corp|co|company|gmbh|limited|sa|sas|ag)$/i, "").trim();
+  if (!key) return;
+
+  const rule = await ctx.db
+    .query("billRules")
+    .withIndex("by_vendorKey", (q: any) => q.eq("vendorKey", key))
+    .first();
+  if (!rule) return;
+
+  const patch: Record<string, unknown> = {};
+  if (rule.invoiceName) {
+    // For CC bills, always apply the learned name (overwriting the
+    // auto-generated "Zelle Payment to X" placeholder) since the rule
+    // represents the user's preferred display name.
+    patch.invoiceName = rule.invoiceName;
+  }
+  if (!bill.contactId && rule.contactId) {
+    const contact = await ctx.db.get(rule.contactId);
+    if (contact) patch.contactId = rule.contactId;
+  }
+  if (Object.keys(patch).length > 0) {
+    await ctx.db.patch(billId, patch);
+  }
 }
 
 /** Approve a transaction — this is the gate before it hits horse profiles */
