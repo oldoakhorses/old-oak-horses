@@ -1207,6 +1207,201 @@ export const cleanCcBillNames = mutation({
 });
 
 /**
+/**
+ * Reverse direction of matching: given a freshly-uploaded invoice, look for
+ * unmatched CC transactions that likely represent the same charge.
+ *
+ * Surfaces top candidates so the invoice preview can show "this looks like
+ * a CC charge from Chase 5/15 — link them?" suggestion. Same signals the
+ * forward CSV upload uses: amount, contact-keyword overlap, posting-date
+ * proximity to the bill's invoice date.
+ *
+ * Returns top 3 candidates with a confidence score.
+ */
+export const findMatchingTransactionsForBill = query({
+  args: { billId: v.id("bills") },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) return [];
+
+    // CC-sourced bills already ARE a CC transaction — nothing to match.
+    if (bill.source === "cc_transaction") return [];
+
+    const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
+    const billTotalRaw =
+      (extracted as any).invoice_total_usd ??
+      (extracted as any).invoiceTotalUsd ??
+      (extracted as any).total;
+    const billTotal = typeof billTotalRaw === "number" && Number.isFinite(billTotalRaw)
+      ? Math.abs(billTotalRaw)
+      : 0;
+    if (billTotal <= 0) return [];
+
+    const billDateRaw =
+      (extracted as any).invoice_date ??
+      (extracted as any).invoiceDate;
+    let billDateMs: number | null = null;
+    if (typeof billDateRaw === "string") {
+      const parsed = new Date(billDateRaw);
+      if (!Number.isNaN(parsed.getTime())) billDateMs = parsed.getTime();
+    }
+
+    // Resolve the bill's contact name (and contact id) for keyword matching.
+    let billContactName: string | undefined;
+    let billContactId: Id<"contacts"> | undefined;
+    if (bill.contactId) {
+      const c = await ctx.db.get(bill.contactId);
+      billContactName = c?.name;
+      billContactId = bill.contactId;
+    }
+    if (!billContactName) {
+      billContactName =
+        bill.extractedVendorContact?.vendorName ??
+        (bill as any).extractedProviderContact?.providerName ??
+        bill.customProviderName ??
+        bill.invoiceName ??
+        undefined;
+    }
+    const billKeywords = billContactName ? extractKeywords(billContactName) : [];
+
+    // Walk unmatched CC transactions, score each candidate.
+    const allTxns = await ctx.db.query("ccTransactions").collect();
+    type Scored = {
+      txn: typeof allTxns[number];
+      confidence: "exact" | "high" | "medium" | "low";
+      score: number;
+      amountDiff: number;
+      daysDiff: number | null;
+    };
+    const matches: Scored[] = [];
+    for (const txn of allTxns) {
+      if (txn.matchedBillId) continue;
+      const absAmount = Math.abs(txn.amount);
+      if (absAmount <= 0) continue;
+
+      const amountDiff = Math.abs(billTotal - absAmount);
+      const amountMatch = amountDiff < 0.02;
+      const closeAmount = amountDiff / Math.max(billTotal, 1) < 0.05;
+      if (!amountMatch && !closeAmount) continue; // gate on amount first
+
+      // Static descriptor → contact mapping. If the txn cleanly maps to a
+      // known contact and that contact is this bill's contact, that's the
+      // strongest signal we have.
+      const staticMapping = findStaticMapping(txn.description);
+      let contactMatch = false;
+      if (staticMapping && billContactId) {
+        const allContacts = await ctx.db.query("contacts").collect();
+        const staticContact = allContacts.find(
+          (c) => (c.name ?? "").toLowerCase().trim() === staticMapping.contactName.toLowerCase().trim(),
+        );
+        if (staticContact && String(staticContact._id) === String(billContactId)) {
+          contactMatch = true;
+        }
+      }
+
+      // Keyword overlap between bill's contact/name and txn description.
+      const txnKeywords = extractKeywords(txn.description);
+      const commonKeywords = billKeywords.filter((kw) =>
+        txnKeywords.some((tk) => tk.includes(kw) || kw.includes(tk)),
+      );
+      const nameMatch = commonKeywords.length >= 1;
+      const strongNameMatch = commonKeywords.length >= 2;
+
+      // Date proximity — bill date within ~60 days of posting date.
+      let daysDiff: number | null = null;
+      let dateClose = false;
+      if (billDateMs && txn.postingDate) {
+        const txnMs = new Date(txn.postingDate).getTime();
+        if (!Number.isNaN(txnMs)) {
+          daysDiff = Math.abs(billDateMs - txnMs) / (1000 * 60 * 60 * 24);
+          dateClose = daysDiff < 60;
+        }
+      }
+
+      let confidence: Scored["confidence"];
+      if (contactMatch && amountMatch) confidence = "exact";
+      else if (amountMatch && strongNameMatch && dateClose) confidence = "exact";
+      else if (contactMatch && closeAmount) confidence = "high";
+      else if (amountMatch && (strongNameMatch || (nameMatch && dateClose))) confidence = "high";
+      else if (amountMatch && (nameMatch || dateClose)) confidence = "medium";
+      else if (closeAmount && strongNameMatch) confidence = "medium";
+      else if (amountMatch) confidence = "low";
+      else if (closeAmount && nameMatch) confidence = "low";
+      else continue;
+
+      // Numeric score for sort stability — higher is better.
+      const score =
+        (confidence === "exact" ? 100 : confidence === "high" ? 75 : confidence === "medium" ? 50 : 25)
+        - amountDiff
+        - (daysDiff ?? 30) * 0.1;
+
+      matches.push({ txn, confidence, score, amountDiff, daysDiff });
+    }
+
+    matches.sort((a, b) => b.score - a.score);
+
+    return matches.slice(0, 3).map((m) => ({
+      transactionId: m.txn._id,
+      statementId: m.txn.statementId,
+      description: m.txn.description,
+      amount: m.txn.amount,
+      postingDate: m.txn.postingDate,
+      confidence: m.confidence,
+      amountDiff: round2(m.amountDiff),
+      daysDiff: m.daysDiff == null ? null : Math.round(m.daysDiff),
+    }));
+  },
+});
+
+/** Link an unmatched CC transaction to an existing bill. Sets both sides:
+ *  the transaction's matchedBillId points at the bill, and the bill records
+ *  the reverse pointer via ccTransactionId for future lookups. */
+export const linkBillToTransaction = mutation({
+  args: {
+    billId: v.id("bills"),
+    transactionId: v.id("ccTransactions"),
+  },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    const txn = await ctx.db.get(args.transactionId);
+    if (!bill) throw new Error("Bill not found");
+    if (!txn) throw new Error("Transaction not found");
+    if (txn.matchedBillId) {
+      throw new Error("This transaction is already linked to another bill");
+    }
+
+    await ctx.db.patch(args.transactionId, {
+      matchedBillId: args.billId,
+      matchConfidence: "exact",
+    });
+    // Bills already have a ccTransactionId slot (used by CC-sourced bills).
+    // Reverse-matched bills also stamp this so the bill page knows about
+    // the link.
+    await ctx.db.patch(args.billId, {
+      ccTransactionId: args.transactionId,
+    });
+  },
+});
+
+/** Undo a reverse-link without deleting either side. */
+export const unlinkBillFromTransaction = mutation({
+  args: { billId: v.id("bills") },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+    const txnId = (bill as any).ccTransactionId;
+    if (txnId) {
+      try {
+        await ctx.db.patch(txnId, { matchedBillId: undefined, matchConfidence: "none" });
+      } catch {
+        // txn may have been deleted; ignore
+      }
+    }
+    await ctx.db.patch(args.billId, { ccTransactionId: undefined });
+  },
+});
+
+/**
  * Backfill `isCredit` flag on extractedData for CC-reconcile bills.
  * Reads the source ccTransaction.amount sign — positive = credit (money in).
  * Safe to re-run; only patches bills missing the flag.

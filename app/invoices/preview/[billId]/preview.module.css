@@ -1592,3 +1592,114 @@ select.categorySelect:hover {
   font-size: 11px;
   color: #6b7084;
 }
+
+/* Reverse CC match suggestion — shown at the top of the preview when an
+ * unmatched credit-card transaction looks like the same charge as this
+ * uploaded invoice. */
+.ccMatchCard {
+  background: rgba(74, 91, 219, 0.04);
+  border: 1px solid rgba(74, 91, 219, 0.18);
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+
+.ccMatchHeader {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.ccMatchIcon {
+  font-size: 18px;
+  line-height: 1;
+  margin-top: 1px;
+}
+
+.ccMatchTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.ccMatchSubtitle {
+  font-size: 11px;
+  color: #6b7084;
+  margin-top: 2px;
+}
+
+.ccMatchRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #e6e7ed;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.ccMatchRowMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.ccMatchDesc {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a2e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ccMatchMeta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  color: #6b7084;
+  margin-top: 2px;
+}
+
+.ccMatchMetaDot {
+  opacity: 0.5;
+}
+
+.ccMatchConfidence {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+}
+
+.ccMatchExact   { background: rgba(34, 197, 131, 0.12);  color: #22c583; }
+.ccMatchHigh    { background: rgba(20, 184, 166, 0.12);  color: #14b8a6; }
+.ccMatchMedium  { background: rgba(245, 158, 11, 0.12);  color: #f59e0b; }
+.ccMatchLow     { background: rgba(107, 112, 132, 0.12); color: #6b7084; }
+
+/* Banner shown once the invoice IS linked to a CC transaction. */
+.ccLinkedCard {
+  background: rgba(34, 197, 131, 0.05);
+  border: 1px solid rgba(34, 197, 131, 0.18);
+  border-radius: 12px;
+  padding: 10px 18px;
+  margin-bottom: 16px;
+}
+
+.ccLinkedRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.ccLinkedRow .changeLink {
+  margin-left: auto;
+}

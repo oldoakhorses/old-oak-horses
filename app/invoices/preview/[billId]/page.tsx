@@ -241,6 +241,18 @@ export default function InvoicePreviewPage() {
   );
   const people = useQuery(api.people.getAllPeople) ?? [];
 
+  // Reverse CC matching: only ask the server when there's something to ask
+  // about. Skip for already-linked bills and for the brief window before
+  // bill loads.
+  const ccMatchSuggestions =
+    useQuery(
+      api.ccReconcile.findMatchingTransactionsForBill,
+      bill && !((bill as any).ccTransactionId) ? { billId } : "skip",
+    ) ?? [];
+  const linkBillToTransaction = useMutation(api.ccReconcile.linkBillToTransaction);
+  const unlinkBillFromTransaction = useMutation(api.ccReconcile.unlinkBillFromTransaction);
+  const [ccLinkBusy, setCcLinkBusy] = useState(false);
+
   const [vendorEdit, setVendorEdit] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<Id<"categories"> | "">("");
   const [customProviderName, setCustomProviderName] = useState("");
@@ -1703,6 +1715,105 @@ export default function InvoicePreviewPage() {
                 <div style={{ fontSize: 12, color: "#4A5BDB", fontWeight: 600 }}>doing things...</div>
               </div>
             ) : null}
+
+            {/* CC reverse-match suggestion banner. Surfaces if this bill
+                isn't already linked AND the server found at least one
+                unmatched CC transaction with a strong-enough signal
+                overlap (amount + contact keywords + date proximity). */}
+            {bill && !((bill as any).ccTransactionId) && ccMatchSuggestions.length > 0 && (
+              <div className={styles.ccMatchCard}>
+                <div className={styles.ccMatchHeader}>
+                  <span className={styles.ccMatchIcon}>💳</span>
+                  <div>
+                    <div className={styles.ccMatchTitle}>looks like an existing CC charge</div>
+                    <div className={styles.ccMatchSubtitle}>
+                      {ccMatchSuggestions.length === 1
+                        ? "we found a matching credit-card transaction"
+                        : `we found ${ccMatchSuggestions.length} possible credit-card matches`}
+                    </div>
+                  </div>
+                </div>
+                {ccMatchSuggestions.map((s: any) => (
+                  <div key={s.transactionId} className={styles.ccMatchRow}>
+                    <div className={styles.ccMatchRowMain}>
+                      <div className={styles.ccMatchDesc}>{s.description}</div>
+                      <div className={styles.ccMatchMeta}>
+                        <span>{formatUsd(Math.abs(s.amount))}</span>
+                        <span className={styles.ccMatchMetaDot}>·</span>
+                        <span>{s.postingDate}</span>
+                        {s.daysDiff != null && (
+                          <>
+                            <span className={styles.ccMatchMetaDot}>·</span>
+                            <span>{s.daysDiff === 0 ? "same day" : `${s.daysDiff}d off`}</span>
+                          </>
+                        )}
+                        <span
+                          className={`${styles.ccMatchConfidence} ${
+                            s.confidence === "exact"
+                              ? styles.ccMatchExact
+                              : s.confidence === "high"
+                                ? styles.ccMatchHigh
+                                : s.confidence === "medium"
+                                  ? styles.ccMatchMedium
+                                  : styles.ccMatchLow
+                          }`}
+                        >
+                          {s.confidence}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="ui-button-filled"
+                      disabled={ccLinkBusy}
+                      onClick={async () => {
+                        setCcLinkBusy(true);
+                        try {
+                          await linkBillToTransaction({
+                            billId,
+                            transactionId: s.transactionId,
+                          });
+                        } catch (err: any) {
+                          alert(`Failed to link: ${err?.message ?? err}`);
+                        } finally {
+                          setCcLinkBusy(false);
+                        }
+                      }}
+                    >
+                      link
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Already-linked indicator + unlink action */}
+            {bill && (bill as any).ccTransactionId && bill.source !== "cc_transaction" && (
+              <div className={styles.ccLinkedCard}>
+                <div className={styles.ccLinkedRow}>
+                  <span className={styles.ccMatchIcon}>🔗</span>
+                  <span>linked to a CC transaction</span>
+                  <button
+                    type="button"
+                    className={styles.changeLink}
+                    disabled={ccLinkBusy}
+                    onClick={async () => {
+                      if (!confirm("Unlink this invoice from its CC transaction?")) return;
+                      setCcLinkBusy(true);
+                      try {
+                        await unlinkBillFromTransaction({ billId });
+                      } catch (err: any) {
+                        alert(`Failed to unlink: ${err?.message ?? err}`);
+                      } finally {
+                        setCcLinkBusy(false);
+                      }
+                    }}
+                  >
+                    unlink
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Combined contact + invoice details. Always-editable inline form —
                 no view/edit toggle. Save + cancel only appear when there are
