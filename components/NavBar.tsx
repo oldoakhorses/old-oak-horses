@@ -40,8 +40,10 @@ export default function NavBar({
 
   const navSections = useMemo(() => getNavSections(user?.role), [user?.role]);
   const profile = useQuery(api.users.getProfile, user?.id ? { userId: user.id as Id<"users"> } : "skip");
-  // Owners *are* the orgs. Filter to active owners and (for owner-role
-  // users) restrict the dropdown to just the one they're tied to.
+  // Only admins switch between businesses. Owner-role users are locked to
+  // their tied owner; team and investor users see no business switcher
+  // at all (their scope comes from horseAccess + role gating).
+  const canSwitchOrg = user?.role === "admin";
   const allOwners = useQuery(api.owners.list) ?? [];
   const orgs = useMemo(
     () => {
@@ -54,6 +56,20 @@ export default function NavBar({
     [allOwners, user?.role, user?.ownerId],
   );
   const activeOrg = activeOrgId ? orgs.find((o: any) => String(o._id) === activeOrgId) : undefined;
+
+  // For owner-role users, force the active org to their tied owner so they
+  // can't accidentally land in "All horses" or another business's view.
+  useEffect(() => {
+    if (user?.role === "owner" && user.ownerId && activeOrgId !== user.ownerId) {
+      setActiveOrgId(user.ownerId);
+    }
+    // For team/investor users, clear any leftover activeOrgId — their scope
+    // is enforced server-side (horseAccess) so the filter would be a noop
+    // but the UI would lie about context.
+    if ((user?.role === "team" || user?.role === "investor") && activeOrgId !== null) {
+      setActiveOrgId(null);
+    }
+  }, [user?.role, user?.ownerId, activeOrgId, setActiveOrgId]);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -154,7 +170,7 @@ export default function NavBar({
             <button
               type="button"
               className={styles.orgTrigger}
-              aria-label="Switch business"
+              aria-label={canSwitchOrg ? "Switch business" : "Account"}
               onClick={() => setProfileMenuOpen((v) => !v)}
             >
               <span className={styles.orgTriggerBadge}>
@@ -165,29 +181,41 @@ export default function NavBar({
                       .join("")
                       .slice(0, 2)
                       .toUpperCase()
-                  : "ALL"}
+                  : canSwitchOrg
+                    ? "ALL"
+                    : (user?.email?.[0]?.toUpperCase() || "U")}
               </span>
               <span className={styles.orgTriggerName}>
-                {activeOrg ? activeOrg.name : "All horses"}
+                {activeOrg
+                  ? activeOrg.name
+                  : canSwitchOrg
+                    ? "All horses"
+                    : (profile?.name || user?.name || user?.email || "Account")}
               </span>
-              <svg
-                className={`${styles.orgTriggerCaret} ${profileMenuOpen ? styles.orgTriggerCaretOpen : ""}`}
-                width="10"
-                height="10"
-                viewBox="0 0 10 10"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M2.5 4l2.5 2.5L7.5 4" />
-              </svg>
+              {/* Caret only when the user can actually switch — otherwise
+                  the dropdown is just an account menu. */}
+              {canSwitchOrg && (
+                <svg
+                  className={`${styles.orgTriggerCaret} ${profileMenuOpen ? styles.orgTriggerCaretOpen : ""}`}
+                  width="10"
+                  height="10"
+                  viewBox="0 0 10 10"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M2.5 4l2.5 2.5L7.5 4" />
+                </svg>
+              )}
             </button>
 
             {profileMenuOpen && (
               <div className={styles.profileMenu} role="menu">
-                {/* Active card — either current org, or "all" if no org picked */}
+                {/* Active card — either current org, or "all" if no org picked.
+                    For non-admins, the badge shows their tied owner's
+                    initials (or user initials for team/investor users). */}
                 <div className={styles.profileMenuActive}>
                   <div className={styles.profileMenuActiveBadge}>
                     {activeOrg
@@ -197,54 +225,64 @@ export default function NavBar({
                           .join("")
                           .slice(0, 2)
                           .toUpperCase()
-                      : "ALL"}
+                      : canSwitchOrg
+                        ? "ALL"
+                        : (user?.email?.[0]?.toUpperCase() || "U")}
                   </div>
                   <div className={styles.profileMenuActiveName}>
-                    {activeOrg ? activeOrg.name : "All horses"}
+                    {activeOrg
+                      ? activeOrg.name
+                      : canSwitchOrg
+                        ? "All horses"
+                        : (profile?.name || user?.name || user?.email || "Account")}
                   </div>
                 </div>
 
-                <div className={styles.profileMenuDivider} />
+                {/* Org switching is admin-only. Hide the "All horses" toggle
+                    and other-orgs list entirely for non-admins. */}
+                {canSwitchOrg && (
+                  <>
+                    <div className={styles.profileMenuDivider} />
 
-                {/* "All horses" row — only shown when filtered into an org */}
-                {activeOrg && (
-                  <button
-                    type="button"
-                    className={styles.profileMenuRow}
-                    onClick={() => {
-                      setActiveOrgId(null);
-                      setProfileMenuOpen(false);
-                    }}
-                  >
-                    <div className={styles.profileMenuRowBadge}>ALL</div>
-                    <span className={styles.profileMenuRowName}>All horses</span>
-                  </button>
+                    {activeOrg && (
+                      <button
+                        type="button"
+                        className={styles.profileMenuRow}
+                        onClick={() => {
+                          setActiveOrgId(null);
+                          setProfileMenuOpen(false);
+                        }}
+                      >
+                        <div className={styles.profileMenuRowBadge}>ALL</div>
+                        <span className={styles.profileMenuRowName}>All horses</span>
+                      </button>
+                    )}
+
+                    {orgs
+                      .filter((o: any) => String(o._id) !== activeOrgId)
+                      .map((o: any) => (
+                        <button
+                          key={o._id}
+                          type="button"
+                          className={styles.profileMenuRow}
+                          onClick={() => {
+                            setActiveOrgId(String(o._id));
+                            setProfileMenuOpen(false);
+                          }}
+                        >
+                          <div className={styles.profileMenuRowBadge}>
+                            {o.name
+                              .split(" ")
+                              .map((w: string) => w[0])
+                              .join("")
+                              .slice(0, 2)
+                              .toUpperCase()}
+                          </div>
+                          <span className={styles.profileMenuRowName}>{o.name}</span>
+                        </button>
+                      ))}
+                  </>
                 )}
-
-                {/* Other orgs */}
-                {orgs
-                  .filter((o: any) => String(o._id) !== activeOrgId)
-                  .map((o: any) => (
-                    <button
-                      key={o._id}
-                      type="button"
-                      className={styles.profileMenuRow}
-                      onClick={() => {
-                        setActiveOrgId(String(o._id));
-                        setProfileMenuOpen(false);
-                      }}
-                    >
-                      <div className={styles.profileMenuRowBadge}>
-                        {o.name
-                          .split(" ")
-                          .map((w: string) => w[0])
-                          .join("")
-                          .slice(0, 2)
-                          .toUpperCase()}
-                      </div>
-                      <span className={styles.profileMenuRowName}>{o.name}</span>
-                    </button>
-                  ))}
 
                 <div className={styles.profileMenuDivider} />
 
