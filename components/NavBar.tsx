@@ -47,6 +47,7 @@ export default function NavBar({
   // each-word for anything not listed here.
   const orgAbbreviation = (name: string): string => {
     const overrides: Record<string, string> = {
+      "ev equestrian": "EV",
       "old oak group": "OG",
       "old oak farm": "OF",
       "old oak horses": "OH",
