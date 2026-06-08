@@ -40,6 +40,26 @@ export default function NavBar({
 
   const navSections = useMemo(() => getNavSections(user?.role), [user?.role]);
   const profile = useQuery(api.users.getProfile, user?.id ? { userId: user.id as Id<"users"> } : "skip");
+
+  // Custom 2-letter abbreviations for orgs that share a prefix and would
+  // otherwise collide ("Old Oak Group LLC" and "Old Oak Farm LLC" both
+  // produce "OO" from naive initials). Falls through to first-letter-of-
+  // each-word for anything not listed here.
+  const orgAbbreviation = (name: string): string => {
+    const overrides: Record<string, string> = {
+      "old oak group": "OG",
+      "old oak farm": "OF",
+      "old oak horses": "OH",
+    };
+    const key = name.toLowerCase().replace(/\s+(llc|inc|ltd|corp|co)\.?\s*$/i, "").trim();
+    if (overrides[key]) return overrides[key];
+    return name
+      .split(" ")
+      .map((w) => w[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  };
   // Only admins switch between businesses. Owner-role users are locked to
   // their tied owner; team and investor users see no business switcher
   // at all (their scope comes from horseAccess + role gating).
@@ -170,45 +190,29 @@ export default function NavBar({
             <button
               type="button"
               className={styles.orgTrigger}
-              aria-label={canSwitchOrg ? "Switch business" : "Account"}
+              aria-label={
+                activeOrg
+                  ? `Business: ${activeOrg.name}`
+                  : canSwitchOrg
+                    ? "Switch business"
+                    : "Account"
+              }
+              title={
+                activeOrg
+                  ? activeOrg.name
+                  : canSwitchOrg
+                    ? "All horses"
+                    : (profile?.name || user?.name || user?.email || "Account")
+              }
               onClick={() => setProfileMenuOpen((v) => !v)}
             >
               <span className={styles.orgTriggerBadge}>
                 {activeOrg
-                  ? activeOrg.name
-                      .split(" ")
-                      .map((w: string) => w[0])
-                      .join("")
-                      .slice(0, 2)
-                      .toUpperCase()
+                  ? orgAbbreviation(activeOrg.name)
                   : canSwitchOrg
                     ? "ALL"
                     : (user?.email?.[0]?.toUpperCase() || "U")}
               </span>
-              <span className={styles.orgTriggerName}>
-                {activeOrg
-                  ? activeOrg.name
-                  : canSwitchOrg
-                    ? "All horses"
-                    : (profile?.name || user?.name || user?.email || "Account")}
-              </span>
-              {/* Caret only when the user can actually switch — otherwise
-                  the dropdown is just an account menu. */}
-              {canSwitchOrg && (
-                <svg
-                  className={`${styles.orgTriggerCaret} ${profileMenuOpen ? styles.orgTriggerCaretOpen : ""}`}
-                  width="10"
-                  height="10"
-                  viewBox="0 0 10 10"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M2.5 4l2.5 2.5L7.5 4" />
-                </svg>
-              )}
             </button>
 
             {profileMenuOpen && (
@@ -219,12 +223,7 @@ export default function NavBar({
                 <div className={styles.profileMenuActive}>
                   <div className={styles.profileMenuActiveBadge}>
                     {activeOrg
-                      ? activeOrg.name
-                          .split(" ")
-                          .map((w: string) => w[0])
-                          .join("")
-                          .slice(0, 2)
-                          .toUpperCase()
+                      ? orgAbbreviation(activeOrg.name)
                       : canSwitchOrg
                         ? "ALL"
                         : (user?.email?.[0]?.toUpperCase() || "U")}
@@ -271,12 +270,7 @@ export default function NavBar({
                           }}
                         >
                           <div className={styles.profileMenuRowBadge}>
-                            {o.name
-                              .split(" ")
-                              .map((w: string) => w[0])
-                              .join("")
-                              .slice(0, 2)
-                              .toUpperCase()}
+                            {orgAbbreviation(o.name)}
                           </div>
                           <span className={styles.profileMenuRowName}>{o.name}</span>
                         </button>
