@@ -276,6 +276,9 @@ export default function InvoicePreviewPage() {
   const [detailsEdit, setDetailsEdit] = useState(false);
   const [details, setDetails] = useState({
     invoiceName: "",
+    /** Free-form details/description shown under the invoice name on the
+     *  preview and as small subtext on the invoices list. */
+    invoiceDetails: "",
     invoiceNumber: "",
     invoiceDate: "",
     dueDate: "",
@@ -402,6 +405,7 @@ export default function InvoicePreviewPage() {
 
     setDetails({
       invoiceName: String(bill.invoiceName ?? ""),
+      invoiceDetails: String((bill as any).invoiceDetails ?? ""),
       invoiceNumber: String(extracted.invoice_number ?? extracted.invoiceNumber ?? ""),
       invoiceDate: String(extracted.invoice_date ?? extracted.invoiceDate ?? ""),
       dueDate: String(extracted.due_date ?? extracted.dueDate ?? ""),
@@ -1247,10 +1251,12 @@ export default function InvoicePreviewPage() {
         extractedVendorContact: { vendorName: trimmedName || undefined },
       });
 
-      // 2. Save invoice details (only the 3 editable invoice fields).
+      // 2. Save invoice details (the editable invoice fields + the new
+      //    free-form details subtitle).
       await updatePreviewFields({
         billId,
         invoiceName: details.invoiceName || undefined,
+        invoiceDetails: details.invoiceDetails || undefined,
         invoiceNumber: details.invoiceNumber || undefined,
         invoiceDate: details.invoiceDate || undefined,
       });
@@ -1273,6 +1279,7 @@ export default function InvoicePreviewPage() {
       await updatePreviewFields({
         billId,
         invoiceName: details.invoiceName || undefined,
+        invoiceDetails: details.invoiceDetails || undefined,
         invoiceNumber: details.invoiceNumber || undefined,
         invoiceDate: details.invoiceDate || undefined,
         dueDate: details.dueDate || undefined,
@@ -1770,6 +1777,7 @@ export default function InvoicePreviewPage() {
     if (!bill) return false;
     const extracted = (bill.extractedData ?? {}) as Record<string, unknown>;
     const savedInvoiceName = String(bill.invoiceName ?? "");
+    const savedInvoiceDetails = String((bill as any).invoiceDetails ?? "");
     const savedInvoiceNumber = String((extracted as any).invoice_number ?? (extracted as any).invoiceNumber ?? "");
     const savedInvoiceDate = String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? "");
     const savedContactName = String(
@@ -1777,13 +1785,14 @@ export default function InvoicePreviewPage() {
     );
     return (
       details.invoiceName !== savedInvoiceName ||
+      details.invoiceDetails !== savedInvoiceDetails ||
       details.invoiceNumber !== savedInvoiceNumber ||
       details.invoiceDate !== savedInvoiceDate ||
       contactSearch !== savedContactName ||
       // contact link changed (e.g. user picked a different existing contact)
       String(selectedContactId ?? "") !== String(bill.contactId ?? "")
     );
-  }, [bill, details.invoiceName, details.invoiceNumber, details.invoiceDate, contactSearch, selectedContactId]);
+  }, [bill, details.invoiceName, details.invoiceDetails, details.invoiceNumber, details.invoiceDate, contactSearch, selectedContactId]);
 
   useEffect(() => {
     if (bill && bill.status !== "parsing" && bill.status !== "uploading" && reparsing) {
@@ -1965,6 +1974,18 @@ export default function InvoicePreviewPage() {
                   />
                 </div>
 
+                {/* 1a. Invoice Details — free-form subtitle. Shown on the
+                    main invoices list as small subtext under the name. */}
+                <div>
+                  <div className={styles.label}>DETAILS</div>
+                  <input
+                    className={styles.inputCompact}
+                    value={details.invoiceDetails}
+                    onChange={(e) => setDetails((prev) => ({ ...prev, invoiceDetails: e.target.value }))}
+                    placeholder="optional description shown as subtext on the invoices list"
+                  />
+                </div>
+
                 {/* 2. Invoice Date (required, pre-populated) */}
                 <div>
                   <div className={styles.label}>INVOICE DATE *</div>
@@ -2035,6 +2056,7 @@ export default function InvoicePreviewPage() {
                       setDetails((prev) => ({
                         ...prev,
                         invoiceName: String(bill?.invoiceName ?? ""),
+                        invoiceDetails: String((bill as any)?.invoiceDetails ?? ""),
                         invoiceNumber: String((extracted as any).invoice_number ?? (extracted as any).invoiceNumber ?? ""),
                         invoiceDate: String((extracted as any).invoice_date ?? (extracted as any).invoiceDate ?? ""),
                       }));

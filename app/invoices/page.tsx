@@ -356,9 +356,14 @@ export default function InvoicesPage() {
                       router.push(url);
                     }}
                   >
-                    {displayName}
-                    {row.source === "cc_transaction" && <span className={styles.ccBadge}>CC</span>}
-                    {row.source === "email" && <span className={styles.ccBadge}>E</span>}
+                    <span className={styles.invoiceNameMain}>
+                      {displayName}
+                      {row.source === "cc_transaction" && <span className={styles.ccBadge}>CC</span>}
+                      {row.source === "email" && <span className={styles.ccBadge}>E</span>}
+                    </span>
+                    {(row as any).invoiceDetails ? (
+                      <span className={styles.invoiceNameSubtext}>{(row as any).invoiceDetails}</span>
+                    ) : null}
                   </a>
                   <span className={styles.colDate}>{formatDate(date)}</span>
                   <span className={styles.colContact}>{contact}</span>

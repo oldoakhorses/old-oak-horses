@@ -62,6 +62,9 @@ export default defineSchema({
     errorMessage: v.optional(v.string()),
     customProviderName: v.optional(v.string()),
     invoiceName: v.optional(v.string()),
+    /** Free-form details/description shown under the invoice name on the
+     *  preview screen and as small subtext on the invoices list. */
+    invoiceDetails: v.optional(v.string()),
     originalPdfUrl: v.optional(v.string()),
     travelSubcategory: v.optional(v.string()),
     housingSubcategory: v.optional(v.string()),
