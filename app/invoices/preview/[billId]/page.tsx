@@ -228,7 +228,17 @@ export default function InvoicePreviewPage() {
   const linkedRecords = useQuery(api.horseRecords.getByBill, { billId }) ?? [];
   const categories = useQuery(api.categories.getAllCategories) ?? [];
   const orgArgs = useOrgArgs();
+  // Picker source: respect the active org filter so the dropdown only
+  // offers horses you can assign within this context.
   const horses = useQuery(api.horses.getActiveHorses, orgArgs) ?? [];
+  // Display source: every active horse, unfiltered. Used to resolve
+  // names for horses already assigned to this bill but living in
+  // another org — without this fallback they'd render as "Unknown".
+  const allHorses = useQuery(api.horses.getActiveHorses, {}) ?? [];
+  const horseNameById = useMemo(
+    () => new Map(allHorses.map((h) => [String(h._id), h.name])),
+    [allHorses],
+  );
   const people = useQuery(api.people.getAllPeople) ?? [];
 
   const [vendorEdit, setVendorEdit] = useState(false);
@@ -635,11 +645,17 @@ export default function InvoicePreviewPage() {
     }
 
     return splitTargetIds.map((id) => {
+      // Display name fallback: look in the (filtered) picker list first,
+      // then the full unfiltered horse list — that catches horses owned
+      // by another org that this bill still legitimately splits to.
       const entity = (assignType === "horse" ? horses : people).find((row) => String(row._id) === id);
+      const displayName = entity?.name
+        ?? (assignType === "horse" ? horseNameById.get(id) : undefined)
+        ?? "Unknown";
       const parts = map.get(id) ?? { direct: 0, shared: 0 };
       return {
         id,
-        name: entity?.name ?? "Unknown",
+        name: displayName,
         direct: round2(parts.direct),
         shared: round2(parts.shared),
         total: round2(parts.direct + parts.shared)
@@ -799,7 +815,9 @@ export default function InvoicePreviewPage() {
             {hasSplitInvoice ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillSplit}`}>↔ split in invoice</span> : null}
             {hasBusinessGeneral ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillGeneral}`}>◼ general</span> : null}
             {!hasAnySplit && !hasBusinessGeneral ? selectedEntityIds.map((id) => {
-              const name = entityList.find((entry) => String(entry._id) === id)?.name ?? "Unknown";
+              const name = entityList.find((entry) => String(entry._id) === id)?.name
+                ?? (assignType === "horse" ? horseNameById.get(id) : undefined)
+                ?? "Unknown";
               return (
                 <span key={id} className={`${styles.lineHorsePill} ${assignType === "person" ? styles.lineHorsePillPerson : ""}`}>
                   {name}
@@ -1470,9 +1488,10 @@ export default function InvoicePreviewPage() {
                 const entity = entityList.find((entry) => String(entry._id) === id);
                 const evenAmounts = splitEven(total, wholeAssignedIds.length);
                 const index = wholeAssignedIds.indexOf(id);
+                const fallback = assignType === "horse" ? horseNameById.get(id) : undefined;
                 return {
                   entityId: id,
-                  entityName: entity?.name ?? "Unknown",
+                  entityName: entity?.name ?? fallback ?? "Unknown",
                   amount: round2(wholeSplitType === "even" ? evenAmounts[index] ?? 0 : Number(wholeAmounts[id] || 0))
                 };
               })
@@ -2102,9 +2121,12 @@ export default function InvoicePreviewPage() {
                     const entry = entityList.find((row) => String(row._id) === id);
                     const evenAmounts = splitEven(total, wholeAssignedIds.length);
                     const amount = wholeAssignMode === "single" ? total : (wholeSplitType === "even" ? evenAmounts[index] ?? 0 : Number(wholeAmounts[id] || 0));
+                    const entryName = entry?.name
+                      ?? (assignType === "horse" ? horseNameById.get(id) : undefined)
+                      ?? "Unknown";
                     return (
                       <div key={id} className={styles.wholeRow}>
-                        <div>{assignType === "horse" ? "🐴" : "👤"} {entry?.name ?? "Unknown"}</div>
+                        <div>{assignType === "horse" ? "🐴" : "👤"} {entryName}</div>
                         <div className={styles.wholeAmountWrap}>
                           {wholeAssignMode === "split" && wholeSplitType === "custom" ? (
                             <input
