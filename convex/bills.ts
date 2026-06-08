@@ -193,22 +193,31 @@ export const listForLinking = query(async (ctx) => {
 });
 
 export const listAll = query({
-  args: { ownerId: v.optional(v.id("owners")) },
+  args: { ownerId: v.optional(v.string()) },
   handler: async (ctx, args) => {
   let bills = await ctx.db.query("bills").withIndex("by_uploadedAt").order("desc").collect();
 
   // Owner filter: include a bill only if it references at least one horse
   // owned by the picked owner. Person-only and unassigned bills are hidden
   // in filtered views since they don't tie to a specific owner.
+  let safeOwnerId: any = undefined;
   if (args.ownerId) {
+    try {
+      const owner = await ctx.db.get(args.ownerId as any);
+      if (owner) safeOwnerId = owner._id;
+    } catch {
+      // stale/wrong-table id — treat as no filter
+    }
+  }
+  if (safeOwnerId) {
     const allowed = new Set<string>();
     const allHorses = await ctx.db.query("horses").collect();
     for (const h of allHorses) {
-      if (h.ownerId && String(h.ownerId) === String(args.ownerId)) allowed.add(String(h._id));
+      if (h.ownerId && String(h.ownerId) === String(safeOwnerId)) allowed.add(String(h._id));
     }
     const links = await ctx.db
       .query("horseOwnerships")
-      .withIndex("by_owner", (q: any) => q.eq("ownerId", args.ownerId!))
+      .withIndex("by_owner", (q: any) => q.eq("ownerId", safeOwnerId))
       .collect();
     for (const link of links) allowed.add(String(link.horseId));
 

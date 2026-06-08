@@ -30,34 +30,52 @@ function filterByIdSet<T extends { _id: any }>(rows: T[], allowed: Set<string> |
   return rows.filter((h) => allowed.has(String(h._id)));
 }
 
+/** Accept any string for ownerId (rather than v.id("owners")) so a stale
+ *  id left in localStorage from the brief organizations-table experiment
+ *  doesn't crash the query at validation time. Invalid ids resolve to
+ *  null and fall through to the unfiltered branch. */
+async function coerceOwnerId(ctx: any, raw: string | undefined): Promise<Id<"owners"> | undefined> {
+  if (!raw) return undefined;
+  try {
+    const owner = await ctx.db.get(raw as Id<"owners">);
+    if (owner && owner._id) return owner._id as Id<"owners">;
+  } catch {
+    // wrong table prefix — treat as no filter
+  }
+  return undefined;
+}
+
 export const getActiveHorses = query({
-  args: { ownerId: v.optional(v.id("owners")) },
+  args: { ownerId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const rows = await ctx.db
       .query("horses")
       .withIndex("by_status_name", (q) => q.eq("status", "active"))
       .collect();
-    const allowed = await horseIdsForOwner(ctx, args.ownerId);
+    const safeOwnerId = await coerceOwnerId(ctx, args.ownerId);
+    const allowed = await horseIdsForOwner(ctx, safeOwnerId);
     return filterByIdSet(rows, allowed);
   }
 });
 
 export const getInactiveHorses = query({
-  args: { ownerId: v.optional(v.id("owners")) },
+  args: { ownerId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const horses = await ctx.db.query("horses").collect();
     const inactive = horses.filter((horse) => horse.status !== "active" || horse.isSold);
-    const allowed = await horseIdsForOwner(ctx, args.ownerId);
+    const safeOwnerId = await coerceOwnerId(ctx, args.ownerId);
+    const allowed = await horseIdsForOwner(ctx, safeOwnerId);
     const filtered = filterByIdSet(inactive, allowed);
     return filtered.sort((a, b) => b.createdAt - a.createdAt);
   }
 });
 
 export const getAllHorses = query({
-  args: { ownerId: v.optional(v.id("owners")) },
+  args: { ownerId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const rows = await ctx.db.query("horses").withIndex("by_name").collect();
-    const allowed = await horseIdsForOwner(ctx, args.ownerId);
+    const safeOwnerId = await coerceOwnerId(ctx, args.ownerId);
+    const allowed = await horseIdsForOwner(ctx, safeOwnerId);
     return filterByIdSet(rows, allowed);
   }
 });

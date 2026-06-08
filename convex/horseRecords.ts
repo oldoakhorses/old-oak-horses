@@ -192,20 +192,29 @@ export const getUpcoming = query({
 });
 
 export const getAll = query({
-  args: { ownerId: v.optional(v.id("owners")) },
+  args: { ownerId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     let rows = await ctx.db.query("horseRecords").collect();
     // Filter by owner: include records whose parent horse is owned by the
     // picked owner (either via horse.ownerId or the horseOwnerships join).
+    let safeOwnerId: any = undefined;
     if (args.ownerId) {
+      try {
+        const owner = await ctx.db.get(args.ownerId as any);
+        if (owner) safeOwnerId = owner._id;
+      } catch {
+        // stale or wrong-table id → fall through to unfiltered
+      }
+    }
+    if (safeOwnerId) {
       const allowed = new Set<string>();
       const allHorses = await ctx.db.query("horses").collect();
       for (const h of allHorses) {
-        if (h.ownerId && String(h.ownerId) === String(args.ownerId)) allowed.add(String(h._id));
+        if (h.ownerId && String(h.ownerId) === String(safeOwnerId)) allowed.add(String(h._id));
       }
       const links = await ctx.db
         .query("horseOwnerships")
-        .withIndex("by_owner", (q: any) => q.eq("ownerId", args.ownerId!))
+        .withIndex("by_owner", (q: any) => q.eq("ownerId", safeOwnerId))
         .collect();
       for (const link of links) allowed.add(String(link.horseId));
       rows = rows.filter((r) => allowed.has(String(r.horseId)));
