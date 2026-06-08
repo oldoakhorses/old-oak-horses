@@ -849,12 +849,74 @@ select.categorySelect:hover {
   padding: 14px 22px;
 }
 
+/* Numbered-step container for the split-whole-invoice flow. Each step is
+ * a labeled block so the user moves through the form top-to-bottom rather
+ * than juggling tabs. */
+.wholeStep {
+  margin-bottom: 18px;
+}
+
+.wholeStep:last-of-type {
+  margin-bottom: 0;
+}
+
+.wholeStepLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7084;
+  margin-bottom: 8px;
+}
+
+.wholeStepNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #1a1a2e;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
 .wholeAssignMode {
   display: inline-flex;
   border: 1px solid #e8eaf0;
   border-radius: 8px;
   overflow: hidden;
-  margin-bottom: 14px;
+}
+
+/* Compact entity toggle (horses/people icons only) — secondary to the
+ * primary mode toggle. Sits beside it in the card header. */
+.entityToggleCompact {
+  display: inline-flex;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.entityToggleCompactBtn {
+  border: none;
+  background: #fff;
+  font-size: 14px;
+  padding: 6px 10px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.entityToggleCompactBtn + .entityToggleCompactBtn {
+  border-left: 1px solid #e8eaf0;
+}
+
+.entityToggleCompactActive {
+  background: #1a1a2e;
 }
 
 .wholeBusinessNote {

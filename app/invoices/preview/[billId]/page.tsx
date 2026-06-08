@@ -1893,25 +1893,28 @@ export default function InvoicePreviewPage() {
                 </div>
                 {requiresAssignment ? (
                   <div className={styles.headerToggleRow}>
-                    <div className={styles.entityToggle}>
-                      <button
-                        type="button"
-                        className={assignType === "horse" ? styles.entityHorseActive : styles.entityInactive}
-                        onClick={() => switchAssignType("horse")}
-                      >
-                        🐴 horses
-                      </button>
-                      <button
-                        type="button"
-                        className={assignType === "person" ? styles.entityPersonActive : styles.entityInactive}
-                        onClick={() => switchAssignType("person")}
-                      >
-                        👤 people
-                      </button>
-                    </div>
                     <div className={styles.modeToggle}>
                       <button type="button" className={mode === "line" ? styles.modeToggleActive : styles.modeToggleInactive} onClick={() => setMode("line")}>by line item</button>
                       <button type="button" className={mode === "whole" ? styles.modeToggleActive : styles.modeToggleInactive} onClick={() => setMode("whole")}>split whole invoice</button>
+                    </div>
+                    {/* Compact entity toggle — secondary to the mode choice */}
+                    <div className={styles.entityToggleCompact}>
+                      <button
+                        type="button"
+                        className={`${styles.entityToggleCompactBtn} ${assignType === "horse" ? styles.entityToggleCompactActive : ""}`}
+                        onClick={() => switchAssignType("horse")}
+                        aria-label="assign to horses"
+                      >
+                        🐴
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.entityToggleCompactBtn} ${assignType === "person" ? styles.entityToggleCompactActive : ""}`}
+                        onClick={() => switchAssignType("person")}
+                        aria-label="assign to people"
+                      >
+                        👤
+                      </button>
                     </div>
                   </div>
                 ) : null}
@@ -2025,51 +2028,77 @@ export default function InvoicePreviewPage() {
                 </>
               ) : (
                 <div className={styles.wholeWrap}>
-                  <div className={styles.wholeAssignMode}>
-                    <button type="button" className={`${styles.segmentBtn} ${wholeAssignMode === "single" ? styles.segmentBtnActive : ""}`} onClick={() => { setWholeAssignMode("single"); setWholeAssignedIds((prev) => prev.slice(0, 1)); }}>
-                      {assignType === "horse" ? "one horse" : "one person"}
-                    </button>
-                    <button type="button" className={`${styles.segmentBtn} ${wholeAssignMode === "split" ? styles.segmentBtnActive : ""}`} onClick={() => setWholeAssignMode("split")}>
-                      split across {assignType === "horse" ? "horses" : "people"}
-                    </button>
-                    <button type="button" className={`${styles.segmentBtn} ${wholeAssignMode === "business_general" ? styles.segmentBtnActive : ""}`} onClick={() => { setWholeAssignMode("business_general"); setWholeAssignedIds([]); setWholeAmounts({}); }}>
-                      business general
-                    </button>
+                  {/* STEP 1 — split type: pick the shape of the assignment */}
+                  <div className={styles.wholeStep}>
+                    <div className={styles.wholeStepLabel}>
+                      <span className={styles.wholeStepNum}>1</span>
+                      <span>SPLIT TYPE</span>
+                    </div>
+                    <div className={styles.wholeAssignMode}>
+                      <button type="button" className={`${styles.segmentBtn} ${wholeAssignMode === "single" ? styles.segmentBtnActive : ""}`} onClick={() => { setWholeAssignMode("single"); setWholeAssignedIds((prev) => prev.slice(0, 1)); }}>
+                        {assignType === "horse" ? "one horse" : "one person"}
+                      </button>
+                      <button type="button" className={`${styles.segmentBtn} ${wholeAssignMode === "split" ? styles.segmentBtnActive : ""}`} onClick={() => setWholeAssignMode("split")}>
+                        split across {assignType === "horse" ? "horses" : "people"}
+                      </button>
+                      <button type="button" className={`${styles.segmentBtn} ${wholeAssignMode === "business_general" ? styles.segmentBtnActive : ""}`} onClick={() => { setWholeAssignMode("business_general"); setWholeAssignedIds([]); setWholeAmounts({}); }}>
+                        business general
+                      </button>
+                    </div>
                   </div>
 
                   {wholeAssignMode === "business_general" ? (
                     <div className={styles.wholeBusinessNote}>◼ This invoice will be recorded as a general business expense with no horse or person assignment.</div>
                   ) : null}
 
-                  <div className={styles.formField}>
-                    <div className={styles.label}>CATEGORY</div>
-                    <select
-                      className={styles.categorySelect}
-                      value={wholeCategoryOverride}
-                      onChange={(event) => { setWholeCategoryOverride(event.target.value); setWholeSubcategoryOverride(""); }}
-                    >
-                      <option value="">use invoice category</option>
-                      {ALL_CATEGORY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {SUBCATEGORY_OPTIONS[wholeCategoryOverride || categorySlug || ""] ? (
-                  <div className={styles.formField}>
-                    <div className={styles.label}>SUBCATEGORY</div>
-                    <select
-                      className={styles.categorySelect}
-                      value={wholeSubcategoryOverride}
-                      onChange={(event) => setWholeSubcategoryOverride(event.target.value)}
-                    >
-                      <option value="">—</option>
-                      {(SUBCATEGORY_OPTIONS[wholeCategoryOverride || categorySlug || ""] ?? []).map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* STEP 2 — even or custom amounts (only shown when splitting across multiple) */}
+                  {wholeAssignMode === "split" ? (
+                    <div className={styles.wholeStep}>
+                      <div className={styles.wholeStepLabel}>
+                        <span className={styles.wholeStepNum}>2</span>
+                        <span>SPLIT AMOUNTS</span>
+                      </div>
+                      <div className={styles.segmented}>
+                        <button type="button" className={`${styles.segmentBtn} ${wholeSplitType === "even" ? styles.segmentBtnActive : ""}`} onClick={() => setWholeSplitType("even")}>even</button>
+                        <button type="button" className={`${styles.segmentBtn} ${wholeSplitType === "custom" ? styles.segmentBtnActive : ""}`} onClick={() => setWholeSplitType("custom")}>custom</button>
+                      </div>
+                    </div>
                   ) : null}
+
+                  {/* STEP 3 — category & subcategory */}
+                  <div className={styles.wholeStep}>
+                    <div className={styles.wholeStepLabel}>
+                      <span className={styles.wholeStepNum}>{wholeAssignMode === "split" ? 3 : 2}</span>
+                      <span>CATEGORY</span>
+                    </div>
+                    <div className={styles.formField}>
+                      <select
+                        className={styles.categorySelect}
+                        value={wholeCategoryOverride}
+                        onChange={(event) => { setWholeCategoryOverride(event.target.value); setWholeSubcategoryOverride(""); }}
+                      >
+                        <option value="">use invoice category</option>
+                        {ALL_CATEGORY_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {SUBCATEGORY_OPTIONS[wholeCategoryOverride || categorySlug || ""] ? (
+                      <div className={styles.formField}>
+                        <div className={styles.label}>SUBCATEGORY</div>
+                        <select
+                          className={styles.categorySelect}
+                          value={wholeSubcategoryOverride}
+                          onChange={(event) => setWholeSubcategoryOverride(event.target.value)}
+                        >
+                          <option value="">—</option>
+                          {(SUBCATEGORY_OPTIONS[wholeCategoryOverride || categorySlug || ""] ?? []).map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
+                  </div>
 
                   <div className={styles.lineSummary}>
                     {lineItems.map((line, index) => (
@@ -2078,43 +2107,38 @@ export default function InvoicePreviewPage() {
                     <div className={styles.splitSummaryTotal}><span>TOTAL</span><span>{formatUsd(total)}</span></div>
                   </div>
 
-                  {wholeAssignMode === "split" ? (
-                  <div className={styles.formField}>
-                    <div className={styles.label}>SPLIT TYPE</div>
-                    <div className={styles.segmented}>
-                      <button type="button" className={`${styles.segmentBtn} ${wholeSplitType === "even" ? styles.segmentBtnActive : ""}`} onClick={() => setWholeSplitType("even")}>even</button>
-                      <button type="button" className={`${styles.segmentBtn} ${wholeSplitType === "custom" ? styles.segmentBtnActive : ""}`} onClick={() => setWholeSplitType("custom")}>custom</button>
-                    </div>
-                  </div>
-                  ) : null}
-
+                  {/* STEP 4 — select horses/people (skipped for business_general) */}
                   {wholeAssignMode !== "business_general" ? (
-                  <div className={styles.formField}>
-                    <select
-                      className={`${styles.assignSelect} ${assignType === "horse" ? styles.addEntityHorse : styles.addEntityPerson}`}
-                      value=""
-                      onChange={(event) => {
-                        const value = event.target.value;
-                        if (value === BUSINESS_GENERAL) {
-                          setWholeAssignMode("business_general");
-                          setWholeAssignedIds([]);
-                          setWholeAmounts({});
-                          return;
-                        }
-                        if (!value || wholeAssignedIds.includes(value)) return;
-                        setWholeAssignedIds((prev) => wholeAssignMode === "single" ? [value] : [...prev, value]);
-                      }}
-                    >
-                      <option value="">+ add {assignType === "horse" ? "horse" : "person"}...</option>
-                      <option value={BUSINESS_GENERAL}>◼ business general</option>
-                      <option disabled>────────────</option>
-                      {entityList
-                        .filter((entry) => !wholeAssignedIds.includes(String(entry._id)))
-                        .map((entry) => (
-                          <option key={entry._id} value={entry._id}>{entry.name}</option>
-                        ))}
-                    </select>
-                  </div>
+                    <div className={styles.wholeStep}>
+                      <div className={styles.wholeStepLabel}>
+                        <span className={styles.wholeStepNum}>{wholeAssignMode === "split" ? 4 : 3}</span>
+                        <span>{assignType === "horse" ? "SELECT HORSES" : "SELECT PEOPLE"}</span>
+                      </div>
+                      <div className={styles.formField}>
+                        <select
+                          className={`${styles.assignSelect} ${assignType === "horse" ? styles.addEntityHorse : styles.addEntityPerson}`}
+                          value=""
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            if (value === BUSINESS_GENERAL) {
+                              setWholeAssignMode("business_general");
+                              setWholeAssignedIds([]);
+                              setWholeAmounts({});
+                              return;
+                            }
+                            if (!value || wholeAssignedIds.includes(value)) return;
+                            setWholeAssignedIds((prev) => wholeAssignMode === "single" ? [value] : [...prev, value]);
+                          }}
+                        >
+                          <option value="">+ add {assignType === "horse" ? "horse" : "person"}...</option>
+                          {entityList
+                            .filter((entry) => !wholeAssignedIds.includes(String(entry._id)))
+                            .map((entry) => (
+                              <option key={entry._id} value={entry._id}>{entry.name}</option>
+                            ))}
+                        </select>
+                      </div>
+                    </div>
                   ) : null}
 
                   {wholeAssignMode !== "business_general" ? wholeAssignedIds.map((id, index) => {
