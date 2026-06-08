@@ -226,7 +226,15 @@ export const listAll = query({
       for (const h of bill.assignedHorses ?? []) horseIds.push(String(h.horseId));
       for (const h of bill.horseAssignments ?? []) if (h.horseId) horseIds.push(String(h.horseId));
       for (const s of bill.splitLineItems ?? []) for (const sp of s.splits ?? []) horseIds.push(String(sp.horseId));
-      return horseIds.some((id) => allowed.has(id));
+      if (horseIds.some((id) => allowed.has(id))) return true;
+
+      // Business-assigned: include the bill if the picked owner is one of
+      // its assignedBusinesses. Lets admin/overhead spend filter into the
+      // right LLC's view even when no horse is tied to the bill.
+      for (const b of (bill as any).assignedBusinesses ?? []) {
+        if (String(b.ownerId) === String(safeOwnerId)) return true;
+      }
+      return false;
     });
   }
 
@@ -2386,6 +2394,38 @@ export const applyZellePayRenameRules = mutation({
   },
 });
 
+/**
+ * Whole-invoice business (= owner) assignment. Parallel to
+ * saveHorseAssignment / savePersonAssignment but writes to the new
+ * assignedBusinesses field. Used when an admin/overhead invoice should
+ * be attributed to one or more LLCs rather than marked
+ * "business general" (truly unassigned).
+ */
+export const saveBusinessAssignment = mutation({
+  args: {
+    billId: v.id("bills"),
+    isSplit: v.boolean(),
+    assignedBusinesses: v.array(
+      v.object({
+        ownerId: v.id("owners"),
+        ownerName: v.string(),
+        amount: v.number(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+    await ctx.db.patch(args.billId, {
+      isSplit: args.isSplit,
+      assignedBusinesses: args.assignedBusinesses,
+      // Clear other-entity assignments so we don't show stale data.
+      assignedHorses: [],
+      assignedPeople: [],
+    });
+  },
+});
+
 export const savePersonAssignment = mutation({
   args: {
     billId: v.id("bills"),
@@ -2928,7 +2968,7 @@ export const approveBill = mutation({
     billId: v.id("bills"),
     lineItems: v.optional(v.array(v.any())),
     assignMode: v.optional(v.union(v.literal("line"), v.literal("whole"))),
-    assignType: v.optional(v.union(v.literal("horse"), v.literal("person"))),
+    assignType: v.optional(v.union(v.literal("horse"), v.literal("person"), v.literal("business"))),
     splitEntities: v.optional(
       v.array(
         v.object({

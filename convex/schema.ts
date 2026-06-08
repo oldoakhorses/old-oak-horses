@@ -46,7 +46,7 @@ export default defineSchema({
     fileId: v.optional(v.id("_storage")),
     fileName: v.string(),
     notes: v.optional(v.string()),
-    assignType: v.optional(v.union(v.literal("horse"), v.literal("person"))),
+    assignType: v.optional(v.union(v.literal("horse"), v.literal("person"), v.literal("business"))),
     assignMode: v.optional(v.union(v.literal("line"), v.literal("whole"))),
     splitMode: v.optional(v.union(v.literal("even"), v.literal("custom"))),
     status: v.union(
@@ -98,6 +98,22 @@ export default defineSchema({
           amount: v.number(),
           direct: v.optional(v.number()),
           shared: v.optional(v.number())
+        })
+      )
+    ),
+    /**
+     * Whole-invoice business assignments — analogous to assignedHorses/
+     * assignedPeople. Each entry pins a slice of the invoice total to a
+     * specific owner (= business entity). Used for admin/overhead spend
+     * that should land on a particular LLC's books rather than be marked
+     * "business general".
+     */
+    assignedBusinesses: v.optional(
+      v.array(
+        v.object({
+          ownerId: v.id("owners"),
+          ownerName: v.string(),
+          amount: v.number(),
         })
       )
     ),

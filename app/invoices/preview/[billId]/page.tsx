@@ -34,7 +34,7 @@ function categoryToRecordType(slug: string): RecordType {
   return "other";
 }
 
-type AssignType = "horse" | "person";
+type AssignType = "horse" | "person" | "business";
 type WholeAssignMode = "single" | "split" | "business_general";
 
 type ParsedLine = {
@@ -240,6 +240,16 @@ export default function InvoicePreviewPage() {
     [allHorses],
   );
   const people = useQuery(api.people.getAllPeople) ?? [];
+  // Owners are surfaced as "businesses" in this flow — when the user
+  // picks "🏢 businesses" the same entity-list slot pulls from here.
+  const businessesRaw = useQuery(api.owners.list) ?? [];
+  const businesses = useMemo(
+    () =>
+      businessesRaw
+        .filter((o: any) => o.isActive !== false)
+        .map((o: any) => ({ _id: o._id, name: o.name })),
+    [businessesRaw],
+  );
 
   // Reverse CC matching: only ask the server when there's something to ask
   // about. Skip for already-linked bills and for the brief window before
@@ -339,6 +349,7 @@ export default function InvoicePreviewPage() {
   const createContact = useMutation(api.contacts.createContact);
   const saveHorseAssignment = useMutation(api.bills.saveHorseAssignment);
   const savePersonAssignment = useMutation(api.bills.savePersonAssignment);
+  const saveBusinessAssignment = useMutation(api.bills.saveBusinessAssignment);
   const saveDuesAssignments = useMutation(api.bills.saveDuesAssignments);
   const approveBill = useMutation(api.bills.approveBill);
   const deleteBill = useMutation(api.bills.deleteBill);
@@ -716,7 +727,11 @@ export default function InvoicePreviewPage() {
   const approveDisabled = !assignmentReady;
   const isEditing = Boolean(bill?.isApproved);
 
-  const entityList = assignType === "horse" ? horses : people;
+  const entityList = (
+    assignType === "horse" ? horses
+      : assignType === "business" ? businesses
+      : people
+  ) as { _id: any; name: string }[];
 
   function switchAssignType(newType: AssignType) {
     if (newType === assignType) return;
@@ -730,6 +745,12 @@ export default function InvoicePreviewPage() {
     setWholeAssignedIds([]);
     setWholeAmounts({});
     setWholeAssignMode("split");
+    // Business assignment is whole-invoice only in this pass. Force the
+    // mode toggle so the user can't end up in "by line item" with no way
+    // to picker per-line businesses.
+    if (newType === "business") {
+      setMode("whole");
+    }
   }
 
   function toggleEntityOnItem(index: number, entityId: string) {
@@ -1277,6 +1298,24 @@ export default function InvoicePreviewPage() {
         });
         return;
       }
+
+      if (assignType === "business") {
+        const evenlySplit = splitEven(total, wholeAssignedIds.length);
+        const activeIds = wholeAssignMode === "single" ? wholeAssignedIds.slice(0, 1) : wholeAssignedIds;
+        await saveBusinessAssignment({
+          billId,
+          isSplit: activeIds.length > 1,
+          assignedBusinesses: activeIds.map((id, index) => {
+            const biz = businesses.find((b) => String(b._id) === id);
+            return {
+              ownerId: id as Id<"owners">,
+              ownerName: biz?.name ?? "Unknown",
+              amount: round2(wholeSplitType === "even" ? evenlySplit[index] ?? 0 : Number(wholeAmounts[id] || 0)),
+            };
+          }),
+        });
+        return;
+      }
     }
 
     if (categorySlug === "dues-registrations") {
@@ -1439,18 +1478,23 @@ export default function InvoicePreviewPage() {
       return;
     }
 
+    // Dues-registrations per-line save path only supports horse/person/general.
+    // Business is whole-invoice only (switchAssignType forces mode=whole) so
+    // we should never reach here with assignType="business" — but guard anyway.
+    if (assignType === "business") return;
+    const lineAssignType = assignType as "horse" | "person";
     await saveDuesAssignments({
       billId,
       assignments: lineItems.map((_, index) => {
         const row = lineStates[index];
         const entityId = row?.assignees?.[0];
         const entityName =
-          assignType === "horse"
+          lineAssignType === "horse"
             ? horses.find((entry) => String(entry._id) === entityId)?.name
             : people.find((entry) => String(entry._id) === entityId)?.name;
         return {
           lineItemIndex: index,
-          entityType: entityId ? assignType : "none",
+          entityType: entityId ? lineAssignType : "none",
           entityId: entityId || undefined,
           entityName
         };
@@ -2015,6 +2059,7 @@ export default function InvoicePreviewPage() {
                         className={`${styles.entityToggleCompactBtn} ${assignType === "horse" ? styles.entityToggleCompactActive : ""}`}
                         onClick={() => switchAssignType("horse")}
                         aria-label="assign to horses"
+                        title="horses"
                       >
                         🐴
                       </button>
@@ -2023,8 +2068,18 @@ export default function InvoicePreviewPage() {
                         className={`${styles.entityToggleCompactBtn} ${assignType === "person" ? styles.entityToggleCompactActive : ""}`}
                         onClick={() => switchAssignType("person")}
                         aria-label="assign to people"
+                        title="people"
                       >
                         👤
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.entityToggleCompactBtn} ${assignType === "business" ? styles.entityToggleCompactActive : ""}`}
+                        onClick={() => switchAssignType("business")}
+                        aria-label="assign to businesses"
+                        title="businesses"
+                      >
+                        🏢
                       </button>
                     </div>
                   </div>
@@ -2104,10 +2159,10 @@ export default function InvoicePreviewPage() {
 
                   {costBreakdown.length > 0 || businessGeneralTotal > 0 ? (
                     <div className={styles.costBreakdown}>
-                      <div className={styles.breakdownTitle}>COST BREAKDOWN PER {assignType === "horse" ? "HORSE" : "PERSON"}</div>
+                      <div className={styles.breakdownTitle}>COST BREAKDOWN PER {assignType === "horse" ? "HORSE" : assignType === "business" ? "BUSINESS" : "PERSON"}</div>
                       {costBreakdown.map((row) => (
                         <div key={row.id} className={styles.breakdownRow}>
-                          <div>{assignType === "horse" ? "🐴" : "👤"} {row.name} <span className={styles.muted}>({formatUsd(row.direct)} + {formatUsd(row.shared)} shared)</span></div>
+                          <div>{assignType === "horse" ? "🐴" : assignType === "business" ? "🏢" : "👤"} {row.name} <span className={styles.muted}>({formatUsd(row.direct)} + {formatUsd(row.shared)} shared)</span></div>
                           <div>{formatUsd(row.total)}</div>
                         </div>
                       ))}
@@ -2147,10 +2202,10 @@ export default function InvoicePreviewPage() {
                     </div>
                     <div className={styles.wholeAssignMode}>
                       <button type="button" className={`${styles.segmentBtn} ${wholeAssignMode === "single" ? styles.segmentBtnActive : ""}`} onClick={() => { setWholeAssignMode("single"); setWholeAssignedIds((prev) => prev.slice(0, 1)); }}>
-                        {assignType === "horse" ? "one horse" : "one person"}
+                        {assignType === "horse" ? "one horse" : assignType === "business" ? "one business" : "one person"}
                       </button>
                       <button type="button" className={`${styles.segmentBtn} ${wholeAssignMode === "split" ? styles.segmentBtnActive : ""}`} onClick={() => setWholeAssignMode("split")}>
-                        split across {assignType === "horse" ? "horses" : "people"}
+                        split across {assignType === "horse" ? "horses" : assignType === "business" ? "businesses" : "people"}
                       </button>
                       <button type="button" className={`${styles.segmentBtn} ${wholeAssignMode === "business_general" ? styles.segmentBtnActive : ""}`} onClick={() => { setWholeAssignMode("business_general"); setWholeAssignedIds([]); setWholeAmounts({}); }}>
                         business general
@@ -2218,12 +2273,18 @@ export default function InvoicePreviewPage() {
                     <div className={styles.splitSummaryTotal}><span>TOTAL</span><span>{formatUsd(total)}</span></div>
                   </div>
 
-                  {/* STEP 4 — select horses/people (skipped for business_general) */}
+                  {/* STEP 4 — select horses/people/businesses (skipped for business_general) */}
                   {wholeAssignMode !== "business_general" ? (
                     <div className={styles.wholeStep}>
                       <div className={styles.wholeStepLabel}>
                         <span className={styles.wholeStepNum}>{wholeAssignMode === "split" ? 4 : 3}</span>
-                        <span>{assignType === "horse" ? "SELECT HORSES" : "SELECT PEOPLE"}</span>
+                        <span>
+                          {assignType === "horse"
+                            ? "SELECT HORSES"
+                            : assignType === "business"
+                              ? "SELECT BUSINESSES"
+                              : "SELECT PEOPLE"}
+                        </span>
                       </div>
                       <div className={styles.formField}>
                         <select
@@ -2241,7 +2302,9 @@ export default function InvoicePreviewPage() {
                             setWholeAssignedIds((prev) => wholeAssignMode === "single" ? [value] : [...prev, value]);
                           }}
                         >
-                          <option value="">+ add {assignType === "horse" ? "horse" : "person"}...</option>
+                          <option value="">
+                            + add {assignType === "horse" ? "horse" : assignType === "business" ? "business" : "person"}...
+                          </option>
                           {entityList
                             .filter((entry) => !wholeAssignedIds.includes(String(entry._id)))
                             .map((entry) => (
@@ -2261,7 +2324,7 @@ export default function InvoicePreviewPage() {
                       ?? "Unknown";
                     return (
                       <div key={id} className={styles.wholeRow}>
-                        <div>{assignType === "horse" ? "🐴" : "👤"} {entryName}</div>
+                        <div>{assignType === "horse" ? "🐴" : assignType === "business" ? "🏢" : "👤"} {entryName}</div>
                         <div className={styles.wholeAmountWrap}>
                           {wholeAssignMode === "split" && wholeSplitType === "custom" ? (
                             <input
