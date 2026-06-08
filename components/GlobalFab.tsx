@@ -1527,7 +1527,7 @@ export default function GlobalFab() {
                           <option value="ocala">Ocala</option>
                           <option value="la">LA</option>
                           <option value="eu">EU</option>
-                          <option value="can">CAN</option>
+                          <option value="can">Canada</option>
                         </select>
                       </label>
                     </div>

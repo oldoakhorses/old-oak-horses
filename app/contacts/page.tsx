@@ -48,7 +48,7 @@ const LOCATION_LABELS: Record<Exclude<LocationValue, "all">, string> = {
   ocala: "Ocala",
   la: "LA",
   eu: "EU",
-  can: "CAN",
+  can: "Canada",
   ca: "CA",
   us: "US",
   ky: "KY",
@@ -282,7 +282,7 @@ export default function ContactsPage() {
               <option value="ocala">Ocala</option>
               <option value="la">LA</option>
               <option value="eu">EU</option>
-              <option value="can">CAN</option>
+              <option value="can">Canada</option>
               <option value="ca">CA</option>
               <option value="us">US</option>
               <option value="ky">KY</option>
@@ -342,7 +342,7 @@ export default function ContactsPage() {
                     <option value="ocala">Ocala</option>
                     <option value="la">LA</option>
                     <option value="eu">EU</option>
-                    <option value="can">CAN</option>
+                    <option value="can">Canada</option>
                     <option value="ca">CA</option>
                     <option value="us">US</option>
                     <option value="ky">KY</option>

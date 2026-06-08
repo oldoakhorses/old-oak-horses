@@ -258,13 +258,10 @@ export default function ContactDetailPage() {
                 <option value="ocala">Ocala</option>
                 <option value="la">LA</option>
                 <option value="eu">EU</option>
-                <option value="can">CAN</option>
+                <option value="can">Canada</option>
                 <option value="ca">CA</option>
                 <option value="us">US</option>
                 <option value="ky">KY</option>
-                <option value="la">LA</option>
-                <option value="eu">EU</option>
-                <option value="can">Canada</option>
               </select>
             </div>
             <div className={styles.editField} style={{ gridColumn: "1 / -1" }}>
