@@ -623,6 +623,11 @@ export default function DashboardPage() {
       />
 
       <main className="page-main">
+        {/* TO-DO section temporarily hidden — flip `false` to `true` to
+            restore. Backend queries (api.todos.*) still fire so the data
+            stays warm; toggle the useQuery args at the top of the file to
+            "skip" if you want them quiet too. */}
+        {false && (
         <section className={styles.card}>
           <div className={styles.upcomingLabel}>// TO-DO</div>
           <div className={styles.sectionHeader}>
@@ -732,6 +737,7 @@ export default function DashboardPage() {
             </div>
           ) : null}
         </section>
+        )}
 
         <section className={styles.card}>
           <div className={styles.upcomingLabel}>// UPCOMING</div>
