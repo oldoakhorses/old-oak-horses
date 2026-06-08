@@ -228,11 +228,24 @@ export const listAll = query({
       for (const s of bill.splitLineItems ?? []) for (const sp of s.splits ?? []) horseIds.push(String(sp.horseId));
       if (horseIds.some((id) => allowed.has(id))) return true;
 
-      // Business-assigned: include the bill if the picked owner is one of
-      // its assignedBusinesses. Lets admin/overhead spend filter into the
-      // right LLC's view even when no horse is tied to the bill.
+      // Whole-invoice business assignment: include the bill if the picked
+      // owner is one of its assignedBusinesses.
       for (const b of (bill as any).assignedBusinesses ?? []) {
         if (String(b.ownerId) === String(safeOwnerId)) return true;
+      }
+
+      // Per-line-item business assignment: scan extractedData.line_items
+      // for any line tagged assigneeType === "business" with this owner.
+      const extracted = ((bill as any).extractedData ?? {}) as Record<string, unknown>;
+      const lineItems = Array.isArray((extracted as any).line_items)
+        ? (extracted as any).line_items as any[]
+        : Array.isArray((extracted as any).lineItems)
+          ? (extracted as any).lineItems as any[]
+          : [];
+      for (const li of lineItems) {
+        if (li?.assigneeType === "business" && String(li?.assigneeId ?? "") === String(safeOwnerId)) {
+          return true;
+        }
       }
       return false;
     });

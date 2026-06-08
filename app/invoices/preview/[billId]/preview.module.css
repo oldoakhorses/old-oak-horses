@@ -575,6 +575,22 @@ select.categorySelect:hover {
   color: #ec4899;
 }
 
+.lineHorsePillBusiness {
+  background: rgba(245, 158, 11, 0.10);
+  color: #b45309;
+}
+
+/* Section label inside the per-line picker dropdown — separates the
+ * BUSINESSES section from the horse/person list above. */
+.lineHorseDropdownLabel {
+  padding: 8px 12px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #6b7084;
+  text-transform: uppercase;
+}
+
 .lineHorsePillRemove {
   font-size: 8px;
   cursor: pointer;

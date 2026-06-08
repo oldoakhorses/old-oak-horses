@@ -84,6 +84,12 @@ const NO_ASSIGNMENT_CATEGORY_SLUGS = new Set(["marketing"]);
 const SPLIT_ALL = "__split_all__";
 const SPLIT_INVOICE = "__split_invoice__";
 const BUSINESS_GENERAL = "__business_general__";
+/** Per-line-item assignment to a specific business (= owner). Stored in
+ *  `assignees` as `BIZ_PREFIX + ownerId` so it doesn't collide with
+ *  horse/person IDs in the same array. */
+const BIZ_PREFIX = "biz:";
+const isBizId = (id: string) => id.startsWith(BIZ_PREFIX);
+const unwrapBizId = (id: string) => id.slice(BIZ_PREFIX.length);
 const VET_SUBCATEGORY_OPTIONS = [
   { value: "medication", label: "Medication" },
   { value: "joint_injections", label: "Joint Injections" },
@@ -776,7 +782,23 @@ export default function InvoicePreviewPage() {
         };
       }
 
-      let current = row.assignees.filter((id) => id !== SPLIT_ALL && id !== SPLIT_INVOICE && id !== BUSINESS_GENERAL);
+      // Business assignments are exclusive — pick a business and the line
+      // belongs entirely to that LLC. Clear any horse/person picks.
+      if (isBizId(entityId)) {
+        const already = row.assignees.includes(entityId);
+        return {
+          ...prev,
+          [index]: {
+            ...row,
+            // Toggle: clicking the selected business removes it.
+            assignees: already ? [] : [entityId],
+            confirmed: !already,
+            autoDetected: false,
+          },
+        };
+      }
+
+      let current = row.assignees.filter((id) => id !== SPLIT_ALL && id !== SPLIT_INVOICE && id !== BUSINESS_GENERAL && !isBizId(id));
       if (current.includes(entityId)) {
         current = current.filter((id) => id !== entityId);
       } else {
@@ -848,12 +870,19 @@ export default function InvoicePreviewPage() {
             {hasSplitInvoice ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillSplit}`}>↔ split in invoice</span> : null}
             {hasBusinessGeneral ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillGeneral}`}>◼ general</span> : null}
             {!hasAnySplit && !hasBusinessGeneral ? selectedEntityIds.map((id) => {
-              const name = entityList.find((entry) => String(entry._id) === id)?.name
-                ?? (assignType === "horse" ? horseNameById.get(id) : undefined)
-                ?? "Unknown";
+              const isBiz = isBizId(id);
+              const ownerId = isBiz ? unwrapBizId(id) : undefined;
+              const name = isBiz
+                ? (businesses.find((b: any) => String(b._id) === ownerId)?.name ?? "Business")
+                : (entityList.find((entry) => String(entry._id) === id)?.name
+                    ?? (assignType === "horse" ? horseNameById.get(id) : undefined)
+                    ?? "Unknown");
               return (
-                <span key={id} className={`${styles.lineHorsePill} ${assignType === "person" ? styles.lineHorsePillPerson : ""}`}>
-                  {name}
+                <span
+                  key={id}
+                  className={`${styles.lineHorsePill} ${isBiz ? styles.lineHorsePillBusiness : assignType === "person" ? styles.lineHorsePillPerson : ""}`}
+                >
+                  {isBiz ? "🏢 " : ""}{name}
                   <span
                     className={styles.lineHorsePillRemove}
                     onClick={(event) => {
@@ -894,6 +923,31 @@ export default function InvoicePreviewPage() {
                   </button>
                 );
               })}
+              {/* Businesses section — lets a line item be attributed to a
+                  specific LLC (overhead/admin expense). Picking one is
+                  exclusive: it replaces any horse/person assignment for
+                  this line. */}
+              {businesses.length > 0 && (
+                <>
+                  <div className={styles.lineHorseDivider} />
+                  <div className={styles.lineHorseDropdownLabel}>BUSINESSES</div>
+                  {businesses.map((biz: any) => {
+                    const bizKey = BIZ_PREFIX + String(biz._id);
+                    const selected = row.assignees.includes(bizKey);
+                    return (
+                      <button
+                        type="button"
+                        key={biz._id}
+                        className={styles.lineHorseOption}
+                        onClick={() => toggleEntityOnItem(index, bizKey)}
+                      >
+                        <span>{selected ? "☑" : "☐"}</span>
+                        <span>🏢 {biz.name}</span>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
             </div>
           ) : null}
         </div>
@@ -1515,6 +1569,14 @@ export default function InvoicePreviewPage() {
           const selectedAssignees = state?.assignees ?? [];
           const isBusinessGeneral = mode === "line" && selectedAssignees[0] === BUSINESS_GENERAL;
           const isWholeBusinessGeneral = mode === "whole" && wholeAssignMode === "business_general";
+          // Per-line business pick — exclusive single-entity assignment to
+          // a specific LLC. Identifiable by the BIZ_PREFIX on the assignee id.
+          const lineBizId = mode === "line" && selectedAssignees[0] && isBizId(selectedAssignees[0])
+            ? unwrapBizId(selectedAssignees[0])
+            : null;
+          const lineBizName = lineBizId
+            ? businesses.find((b: any) => String(b._id) === lineBizId)?.name
+            : null;
           return {
             ...line,
             description: line.description || `Line item ${index + 1}`,
@@ -1522,11 +1584,24 @@ export default function InvoicePreviewPage() {
             category: (mode === "whole" && wholeCategoryOverride) ? wholeCategoryOverride : (state?.category || categorySlug),
             subcategory: (mode === "whole" && wholeSubcategoryOverride) ? wholeSubcategoryOverride : (state?.subcategory || line.subcategory || null),
             subcategoryAutoDetected: Boolean(state?.subcategoryAutoDetected),
-            horses: assignType === "horse" ? selectedAssignees : undefined,
-            people: assignType === "person" ? selectedAssignees : undefined,
-            assignee: isBusinessGeneral || isWholeBusinessGeneral ? null : (selectedAssignees[0] || ""),
-            assigneeType: isBusinessGeneral || isWholeBusinessGeneral ? "business_general" : assignType,
-            assigneeId: isBusinessGeneral || isWholeBusinessGeneral ? null : (selectedAssignees[0] || ""),
+            horses: assignType === "horse" && !lineBizId ? selectedAssignees : undefined,
+            people: assignType === "person" && !lineBizId ? selectedAssignees : undefined,
+            assignee: isBusinessGeneral || isWholeBusinessGeneral
+              ? null
+              : lineBizId
+                ? lineBizId
+                : (selectedAssignees[0] || ""),
+            assigneeType: isBusinessGeneral || isWholeBusinessGeneral
+              ? "business_general"
+              : lineBizId
+                ? "business"
+                : assignType,
+            assigneeId: isBusinessGeneral || isWholeBusinessGeneral
+              ? null
+              : lineBizId
+                ? lineBizId
+                : (selectedAssignees[0] || ""),
+            assigneeName: lineBizName ?? undefined,
             confidence: state?.autoDetected ? "auto" : "manual",
             confirmed: mode === "whole" ? true : Boolean(state?.confirmed)
           };
