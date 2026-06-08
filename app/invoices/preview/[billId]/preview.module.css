@@ -219,6 +219,21 @@ select.categorySelect:hover {
   margin-top: 2px;
   font-size: 10px;
   color: #9ea2b0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lockedBadge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(34, 197, 131, 0.12);
+  color: #22c583;
+  text-transform: uppercase;
 }
 
 .detailsGrid {

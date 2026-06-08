@@ -222,6 +222,134 @@ const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
   equity: { bg: "rgba(139,92,246,0.08)", color: "#8B5CF6" }
 };
 
+/**
+ * Read-only summary of an approved bill's line items + assignments. Replaces
+ * the live editing controls until the user clicks "edit". For line-item
+ * mode it shows each row's description, the assignee pills (resolving
+ * horse/person/business names from the parent maps), and the amount. For
+ * whole-invoice mode it shows the saved split (assignedHorses /
+ * assignedPeople / assignedBusinesses) as a labeled list.
+ */
+function LockedAssignmentSummary({
+  bill,
+  lineItems,
+  total,
+  mode,
+  assignType,
+  horseNameById,
+  peopleById,
+  businessesById,
+  formatUsd,
+  getLineAmount,
+}: {
+  bill: any;
+  lineItems: any[];
+  total: number;
+  mode: "line" | "whole";
+  assignType: "horse" | "person" | "business";
+  horseNameById: Map<string, string>;
+  peopleById: Map<string, string>;
+  businessesById: Map<string, string>;
+  formatUsd: (n: number) => string;
+  getLineAmount: (line: any) => number;
+}) {
+  const resolveName = (id: string, type: string | undefined): string => {
+    if (isBizId(id)) return businessesById.get(unwrapBizId(id)) ?? "Business";
+    if (type === "business") return businessesById.get(id) ?? "Business";
+    if (type === "person") return peopleById.get(id) ?? "Unknown";
+    return horseNameById.get(id) ?? "Unknown";
+  };
+  const iconFor = (type: string | undefined, id?: string): string => {
+    if (id && isBizId(id)) return "🏢";
+    if (type === "business") return "🏢";
+    if (type === "person") return "👤";
+    if (type === "business_general") return "◼";
+    return "🐴";
+  };
+
+  // Whole-invoice mode: render the saved split list.
+  if (mode === "whole") {
+    const isBizGeneral = !bill?.assignedHorses?.length
+      && !bill?.assignedPeople?.length
+      && !bill?.assignedBusinesses?.length;
+    if (isBizGeneral) {
+      return (
+        <div style={{ padding: "16px 22px" }}>
+          <div style={{ color: "#6b7084", fontSize: 13 }}>
+            ◼ business general — no specific horse, person, or business
+          </div>
+        </div>
+      );
+    }
+    const rows: { name: string; icon: string; amount: number }[] = [
+      ...(bill?.assignedHorses ?? []).map((h: any) => ({ icon: "🐴", name: h.horseName, amount: h.amount })),
+      ...(bill?.assignedPeople ?? []).map((p: any) => ({ icon: "👤", name: p.personName ?? peopleById.get(String(p.personId)) ?? "Unknown", amount: p.amount })),
+      ...(bill?.assignedBusinesses ?? []).map((b: any) => ({ icon: "🏢", name: b.ownerName, amount: b.amount })),
+    ];
+    return (
+      <div style={{ padding: "8px 22px 22px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {rows.map((row, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #eef0f3", fontSize: 13 }}>
+              <span>{row.icon} {row.name}</span>
+              <span style={{ fontWeight: 600 }}>{formatUsd(row.amount)}</span>
+            </div>
+          ))}
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0 0", fontWeight: 700, fontSize: 13 }}>
+            <span>TOTAL</span>
+            <span>{formatUsd(total)}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Line-item mode: render each line with its assignment.
+  return (
+    <div style={{ padding: "8px 22px 22px" }}>
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {lineItems.map((line: any, idx: number) => {
+          const amount = getLineAmount(line);
+          const at = String(line.assigneeType ?? "");
+          const horseIds: string[] = Array.isArray(line.horses) ? line.horses : [];
+          const peopleIds: string[] = Array.isArray(line.people) ? line.people : [];
+          const singleId = String(line.assigneeId ?? line.assignee ?? "").trim();
+          const ids = horseIds.length > 0
+            ? horseIds.map(String)
+            : peopleIds.length > 0
+              ? peopleIds.map(String)
+              : singleId
+                ? [singleId]
+                : [];
+          return (
+            <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 16, alignItems: "center", padding: "10px 0", borderBottom: "1px solid #eef0f3", fontSize: 13 }}>
+              <span>{line.description || `Line ${idx + 1}`}</span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "flex-end" }}>
+                {at === "business_general" ? (
+                  <span style={{ background: "rgba(107,112,132,0.10)", color: "#6b7084", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600 }}>◼ general</span>
+                ) : ids.length === 0 ? (
+                  <span style={{ color: "#6b7084", fontSize: 11 }}>—</span>
+                ) : (
+                  ids.map((id) => (
+                    <span key={id} style={{ background: "rgba(74,91,219,0.08)", color: "#1a1a2e", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600 }}>
+                      {iconFor(at, id)} {resolveName(id, at)}
+                    </span>
+                  ))
+                )}
+              </div>
+              <span style={{ fontWeight: 600, minWidth: 80, textAlign: "right" }}>{formatUsd(amount)}</span>
+            </div>
+          );
+        })}
+        <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0 0", fontWeight: 700, fontSize: 13 }}>
+          <span>TOTAL</span>
+          <span>{formatUsd(total)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function InvoicePreviewPage() {
   const params = useParams<{ billId: string }>();
   const searchParams = useSearchParams();
@@ -500,7 +628,33 @@ export default function InvoicePreviewPage() {
       setWholeSubcategoryOverride("");
     }
 
-    if (requiresHorse && bill.assignedHorses?.length) {
+    // Saved assignMode is the source of truth — if a prior save explicitly
+    // recorded "line", honor that even if stale assignedHorses from an
+    // earlier whole-mode save still linger on the row. Only fall back to
+    // the assignedHorses-based heuristic when assignMode is unset.
+    const savedAssignMode = (bill as any).assignMode;
+    if (savedAssignMode === "line") {
+      // Already set to "line" above — nothing to do.
+    } else if (savedAssignMode === "whole" && bill.assignedHorses?.length) {
+      setMode("whole");
+      setWholeAssignedIds(bill.assignedHorses.map((entry) => String(entry.horseId)));
+      setWholeAmounts(
+        Object.fromEntries(bill.assignedHorses.map((entry) => [String(entry.horseId), String(entry.amount)]))
+      );
+      if ((bill as any).splitMode === "custom") setWholeSplitType("custom");
+      else if ((bill as any).splitMode === "even") setWholeSplitType("even");
+      else if (bill.assignedHorses.length > 1) {
+        const amounts = bill.assignedHorses.map((h) => Math.round(h.amount * 100));
+        const allSame = amounts.every((a) => a === amounts[0]);
+        setWholeSplitType(allSame ? "even" : "custom");
+      }
+    } else if (savedAssignMode === "whole" && bill.assignedPeople?.length) {
+      setMode("whole");
+      setWholeAssignedIds(bill.assignedPeople.map((entry) => String(entry.personId)));
+      setWholeAmounts(
+        Object.fromEntries(bill.assignedPeople.map((entry) => [String(entry.personId), String(entry.amount)]))
+      );
+    } else if (savedAssignMode === undefined && requiresHorse && bill.assignedHorses?.length) {
       setMode("whole");
       setWholeAssignedIds(bill.assignedHorses.map((entry) => String(entry.horseId)));
       setWholeAmounts(
@@ -517,7 +671,7 @@ export default function InvoicePreviewPage() {
         const allSame = amounts.every((a) => a === amounts[0]);
         setWholeSplitType(allSame ? "even" : "custom");
       }
-    } else if (requiresPerson && bill.assignedPeople?.length) {
+    } else if (savedAssignMode === undefined && requiresPerson && bill.assignedPeople?.length) {
       setMode("whole");
       setWholeAssignedIds(bill.assignedPeople.map((entry) => String(entry.personId)));
       setWholeAmounts(
@@ -736,6 +890,12 @@ export default function InvoicePreviewPage() {
   // Provider confirmation is no longer required — contacts are auto-detected
   const approveDisabled = !assignmentReady;
   const isEditing = Boolean(bill?.isApproved);
+
+  // After approval the line-items / assignment card flips to a read-only
+  // report. The user clicks "edit" to unlock and make changes; saving
+  // re-locks it. Unapproved bills are always unlocked.
+  const [assignmentsUnlocked, setAssignmentsUnlocked] = useState(false);
+  const assignmentsLocked = isEditing && !assignmentsUnlocked;
 
   const entityList = (
     assignType === "horse" ? horses
@@ -1650,7 +1810,15 @@ export default function InvoicePreviewPage() {
       const effectiveBill = dominantLineCat && dominantLineCat !== categorySlug
         ? { ...bill, category: { ...(bill?.category ?? {}), slug: dominantLineCat } }
         : bill;
-      router.push(isEditing ? "/invoices" : buildPermanentInvoicePath(effectiveBill));
+      if (isEditing) {
+        // Re-editing an already-approved bill: stay on the page and snap
+        // the assignment card back to the locked report so the user can
+        // see their saved state. No navigation.
+        setAssignmentsUnlocked(false);
+      } else {
+        // First approval: route to the permanent invoice URL.
+        router.push(buildPermanentInvoicePath(effectiveBill));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : isEditing ? "Failed to save" : "Failed to approve");
     } finally {
@@ -2141,9 +2309,25 @@ export default function InvoicePreviewPage() {
               <div className={styles.cardHeader}>
                 <div>
                   <div className={styles.cardTitle}>line items</div>
-                  <div className={styles.cardMeta}>{lineItems.length} items · {formatUsd(total)}</div>
+                  <div className={styles.cardMeta}>
+                    {lineItems.length} items · {formatUsd(total)}
+                    {assignmentsLocked ? (
+                      <span className={styles.lockedBadge}>approved</span>
+                    ) : null}
+                  </div>
                 </div>
-                {requiresAssignment ? (
+                {/* When approved and locked: show edit button instead of toggles. */}
+                {assignmentsLocked ? (
+                  <div className={styles.headerToggleRow}>
+                    <button
+                      type="button"
+                      className="ui-button-outlined"
+                      onClick={() => setAssignmentsUnlocked(true)}
+                    >
+                      edit
+                    </button>
+                  </div>
+                ) : requiresAssignment ? (
                   <div className={styles.headerToggleRow}>
                     <div className={styles.modeToggle}>
                       <button type="button" className={mode === "line" ? styles.modeToggleActive : styles.modeToggleInactive} onClick={() => setMode("line")}>by line item</button>
@@ -2183,7 +2367,20 @@ export default function InvoicePreviewPage() {
                 ) : null}
               </div>
 
-              {mode === "line" || !requiresAssignment ? (
+              {assignmentsLocked ? (
+                <LockedAssignmentSummary
+                  bill={bill}
+                  lineItems={lineItems}
+                  total={total}
+                  mode={mode}
+                  assignType={assignType}
+                  horseNameById={horseNameById}
+                  peopleById={new Map(people.map((p) => [String(p._id), p.name]))}
+                  businessesById={new Map(businesses.map((b: any) => [String(b._id), b.name]))}
+                  formatUsd={formatUsd}
+                  getLineAmount={getLineAmount}
+                />
+              ) : mode === "line" || !requiresAssignment ? (
                 <>
                   <div className={`${styles.lineHeader} ${styles.lineHeaderVet}`}>
                     <div>DESCRIPTION</div>
