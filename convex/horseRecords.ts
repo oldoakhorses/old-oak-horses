@@ -410,11 +410,16 @@ export const updateRecordWithNextVisit = mutation({
 
     if (typeof args.nextVisitDate === "number") {
       const nextVisitTimestamp = args.nextVisitDate;
+      // Scheduled follow-ups don't inherit the original contact — the user
+      // fills that in manually closer to the visit (vets/farriers swap,
+      // and pre-filling the prior contact had been masking that decision).
+      // Only fields explicitly passed in this call (cleanedUpdates) are
+      // carried into the upcoming record.
       if (hasExistingUpcoming && record.linkedRecordId) {
         await ctx.db.patch(record.linkedRecordId, {
           date: nextVisitTimestamp,
-          contactName: cleanedUpdates.contactName ?? record.contactName,
-          contactId: cleanedUpdates.contactId ?? record.contactId,
+          contactName: cleanedUpdates.contactName ?? undefined,
+          contactId: cleanedUpdates.contactId ?? undefined,
           type: cleanedUpdates.type ?? record.type,
           customType: cleanedUpdates.customType ?? record.customType,
           serviceType: cleanedUpdates.serviceType ?? record.serviceType,
@@ -430,8 +435,8 @@ export const updateRecordWithNextVisit = mutation({
           type: cleanedUpdates.type ?? record.type,
           customType: cleanedUpdates.customType ?? record.customType,
           date: nextVisitTimestamp,
-          contactName: cleanedUpdates.contactName ?? record.contactName,
-          contactId: cleanedUpdates.contactId ?? record.contactId,
+          contactName: cleanedUpdates.contactName ?? undefined,
+          contactId: cleanedUpdates.contactId ?? undefined,
           serviceType: cleanedUpdates.serviceType ?? record.serviceType,
           visitType: cleanedUpdates.visitType ?? record.visitType,
           visitTypes: cleanedUpdates.visitTypes ?? record.visitTypes,
