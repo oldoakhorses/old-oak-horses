@@ -855,6 +855,10 @@ export default function DashboardPage() {
               const icon = recordTypeIcon(item.record.type);
               const subtype = getUpcomingSubtype(item.record);
               const isFollowup = item.type === "followup";
+              // Farrier upcoming events are recurring maintenance, not
+              // follow-ups — relabel the pill + inline text accordingly.
+              const isFarrier = item.record.type === "farrier";
+              const followupLabel = isFarrier ? "next due" : "follow-up";
               const provider = item.record.contactName?.trim();
               const detail = getUpcomingDetail(item.record);
               const daysAway = daysUntil(item.eventDate);
@@ -874,11 +878,11 @@ export default function DashboardPage() {
                       <span>{icon}</span>
                       <span>
                         {prettyType(item.record.type)}
-                        {isFollowup ? " follow-up" : subtype ? ` — ${subtype}` : ""}
+                        {isFollowup ? ` ${followupLabel}` : subtype ? ` — ${subtype}` : ""}
                         {" — "}
                         {item.horse.name}
                       </span>
-                      {isFollowup ? <span className={styles.followupBadge}>follow-up</span> : null}
+                      {isFollowup ? <span className={styles.followupBadge}>{followupLabel}</span> : null}
                     </div>
                     {provider || detail ? (
                       <div className={styles.upcomingDetail}>

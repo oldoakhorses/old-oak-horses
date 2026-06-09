@@ -929,7 +929,9 @@ export default function RecordsPage() {
                     <span className={styles.colRecord}>
                       <span className={styles.recordIcon}>{recordIcon(record.type)}</span>
                       <span className={styles.recordLabel}>{getRecordLabel(record)}</span>
-                      {activeTab === "upcoming" && row.isFollowup ? <span className={styles.followupBadge}>f/u</span> : null}
+                      {activeTab === "upcoming" && row.isFollowup ? (
+                        <span className={styles.followupBadge}>{record.type === "farrier" ? "due" : "f/u"}</span>
+                      ) : null}
                     </span>
                     <span className={styles.colSubtitle}>{subtitle || <span className={styles.muted}>—</span>}</span>
                     <span className={`${styles.colDate} ${dateSoon ? styles.recordDateSoon : ""}`}>{formatDateShort(row.eventDate)}</span>
