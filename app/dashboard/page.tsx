@@ -174,6 +174,89 @@ export default function DashboardPage() {
     const sorted = [...allRecordsForFeed].sort((a: any, b: any) => (b.date ?? 0) - (a.date ?? 0));
     return sorted.slice(0, 5);
   }, [allRecordsForFeed]);
+
+  // Today's plan: union of upcoming horseRecords whose date is today,
+  // schedule events for today, and free-form calendar events for today.
+  // Date math is done client-side (server queries return broad ranges and
+  // we filter locally so org-filtering can fall in too).
+  const todayBounds = useMemo(() => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const end = start + 24 * 60 * 60 * 1000 - 1;
+    const isoToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    return { start, end, isoToday };
+  }, []);
+  const todaysScheduleEvents = useQuery(api.scheduleEvents.getByDateRange, {
+    startDate: todayBounds.isoToday,
+    endDate: todayBounds.isoToday,
+  }) ?? [];
+  const todaysCalendarEvents = useQuery(api.calendarEvents.getByDateRange, {
+    startDate: todayBounds.isoToday,
+    endDate: todayBounds.isoToday,
+  }) ?? [];
+  const orgHorseIds = useMemo(() => new Set(activeHorses.map((h) => String(h._id))), [activeHorses]);
+  const todaysItems = useMemo(() => {
+    type TodayItem = {
+      key: string;
+      icon: string;
+      title: string;
+      detail?: string;
+      timeLabel?: string;
+      href?: string;
+    };
+
+    const out: TodayItem[] = [];
+
+    // 1. Horse records due/scheduled today (vet visits, farrier, etc.).
+    for (const r of upcomingRecords as any[]) {
+      const t = r.eventDate ?? r.date;
+      if (typeof t !== "number") continue;
+      if (t < todayBounds.start || t > todayBounds.end) continue;
+      // Respect active-org filter via horse membership.
+      if (orgArgs.ownerId) {
+        if (!orgHorseIds.has(String(r.horseId))) continue;
+      }
+      const recType = r.record?.type ?? r.type;
+      const horseName = r.horse?.name ?? r.horseName ?? "—";
+      const isFarrier = recType === "farrier";
+      const followupSuffix = (r.type === "followup") ? (isFarrier ? " next due" : " follow-up") : "";
+      out.push({
+        key: `rec-${r._id ?? r.record?._id}`,
+        icon: recordTypeIcon(recType),
+        title: `${prettyType(recType)}${followupSuffix} — ${horseName}`,
+        detail: r.record?.contactName ?? r.contactName ?? undefined,
+        href: `/horses/${r.horseId ?? r.record?.horseId}/records`,
+      });
+    }
+
+    // 2. Schedule events tied to a horse (showings, lessons targeted to a horse).
+    for (const e of todaysScheduleEvents as any[]) {
+      if (orgArgs.ownerId && !orgHorseIds.has(String(e.horseId))) continue;
+      out.push({
+        key: `sched-${e._id}`,
+        icon: "📅",
+        title: `${e.title || "Scheduled event"} — ${e.horseName ?? ""}`.trim(),
+        detail: e.contactName ?? e.notes ?? undefined,
+        timeLabel: e.time ?? undefined,
+        href: "/calendar",
+      });
+    }
+
+    // 3. Calendar events — show day, lesson schedule, generic items. These
+    //    aren't horse-tied so they always pass the org filter.
+    for (const e of todaysCalendarEvents as any[]) {
+      out.push({
+        key: `cal-${e._id}`,
+        icon: "🗓️",
+        title: e.title || "Calendar event",
+        detail: e.description ?? e.notes ?? undefined,
+        timeLabel: e.time ?? undefined,
+        href: "/calendar",
+      });
+    }
+
+    return out;
+  }, [upcomingRecords, todaysScheduleEvents, todaysCalendarEvents, todayBounds, orgArgs.ownerId, orgHorseIds]);
   const recordProviderCategory = selectedRecordType ? RECORD_TYPE_TO_CATEGORY[selectedRecordType] : "";
   const allContactsForRecord = useQuery(api.contacts.getAllContacts) ?? [];
   const recordProviders = useMemo(
@@ -746,6 +829,52 @@ export default function DashboardPage() {
           ) : null}
         </section>
         )}
+
+        {/* TODAY — what's on the plate for the day. Pulls from upcoming
+            horse records due today + horse-tied schedule events for today
+            + free-form calendar events (show plan / lesson schedule). */}
+        <section className={`${styles.card} ${styles.todayCard}`}>
+          <div className={styles.upcomingLabel}>// TODAY</div>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>today</h2>
+            <Link href="/calendar" className={styles.viewAll}>
+              calendar →
+            </Link>
+          </div>
+
+          {todaysItems.length === 0 ? (
+            <div className={styles.upcomingEmpty}>
+              <div className={styles.upcomingEmptyTitle}>nothing on the schedule</div>
+              <div className={styles.upcomingEmptySub}>upcoming records, scheduled events, and calendar items will appear here on the day they happen</div>
+            </div>
+          ) : (
+            <div className={styles.todayGrid}>
+              {todaysItems.map((item) => {
+                const inner = (
+                  <>
+                    <span className={styles.todayIcon}>{item.icon}</span>
+                    <div className={styles.todayContent}>
+                      <div className={styles.todayTitle}>
+                        {item.timeLabel ? <span className={styles.todayTime}>{item.timeLabel}</span> : null}
+                        <span>{item.title}</span>
+                      </div>
+                      {item.detail ? <div className={styles.todayDetail}>{item.detail}</div> : null}
+                    </div>
+                  </>
+                );
+                return item.href ? (
+                  <Link key={item.key} href={item.href} className={styles.todayItem}>
+                    {inner}
+                  </Link>
+                ) : (
+                  <div key={item.key} className={styles.todayItem}>
+                    {inner}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
         {/* HORSES — now top of the page per the user's reorg request. */}
         <section className={styles.horsesSection}>
