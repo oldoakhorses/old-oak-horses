@@ -915,12 +915,10 @@ export default function InvoicePreviewPage() {
     setWholeAssignedIds([]);
     setWholeAmounts({});
     setWholeAssignMode("split");
-    // Business assignment is whole-invoice only in this pass. Force the
-    // mode toggle so the user can't end up in "by line item" with no way
-    // to picker per-line businesses.
-    if (newType === "business") {
-      setMode("whole");
-    }
+    // Business mode now supports BOTH whole-invoice business assignment
+    // AND per-line horse/person tagging (so a business-owned invoice can
+    // still feed cost-per-horse breakdowns). Don't force the mode here —
+    // let the user pick.
   }
 
   function toggleEntityOnItem(index: number, entityId: string) {
@@ -1034,19 +1032,32 @@ export default function InvoicePreviewPage() {
             {hasSplitInvoice ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillSplit}`}>↔ split in invoice</span> : null}
             {hasBusinessGeneral ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillGeneral}`}>◼ general</span> : null}
             {!hasAnySplit && !hasBusinessGeneral ? selectedEntityIds.map((id) => {
+              // Resolve each pill's entity from the ID, not the global
+              // assignType — so a horse picked under business mode shows
+              // as 🐴 (and feeds the horse cost breakdown), not 🏢.
               const isBiz = isBizId(id);
               const ownerId = isBiz ? unwrapBizId(id) : undefined;
+              const isHorse = !isBiz && Boolean(horses.find((h) => String(h._id) === id));
+              const isPerson = !isBiz && !isHorse && Boolean(people.find((p) => String(p._id) === id));
               const name = isBiz
                 ? (businesses.find((b: any) => String(b._id) === ownerId)?.name ?? "Business")
-                : (entityList.find((entry) => String(entry._id) === id)?.name
-                    ?? (assignType === "horse" ? horseNameById.get(id) : undefined)
-                    ?? "Unknown");
+                : isHorse
+                  ? (horses.find((h) => String(h._id) === id)?.name ?? horseNameById.get(id) ?? "Unknown")
+                  : isPerson
+                    ? (people.find((p) => String(p._id) === id)?.name ?? "Unknown")
+                    : (entityList.find((entry) => String(entry._id) === id)?.name ?? "Unknown");
+              const pillClass = isBiz
+                ? styles.lineHorsePillBusiness
+                : isPerson
+                  ? styles.lineHorsePillPerson
+                  : "";
+              const icon = isBiz ? "🏢 " : isPerson ? "👤 " : isHorse ? "🐴 " : "";
               return (
                 <span
                   key={id}
-                  className={`${styles.lineHorsePill} ${isBiz ? styles.lineHorsePillBusiness : assignType === "person" ? styles.lineHorsePillPerson : ""}`}
+                  className={`${styles.lineHorsePill} ${pillClass}`}
                 >
-                  {isBiz ? "🏢 " : ""}{name}
+                  {icon}{name}
                   <span
                     className={styles.lineHorsePillRemove}
                     onClick={(event) => {
@@ -1065,14 +1076,28 @@ export default function InvoicePreviewPage() {
 
           {openDropdownId === index ? (
             <div className={styles.lineHorseDropdown}>
-              <button type="button" className={styles.lineHorseOption} onClick={() => toggleEntityOnItem(index, SPLIT_INVOICE)}>
-                ↔ split across {assignType === "horse" ? "horses" : "people"} in this invoice
-              </button>
-              <button type="button" className={styles.lineHorseOption} onClick={() => toggleEntityOnItem(index, SPLIT_ALL)}>
-                ↔ split across ALL {assignType === "horse" ? "horses" : "people"}
-              </button>
+              {/* Split & general options reference the *global* assignType
+                  for labeling, but business mode hides the "split across
+                  {entities}" rows since splitting across businesses at
+                  line-item level isn't supported. */}
+              {assignType !== "business" && (
+                <>
+                  <button type="button" className={styles.lineHorseOption} onClick={() => toggleEntityOnItem(index, SPLIT_INVOICE)}>
+                    ↔ split across {assignType === "horse" ? "horses" : "people"} in this invoice
+                  </button>
+                  <button type="button" className={styles.lineHorseOption} onClick={() => toggleEntityOnItem(index, SPLIT_ALL)}>
+                    ↔ split across ALL {assignType === "horse" ? "horses" : "people"}
+                  </button>
+                </>
+              )}
               <button type="button" className={styles.lineHorseOption} onClick={() => toggleEntityOnItem(index, BUSINESS_GENERAL)}>◼ business general</button>
               <div className={styles.lineHorseDivider} />
+
+              {/* Primary entity list — for horse/person assignType this is
+                  the assignType's entities. For business assignType, the
+                  primary list is businesses; the horses/people sections
+                  below let any line still be attributed to a horse/person
+                  for cost-per breakdowns. */}
               {entityList.map((entry) => {
                 const selected = selectedEntityIds.includes(String(entry._id));
                 return (
@@ -1083,15 +1108,59 @@ export default function InvoicePreviewPage() {
                     onClick={() => toggleEntityOnItem(index, String(entry._id))}
                   >
                     <span>{selected ? "☑" : "☐"}</span>
-                    <span>{entry.name}</span>
+                    <span>{assignType === "business" ? "🏢 " : ""}{entry.name}</span>
                   </button>
                 );
               })}
-              {/* Businesses section — lets a line item be attributed to a
-                  specific LLC (overhead/admin expense). Picking one is
-                  exclusive: it replaces any horse/person assignment for
-                  this line. */}
-              {businesses.length > 0 && (
+
+              {/* In business mode, surface horses + people too so admin
+                  invoices can still tag specific lines to a horse or
+                  person for the cost-per breakdowns. */}
+              {assignType === "business" && horses.length > 0 && (
+                <>
+                  <div className={styles.lineHorseDivider} />
+                  <div className={styles.lineHorseDropdownLabel}>HORSES</div>
+                  {horses.map((h) => {
+                    const selected = selectedEntityIds.includes(String(h._id));
+                    return (
+                      <button
+                        type="button"
+                        key={h._id}
+                        className={styles.lineHorseOption}
+                        onClick={() => toggleEntityOnItem(index, String(h._id))}
+                      >
+                        <span>{selected ? "☑" : "☐"}</span>
+                        <span>🐴 {h.name}</span>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+              {assignType === "business" && people.length > 0 && (
+                <>
+                  <div className={styles.lineHorseDivider} />
+                  <div className={styles.lineHorseDropdownLabel}>PEOPLE</div>
+                  {people.map((p) => {
+                    const selected = selectedEntityIds.includes(String(p._id));
+                    return (
+                      <button
+                        type="button"
+                        key={p._id}
+                        className={styles.lineHorseOption}
+                        onClick={() => toggleEntityOnItem(index, String(p._id))}
+                      >
+                        <span>{selected ? "☑" : "☐"}</span>
+                        <span>👤 {p.name}</span>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* For non-business modes, the BUSINESSES section appears at
+                  the bottom (so admin lines on a horse/person invoice can
+                  still target an LLC). */}
+              {assignType !== "business" && businesses.length > 0 && (
                 <>
                   <div className={styles.lineHorseDivider} />
                   <div className={styles.lineHorseDropdownLabel}>BUSINESSES</div>
@@ -1736,14 +1805,45 @@ export default function InvoicePreviewPage() {
           const selectedAssignees = state?.assignees ?? [];
           const isBusinessGeneral = mode === "line" && selectedAssignees[0] === BUSINESS_GENERAL;
           const isWholeBusinessGeneral = mode === "whole" && wholeAssignMode === "business_general";
-          // Per-line business pick — exclusive single-entity assignment to
-          // a specific LLC. Identifiable by the BIZ_PREFIX on the assignee id.
-          const lineBizId = mode === "line" && selectedAssignees[0] && isBizId(selectedAssignees[0])
-            ? unwrapBizId(selectedAssignees[0])
-            : null;
-          const lineBizName = lineBizId
-            ? businesses.find((b: any) => String(b._id) === lineBizId)?.name
-            : null;
+
+          // Resolve each line's per-line entity type by matching the raw
+          // ID against horses / people / businesses sets — instead of
+          // assuming the global assignType. Lets a single bill have a
+          // mix of line-level horse/person/business assignments (e.g.
+          // a business-owned admin invoice with one line attributed to
+          // a horse for cost-per-horse tracking).
+          const resolveLine = (raw: string | undefined): {
+            type: "horse" | "person" | "business" | null;
+            id: string | null;
+            name: string | undefined;
+          } => {
+            if (!raw) return { type: null, id: null, name: undefined };
+            if (isBizId(raw)) {
+              const ownerId = unwrapBizId(raw);
+              return { type: "business", id: ownerId, name: businesses.find((b: any) => String(b._id) === ownerId)?.name };
+            }
+            if (horses.find((h) => String(h._id) === raw)) {
+              return { type: "horse", id: raw, name: horses.find((h) => String(h._id) === raw)?.name };
+            }
+            if (people.find((p) => String(p._id) === raw)) {
+              return { type: "person", id: raw, name: people.find((p) => String(p._id) === raw)?.name };
+            }
+            if (businesses.find((b: any) => String(b._id) === raw)) {
+              return { type: "business", id: raw, name: businesses.find((b: any) => String(b._id) === raw)?.name };
+            }
+            // Unknown id — fall back to global assignType so legacy data
+            // still saves the same way it always did.
+            return { type: assignType, id: raw, name: undefined };
+          };
+
+          const resolved = resolveLine(selectedAssignees[0]);
+          // Per-line entity arrays: horses[]/people[] feed the cost-per
+          // breakdowns. A single line can only contribute to one
+          // breakdown at a time, but selectedAssignees can hold multiple
+          // horses (or multiple people) in horse/person mode.
+          const horseLineIds = selectedAssignees.filter((id) => horses.find((h) => String(h._id) === id));
+          const personLineIds = selectedAssignees.filter((id) => people.find((p) => String(p._id) === id));
+
           return {
             ...line,
             description: line.description || `Line item ${index + 1}`,
@@ -1751,24 +1851,21 @@ export default function InvoicePreviewPage() {
             category: (mode === "whole" && wholeCategoryOverride) ? wholeCategoryOverride : (state?.category || categorySlug),
             subcategory: (mode === "whole" && wholeSubcategoryOverride) ? wholeSubcategoryOverride : (state?.subcategory || line.subcategory || null),
             subcategoryAutoDetected: Boolean(state?.subcategoryAutoDetected),
-            horses: assignType === "horse" && !lineBizId ? selectedAssignees : undefined,
-            people: assignType === "person" && !lineBizId ? selectedAssignees : undefined,
+            // horses[]/people[] reflect what was actually picked, regardless
+            // of the global assignType — so cost-per-horse picks up
+            // horse-tagged lines on a business-owned invoice.
+            horses: horseLineIds.length > 0 ? horseLineIds : undefined,
+            people: personLineIds.length > 0 ? personLineIds : undefined,
             assignee: isBusinessGeneral || isWholeBusinessGeneral
               ? null
-              : lineBizId
-                ? lineBizId
-                : (selectedAssignees[0] || ""),
+              : resolved.id ?? (selectedAssignees[0] || ""),
             assigneeType: isBusinessGeneral || isWholeBusinessGeneral
               ? "business_general"
-              : lineBizId
-                ? "business"
-                : assignType,
+              : resolved.type ?? assignType,
             assigneeId: isBusinessGeneral || isWholeBusinessGeneral
               ? null
-              : lineBizId
-                ? lineBizId
-                : (selectedAssignees[0] || ""),
-            assigneeName: lineBizName ?? undefined,
+              : resolved.id ?? (selectedAssignees[0] || ""),
+            assigneeName: resolved.name ?? undefined,
             confidence: state?.autoDetected ? "auto" : "manual",
             confirmed: mode === "whole" ? true : Boolean(state?.confirmed)
           };
