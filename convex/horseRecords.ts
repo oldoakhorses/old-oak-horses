@@ -476,6 +476,49 @@ export const deleteHorseRecord = mutation({
   }
 });
 
+/**
+ * Backfill: clear contact fields on every existing upcoming record whose
+ * contact was inherited from its parent (linkedRecordId). Detection rule:
+ * upcoming.contactId === parent.contactId AND upcoming.contactName ===
+ * parent.contactName. Both matching is the inheritance signature; if the
+ * user manually changed only one, we don't touch it. Idempotent.
+ *
+ *   npx convex run --prod horseRecords:clearInheritedContactsOnUpcoming
+ */
+export const clearInheritedContactsOnUpcoming = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const upcomings = await ctx.db
+      .query("horseRecords")
+      .filter((q) => q.eq(q.field("isUpcoming"), true))
+      .collect();
+
+    let cleared = 0;
+    let skipped = 0;
+    for (const up of upcomings) {
+      if (!up.linkedRecordId) {
+        // Orphan upcoming (not paired to a parent). Leave alone.
+        skipped++;
+        continue;
+      }
+      const parent = await ctx.db.get(up.linkedRecordId);
+      if (!parent) {
+        skipped++;
+        continue;
+      }
+      const sameContactId = String(up.contactId ?? "") === String((parent as any).contactId ?? "");
+      const sameContactName = String(up.contactName ?? "") === String((parent as any).contactName ?? "");
+      if (sameContactId && sameContactName && (up.contactId || up.contactName)) {
+        await ctx.db.patch(up._id, { contactId: undefined, contactName: undefined });
+        cleared++;
+      } else {
+        skipped++;
+      }
+    }
+    return { cleared, skipped, total: upcomings.length };
+  },
+});
+
 /** One-shot migration: collapse `title` and `medications` on every
  *  medication record so the joined medications string acts as the
  *  record's title. Three cases per record:
