@@ -166,6 +166,14 @@ export default function DashboardPage() {
   const activeHorses = useQuery(api.horses.getActiveHorses, orgArgs) ?? [];
   const categories = useQuery(api.categories.getAllCategories) ?? [];
   const upcomingRecords = useQuery(api.horseRecords.getUpcoming) ?? [];
+
+  // Recent activity feed: 5 most-recently-logged records (incl. meds),
+  // org-filtered. Used to populate the new "recent activity" panel.
+  const allRecordsForFeed = useQuery(api.horseRecords.getAll, orgArgs) ?? [];
+  const recentActivity = useMemo(() => {
+    const sorted = [...allRecordsForFeed].sort((a: any, b: any) => (b.date ?? 0) - (a.date ?? 0));
+    return sorted.slice(0, 5);
+  }, [allRecordsForFeed]);
   const recordProviderCategory = selectedRecordType ? RECORD_TYPE_TO_CATEGORY[selectedRecordType] : "";
   const allContactsForRecord = useQuery(api.contacts.getAllContacts) ?? [];
   const recordProviders = useMemo(
@@ -739,7 +747,96 @@ export default function DashboardPage() {
         </section>
         )}
 
-        <section className={styles.card}>
+        {/* HORSES — now top of the page per the user's reorg request. */}
+        <section className={styles.horsesSection}>
+          <div className={styles.horsesHead}>
+            <div className="ui-label">// HORSES</div>
+            <Link href="/horses" className={styles.viewAll}>
+              view all →
+            </Link>
+          </div>
+
+          <div className={styles.grid}>
+            {shownHorses.map((horse) => (
+              <Link href={`/horses/${horse._id}`} key={horse._id} className={styles.horseCard}>
+                <div className={styles.horseCardTop}>
+                  <div className={styles.horseAvatar}>🐴</div>
+                </div>
+                <div className={styles.horseCardBody}>
+                  <h3 className={styles.horseName}>{horse.name}</h3>
+                  <div className={styles.horseMetaLine}>{horseOwnerSexLine(horse.owner, horse.sex)}</div>
+                </div>
+              </Link>
+            ))}
+
+            <button type="button" className={styles.addCard} onClick={() => setShowHorseModal(true)}>
+              <div className={styles.plus}>+</div>
+              <div>add horse</div>
+            </button>
+          </div>
+        </section>
+
+        {/* Two-column row: RECENT ACTIVITY (left 2/3) + UPCOMING (right 1/3). */}
+        <div className={styles.activityRow}>
+          <section className={`${styles.card} ${styles.recentActivityCard}`}>
+            <div className={styles.upcomingLabel}>// RECENT ACTIVITY</div>
+            <div className={styles.sectionHeader}>
+              <h2 className={styles.sectionTitle}>recent activity</h2>
+              <Link href="/records" className={styles.viewAll}>
+                see all →
+              </Link>
+            </div>
+
+            {recentActivity.length === 0 ? (
+              <div className={styles.upcomingEmpty}>
+                <div className={styles.upcomingEmptyTitle}>nothing logged yet</div>
+                <div className={styles.upcomingEmptySub}>records and meds will show up here as they're added</div>
+              </div>
+            ) : (
+              recentActivity.map((rec: any) => {
+                const icon = rec.type === "medication"
+                  ? "💊"
+                  : rec.type === "veterinary"
+                    ? "🩺"
+                    : rec.type === "farrier"
+                      ? "🔧"
+                      : rec.type === "bodywork"
+                        ? "🦴"
+                        : "📋";
+                const d = new Date(rec.date ?? 0);
+                const month = d.toLocaleString("en-US", { month: "short" }).toUpperCase();
+                const day = String(d.getDate());
+                const detail = rec.type === "medication"
+                  ? (Array.isArray(rec.medications) && rec.medications.length > 0 ? rec.medications.join(", ") : (rec.treatmentDescription ?? ""))
+                  : (rec.visitTypes?.join(", ") || rec.visitType || rec.vaccineName || rec.serviceType || rec.customType || "");
+                return (
+                  <div key={rec._id} className={styles.upcomingRow}>
+                    <div className={styles.upcomingDateBlock}>
+                      <div className={styles.upcomingDateMonth}>{month}</div>
+                      <div className={styles.upcomingDateDay}>{day}</div>
+                    </div>
+                    <div className={styles.upcomingContent}>
+                      <div className={styles.upcomingTitle}>
+                        <span>{icon}</span>
+                        <span>
+                          {prettyType(rec.type)}
+                          {" — "}
+                          {rec.horseName ?? rec.horse?.name ?? "—"}
+                        </span>
+                      </div>
+                      {rec.contactName || detail ? (
+                        <div className={styles.upcomingDetail}>
+                          {rec.contactName && detail ? `${rec.contactName} · ${detail}` : (rec.contactName || detail)}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </section>
+
+          <section className={`${styles.card} ${styles.upcomingCard}`}>
           <div className={styles.upcomingLabel}>// UPCOMING</div>
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>upcoming</h2>
@@ -797,35 +894,8 @@ export default function DashboardPage() {
           <button type="button" className={styles.upcomingSeeAll} onClick={() => router.push("/records")}>
             see all records →
           </button>
-        </section>
-
-        <section className={styles.horsesSection}>
-          <div className={styles.horsesHead}>
-            <div className="ui-label">// HORSES</div>
-            <Link href="/horses" className={styles.viewAll}>
-              view all →
-            </Link>
-          </div>
-
-          <div className={styles.grid}>
-            {shownHorses.map((horse) => (
-              <Link href={`/horses/${horse._id}`} key={horse._id} className={styles.horseCard}>
-                <div className={styles.horseCardTop}>
-                  <div className={styles.horseAvatar}>🐴</div>
-                </div>
-                <div className={styles.horseCardBody}>
-                  <h3 className={styles.horseName}>{horse.name}</h3>
-                  <div className={styles.horseMetaLine}>{horseOwnerSexLine(horse.owner, horse.sex)}</div>
-                </div>
-              </Link>
-            ))}
-
-            <button type="button" className={styles.addCard} onClick={() => setShowHorseModal(true)}>
-              <div className={styles.plus}>+</div>
-              <div>add horse</div>
-            </button>
-          </div>
-        </section>
+          </section>
+        </div>
 
         <div className="ui-footer">TEAM_LDK // DASHBOARD</div>
       </main>

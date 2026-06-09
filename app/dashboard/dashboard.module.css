@@ -425,7 +425,37 @@
 }
 
 .horsesSection {
-  margin-top: 28px;
+  margin-top: 0;
+  margin-bottom: 28px;
+}
+
+/* Two-column row below horses: recent activity (left 2/3) + upcoming
+ * (right 1/3, sticky-pinned so it stays visible as the activity feed
+ * scrolls). On narrow screens the columns stack. */
+.activityRow {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.recentActivityCard {
+  margin-top: 0;
+}
+
+.upcomingCard {
+  margin-top: 0;
+  position: sticky;
+  top: 72px; /* clears the sticky navbar */
+}
+
+@media (max-width: 900px) {
+  .activityRow {
+    grid-template-columns: 1fr;
+  }
+  .upcomingCard {
+    position: static;
+  }
 }
 
 .horsesHead {
