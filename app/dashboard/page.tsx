@@ -165,7 +165,7 @@ export default function DashboardPage() {
   const orgArgs = useOrgArgs();
   const activeHorses = useQuery(api.horses.getActiveHorses, orgArgs) ?? [];
   const categories = useQuery(api.categories.getAllCategories) ?? [];
-  const upcomingRecords = useQuery(api.horseRecords.getUpcoming) ?? [];
+  const upcomingRecords = useQuery(api.horseRecords.getUpcoming, orgArgs) ?? [];
 
   // Recent activity feed: 5 most-recently-logged records (incl. meds),
   // org-filtered. Used to populate the new "recent activity" panel.

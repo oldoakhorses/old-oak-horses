@@ -161,10 +161,37 @@ export const getAllByHorse = query({
 });
 
 export const getUpcoming = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { ownerId: v.optional(v.string()) },
+  handler: async (ctx, args) => {
     const now = Date.now();
     const rows = await ctx.db.query("horseRecords").collect();
+
+    // Resolve owner safely (same defense-in-depth pattern as horses.ts) and
+    // build the set of horse ids that belong to that owner — including
+    // co-owners via the horseOwnerships join table.
+    let safeOwnerId: any = undefined;
+    if (args.ownerId) {
+      try {
+        const owner = await ctx.db.get(args.ownerId as any);
+        if (owner) safeOwnerId = owner._id;
+      } catch {
+        // stale/wrong-table id — fall through to unfiltered
+      }
+    }
+    let allowedHorseIds: Set<string> | null = null;
+    if (safeOwnerId) {
+      allowedHorseIds = new Set<string>();
+      const horses = await ctx.db.query("horses").collect();
+      for (const h of horses) {
+        if (h.ownerId && String(h.ownerId) === String(safeOwnerId)) allowedHorseIds.add(String(h._id));
+      }
+      const links = await ctx.db
+        .query("horseOwnerships")
+        .withIndex("by_owner", (q: any) => q.eq("ownerId", safeOwnerId))
+        .collect();
+      for (const link of links) allowedHorseIds.add(String(link.horseId));
+    }
+
     const upcoming: Array<{
       type: "scheduled" | "followup";
       record: typeof rows[number];
@@ -173,6 +200,7 @@ export const getUpcoming = query({
     }> = [];
 
     for (const record of rows) {
+      if (allowedHorseIds && !allowedHorseIds.has(String(record.horseId))) continue;
       const horse = await ctx.db.get(record.horseId);
       if (!horse || horse.status !== "active") continue;
 
