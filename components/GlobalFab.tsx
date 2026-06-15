@@ -544,97 +544,12 @@ export default function GlobalFab() {
   }
 
   async function handleRecordAttachmentSelect(file: File | null) {
+    // Plain file pick — no PDF parsing, no auto-fill, no detection. The
+    // upload happens later in uploadAttachmentIfPresent at save time, so
+    // we just stash the File here.
     setRecordAttachment(file);
     setRecordAttachmentStorageId(null);
     setRecordReportDetection({ detected: false, reportType: "unknown", message: "" });
-    if (!file || file.type !== "application/pdf") return;
-
-    setRecordDetecting(true);
-    try {
-      const uploadUrl = await generateUploadUrl();
-      const uploadResponse = await fetch(uploadUrl, {
-        method: "POST",
-        headers: { "Content-Type": file.type || "application/pdf" },
-        body: file
-      });
-      if (!uploadResponse.ok) throw new Error("Failed to upload attachment for detection");
-      const payload = await uploadResponse.json();
-      const storageId = payload.storageId as Id<"_storage">;
-      setRecordAttachmentStorageId(storageId);
-
-      const detection = await detectRecordReport({ fileStorageId: storageId }) as {
-        reportType: "bodywork" | "invoice" | "unknown";
-        matchedHorseName?: string | null;
-        reportDate?: string | null;
-        contactName?: string | null;
-        treatmentNotes?: string | null;
-        horses?: Array<{
-          extractedHorseName: string;
-          matchedHorseName: string | null;
-          treatmentNotes: string;
-          sessionNumber: number | null;
-        }>;
-      };
-
-      if (detection.reportType !== "bodywork") return;
-
-      // Match all detected horses to active horses
-      const detectedHorses = detection.horses ?? [];
-      const matchedHorseIds: Id<"horses">[] = [];
-      const perHorseNotes: DetectedHorseNotes[] = [];
-
-      for (const dh of detectedHorses) {
-        const matchName = dh.matchedHorseName ?? dh.extractedHorseName;
-        const horse = matchName
-          ? activeHorses.find((h) => h.name.toLowerCase() === matchName.toLowerCase())
-          : undefined;
-        if (horse) {
-          matchedHorseIds.push(horse._id);
-          perHorseNotes.push({
-            horseId: horse._id,
-            horseName: horse.name,
-            notes: dh.treatmentNotes || "",
-          });
-        }
-      }
-
-      // Fallback to single-horse matching if multi-horse didn't work
-      if (matchedHorseIds.length === 0 && detection.matchedHorseName) {
-        const horse = activeHorses.find((h) => h.name.toLowerCase() === detection.matchedHorseName!.toLowerCase());
-        if (horse) {
-          matchedHorseIds.push(horse._id);
-          perHorseNotes.push({
-            horseId: horse._id,
-            horseName: horse.name,
-            notes: detection.treatmentNotes?.trim() || "",
-          });
-        }
-      }
-
-      // Build combined notes for display — individual notes will be used per-horse on save
-      const combinedNotes = perHorseNotes.length === 1
-        ? perHorseNotes[0].notes
-        : perHorseNotes.map((p) => `${p.horseName}:\n${p.notes}`).join("\n\n");
-
-      setSelectedRecordType("bodywork");
-      setRecordForm((prev) => ({
-        ...prev,
-        horseIds: matchedHorseIds.length > 0 ? matchedHorseIds : prev.horseIds,
-        date: detection.reportDate || prev.date,
-        contactName: detection.contactName || "Fred Michelon",
-        notes: combinedNotes || detection.treatmentNotes?.trim() || prev.notes
-      }));
-      setRecordReportDetection({
-        detected: true,
-        reportType: "bodywork",
-        message: `✓ report detected — ${matchedHorseIds.length > 1 ? `${matchedHorseIds.length} horses` : "fields"} pre-filled from PDF`,
-        perHorseNotes: perHorseNotes.length > 0 ? perHorseNotes : undefined,
-      });
-    } catch (error) {
-      setRecordError(error instanceof Error ? error.message : "Failed to detect report type from attachment");
-    } finally {
-      setRecordDetecting(false);
-    }
   }
 
   function handleDocumentFileSelect(file: File | null) {
