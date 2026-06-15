@@ -95,6 +95,7 @@ type GlobalRecord = {
   notes?: string;
   attachmentStorageId?: string;
   attachmentUrl?: string | null;
+  attachmentUrls?: Array<{ storageId: string; name: string; url: string | null; mimeType?: string }>;
   billId?: Id<"bills">;
   billInfo?: { billId: Id<"bills">; contactName: string; invoiceDate: string } | null;
 };
@@ -255,7 +256,10 @@ export default function RecordsPage() {
   const editContactDropdownRef = useRef<HTMLDivElement | null>(null);
   const [editSubcatDropdownOpen, setEditSubcatDropdownOpen] = useState(false);
   const editSubcatDropdownRef = useRef<HTMLDivElement | null>(null);
-  const [recordAttachment, setRecordAttachment] = useState<File | null>(null);
+  // Multi-attachment state. Single state slot to keep with the existing
+  // form reset flow; UI lets the user add files incrementally and remove
+  // individual entries.
+  const [recordAttachments, setRecordAttachments] = useState<File[]>([]);
   const [recordSubmitting, setRecordSubmitting] = useState(false);
   const [recordSuccess, setRecordSuccess] = useState(false);
   const [recordError, setRecordError] = useState("");
@@ -469,7 +473,7 @@ export default function RecordsPage() {
     resetTimerRef.current = setTimeout(() => {
       setSelectedRecordType(null);
       setRecordForm(createInitialRecordForm());
-      setRecordAttachment(null);
+      setRecordAttachments([]);
       setRecordSuccess(false);
       setRecordError("");
       setRecordSubmitting(false);
@@ -518,19 +522,31 @@ export default function RecordsPage() {
     }));
   }
 
-  async function uploadAttachmentIfPresent() {
-    if (!recordAttachment) return undefined;
-    const uploadUrl = await generateUploadUrl();
-    const response = await fetch(uploadUrl, {
-      method: "POST",
-      headers: { "Content-Type": recordAttachment.type || "application/octet-stream" },
-      body: recordAttachment,
-    });
-    if (!response.ok) {
-      throw new Error("Failed to upload attachment");
-    }
-    const payload = await response.json();
-    return typeof payload.storageId === "string" ? payload.storageId : undefined;
+  /**
+   * Upload every queued attachment in parallel and return the array of
+   * { storageId, name, mimeType } entries to persist on the record.
+   * Returns an empty array when nothing is queued.
+   */
+  async function uploadAttachmentsIfPresent(): Promise<Array<{ storageId: string; name: string; mimeType?: string }>> {
+    if (recordAttachments.length === 0) return [];
+    const results = await Promise.all(
+      recordAttachments.map(async (file) => {
+        const uploadUrl = await generateUploadUrl();
+        const response = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to upload ${file.name}`);
+        }
+        const payload = await response.json();
+        const storageId = typeof payload.storageId === "string" ? payload.storageId : undefined;
+        if (!storageId) throw new Error(`Upload of ${file.name} returned no storage id`);
+        return { storageId, name: file.name, mimeType: file.type || undefined };
+      }),
+    );
+    return results;
   }
 
   async function onSaveRecord(event?: FormEvent<HTMLFormElement> | React.MouseEvent) {
@@ -553,12 +569,15 @@ export default function RecordsPage() {
         if (cid) resolvedContactId = cid;
       }
 
-      const attachmentStorageId = await uploadAttachmentIfPresent();
+      const uploadedAttachments = await uploadAttachmentsIfPresent();
       for (const horseId of recordForm.horseIds) {
         const horse = activeHorses.find((h) => h._id === horseId);
-        const attachmentName = attachmentStorageId && recordAttachment
-          ? buildAttachmentName(horse?.name ?? "horse", selectedRecordType, recordForm.date, contactName, recordAttachment.name)
-          : undefined;
+        // Rename each uploaded entry with the standard horse/type/date/contact prefix.
+        const attachmentsForHorse = uploadedAttachments.map((a) => ({
+          storageId: a.storageId,
+          name: buildAttachmentName(horse?.name ?? "horse", selectedRecordType, recordForm.date, contactName, a.name),
+          mimeType: a.mimeType,
+        }));
         const mainRecordId = await createHorseRecord({
           horseId,
           title: recordForm.title.trim() || undefined,
@@ -579,8 +598,7 @@ export default function RecordsPage() {
           medicationRepeatUnit: recordForm.medications.length > 0 && recordForm.medicationRepeatUnit ? recordForm.medicationRepeatUnit : undefined,
           isUpcoming: false,
           notes: recordForm.notes.trim() || undefined,
-          attachmentStorageId,
-          attachmentName,
+          attachments: attachmentsForHorse.length > 0 ? attachmentsForHorse : undefined,
           billId: recordForm.billId ? recordForm.billId as Id<"bills"> : undefined,
         });
         if (recordForm.nextVisitDate) {
@@ -1251,37 +1269,54 @@ export default function RecordsPage() {
                         )}
                       </div>
 
-                      {record.attachmentUrl ? (
-                        <div className={styles.attachmentRow}>
-                          <span className={styles.attachmentLabel}>ATTACHMENT</span>
-                          <div className={styles.attachmentValue}>
-                            <span>📎 {(record as any).attachmentName || "attachment"}</span>
-                            <button
-                              type="button"
-                              className={styles.attachmentLink}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                window.open(record.attachmentUrl || "", "_blank", "noopener,noreferrer");
-                              }}
-                            >
-                              open
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.attachmentLink}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                const link = document.createElement("a");
-                                link.href = record.attachmentUrl || "";
-                                link.download = (record as any).attachmentName || "attachment";
-                                link.click();
-                              }}
-                            >
-                              download
-                            </button>
+                      {(() => {
+                        // Prefer the new multi-attachment list when present;
+                        // fall back to the legacy single-attachment fields so
+                        // historical records still render.
+                        const list = Array.isArray(record.attachmentUrls) && record.attachmentUrls.length > 0
+                          ? record.attachmentUrls
+                          : record.attachmentUrl
+                            ? [{ storageId: record.attachmentStorageId ?? "", name: (record as any).attachmentName || "attachment", url: record.attachmentUrl, mimeType: undefined as string | undefined }]
+                            : [];
+                        if (list.length === 0) return null;
+                        return (
+                          <div className={styles.attachmentRow}>
+                            <span className={styles.attachmentLabel}>
+                              {list.length > 1 ? `ATTACHMENTS (${list.length})` : "ATTACHMENT"}
+                            </span>
+                            <div className={styles.attachmentValue} style={{ flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
+                              {list.map((a, idx) => (
+                                <div key={`${a.storageId}-${idx}`} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                                  <span>📎 {a.name}</span>
+                                  <button
+                                    type="button"
+                                    className={styles.attachmentLink}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      if (a.url) window.open(a.url, "_blank", "noopener,noreferrer");
+                                    }}
+                                  >
+                                    open
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={styles.attachmentLink}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      const link = document.createElement("a");
+                                      link.href = a.url || "";
+                                      link.download = a.name || "attachment";
+                                      link.click();
+                                    }}
+                                  >
+                                    download
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ) : null}
+                        );
+                      })()}
 
                       <div className={styles.expandedActions}>
                         {editing ? (
@@ -1876,19 +1911,55 @@ export default function RecordsPage() {
                   </div>
                 </RecordField>
 
-                <RecordField label="ATTACHMENT">
+                <RecordField label="ATTACHMENTS">
                   <label className={styles.dropZone}>
                     <input
                       type="file"
+                      multiple
                       className={styles.fileInput}
                       accept=".pdf,.jpg,.jpeg,.png,.mp4,.mov,.webm"
-                      onChange={(event: ChangeEvent<HTMLInputElement>) => setRecordAttachment(event.target.files?.[0] ?? null)}
+                      onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                        const picked = Array.from(event.target.files ?? []);
+                        if (picked.length === 0) return;
+                        setRecordAttachments((prev) => [...prev, ...picked]);
+                        // Reset the input so re-picking the same file works.
+                        event.target.value = "";
+                      }}
                     />
                     <div className={styles.dropZoneText}>
-                      drop file or <span className={styles.dropZoneBrowse}>browse</span>
+                      drop files or <span className={styles.dropZoneBrowse}>browse</span>
                     </div>
-                    <div className={styles.dropZoneSubtext}>PDF, JPG, PNG, MP4, MOV — max 10MB</div>
-                    {recordAttachment ? <div className={styles.dropZoneFile}>{recordAttachment.name}</div> : null}
+                    <div className={styles.dropZoneSubtext}>PDF, JPG, PNG, MP4, MOV — multiple files OK</div>
+                    {recordAttachments.length > 0 ? (
+                      <div className={styles.dropZoneFile}>
+                        {recordAttachments.map((file, idx) => (
+                          <div
+                            key={`${file.name}-${idx}`}
+                            style={{ display: "flex", justifyContent: "space-between", gap: 8 }}
+                          >
+                            <span>📎 {file.name}</span>
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              style={{ cursor: "pointer", color: "#ef4444" }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setRecordAttachments((prev) => prev.filter((_, i) => i !== idx));
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  setRecordAttachments((prev) => prev.filter((_, i) => i !== idx));
+                                }
+                              }}
+                            >
+                              ✕
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </label>
                 </RecordField>
 

@@ -7,6 +7,27 @@ function withStorageId(value?: string) {
   return value as Id<"_storage"> | undefined;
 }
 
+/**
+ * Return a record's resolved attachment URL list. Prefers the new
+ * `attachments` array; falls back to the legacy single attachmentStorageId
+ * so old data still renders.
+ */
+async function resolveAttachments(ctx: any, row: any): Promise<Array<{ storageId: string; name: string; url: string | null; mimeType?: string }>> {
+  const list = Array.isArray(row.attachments) && row.attachments.length > 0
+    ? row.attachments
+    : row.attachmentStorageId
+      ? [{ storageId: row.attachmentStorageId, name: row.attachmentName ?? "Attachment", mimeType: undefined }]
+      : [];
+  return await Promise.all(
+    list.map(async (a: any) => ({
+      storageId: a.storageId,
+      name: a.name,
+      mimeType: a.mimeType,
+      url: await ctx.storage.getUrl(a.storageId as Id<"_storage">),
+    })),
+  );
+}
+
 export const createHorseRecord = mutation({
   args: {
     horseId: v.id("horses"),
@@ -52,11 +73,24 @@ export const createHorseRecord = mutation({
     notes: v.optional(v.string()),
     attachmentStorageId: v.optional(v.string()),
     attachmentName: v.optional(v.string()),
+    /** Multi-attachment payload. When supplied, it takes precedence over
+     *  the legacy single-attachment fields. */
+    attachments: v.optional(
+      v.array(
+        v.object({
+          storageId: v.string(),
+          name: v.string(),
+          mimeType: v.optional(v.string()),
+        })
+      )
+    ),
     billId: v.optional(v.id("bills"))
   },
   handler: async (ctx, args) => {
     console.log("createHorseRecord called with:", JSON.stringify(args, null, 2));
     try {
+      const attachments = args.attachments && args.attachments.length > 0 ? args.attachments : undefined;
+
       const recordId = await ctx.db.insert("horseRecords", {
         horseId: args.horseId,
         title: args.title?.trim() || undefined,
@@ -80,11 +114,21 @@ export const createHorseRecord = mutation({
         notes: args.notes?.trim() || undefined,
         attachmentStorageId: args.attachmentStorageId,
         attachmentName: args.attachmentName?.trim() || undefined,
+        attachments,
         billId: args.billId
       });
 
-      // Schedule Dropbox upload if there's an attachment
-      if (args.attachmentStorageId) {
+      // Schedule Dropbox upload for each attached file. Legacy
+      // single-attachment path stays for backwards compat with any caller
+      // still using attachmentStorageId.
+      if (attachments) {
+        for (const a of attachments) {
+          await ctx.scheduler.runAfter(0, internal.dropbox.uploadRecordAttachmentToDropbox, {
+            recordId,
+            storageId: a.storageId,
+          });
+        }
+      } else if (args.attachmentStorageId) {
         await ctx.scheduler.runAfter(0, internal.dropbox.uploadRecordAttachmentToDropbox, {
           recordId,
           storageId: args.attachmentStorageId
@@ -115,6 +159,7 @@ export const getRecentByHorse = query({
         ...row,
         contactName: row.contactName ?? (row as any).providerName,
         attachmentUrl: row.attachmentStorageId ? await ctx.storage.getUrl(withStorageId(row.attachmentStorageId)!) : null,
+        attachmentUrls: await resolveAttachments(ctx, row),
       }))
     );
   },
@@ -153,6 +198,7 @@ export const getAllByHorse = query({
           ...row,
           contactName: row.contactName ?? (row as any).providerName,
           attachmentUrl: row.attachmentStorageId ? await ctx.storage.getUrl(withStorageId(row.attachmentStorageId)!) : null,
+          attachmentUrls: await resolveAttachments(ctx, row),
           billInfo,
         };
       })
@@ -279,6 +325,7 @@ export const getAll = query({
               }
             : null,
           attachmentUrl: record.attachmentStorageId ? await ctx.storage.getUrl(withStorageId(record.attachmentStorageId)!) : null,
+          attachmentUrls: await resolveAttachments(ctx, record),
           billInfo,
         };
       })
@@ -396,6 +443,18 @@ export const updateRecordWithNextVisit = mutation({
       medicationRepeatUnit: v.optional(v.union(v.literal("days"), v.literal("weeks"), v.literal("months"))),
       attachmentStorageId: v.optional(v.string()),
       attachmentName: v.optional(v.string()),
+      /** Full attachment list — when present, replaces existing attachments
+       *  on the record. An empty array clears them. Undefined leaves them
+       *  alone. */
+      attachments: v.optional(
+        v.array(
+          v.object({
+            storageId: v.string(),
+            name: v.string(),
+            mimeType: v.optional(v.string()),
+          })
+        )
+      ),
       billId: v.optional(v.id("bills")),
     }),
     nextVisitDate: v.optional(v.number()),
@@ -419,7 +478,24 @@ export const updateRecordWithNextVisit = mutation({
       billId: args.updates.billId,
     };
 
-    // Schedule Dropbox upload if a new attachment was added
+    // Multi-attachment update: caller passed an `attachments` array.
+    // Replace the record's attachments entirely (empty array clears).
+    // Schedule a Dropbox upload for any newly-added entry.
+    if (args.updates.attachments !== undefined) {
+      const newAttachments = args.updates.attachments.length > 0 ? args.updates.attachments : undefined;
+      (cleanedUpdates as any).attachments = newAttachments;
+      const existingIds = new Set((record.attachments ?? []).map((a: any) => String(a.storageId)));
+      for (const a of args.updates.attachments) {
+        if (!existingIds.has(String(a.storageId))) {
+          await ctx.scheduler.runAfter(0, internal.dropbox.uploadRecordAttachmentToDropbox, {
+            recordId: args.recordId,
+            storageId: a.storageId,
+          });
+        }
+      }
+    }
+
+    // Schedule Dropbox upload if a new legacy single attachment was added
     if (args.updates.attachmentStorageId && args.updates.attachmentStorageId !== record.attachmentStorageId) {
       await ctx.scheduler.runAfter(0, internal.dropbox.uploadRecordAttachmentToDropbox, {
         recordId: args.recordId,
@@ -496,7 +572,18 @@ export const deleteHorseRecord = mutation({
     }
 
     if (record.attachmentStorageId) {
-      await ctx.storage.delete(withStorageId(record.attachmentStorageId)!);
+      try {
+        await ctx.storage.delete(withStorageId(record.attachmentStorageId)!);
+      } catch {
+        // file may already be gone; keep going
+      }
+    }
+    for (const a of (record as any).attachments ?? []) {
+      try {
+        await ctx.storage.delete(a.storageId as Id<"_storage">);
+      } catch {
+        // ignore
+      }
     }
 
     await ctx.db.delete(args.recordId);

@@ -421,8 +421,22 @@ export default defineSchema({
     isUpcoming: v.optional(v.boolean()),
     linkedRecordId: v.optional(v.id("horseRecords")),
     notes: v.optional(v.string()),
+    /** Legacy single-attachment fields. Preserved for read-back; new
+     *  writes should populate `attachments` instead. */
     attachmentStorageId: v.optional(v.string()),
     attachmentName: v.optional(v.string()),
+    /** Multi-attachment list. Each entry pairs a storage id with the
+     *  original file name (and optionally a mime type for icon picking).
+     *  Empty/undefined means no attachments. */
+    attachments: v.optional(
+      v.array(
+        v.object({
+          storageId: v.string(),
+          name: v.string(),
+          mimeType: v.optional(v.string()),
+        })
+      )
+    ),
     billId: v.optional(v.id("bills")),
     dropboxPath: v.optional(v.string())
   })
