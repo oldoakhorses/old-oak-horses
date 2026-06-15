@@ -130,8 +130,21 @@ export default function HorseRecordsPage() {
   const horse = useQuery(api.horses.getHorseById, horseId ? { horseId } : "skip");
   // Medications live on /meds (and the horse profile's MEDS tile), so we
   // filter them out of the per-horse records page to avoid duplication.
+  // Two flavors to drop:
+  //   - top-level type === "medication" (the new shape)
+  //   - legacy veterinary records whose visitType / visitTypes is
+  //     "medication" (pre-migration data that still resolves to a
+  //     "Medication" label)
   const allRecordsRaw = (useQuery(api.horseRecords.getAllByHorse, horseId ? { horseId } : "skip") as HorseRecord[] | undefined) ?? [];
-  const allRecords = useMemo(() => allRecordsRaw.filter((r) => r.type !== "medication"), [allRecordsRaw]);
+  const allRecords = useMemo(
+    () => allRecordsRaw.filter((r) => {
+      if (r.type === "medication") return false;
+      const visitTypes = r.visitTypes?.length ? r.visitTypes : r.visitType ? [r.visitType] : [];
+      if (visitTypes.includes("medication")) return false;
+      return true;
+    }),
+    [allRecordsRaw],
+  );
 
   const allInvoicesForLinking = useQuery(api.bills.listForLinking) ?? [];
   const allContactsForRecord = useQuery(api.contacts.getAllContacts) ?? [];

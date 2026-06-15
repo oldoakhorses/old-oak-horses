@@ -219,7 +219,19 @@ export default function RecordsPage() {
   // so the two surfaces don't double-show the same data.
   const orgArgs = useOrgArgs();
   const allRecordsRaw = (useQuery(api.horseRecords.getAll, orgArgs) as GlobalRecord[] | undefined) ?? [];
-  const allRecords = useMemo(() => allRecordsRaw.filter((r) => r.type !== "medication"), [allRecordsRaw]);
+  // Hide anything medication-related so the records list doesn't duplicate
+  // what /meds shows. Covers both the new top-level type === "medication"
+  // shape AND legacy veterinary records whose visitType / visitTypes
+  // includes "medication".
+  const allRecords = useMemo(
+    () => allRecordsRaw.filter((r) => {
+      if (r.type === "medication") return false;
+      const visitTypes = r.visitTypes?.length ? r.visitTypes : (r as any).visitType ? [(r as any).visitType] : [];
+      if (visitTypes.includes("medication")) return false;
+      return true;
+    }),
+    [allRecordsRaw],
+  );
   const activeHorses = useQuery(api.horses.getActiveHorses, orgArgs) ?? [];
 
   const [activeTab, setActiveTab] = useState<Tab>("past");
