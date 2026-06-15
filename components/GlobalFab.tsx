@@ -220,6 +220,10 @@ export default function GlobalFab() {
   const [recordForm, setRecordForm] = useState<RecordFormState>(createInitialRecordForm);
   const [recordAttachment, setRecordAttachment] = useState<File | null>(null);
   const [recordAttachmentStorageId, setRecordAttachmentStorageId] = useState<Id<"_storage"> | null>(null);
+  /** Extra attachments beyond the primary one. The primary slot is the
+   *  file that drives PDF auto-detection; everything else just gets
+   *  uploaded and attached. */
+  const [recordExtraAttachments, setRecordExtraAttachments] = useState<File[]>([]);
   const [recordDetecting, setRecordDetecting] = useState(false);
   const [recordReportDetection, setRecordReportDetection] = useState<RecordReportDetectionState>({
     detected: false,
@@ -405,6 +409,7 @@ export default function GlobalFab() {
       setRecordForm(createInitialRecordForm());
       setRecordAttachment(null);
       setRecordAttachmentStorageId(null);
+      setRecordExtraAttachments([]);
       setRecordDetecting(false);
       setRecordReportDetection({ detected: false, reportType: "unknown", message: "" });
       setRecordSuccess(false);
@@ -514,6 +519,28 @@ export default function GlobalFab() {
     const storageId = typeof payload.storageId === "string" ? (payload.storageId as Id<"_storage">) : undefined;
     if (storageId) setRecordAttachmentStorageId(storageId);
     return storageId;
+  }
+
+  /** Uploads every extra file in parallel and returns the entries to
+   *  append to the record's attachments array. Does NOT include the
+   *  primary attachment — that's added at save time. */
+  async function uploadExtraAttachments(): Promise<Array<{ storageId: string; name: string; mimeType?: string }>> {
+    if (recordExtraAttachments.length === 0) return [];
+    return await Promise.all(
+      recordExtraAttachments.map(async (file) => {
+        const uploadUrl = await generateUploadUrl();
+        const response = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+        if (!response.ok) throw new Error(`Failed to upload ${file.name}`);
+        const payload = await response.json();
+        const storageId = typeof payload.storageId === "string" ? payload.storageId : undefined;
+        if (!storageId) throw new Error(`Upload of ${file.name} returned no storage id`);
+        return { storageId, name: file.name, mimeType: file.type || undefined };
+      }),
+    );
   }
 
   async function handleRecordAttachmentSelect(file: File | null) {
@@ -783,6 +810,17 @@ export default function GlobalFab() {
       }
 
       const attachmentStorageId = await uploadAttachmentIfPresent();
+      const extras = await uploadExtraAttachments();
+      const combinedAttachments: Array<{ storageId: string; name: string; mimeType?: string }> = [
+        ...(attachmentStorageId && recordAttachment
+          ? [{
+              storageId: String(attachmentStorageId),
+              name: recordAttachment.name,
+              mimeType: recordAttachment.type || undefined,
+            }]
+          : []),
+        ...extras,
+      ];
       const perHorseNotes = recordReportDetection.perHorseNotes;
       for (const horseId of recordForm.horseIds) {
         const horseSpecificNotes = perHorseNotes?.find((p) => p.horseId === horseId)?.notes;
@@ -814,6 +852,7 @@ export default function GlobalFab() {
           isUpcoming: false,
           notes: notesForHorse || undefined,
           attachmentStorageId,
+          attachments: combinedAttachments.length > 0 ? combinedAttachments : undefined,
           billId: recordForm.billId ? recordForm.billId as Id<"bills"> : undefined,
         });
         if (recordForm.nextVisitDate) {
@@ -1655,21 +1694,72 @@ export default function GlobalFab() {
                   </div>
                 </RecordField>
 
-                <RecordField label="ATTACHMENT">
+                <RecordField label="ATTACHMENTS">
                   <label className={styles.dropZone}>
                     <input
                       type="file"
+                      multiple
                       className={styles.fileInput}
                       accept=".pdf,.jpg,.jpeg,.png,.mp4,.mov,.webm"
                       onChange={(e) => {
-                        void handleRecordAttachmentSelect(e.target.files?.[0] ?? null);
+                        const picked = Array.from(e.target.files ?? []);
+                        if (picked.length === 0) return;
+                        // First file goes through detection (PDF auto-parse).
+                        // Subsequent files go straight into the extras list.
+                        const [first, ...rest] = picked;
+                        if (!recordAttachment) {
+                          void handleRecordAttachmentSelect(first);
+                          if (rest.length > 0) setRecordExtraAttachments((prev) => [...prev, ...rest]);
+                        } else {
+                          // Already have a primary file — everything new is extra.
+                          setRecordExtraAttachments((prev) => [...prev, ...picked]);
+                        }
+                        e.target.value = "";
                       }}
                     />
                     <div className={styles.dropZoneText}>
-                      drop file or <span className={styles.dropZoneBrowse}>browse</span>
+                      drop files or <span className={styles.dropZoneBrowse}>browse</span>
                     </div>
-                    <div className={styles.dropZoneSubtext}>PDF, JPG, PNG, MP4, MOV — max 10MB</div>
-                    {recordAttachment ? <div className={styles.dropZoneFile}>{recordAttachment.name}</div> : null}
+                    <div className={styles.dropZoneSubtext}>PDF, JPG, PNG, MP4, MOV — multiple files OK</div>
+                    {recordAttachment ? (
+                      <div className={styles.dropZoneFile} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                        <span>📎 {recordAttachment.name}</span>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          style={{ cursor: "pointer", color: "#ef4444" }}
+                          onClick={(ev) => {
+                            ev.preventDefault();
+                            ev.stopPropagation();
+                            setRecordAttachment(null);
+                            setRecordAttachmentStorageId(null);
+                          }}
+                        >
+                          ✕
+                        </span>
+                      </div>
+                    ) : null}
+                    {recordExtraAttachments.map((file, idx) => (
+                      <div
+                        key={`${file.name}-${idx}`}
+                        className={styles.dropZoneFile}
+                        style={{ display: "flex", justifyContent: "space-between", gap: 8 }}
+                      >
+                        <span>📎 {file.name}</span>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          style={{ cursor: "pointer", color: "#ef4444" }}
+                          onClick={(ev) => {
+                            ev.preventDefault();
+                            ev.stopPropagation();
+                            setRecordExtraAttachments((prev) => prev.filter((_, i) => i !== idx));
+                          }}
+                        >
+                          ✕
+                        </span>
+                      </div>
+                    ))}
                     {recordDetecting ? <div className={styles.dropZoneFile}>detecting report...</div> : null}
                   </label>
                 </RecordField>
