@@ -169,7 +169,13 @@ export default function HorseRecordsPage() {
   const [editState, setEditState] = useState<EditState | null>(null);
   const [recordToDelete, setRecordToDelete] = useState<{ id: Id<"horseRecords">; name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [editAttachment, setEditAttachment] = useState<File | null>(null);
+  /** Newly-queued files to upload on save. Stacks alongside the
+   *  existing attachments — those live in editKeptAttachments. */
+  const [editNewAttachments, setEditNewAttachments] = useState<File[]>([]);
+  /** Existing attachments on the record that the user wants to keep.
+   *  Removing a chip drops the entry. Save persists this list (plus any
+   *  newly-uploaded files) onto the record. */
+  const [editKeptAttachments, setEditKeptAttachments] = useState<Array<{ storageId: string; name: string; mimeType?: string }>>([]);
   const editFileRef = useRef<HTMLInputElement>(null);
   const [editProviderDropdownOpen, setEditProviderDropdownOpen] = useState(false);
   const editContactDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -314,20 +320,27 @@ export default function HorseRecordsPage() {
     }
     const nextVisitTimestamp = editState.nextVisitDate ? new Date(`${editState.nextVisitDate}T00:00:00`).getTime() : undefined;
 
-    let attachmentStorageId: string | undefined;
-    let attachmentName: string | undefined;
-    if (editAttachment) {
-      const uploadUrl = await generateUploadUrl();
-      const resp = await fetch(uploadUrl, {
-        method: "POST",
-        headers: { "Content-Type": editAttachment.type || "application/octet-stream" },
-        body: editAttachment,
-      });
-      if (!resp.ok) throw new Error("Failed to upload attachment");
-      const payload = await resp.json();
-      attachmentStorageId = typeof payload.storageId === "string" ? payload.storageId : undefined;
-      attachmentName = editAttachment.name;
-    }
+    // Upload every newly-queued file in parallel, then merge with the
+    // existing kept attachments. The backend's updateRecordWithNextVisit
+    // accepts the full attachments array — when present, it replaces the
+    // record's attachments entirely (and schedules Dropbox uploads only
+    // for new storage ids).
+    const newlyUploaded = await Promise.all(
+      editNewAttachments.map(async (file) => {
+        const uploadUrl = await generateUploadUrl();
+        const resp = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+        if (!resp.ok) throw new Error(`Failed to upload ${file.name}`);
+        const payload = await resp.json();
+        const storageId = typeof payload.storageId === "string" ? payload.storageId : undefined;
+        if (!storageId) throw new Error(`Upload of ${file.name} returned no storage id`);
+        return { storageId, name: file.name, mimeType: file.type || undefined };
+      }),
+    );
+    const mergedAttachments = [...editKeptAttachments, ...newlyUploaded];
 
     await updateRecordWithNextVisit({
       recordId: editingRecordId,
@@ -349,13 +362,14 @@ export default function HorseRecordsPage() {
         medicationRepeatValue: editState.medications.length > 0 && editState.medicationRepeatValue ? parseInt(editState.medicationRepeatValue, 10) : undefined,
         medicationRepeatUnit: editState.medications.length > 0 && editState.medicationRepeatUnit ? editState.medicationRepeatUnit : undefined,
         billId: editState.billId ? editState.billId as Id<"bills"> : undefined,
-        ...(attachmentStorageId ? { attachmentStorageId, attachmentName } : {}),
+        attachments: mergedAttachments,
       },
       nextVisitDate: nextVisitTimestamp,
     });
     setEditingRecordId(null);
     setEditState(null);
-    setEditAttachment(null);
+    setEditNewAttachments([]);
+    setEditKeptAttachments([]);
   }
 
   async function confirmDelete() {
@@ -561,6 +575,8 @@ export default function HorseRecordsPage() {
                       setMenuOpenId(null);
                       setEditingRecordId(null);
                       setEditState(null);
+                      setEditNewAttachments([]);
+                      setEditKeptAttachments([]);
                     }}
                   >
                     <span className={styles.colRecord}>
@@ -769,49 +785,54 @@ export default function HorseRecordsPage() {
                                 </>
                               </ExpandedInput>
                             ) : null}
-                            <ExpandedInput label="ATTACHMENT">
+                            <ExpandedInput label={editKeptAttachments.length + editNewAttachments.length > 1 ? "ATTACHMENTS" : "ATTACHMENT"}>
                               <>
                                 <input
                                   ref={editFileRef}
                                   type="file"
+                                  multiple
                                   style={{ display: "none" }}
+                                  accept=".pdf,.jpg,.jpeg,.png,.mp4,.mov,.webm"
                                   onChange={(event) => {
-                                    const file = event.target.files?.[0] ?? null;
-                                    setEditAttachment(file);
-                                    if (file && !editState.notes.trim()) {
-                                      const baseName = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
-                                      setEditState({ ...editState, notes: baseName });
-                                    }
+                                    const picked = Array.from(event.target.files ?? []);
+                                    if (picked.length === 0) return;
+                                    setEditNewAttachments((prev) => [...prev, ...picked]);
+                                    if (editFileRef.current) editFileRef.current.value = "";
                                   }}
                                 />
-                                {editAttachment ? (
-                                  <div className={styles.editAttachmentRow}>
-                                    <span className={styles.editAttachmentName}>📎 {editAttachment.name}</span>
+                                {/* Existing files on the record — removable. */}
+                                {editKeptAttachments.map((a, idx) => (
+                                  <div key={`kept-${a.storageId}-${idx}`} className={styles.editAttachmentRow}>
+                                    <span className={styles.editAttachmentName}>📎 {a.name}</span>
                                     <button
                                       type="button"
                                       className={styles.editAttachmentRemove}
-                                      onClick={() => {
-                                        setEditAttachment(null);
-                                        if (editFileRef.current) editFileRef.current.value = "";
-                                      }}
+                                      onClick={() => setEditKeptAttachments((prev) => prev.filter((_, i) => i !== idx))}
                                     >
                                       ✕
                                     </button>
                                   </div>
-                                ) : record.attachmentUrl ? (
-                                  <div className={styles.editAttachmentRow}>
-                                    <span className={styles.editAttachmentName}>📎 {(record as any).attachmentName || "attachment"}</span>
-                                    <span style={{ fontSize: 9, color: "#9EA2B0" }}>already attached</span>
+                                ))}
+                                {/* New files queued this edit session. */}
+                                {editNewAttachments.map((file, idx) => (
+                                  <div key={`new-${file.name}-${idx}`} className={styles.editAttachmentRow}>
+                                    <span className={styles.editAttachmentName}>📎 {file.name}</span>
+                                    <button
+                                      type="button"
+                                      className={styles.editAttachmentRemove}
+                                      onClick={() => setEditNewAttachments((prev) => prev.filter((_, i) => i !== idx))}
+                                    >
+                                      ✕
+                                    </button>
                                   </div>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    className={styles.editAttachmentBtn}
-                                    onClick={() => editFileRef.current?.click()}
-                                  >
-                                    + add attachment
-                                  </button>
-                                )}
+                                ))}
+                                <button
+                                  type="button"
+                                  className={styles.editAttachmentBtn}
+                                  onClick={() => editFileRef.current?.click()}
+                                >
+                                  + add attachment
+                                </button>
                               </>
                             </ExpandedInput>
                             <ExpandedInput label="LINKED INVOICE">
@@ -954,6 +975,8 @@ export default function HorseRecordsPage() {
                                 event.stopPropagation();
                                 setEditingRecordId(null);
                                 setEditState(null);
+                                setEditNewAttachments([]);
+                                setEditKeptAttachments([]);
                               }}
                             >
                               cancel
@@ -991,6 +1014,24 @@ export default function HorseRecordsPage() {
                                   medicationRepeatUnit: (record.medicationRepeatUnit || "") as "" | "days" | "weeks" | "months",
                                   billId: record.billId ? String(record.billId) : "",
                                 });
+                                // Seed the kept-attachment chips from the record's
+                                // existing attachments[]; fall back to the legacy
+                                // single-attachment fields for older rows.
+                                const existing = Array.isArray((record as any).attachmentUrls) && (record as any).attachmentUrls.length > 0
+                                  ? (record as any).attachmentUrls.map((a: any) => ({
+                                      storageId: String(a.storageId),
+                                      name: String(a.name),
+                                      mimeType: a.mimeType,
+                                    }))
+                                  : (record.attachmentStorageId
+                                      ? [{
+                                          storageId: String(record.attachmentStorageId),
+                                          name: String((record as any).attachmentName || "attachment"),
+                                          mimeType: undefined,
+                                        }]
+                                      : []);
+                                setEditKeptAttachments(existing);
+                                setEditNewAttachments([]);
                               }}
                             >
                               edit
