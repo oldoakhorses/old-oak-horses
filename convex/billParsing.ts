@@ -163,6 +163,27 @@ export const parseBillPdf = internalAction({
       console.log("=== END RAW TEXT ===");
       console.log("Text length:", extractedPdfText.length);
 
+      // Hotel folios from well-known chains are full of per-night room
+      // charges, taxes, resort fees, parking, F&B — the structured
+      // line-item parse routinely chokes on them. Short-circuit to a
+      // minimal "contact + total" extraction in that case.
+      const hotelBrand = detectHotelChain(provider?.name, extractedPdfText);
+      if (hotelBrand) {
+        console.log(`[billParsing] hotel chain detected (${hotelBrand}) — using minimal fallback parse`);
+        const parsed = buildHotelFallbackParse(hotelBrand, extractedPdfText);
+        const totalUsd = Number((parsed as any).invoice_total_usd) || 0;
+        const travelCategory = await ctx.runQuery(internal.bills.getCategoryBySlug, { slug: "travel" });
+        await ctx.runMutation(internal.bills.markDone, {
+          billId: bill._id,
+          extractedData: { ...parsed, invoice_total_usd: totalUsd, invoiceTotalUsd: totalUsd, total: totalUsd },
+          status: "pending",
+          travelSubcategory: "hotels",
+          extractedVendorContact: { vendorName: hotelBrand },
+          ...(travelCategory?._id ? { inferredCategoryId: travelCategory._id } : {}),
+        });
+        return;
+      }
+
       const extractionPrompt = getExtractionPrompt({
         categorySlug: categorySlug ?? "auto-detect",
         travelSubcategory: bill.travelSubcategory,
@@ -1922,6 +1943,147 @@ function isAirbnbProviderSignal(...values: Array<string | undefined>) {
   const joined = values.filter(Boolean).join(" ").toLowerCase();
   if (!joined) return false;
   return joined.includes("airbnb");
+}
+
+/**
+ * Detect well-known hotel chains so the parser can fall back to a minimal
+ * "just total + contact" extraction instead of failing on the often-busy
+ * line-itemed folios these brands send (taxes, room charges per night,
+ * resort fees, parking, F&B, etc.). Returns the canonical brand label or
+ * null if no match.
+ */
+function detectHotelChain(...values: Array<string | undefined>): string | null {
+  const joined = values.filter(Boolean).join(" ").toLowerCase();
+  if (!joined) return null;
+  const brands: Array<{ label: string; tokens: string[] }> = [
+    { label: "Marriott", tokens: ["marriott"] },
+    { label: "Residence Inn", tokens: ["residence inn"] },
+    { label: "Courtyard by Marriott", tokens: ["courtyard by marriott", "courtyard marriott"] },
+    { label: "Fairfield Inn", tokens: ["fairfield inn"] },
+    { label: "SpringHill Suites", tokens: ["springhill suites", "springhill"] },
+    { label: "TownePlace Suites", tokens: ["towneplace suites", "towneplace"] },
+    { label: "JW Marriott", tokens: ["jw marriott"] },
+    { label: "Ritz-Carlton", tokens: ["ritz-carlton", "ritz carlton"] },
+    { label: "Westin", tokens: ["westin"] },
+    { label: "Sheraton", tokens: ["sheraton"] },
+    { label: "Renaissance Hotels", tokens: ["renaissance hotel"] },
+    { label: "Le Méridien", tokens: ["le meridien", "le méridien", "meridien hotel"] },
+    { label: "W Hotels", tokens: ["w hotels", "w hotel"] },
+    { label: "Aloft Hotels", tokens: ["aloft hotel"] },
+    { label: "Element Hotels", tokens: ["element hotel"] },
+    { label: "Hilton", tokens: ["hilton"] },
+    { label: "DoubleTree", tokens: ["doubletree"] },
+    { label: "Hampton Inn", tokens: ["hampton inn", "hampton by hilton"] },
+    { label: "Embassy Suites", tokens: ["embassy suites"] },
+    { label: "Homewood Suites", tokens: ["homewood suites"] },
+    { label: "Hilton Garden Inn", tokens: ["hilton garden inn"] },
+    { label: "Conrad Hotels", tokens: ["conrad hotel"] },
+    { label: "Waldorf Astoria", tokens: ["waldorf astoria"] },
+    { label: "Hyatt", tokens: ["hyatt"] },
+    { label: "Hyatt Place", tokens: ["hyatt place"] },
+    { label: "Grand Hyatt", tokens: ["grand hyatt"] },
+    { label: "Park Hyatt", tokens: ["park hyatt"] },
+    { label: "Andaz", tokens: ["andaz"] },
+    { label: "IHG", tokens: ["ihg"] },
+    { label: "Holiday Inn", tokens: ["holiday inn"] },
+    { label: "Holiday Inn Express", tokens: ["holiday inn express"] },
+    { label: "Crowne Plaza", tokens: ["crowne plaza"] },
+    { label: "InterContinental", tokens: ["intercontinental"] },
+    { label: "Kimpton Hotels", tokens: ["kimpton"] },
+    { label: "Staybridge Suites", tokens: ["staybridge suites"] },
+    { label: "Choice Hotels", tokens: ["choice hotel"] },
+    { label: "Comfort Inn", tokens: ["comfort inn"] },
+    { label: "Quality Inn", tokens: ["quality inn"] },
+    { label: "Best Western", tokens: ["best western"] },
+    { label: "Wyndham", tokens: ["wyndham"] },
+    { label: "La Quinta", tokens: ["la quinta"] },
+    { label: "Days Inn", tokens: ["days inn"] },
+    { label: "Super 8", tokens: ["super 8"] },
+    { label: "Four Seasons", tokens: ["four seasons"] },
+    { label: "Fairmont", tokens: ["fairmont"] },
+    { label: "Mandarin Oriental", tokens: ["mandarin oriental"] },
+    { label: "Aman Resorts", tokens: ["aman resort", "amanresort"] },
+    { label: "Rosewood Hotels", tokens: ["rosewood"] },
+    { label: "Peninsula Hotels", tokens: ["peninsula hotel"] },
+    { label: "Loews Hotels", tokens: ["loews hotel"] },
+    { label: "Omni Hotels", tokens: ["omni hotel"] },
+    { label: "Accor", tokens: ["accor"] },
+    { label: "Sofitel", tokens: ["sofitel"] },
+    { label: "Pullman Hotels", tokens: ["pullman hotel"] },
+    { label: "Novotel", tokens: ["novotel"] },
+    { label: "Mercure", tokens: ["mercure"] },
+    { label: "ibis", tokens: ["ibis hotel"] },
+    { label: "Raffles Hotels", tokens: ["raffles"] },
+  ];
+  for (const { label, tokens } of brands) {
+    if (tokens.some((t) => joined.includes(t))) return label;
+  }
+  return null;
+}
+
+/**
+ * Minimal hotel-folio fallback. Scans the OCR'd text for the largest
+ * dollar amount that looks like a total (preferring lines marked "total"
+ * / "balance" / "amount due") and the invoice date. Returns a parsed
+ * shape compatible with the rest of the pipeline: one line item carrying
+ * the full amount.
+ */
+function buildHotelFallbackParse(
+  brandLabel: string,
+  extractedText: string,
+): Record<string, unknown> {
+  const text = extractedText || "";
+
+  // Date — first ISO or US-style we can find.
+  let invoiceDate: string | undefined;
+  const isoMatch = text.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
+  if (isoMatch) {
+    invoiceDate = `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  } else {
+    const usMatch = text.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](20\d{2}|\d{2})\b/);
+    if (usMatch) {
+      let yyyy = usMatch[3];
+      if (yyyy.length === 2) yyyy = `20${yyyy}`;
+      const mm = String(usMatch[1]).padStart(2, "0");
+      const dd = String(usMatch[2]).padStart(2, "0");
+      invoiceDate = `${yyyy}-${mm}-${dd}`;
+    }
+  }
+
+  // Total — prefer the line(s) labeled total/balance/amount due/grand total.
+  // Fall back to the largest dollar amount on the document if no label hit.
+  let total = 0;
+  const labeledTotalRegex = /\b(?:grand\s+total|balance\s+due|amount\s+due|total\s+due|total)\b[^\n\r]{0,40}\$?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})?|[0-9]+\.[0-9]{2})/gi;
+  let labeled: RegExpExecArray | null;
+  while ((labeled = labeledTotalRegex.exec(text)) !== null) {
+    const candidate = Number(labeled[1].replace(/,/g, ""));
+    if (Number.isFinite(candidate) && candidate > total) total = candidate;
+  }
+  if (total === 0) {
+    // Last-resort: scan all dollar amounts, take the max.
+    const allAmounts = [...text.matchAll(/\$?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})|[0-9]+\.[0-9]{2})/g)];
+    for (const m of allAmounts) {
+      const candidate = Number(m[1].replace(/,/g, ""));
+      if (Number.isFinite(candidate) && candidate > total) total = candidate;
+    }
+  }
+
+  return {
+    contact_name: brandLabel,
+    provider_name: brandLabel,
+    invoice_date: invoiceDate,
+    invoice_total_usd: total,
+    line_items: [
+      {
+        description: `${brandLabel} — hotel folio`,
+        amount: total,
+        total_usd: total,
+        category: "travel",
+        subcategory: "hotels",
+        confidence: "fallback",
+      },
+    ],
+  };
 }
 
 function isEqSportsProviderSignal(...values: Array<string | undefined>) {
