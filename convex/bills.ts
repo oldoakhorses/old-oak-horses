@@ -171,7 +171,18 @@ export const triggerBillParsing = mutation({
     if (!bill) throw new Error("Bill not found");
 
     await ctx.db.patch(args.billId, { status: "parsing", errorMessage: undefined });
-    await ctx.scheduler.runAfter(0, internal.billParsing.parseBillPdf, { billId: args.billId });
+    // Route email-sourced bills (HTML body stored in fileId) to the email
+    // parser; everything else goes through the PDF/image path. The PDF
+    // parser can't read an HTML body — it'd silently produce nothing.
+    const isEmailSource = bill.source === "email"
+      || (typeof bill.fileName === "string" && /\.html?$/i.test(bill.fileName));
+    if (isEmailSource) {
+      await ctx.scheduler.runAfter(0, internal.billParsing.reparseEmailBillFromStorage, {
+        billId: args.billId,
+      });
+    } else {
+      await ctx.scheduler.runAfter(0, internal.billParsing.parseBillPdf, { billId: args.billId });
+    }
     return { queued: true };
   }
 });

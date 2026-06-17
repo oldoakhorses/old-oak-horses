@@ -645,6 +645,55 @@ async function runEmailPostProcessing(
   }
 }
 
+/**
+ * Re-parse an email-sourced bill from the HTML body stored in its
+ * fileId. Called by the user-facing re-parse button — at original
+ * ingest time the inbound webhook passes htmlBody/textBody/subject in
+ * memory, but on re-parse we have to read the body back out of storage.
+ *
+ * Reuses the exact same Square fast-path + LLM extraction logic as
+ * parseEmailBody so the two stay in lockstep.
+ */
+export const reparseEmailBillFromStorage = internalAction({
+  args: { billId: v.id("bills") },
+  handler: async (ctx, args) => {
+    const bill = await ctx.runQuery(internal.bills.getBill, { billId: args.billId });
+    if (!bill) throw new Error("Bill not found");
+    if (!bill.fileId) {
+      await ctx.runMutation(internal.bills.markError, {
+        billId: bill._id,
+        errorMessage: "No stored email body to re-parse",
+      });
+      return;
+    }
+
+    try {
+      const blob = await ctx.storage.get(bill.fileId);
+      if (!blob) throw new Error("Email body not found in storage");
+      const htmlBody = await blob.text();
+
+      // createdBy on inbound bills is set to the fromEmail. Use it as a
+      // best-effort proxy for re-parse; subject is derived from the bill
+      // name (stored as "Email - <subject> - <date>.html").
+      const subjectMatch = String(bill.fileName ?? "").match(/^Email - (.+) - \d{4}-\d{2}-\d{2}\.html?$/i);
+      const subject = subjectMatch?.[1] ?? bill.fileName ?? "";
+      const fromEmail = String(bill.createdBy ?? "");
+
+      await ctx.runAction(internal.billParsing.parseEmailBody, {
+        billId: bill._id,
+        htmlBody,
+        textBody: "",
+        subject,
+        fromEmail,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to re-parse email body";
+      await ctx.runMutation(internal.bills.markError, { billId: bill._id, errorMessage: message });
+      throw err;
+    }
+  },
+});
+
 export const parseEmailBody = internalAction({
   args: {
     billId: v.id("bills"),
