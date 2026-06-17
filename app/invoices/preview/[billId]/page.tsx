@@ -3106,17 +3106,51 @@ export default function InvoicePreviewPage() {
 }
 
 function PreviewContent({ url, fileName }: { url: string; fileName: string }) {
-  const lowerName = fileName.toLowerCase();
-  const isImage = /\.(png|jpe?g|gif|webp|tiff?|bmp|heic)$/.test(lowerName) ||
-    /^image\//.test(lowerName);
+  // Authoritative content-type via HEAD request — bill.fileName loses its
+  // extension once markDone rebuilds it after parsing, so filename-only
+  // heuristics were misclassifying parsed image bills as PDFs.
+  const [serverContentType, setServerContentType] = useState<string | null>(null);
+  // onError fallback for the <img> render — if the browser can't decode
+  // the response as an image, swap to an iframe so the user at least sees
+  // *something* (and the open-in-new-tab link still works).
+  const [imageFailed, setImageFailed] = useState(false);
 
-  if (isImage) {
+  useEffect(() => {
+    let cancelled = false;
+    setServerContentType(null);
+    setImageFailed(false);
+    fetch(url, { method: "HEAD" })
+      .then((r) => {
+        if (cancelled) return;
+        setServerContentType(r.headers.get("content-type"));
+      })
+      .catch(() => {
+        // Ignore — fall back to filename heuristic below.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+
+  const lowerName = (fileName || "").toLowerCase();
+  const ct = (serverContentType ?? "").toLowerCase();
+  const isImageByCt = ct.startsWith("image/");
+  const isPdfByCt = ct.startsWith("application/pdf");
+  // Permissive filename hint — extension can be anywhere in the name now
+  // (after markDone reformats it). Looks for `.png` as a token boundary
+  // so "team-png-receipts" doesn't false-match.
+  const isImageByName = /\.(png|jpe?g|gif|webp|tiff?|bmp|heic|avif)(\b|$|[?#])/i.test(lowerName);
+
+  const renderImage = !imageFailed && (isImageByCt || (!isPdfByCt && isImageByName));
+
+  if (renderImage) {
     return (
       <div className={styles.pdfFrame} style={{ overflow: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16 }}>
         <img
           src={url}
           alt="Invoice attachment"
           style={{ maxWidth: "100%", height: "auto", borderRadius: 4 }}
+          onError={() => setImageFailed(true)}
         />
       </div>
     );

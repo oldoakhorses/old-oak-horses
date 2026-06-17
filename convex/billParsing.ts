@@ -47,6 +47,44 @@ const PROVIDER_CONTACT_PROMPT = `Also extract the provider/vendor contact detail
 - website: website URL
 - accountNumber: any account number, customer number, or debtor ID
 Look in the letterhead, header, footer, and sidebar areas of the invoice for this info.`;
+/**
+ * Build the right Anthropic content block for a stored attachment. PDFs go
+ * in as `document`; PNG/JPEG/GIF/WEBP go in as `image`. Used to be PDF-only,
+ * which silently produced empty extractions for email-forwarded image
+ * invoices because Anthropic rejected the `application/pdf` media_type on
+ * non-PDF bytes.
+ */
+function attachmentBlockFor(blobType: string, fileName: string, base64: string) {
+  const t = (blobType || "").toLowerCase();
+  const lowerName = (fileName || "").toLowerCase();
+  const imageMap: Record<string, "image/png" | "image/jpeg" | "image/gif" | "image/webp"> = {
+    "image/png": "image/png",
+    "image/jpeg": "image/jpeg",
+    "image/jpg": "image/jpeg",
+    "image/gif": "image/gif",
+    "image/webp": "image/webp",
+  };
+  const mt = imageMap[t]
+    ?? (lowerName.endsWith(".png") ? "image/png" as const
+      : lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg") ? "image/jpeg" as const
+      : lowerName.endsWith(".gif") ? "image/gif" as const
+      : lowerName.endsWith(".webp") ? "image/webp" as const
+      : null);
+  if (mt) {
+    return {
+      type: "image" as const,
+      source: { type: "base64" as const, media_type: mt, data: base64 },
+    };
+  }
+  // Fall through to PDF — covers application/pdf, application/octet-stream
+  // from over-cautious mail clients, and unknown types where the parser
+  // can at least attempt PDF interpretation.
+  return {
+    type: "document" as const,
+    source: { type: "base64" as const, media_type: "application/pdf" as const, data: base64 },
+  };
+}
+
 export const parseBillPdf = internalAction({
   args: { billId: v.id("bills") },
   handler: async (ctx, args) => {
@@ -87,13 +125,16 @@ export const parseBillPdf = internalAction({
 
       const bytes = await blob.arrayBuffer();
       const base64Pdf = Buffer.from(bytes).toString("base64");
+      const fileBlock = attachmentBlockFor(blob.type, bill.fileName ?? "", base64Pdf);
+      const isImageBlock = fileBlock.type === "image";
+      console.log(`[billParsing] attachment block kind=${fileBlock.type} blobType=${blob.type || "(none)"}`);
 
       const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
       if (!anthropicApiKey) {
         throw new Error("ANTHROPIC_API_KEY is not set in Convex environment");
       }
       const client = new Anthropic({ apiKey: anthropicApiKey });
-      console.log("2. Extracting text from PDF...");
+      console.log("2. Extracting text from attachment...");
       const textExtractionResponse = await client.messages.create({
         model: "claude-sonnet-4-20250514",
         max_tokens: 4096,
@@ -102,21 +143,16 @@ export const parseBillPdf = internalAction({
           {
             role: "user",
             content: [
-              {
-                type: "document",
-                source: {
-                  type: "base64",
-                  media_type: "application/pdf",
-                  data: base64Pdf
-                }
-              },
+              fileBlock as any,
               {
                 type: "text",
-                text: "Extract visible text from this invoice PDF. Return plain text only."
-              }
-            ]
-          }
-        ]
+                text: isImageBlock
+                  ? "Extract all visible text from this invoice image. Return plain text only."
+                  : "Extract visible text from this invoice PDF. Return plain text only.",
+              },
+            ],
+          },
+        ],
       });
       const extractedTextBlock = textExtractionResponse.content.find((c: any) => c.type === "text");
       const extractedPdfText = extractedTextBlock && extractedTextBlock.type === "text" ? extractedTextBlock.text : "";
@@ -153,18 +189,11 @@ export const parseBillPdf = internalAction({
           {
             role: "user",
             content: [
-              {
-                type: "document",
-                source: {
-                  type: "base64",
-                  media_type: "application/pdf",
-                  data: base64Pdf
-                }
-              },
-              { type: "text", text: prompt }
-            ]
-          }
-        ]
+              fileBlock as any,
+              { type: "text", text: prompt },
+            ],
+          },
+        ],
       });
 
       const textBlock = response.content.find((c: any) => c.type === "text");
