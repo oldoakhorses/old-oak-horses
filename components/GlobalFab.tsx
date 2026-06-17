@@ -1763,10 +1763,16 @@ export default function GlobalFab() {
             <span className={styles.fabMenuIcon}>💊</span>
             <span className={styles.fabMenuLabel}>record meds</span>
           </button>
-          <button type="button" className={styles.fabMenuItem} onClick={() => handleFabOptionClick("invoice")}>
-            <span className={styles.fabMenuIcon}>📄</span>
-            <span className={styles.fabMenuLabel}>upload invoice</span>
-          </button>
+          {/* Upload invoice is only meaningful for users who can reach the
+              /invoices section — that gating lives in lib/permissions.ts and
+              currently allows admin + owner. team / investor users don't see
+              the invoice list, so hide the entry from their FAB. */}
+          {(user?.role === "admin" || user?.role === "owner") && (
+            <button type="button" className={styles.fabMenuItem} onClick={() => handleFabOptionClick("invoice")}>
+              <span className={styles.fabMenuIcon}>📄</span>
+              <span className={styles.fabMenuLabel}>upload invoice</span>
+            </button>
+          )}
           <button type="button" className={styles.fabMenuItem} onClick={() => handleFabOptionClick("document")}>
             <span className={styles.fabMenuIcon}>📎</span>
             <span className={styles.fabMenuLabel}>add document</span>
