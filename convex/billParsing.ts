@@ -546,6 +546,105 @@ export const parseBillNow = action({
   }
 });
 
+/**
+ * Shared post-processing for any email-parse path (LLM extraction OR
+ * deterministic Square parse). Normalizes the parsed payload, runs
+ * horse/person matching, derives category + contact, and writes the bill.
+ */
+async function runEmailPostProcessing(
+  ctx: any,
+  bill: any,
+  parsed: Record<string, unknown>,
+  args: { subject: string; fromEmail: string },
+) {
+  const normalized = normalizeParsedPayload(parsed);
+  const normalizedResult = ensureUsdAmounts(normalized);
+
+  const [registeredHorses, registeredPeople, dynamicHorseAliases, dynamicPersonAliases] = await Promise.all([
+    ctx.runQuery(internal.bills.getAllHorsesForMatching, {}),
+    ctx.runQuery(internal.bills.getAllPeopleForMatching, {}),
+    ctx.runQuery(internal.bills.getHorseAliasesForMatching, {}),
+    ctx.runQuery(internal.bills.getPersonAliasesForMatching, {}),
+  ]);
+
+  const matched = applyEntityMatching(normalizedResult, registeredHorses, registeredPeople, dynamicHorseAliases, dynamicPersonAliases, {
+    matchHorses: true,
+    matchPeople: true,
+  });
+
+  const lineItemCategories = collectLineItemCategories(matched);
+  const unmatchedHorseNames = collectUnmatchedHorseNames(matched);
+
+  const providerContactPatch = extractVendorContactInfo(matched);
+  const extractedVendorContact = buildExtractedVendorContact(providerContactPatch);
+
+  const extractedProviderName = pickString(matched, [
+    "contact_name", "contactName", "vendor_name", "vendorName",
+  ]);
+
+  let resolvedContactId: string | undefined;
+  const extractedCustomProviderName = extractedProviderName || bill.customProviderName;
+
+  if (extractedProviderName) {
+    const [allContacts, contactAliases] = await Promise.all([
+      ctx.runQuery(api.contacts.getAllContacts, {}),
+      ctx.runQuery(internal.contacts.listContactAliasesForMatching, {}),
+    ]);
+    const allContactRows = (allContacts as any[]).map((c: any) => ({
+      _id: String(c._id),
+      name: c.name,
+      category: c.category,
+      slug: c.slug,
+    }));
+    const result = matchContact(extractedProviderName, allContactRows, contactAliases as any);
+    if (result.matched && result.contactId) {
+      resolvedContactId = result.contactId;
+    }
+  }
+
+  let inferredCategoryId: string | undefined;
+  if (lineItemCategories.length > 0) {
+    const freq = new Map<string, number>();
+    for (const cat of lineItemCategories) freq.set(cat, (freq.get(cat) || 0) + 1);
+    const dominant = [...freq.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    if (dominant) {
+      const cat = await ctx.runQuery(internal.bills.getCategoryBySlug, { slug: dominant });
+      if (cat) inferredCategoryId = cat._id;
+    }
+  }
+
+  const currencyMeta = extractCurrencyMeta(matched);
+  const billDiscount = pickNumber(matched, ["discount", "professional_discount"]);
+
+  await ctx.runMutation(internal.bills.markDone, {
+    billId: bill._id,
+    extractedData: matched,
+    status: "pending",
+    lineItemCategories: lineItemCategories.length > 0 ? lineItemCategories : undefined,
+    hasUnmatchedHorses: unmatchedHorseNames.length > 0,
+    unmatchedHorseNames,
+    contactId: resolvedContactId as any,
+    customProviderName: extractedCustomProviderName,
+    extractedVendorContact,
+    inferredCategoryId: inferredCategoryId as any,
+    ...currencyMeta,
+    discount: typeof billDiscount === "number" ? round2(billDiscount) : undefined,
+  });
+
+  if (!resolvedContactId && extractedProviderName) {
+    await ctx.runMutation(internal.contacts.upsertContactFromInvoice, {
+      name: extractedProviderName,
+      category: lineItemCategories.length > 0 ? lineItemCategories[0] : "other",
+      companyName: providerContactPatch.fullName ?? extractedProviderName,
+      address: providerContactPatch.address,
+      phone: providerContactPatch.phone,
+      email: providerContactPatch.email,
+      website: providerContactPatch.website,
+      accountNumber: providerContactPatch.accountNumber,
+    });
+  }
+}
+
 export const parseEmailBody = internalAction({
   args: {
     billId: v.id("bills"),
@@ -579,6 +678,25 @@ export const parseEmailBody = internalAction({
           errorMessage: "Email had no readable content",
         });
         return;
+      }
+
+      // Square POS receipt fast path. Square's format is rigid and
+      // line-itemed; a deterministic regex parser is more reliable than
+      // asking the LLM and is also faster + cheaper.
+      const looksSquare = isSquareReceipt({
+        htmlBody: args.htmlBody,
+        textBody: args.textBody,
+        fromEmail: args.fromEmail,
+        emailText,
+      });
+      if (looksSquare) {
+        const squareParsed = parseSquareReceipt(emailText);
+        if (squareParsed && Number((squareParsed as any).invoice_total_usd) > 0) {
+          console.log(`[parseEmailBody] Square receipt detected — using deterministic parser (merchant=${(squareParsed as any).contact_name}, items=${((squareParsed as any).line_items ?? []).length})`);
+          await runEmailPostProcessing(ctx, bill, squareParsed, args);
+          return;
+        }
+        console.log("[parseEmailBody] Square fingerprint hit but deterministic parse returned no usable data — falling back to LLM extraction");
       }
 
       const client = new Anthropic({ apiKey: anthropicApiKey });
@@ -634,92 +752,7 @@ Return strict JSON only.`;
       }
 
       const parsed = JSON.parse(stripCodeFences(textBlock.text)) as Record<string, unknown>;
-      const normalized = normalizeParsedPayload(parsed);
-      const normalizedResult = ensureUsdAmounts(normalized);
-
-      const [registeredHorses, registeredPeople, dynamicHorseAliases, dynamicPersonAliases] = await Promise.all([
-        ctx.runQuery(internal.bills.getAllHorsesForMatching, {}),
-        ctx.runQuery(internal.bills.getAllPeopleForMatching, {}),
-        ctx.runQuery(internal.bills.getHorseAliasesForMatching, {}),
-        ctx.runQuery(internal.bills.getPersonAliasesForMatching, {}),
-      ]);
-
-      const matched = applyEntityMatching(normalizedResult, registeredHorses, registeredPeople, dynamicHorseAliases, dynamicPersonAliases, {
-        matchHorses: true,
-        matchPeople: true,
-      });
-
-      const lineItemCategories = collectLineItemCategories(matched);
-      const unmatchedHorseNames = collectUnmatchedHorseNames(matched);
-
-      const providerContactPatch = extractVendorContactInfo(matched);
-      const extractedVendorContact = buildExtractedVendorContact(providerContactPatch);
-
-      const extractedProviderName = pickString(matched, [
-        "contact_name", "contactName", "vendor_name", "vendorName",
-      ]);
-
-      let resolvedContactId: string | undefined;
-      let extractedCustomProviderName = extractedProviderName || bill.customProviderName;
-
-      if (extractedProviderName) {
-        const [allContacts, contactAliases] = await Promise.all([
-          ctx.runQuery(api.contacts.getAllContacts, {}),
-          ctx.runQuery(internal.contacts.listContactAliasesForMatching, {}),
-        ]);
-        const allContactRows = (allContacts as any[]).map((c: any) => ({
-          _id: String(c._id),
-          name: c.name,
-          category: c.category,
-          slug: c.slug,
-        }));
-        const result = matchContact(extractedProviderName, allContactRows, contactAliases as any);
-        if (result.matched && result.contactId) {
-          resolvedContactId = result.contactId;
-        }
-      }
-
-      let inferredCategoryId: string | undefined;
-      if (lineItemCategories.length > 0) {
-        const freq = new Map<string, number>();
-        for (const cat of lineItemCategories) freq.set(cat, (freq.get(cat) || 0) + 1);
-        const dominant = [...freq.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-        if (dominant) {
-          const cat = await ctx.runQuery(internal.bills.getCategoryBySlug, { slug: dominant });
-          if (cat) inferredCategoryId = cat._id;
-        }
-      }
-
-      const currencyMeta = extractCurrencyMeta(matched);
-      const billDiscount = pickNumber(matched, ["discount", "professional_discount"]);
-
-      await ctx.runMutation(internal.bills.markDone, {
-        billId: bill._id,
-        extractedData: matched,
-        status: "pending",
-        lineItemCategories: lineItemCategories.length > 0 ? lineItemCategories : undefined,
-        hasUnmatchedHorses: unmatchedHorseNames.length > 0,
-        unmatchedHorseNames,
-        contactId: resolvedContactId as any,
-        customProviderName: extractedCustomProviderName,
-        extractedVendorContact,
-        inferredCategoryId: inferredCategoryId as any,
-        ...currencyMeta,
-        discount: typeof billDiscount === "number" ? round2(billDiscount) : undefined,
-      });
-
-      if (!resolvedContactId && extractedProviderName) {
-        await ctx.runMutation(internal.contacts.upsertContactFromInvoice, {
-          name: extractedProviderName,
-          category: lineItemCategories.length > 0 ? lineItemCategories[0] : "other",
-          companyName: providerContactPatch.fullName ?? extractedProviderName,
-          address: providerContactPatch.address,
-          phone: providerContactPatch.phone,
-          email: providerContactPatch.email,
-          website: providerContactPatch.website,
-          accountNumber: providerContactPatch.accountNumber,
-        });
-      }
+      await runEmailPostProcessing(ctx, bill, parsed, args);
 
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to parse email receipt";
@@ -1943,6 +1976,198 @@ function isAirbnbProviderSignal(...values: Array<string | undefined>) {
   const joined = values.filter(Boolean).join(" ").toLowerCase();
   if (!joined) return false;
   return joined.includes("airbnb");
+}
+
+/**
+ * Detect a Square POS receipt. Square sends from `messenger@messaging
+ * .squareup.com` (or a `squareup*.com` variant) and the email body has a
+ * very consistent shape: "Receipt for $X at MERCHANT on DATE", an
+ * itemized list, then a Total row, then merchant phone / payment method /
+ * txn id. Detection is intentionally loose — sender check OR any of the
+ * unique phrases — so forwarded receipts (whose envelope sender becomes
+ * the forwarder) still trip the path.
+ */
+function isSquareReceipt(args: {
+  htmlBody?: string;
+  textBody?: string;
+  fromEmail?: string;
+  emailText?: string;
+}): boolean {
+  const haystack = `${args.htmlBody ?? ""} ${args.textBody ?? ""} ${args.fromEmail ?? ""} ${args.emailText ?? ""}`.toLowerCase();
+  if (!haystack) return false;
+  if (/squareup\w*\.com/.test(haystack)) return true;
+  if (/receipt for \$[\d,.]+ at .+ on \d{4}-\d{2}-\d{2}/.test(haystack)) return true;
+  if (/let .+ know how your experience was/.test(haystack)) return true;
+  return false;
+}
+
+/**
+ * Deterministic parser for Square's email receipt format. Reads from the
+ * already-stripped text body (the caller does the HTML → text pass) so
+ * the patterns can stay simple. Returns the same parsed-shape object the
+ * rest of the pipeline expects, or null if the fingerprints look right
+ * but the structure didn't yield a usable result.
+ *
+ * The Square layout always reads (in left-to-right text order):
+ *   "Receipt for $TOTAL at MERCHANT on YYYY-MM-DD-HH:MM."
+ *   "MERCHANT"
+ *   "Let MERCHANT know how your experience was"
+ *   "$TOTAL"     <- big total at the top of the body
+ *   {line items, one per logical row}
+ *   "Total $TOTAL"
+ *   "MERCHANT" "PHONE"
+ *   "Visa 4706 (Keyed)"
+ *   "YYYY-MM-DD-HH:MM"
+ *   "#TXN_ID"   "Auth code: 123456"
+ *
+ * Line item shapes that appear in the wild:
+ *   "{description} × {qty} ${total} (${unit} ea.)"   ← multi-quantity
+ *   "{description} ${amount}"                          ← single line
+ */
+function parseSquareReceipt(emailText: string): Record<string, unknown> | null {
+  const text = (emailText || "").replace(/\s+/g, " ").trim();
+  if (!text) return null;
+
+  // Merchant — pull from "Receipt for $X at MERCHANT on DATE" since it's
+  // delimited cleanly on both sides. Falls back to "Receipt from MERCHANT
+  // #TXN" header line.
+  let merchant: string | undefined;
+  const merchantAtMatch = text.match(/Receipt for \$[\d,.]+ at (.+?) on \d{4}-\d{2}-\d{2}/i);
+  if (merchantAtMatch) merchant = merchantAtMatch[1].trim();
+  if (!merchant) {
+    const merchantFromMatch = text.match(/Receipt from (.+?) #[A-Za-z0-9]+/);
+    if (merchantFromMatch) merchant = merchantFromMatch[1].trim();
+  }
+  if (!merchant) {
+    const letKnowMatch = text.match(/Let (.+?) know how your experience was/i);
+    if (letKnowMatch) merchant = letKnowMatch[1].trim();
+  }
+  if (!merchant) return null;
+
+  // Date — Square uses "YYYY-MM-DD-HH:MM". Normalize to YYYY-MM-DD.
+  let invoiceDate: string | undefined;
+  const dateMatch = text.match(/\b(20\d{2})-(\d{2})-(\d{2})(?:-\d{2}:\d{2})?/);
+  if (dateMatch) {
+    invoiceDate = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
+  }
+
+  // Total — the labeled "Total $X" near the bottom is authoritative.
+  let total = 0;
+  const totalMatch = text.match(/\bTotal\s+\$([\d,]+\.\d{2})\b/);
+  if (totalMatch) total = Number(totalMatch[1].replace(/,/g, ""));
+  if (!total) {
+    const headerTotalMatch = text.match(/Receipt for \$([\d,]+\.\d{2})/);
+    if (headerTotalMatch) total = Number(headerTotalMatch[1].replace(/,/g, ""));
+  }
+
+  // Transaction id — "#XXXX" near the txn metadata block.
+  let txnId: string | undefined;
+  const txnMatch = text.match(/#([A-Za-z0-9]{3,})\b/);
+  if (txnMatch) txnId = txnMatch[1];
+
+  // Payment method — "Visa 4706 (Keyed)" / "MasterCard ...".
+  let paymentMethod: string | undefined;
+  const cardMatch = text.match(/\b(Visa|MasterCard|American Express|Amex|Discover)\s+\d{2,4}\b/i);
+  if (cardMatch) paymentMethod = cardMatch[0];
+
+  // Line items — narrow to the slice between "Let MERCHANT know" and
+  // "Total $X" so we don't grab amounts from the header/footer.
+  const lineItems: Array<Record<string, unknown>> = [];
+  const startIdx = (() => {
+    const letKnow = text.search(/Let .+? know how your experience was/i);
+    if (letKnow >= 0) {
+      // skip past the phrase plus the big body-total dollar amount that
+      // immediately follows it
+      const afterKnow = text.slice(letKnow);
+      const bodyTotalRel = afterKnow.search(/\$[\d,]+\.\d{2}/);
+      if (bodyTotalRel >= 0) {
+        const bodyTotalAbs = letKnow + bodyTotalRel;
+        return bodyTotalAbs + afterKnow.slice(bodyTotalRel).match(/^\$[\d,]+\.\d{2}/)![0].length;
+      }
+      return letKnow + afterKnow.indexOf("was") + 3;
+    }
+    return 0;
+  })();
+  const endIdx = (() => {
+    // First "Total $X" after the start cuts off the items block.
+    const slice = text.slice(startIdx);
+    const m = slice.search(/\bTotal\s+\$[\d,]+\.\d{2}\b/);
+    return m >= 0 ? startIdx + m : text.length;
+  })();
+  const itemsBlock = text.slice(startIdx, endIdx).trim();
+
+  if (itemsBlock) {
+    // Multi-quantity items: "{desc} × {qty} ${total} (${unit} ea.)"
+    const multiQtyRegex = /([A-Za-z][^$×]*?)\s+×\s+(\d+)\s+\$([\d,]+\.\d{2})\s+\(\$([\d,]+\.\d{2})\s+ea\.\)/g;
+    const consumedSpans: Array<[number, number]> = [];
+    let m: RegExpExecArray | null;
+    while ((m = multiQtyRegex.exec(itemsBlock)) !== null) {
+      const description = m[1].trim();
+      const qty = Number(m[2]);
+      const lineTotal = Number(m[3].replace(/,/g, ""));
+      const unit = Number(m[4].replace(/,/g, ""));
+      if (description && Number.isFinite(lineTotal)) {
+        lineItems.push({
+          description,
+          quantity: qty,
+          unit_price: unit,
+          total_usd: lineTotal,
+          amount: lineTotal,
+          category: "supplies",
+        });
+        consumedSpans.push([m.index, m.index + m[0].length]);
+      }
+    }
+
+    // Simple items: "{desc} ${amount}" — but skip text already consumed
+    // by the multi-qty matches, and skip lines that ARE the header/total.
+    // Replace consumed spans with whitespace so they don't trigger the
+    // simple regex.
+    let leftover = itemsBlock;
+    // Walk in reverse so indices stay valid.
+    for (let i = consumedSpans.length - 1; i >= 0; i--) {
+      const [a, b] = consumedSpans[i];
+      leftover = leftover.slice(0, a) + " ".repeat(b - a) + leftover.slice(b);
+    }
+    const simpleRegex = /([A-Za-z][A-Za-z0-9 .,'\-/&]*?)\s+\$([\d,]+\.\d{2})\b/g;
+    while ((m = simpleRegex.exec(leftover)) !== null) {
+      const description = m[1].trim();
+      const amount = Number(m[2].replace(/,/g, ""));
+      // Skip if this match is actually part of "Total $X" or similar
+      // junk that bled past our boundary detection.
+      if (/^total$/i.test(description) || /^subtotal$/i.test(description) || /^tax$/i.test(description)) continue;
+      if (!description || !Number.isFinite(amount)) continue;
+      lineItems.push({
+        description,
+        total_usd: amount,
+        amount,
+        category: "supplies",
+      });
+    }
+  }
+
+  // If no items found, leave a single placeholder line so the bill is
+  // still usable downstream.
+  if (lineItems.length === 0 && total > 0) {
+    lineItems.push({
+      description: `${merchant} — Square receipt`,
+      total_usd: total,
+      amount: total,
+      category: "supplies",
+    });
+  }
+
+  return {
+    contact_name: merchant,
+    vendor_name: merchant,
+    invoice_date: invoiceDate,
+    invoice_number: txnId,
+    invoice_total_usd: total,
+    currency: "USD",
+    payment_method: paymentMethod,
+    line_items: lineItems,
+    vendorContact: { vendorName: merchant },
+  };
 }
 
 /**
