@@ -487,6 +487,13 @@ export default function InvoicePreviewPage() {
   const [reparsing, setReparsing] = useState(false);
   const [error, setError] = useState("");
 
+  // Tracks whether the user has made any post-load edit. Used to gate the
+  // bottom "save changes" button so it's only enabled when something
+  // actually changed — otherwise an already-approved invoice's save
+  // button looks like an action that does nothing.
+  const [formDirty, setFormDirty] = useState(false);
+  const markDirty = () => setFormDirty(true);
+
   // Inline "add line item" form state. Used when the parser pulled no line
   // items off the invoice (especially common with image uploads) so the
   // user can enter them by hand.
@@ -790,6 +797,9 @@ export default function InvoicePreviewPage() {
       setWholeAssignedIds([]);
       setWholeAmounts({});
     }
+
+    // Bill (re)loaded — nothing edited yet.
+    setFormDirty(false);
   }, [bill?._id, bill?.contactId, bill?.categoryId, bill?.status, bill?.extractedData, requiresPerson, categorySlug]);
 
   useEffect(() => {
@@ -1043,6 +1053,7 @@ export default function InvoicePreviewPage() {
 
   function switchAssignType(newType: AssignType) {
     if (newType === assignType) return;
+    markDirty();
     setAssignType(newType);
     // Business assignments default to "everything included" — the common
     // case is the whole invoice belongs to one LLC, so checking every
@@ -1066,6 +1077,7 @@ export default function InvoicePreviewPage() {
   }
 
   function toggleEntityOnItem(index: number, entityId: string) {
+    markDirty();
     setLineStates((prev) => {
       const row = prev[index] ?? {
         assignees: [],
@@ -1332,7 +1344,7 @@ export default function InvoicePreviewPage() {
         <select
           className={styles.categorySelect}
           value={row.category || categorySlug || ""}
-          onChange={(event) => setLineStates((prev) => ({ ...prev, [index]: { ...row, category: event.target.value, subcategory: "" } }))}
+          onChange={(event) => { markDirty(); setLineStates((prev) => ({ ...prev, [index]: { ...row, category: event.target.value, subcategory: "" } })); }}
         >
           <option value="">category...</option>
           {ALL_CATEGORY_OPTIONS.map((option) => (
@@ -1345,7 +1357,8 @@ export default function InvoicePreviewPage() {
             className={`${styles.categorySelect} ${row.subcategoryAutoDetected ? styles.subcategorySelectAuto : ""}`}
             title={row.subcategoryAutoDetected && row.subcategory ? "auto-detected" : undefined}
             value={row.subcategory}
-            onChange={(event) =>
+            onChange={(event) => {
+              markDirty();
               setLineStates((prev) => ({
                 ...prev,
                 [index]: {
@@ -1353,8 +1366,8 @@ export default function InvoicePreviewPage() {
                   subcategory: event.target.value,
                   subcategoryAutoDetected: false,
                 }
-              }))
-            }
+              }));
+            }}
           >
             <option value="">subcategory...</option>
             {(SUBCATEGORY_OPTIONS[row.category || categorySlug || ""] ?? []).map((option) => (
@@ -1369,7 +1382,7 @@ export default function InvoicePreviewPage() {
           <button
             type="button"
             className={`${styles.confirmCheck} ${row.confirmed ? styles.confirmCheckChecked : styles.confirmCheckUnchecked}`}
-            onClick={() => setLineStates((prev) => ({ ...prev, [index]: { ...row, confirmed: !row.confirmed } }))}
+            onClick={() => { markDirty(); setLineStates((prev) => ({ ...prev, [index]: { ...row, confirmed: !row.confirmed } })); }}
             aria-label={row.confirmed ? "uncheck line" : "check line"}
           >
             ✓
@@ -2116,6 +2129,8 @@ export default function InvoicePreviewPage() {
         // the assignment card back to the locked report so the user can
         // see their saved state. No navigation.
         setAssignmentsUnlocked(false);
+        setDetailsUnlocked(false);
+        setFormDirty(false);
       } else {
         // First approval: route to the permanent invoice URL.
         router.push(buildPermanentInvoicePath(effectiveBill));
@@ -2740,8 +2755,8 @@ export default function InvoicePreviewPage() {
                 ) : requiresAssignment ? (
                   <div className={styles.headerToggleRow}>
                     <div className={styles.modeToggle}>
-                      <button type="button" className={mode === "line" ? styles.modeToggleActive : styles.modeToggleInactive} onClick={() => setMode("line")}>by line item</button>
-                      <button type="button" className={mode === "whole" ? styles.modeToggleActive : styles.modeToggleInactive} onClick={() => setMode("whole")}>split whole invoice</button>
+                      <button type="button" className={mode === "line" ? styles.modeToggleActive : styles.modeToggleInactive} onClick={() => { markDirty(); setMode("line"); }}>by line item</button>
+                      <button type="button" className={mode === "whole" ? styles.modeToggleActive : styles.modeToggleInactive} onClick={() => { markDirty(); setMode("whole"); }}>split whole invoice</button>
                     </div>
                     {/* Compact entity toggle — invoices and line items
                         are assignable to horses or businesses. People
@@ -2899,13 +2914,13 @@ export default function InvoicePreviewPage() {
                       <span>SPLIT TYPE</span>
                     </div>
                     <div className={styles.wholeAssignMode}>
-                      <button type="button" className={`${styles.segmentBtn} ${wholeAssignMode === "single" ? styles.segmentBtnActive : ""}`} onClick={() => { setWholeAssignMode("single"); setWholeAssignedIds((prev) => prev.slice(0, 1)); }}>
+                      <button type="button" className={`${styles.segmentBtn} ${wholeAssignMode === "single" ? styles.segmentBtnActive : ""}`} onClick={() => { markDirty(); setWholeAssignMode("single"); setWholeAssignedIds((prev) => prev.slice(0, 1)); }}>
                         {assignType === "horse" ? "one horse" : assignType === "business" ? "one business" : "one person"}
                       </button>
-                      <button type="button" className={`${styles.segmentBtn} ${wholeAssignMode === "split" ? styles.segmentBtnActive : ""}`} onClick={() => setWholeAssignMode("split")}>
+                      <button type="button" className={`${styles.segmentBtn} ${wholeAssignMode === "split" ? styles.segmentBtnActive : ""}`} onClick={() => { markDirty(); setWholeAssignMode("split"); }}>
                         split across {assignType === "horse" ? "horses" : assignType === "business" ? "businesses" : "people"}
                       </button>
-                      <button type="button" className={`${styles.segmentBtn} ${wholeAssignMode === "business_general" ? styles.segmentBtnActive : ""}`} onClick={() => { setWholeAssignMode("business_general"); setWholeAssignedIds([]); setWholeAmounts({}); }}>
+                      <button type="button" className={`${styles.segmentBtn} ${wholeAssignMode === "business_general" ? styles.segmentBtnActive : ""}`} onClick={() => { markDirty(); setWholeAssignMode("business_general"); setWholeAssignedIds([]); setWholeAmounts({}); }}>
                         business general
                       </button>
                     </div>
@@ -2923,8 +2938,8 @@ export default function InvoicePreviewPage() {
                         <span>SPLIT AMOUNTS</span>
                       </div>
                       <div className={styles.segmented}>
-                        <button type="button" className={`${styles.segmentBtn} ${wholeSplitType === "even" ? styles.segmentBtnActive : ""}`} onClick={() => setWholeSplitType("even")}>even</button>
-                        <button type="button" className={`${styles.segmentBtn} ${wholeSplitType === "custom" ? styles.segmentBtnActive : ""}`} onClick={() => setWholeSplitType("custom")}>custom</button>
+                        <button type="button" className={`${styles.segmentBtn} ${wholeSplitType === "even" ? styles.segmentBtnActive : ""}`} onClick={() => { markDirty(); setWholeSplitType("even"); }}>even</button>
+                        <button type="button" className={`${styles.segmentBtn} ${wholeSplitType === "custom" ? styles.segmentBtnActive : ""}`} onClick={() => { markDirty(); setWholeSplitType("custom"); }}>custom</button>
                       </div>
                     </div>
                   ) : null}
@@ -2939,7 +2954,7 @@ export default function InvoicePreviewPage() {
                       <select
                         className={styles.categorySelect}
                         value={wholeCategoryOverride}
-                        onChange={(event) => { setWholeCategoryOverride(event.target.value); setWholeSubcategoryOverride(""); }}
+                        onChange={(event) => { markDirty(); setWholeCategoryOverride(event.target.value); setWholeSubcategoryOverride(""); }}
                       >
                         <option value="">use invoice category</option>
                         {ALL_CATEGORY_OPTIONS.map((option) => (
@@ -2953,7 +2968,7 @@ export default function InvoicePreviewPage() {
                         <select
                           className={styles.categorySelect}
                           value={wholeSubcategoryOverride}
-                          onChange={(event) => setWholeSubcategoryOverride(event.target.value)}
+                          onChange={(event) => { markDirty(); setWholeSubcategoryOverride(event.target.value); }}
                         >
                           <option value="">—</option>
                           {(SUBCATEGORY_OPTIONS[wholeCategoryOverride || categorySlug || ""] ?? []).map((option) => (
@@ -2996,6 +3011,7 @@ export default function InvoicePreviewPage() {
                               : entry.name.toLowerCase().includes(wholePickerSearch.trim().toLowerCase()),
                           );
                           const toggleEntity = (id: string) => {
+                            markDirty();
                             setWholeAssignedIds((prev) => {
                               if (isSingle) {
                                 // Single mode: behaves like a radio. Picking
@@ -3096,6 +3112,7 @@ export default function InvoicePreviewPage() {
                                       <button
                                         type="button"
                                         onClick={() => {
+                                          markDirty();
                                           setWholeAssignedIds([]);
                                           setWholeAmounts({});
                                         }}
@@ -3136,7 +3153,7 @@ export default function InvoicePreviewPage() {
                             <input
                               className={styles.wholeAmountInput}
                               value={wholeAmounts[id] || ""}
-                              onChange={(event) => setWholeAmounts((prev) => ({ ...prev, [id]: event.target.value }))}
+                              onChange={(event) => { markDirty(); setWholeAmounts((prev) => ({ ...prev, [id]: event.target.value })); }}
                             />
                           ) : (
                             <span className={styles.lineAmount}>{formatUsd(amount)}</span>
@@ -3145,6 +3162,7 @@ export default function InvoicePreviewPage() {
                             type="button"
                             className={styles.removeBtn}
                             onClick={() => {
+                              markDirty();
                               setWholeAssignedIds((prev) => prev.filter((row) => row !== id));
                               setWholeAmounts((prev) => {
                                 const next = { ...prev };
@@ -3193,6 +3211,7 @@ export default function InvoicePreviewPage() {
                         : p.name.toLowerCase().includes(taggedPeoplePickerSearch.trim().toLowerCase()),
                     );
                     const togglePerson = (id: string) => {
+                      markDirty();
                       setTaggedPersonIds((prev) =>
                         prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
                       );
@@ -3276,7 +3295,7 @@ export default function InvoicePreviewPage() {
                               <div style={{ padding: 8, borderTop: "1px solid #f1f2f5", display: "flex", justifyContent: "space-between", gap: 8, position: "sticky", bottom: 0, background: "#fff" }}>
                                 <button
                                   type="button"
-                                  onClick={() => setTaggedPersonIds([])}
+                                  onClick={() => { markDirty(); setTaggedPersonIds([]); }}
                                   style={{ fontSize: 11, color: "#dc2626", background: "transparent", border: "none", cursor: "pointer" }}
                                 >
                                   clear all
@@ -3318,7 +3337,7 @@ export default function InvoicePreviewPage() {
                           👤 {name}
                           <button
                             type="button"
-                            onClick={() => setTaggedPersonIds((prev) => prev.filter((x) => x !== id))}
+                            onClick={() => { markDirty(); setTaggedPersonIds((prev) => prev.filter((x) => x !== id)); }}
                             style={{ background: "transparent", border: "none", color: "#ec4899", cursor: "pointer", padding: 0, fontSize: 11 }}
                             aria-label={`remove ${name} tag`}
                           >
@@ -3336,7 +3355,7 @@ export default function InvoicePreviewPage() {
               <div className={styles.cardTitle} style={{ marginBottom: 12 }}>notes</div>
               <textarea
                 value={notes}
-                onChange={(event) => setNotes(event.target.value)}
+                onChange={(event) => { markDirty(); setNotes(event.target.value); }}
                 onBlur={() => void saveNotesIfNeeded()}
                 placeholder="add notes about this invoice..."
                 className={styles.notesTextarea}
@@ -3622,7 +3641,12 @@ export default function InvoicePreviewPage() {
               <button type="button" className={styles.btnDelete} onClick={() => void onDelete()}>delete invoice</button>
               <div className={styles.approveRight}>
                 {approveDisabled ? <div className={styles.helper}>{isEditing ? "confirm assignments to save" : "confirm assignments to approve"}</div> : null}
-                <button type="button" className={styles.btnApprove} disabled={approveDisabled || approving} onClick={() => void onApprove()}>
+                <button
+                  type="button"
+                  className={styles.btnApprove}
+                  disabled={approveDisabled || approving || (isEditing && !formDirty && !detailsDirty)}
+                  onClick={() => void onApprove()}
+                >
                   {approving ? (isEditing ? "saving..." : "approving...") : (isEditing ? "save changes" : "approve invoice")}
                 </button>
               </div>
