@@ -1035,9 +1035,7 @@ export default function RecordsPage() {
                         >
                           {record.billInfo.contactName?.split(/[\s—]/)[0] || "View"}
                         </Link>
-                      ) : (
-                        <span className={styles.mutedSmall}>Not linked</span>
-                      )}
+                      ) : null}
                     </span>
                   </div>
 
