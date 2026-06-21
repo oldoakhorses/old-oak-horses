@@ -21,7 +21,7 @@ export const detectReportFromPdf = action({
     const client = new Anthropic({ apiKey: anthropicApiKey });
 
     const textResponse = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 1800,
       temperature: 0,
       messages: [
@@ -49,7 +49,7 @@ export const detectReportFromPdf = action({
     }
 
     const parseResponse = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 2500,
       temperature: 0,
       messages: [

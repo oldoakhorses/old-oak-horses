@@ -142,7 +142,7 @@ export const parseBillPdf = internalAction({
       // so the downstream regex fallback has something to work with
       // even if the structured extraction returns nothing.
       const textExtractionResponse = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         max_tokens: 8192,
         temperature: 0,
         messages: [
@@ -220,7 +220,7 @@ export const parseBillPdf = internalAction({
       );
 
       const response = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         max_tokens: 8192,
         temperature: 0,
         messages: [
@@ -921,7 +921,7 @@ ${emailText.slice(0, 8000)}
 Return strict JSON only.`;
 
       const response = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         max_tokens: 2048,
         temperature: 0,
         messages: [{ role: "user", content: prompt }],
