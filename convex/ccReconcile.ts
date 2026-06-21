@@ -1336,9 +1336,18 @@ export const findMatchingTransactionsForBill = query({
     const DATE_VERY_CLOSE = 14;     // unlocks "exact" / "high"
     const DATE_CLOSE = 30;          // unlocks "medium"
 
+    // Load the user's dismissed (bill, txn) pairs so we don't keep
+    // re-suggesting transactions the user has already said "not this".
+    const dismissedRows = await ctx.db
+      .query("dismissedCcMatches")
+      .withIndex("by_bill", (q) => q.eq("billId", args.billId))
+      .collect();
+    const dismissedTxnIds = new Set(dismissedRows.map((r) => String(r.transactionId)));
+
     const matches: Scored[] = [];
     for (const txn of allTxns) {
       if (txn.matchedBillId) continue;
+      if (dismissedTxnIds.has(String(txn._id))) continue;
       const absAmount = Math.abs(txn.amount);
       if (absAmount <= 0) continue;
 
@@ -1441,6 +1450,49 @@ export const findMatchingTransactionsForBill = query({
 /** Link an unmatched CC transaction to an existing bill. Sets both sides:
  *  the transaction's matchedBillId points at the bill, and the bill records
  *  the reverse pointer via ccTransactionId for future lookups. */
+/**
+ * Dismiss a suggested CC-charge match for a specific bill. Records the
+ * (billId, transactionId) pair so findMatchingTransactionsForBill stops
+ * surfacing it. Idempotent — re-dismissing the same pair is a no-op.
+ */
+export const dismissCcMatchSuggestion = mutation({
+  args: {
+    billId: v.id("bills"),
+    transactionId: v.id("ccTransactions"),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("dismissedCcMatches")
+      .withIndex("by_bill_txn", (q) =>
+        q.eq("billId", args.billId).eq("transactionId", args.transactionId),
+      )
+      .first();
+    if (existing) return existing._id;
+    return await ctx.db.insert("dismissedCcMatches", {
+      billId: args.billId,
+      transactionId: args.transactionId,
+      dismissedAt: Date.now(),
+    });
+  },
+});
+
+/** Undo a previous dismissal — surfaces the (bill, txn) pair again. */
+export const undismissCcMatchSuggestion = mutation({
+  args: {
+    billId: v.id("bills"),
+    transactionId: v.id("ccTransactions"),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("dismissedCcMatches")
+      .withIndex("by_bill_txn", (q) =>
+        q.eq("billId", args.billId).eq("transactionId", args.transactionId),
+      )
+      .first();
+    if (existing) await ctx.db.delete(existing._id);
+  },
+});
+
 export const linkBillToTransaction = mutation({
   args: {
     billId: v.id("bills"),

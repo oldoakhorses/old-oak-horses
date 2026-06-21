@@ -431,6 +431,7 @@ export default function InvoicePreviewPage() {
       bill && !((bill as any).ccTransactionId) ? { billId } : "skip",
     ) ?? [];
   const linkBillToTransaction = useMutation(api.ccReconcile.linkBillToTransaction);
+  const dismissCcMatchSuggestion = useMutation(api.ccReconcile.dismissCcMatchSuggestion);
   const unlinkBillFromTransaction = useMutation(api.ccReconcile.unlinkBillFromTransaction);
   const [ccLinkBusy, setCcLinkBusy] = useState(false);
 
@@ -2297,26 +2298,62 @@ export default function InvoicePreviewPage() {
                         </span>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      className="ui-button-filled"
-                      disabled={ccLinkBusy}
-                      onClick={async () => {
-                        setCcLinkBusy(true);
-                        try {
-                          await linkBillToTransaction({
-                            billId,
-                            transactionId: s.transactionId,
-                          });
-                        } catch (err: any) {
-                          alert(`Failed to link: ${err?.message ?? err}`);
-                        } finally {
-                          setCcLinkBusy(false);
-                        }
-                      }}
-                    >
-                      link
-                    </button>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <button
+                        type="button"
+                        className="ui-button-filled"
+                        disabled={ccLinkBusy}
+                        onClick={async () => {
+                          setCcLinkBusy(true);
+                          try {
+                            await linkBillToTransaction({
+                              billId,
+                              transactionId: s.transactionId,
+                            });
+                          } catch (err: any) {
+                            alert(`Failed to link: ${err?.message ?? err}`);
+                          } finally {
+                            setCcLinkBusy(false);
+                          }
+                        }}
+                      >
+                        link
+                      </button>
+                      <button
+                        type="button"
+                        title="Dismiss this suggestion — don't show it again for this invoice"
+                        aria-label="Dismiss this suggestion"
+                        disabled={ccLinkBusy}
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 6,
+                          border: "1px solid #e6e7ed",
+                          background: "#fff",
+                          color: "#6B7084",
+                          fontSize: 12,
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                        onClick={async () => {
+                          setCcLinkBusy(true);
+                          try {
+                            await dismissCcMatchSuggestion({
+                              billId,
+                              transactionId: s.transactionId,
+                            });
+                          } catch (err: any) {
+                            alert(`Failed to dismiss: ${err?.message ?? err}`);
+                          } finally {
+                            setCcLinkBusy(false);
+                          }
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

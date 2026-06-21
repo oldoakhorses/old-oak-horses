@@ -702,6 +702,21 @@ export default defineSchema({
     .index("by_statement", ["statementId"])
     .index("by_matched_bill", ["matchedBillId"]),
 
+  /**
+   * Records the (bill, transaction) pairs the user explicitly dismissed
+   * from the "looks like an existing CC charge" suggestion banner.
+   * findMatchingTransactionsForBill filters dismissed pairs out so they
+   * don't keep reappearing. Idempotent — duplicate inserts are guarded
+   * by the by_bill_txn index lookup before write.
+   */
+  dismissedCcMatches: defineTable({
+    billId: v.id("bills"),
+    transactionId: v.id("ccTransactions"),
+    dismissedAt: v.number(),
+  })
+    .index("by_bill", ["billId"])
+    .index("by_bill_txn", ["billId", "transactionId"]),
+
   ccTransactionRules: defineTable({
     /** Normalized keywords extracted from the transaction description */
     descriptionKeywords: v.array(v.string()),
