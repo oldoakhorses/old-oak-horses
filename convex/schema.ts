@@ -203,8 +203,18 @@ export default defineSchema({
       v.object({
         ownerId: v.id("owners"),
         ownerName: v.string(),
-        personId: v.id("people"),
-        personName: v.string(),
+        // Canonical payer fields — who fronted the cost. The payer can
+        // be either a person OR a business (e.g. one LLC reimbursing
+        // another). Discriminated by `payerType`; `payerId` holds the
+        // raw id string so it can point at either table.
+        payerType: v.optional(v.union(v.literal("person"), v.literal("business"))),
+        payerId: v.optional(v.string()),
+        payerName: v.optional(v.string()),
+        // Legacy fields from the initial single-person implementation.
+        // Kept optional for backwards compat; new writes use the payer*
+        // fields above. Read code prefers payerType if present.
+        personId: v.optional(v.id("people")),
+        personName: v.optional(v.string()),
         resolvedAt: v.optional(v.number()),
         resolvedBy: v.optional(v.string()),
       })
@@ -213,7 +223,7 @@ export default defineSchema({
      * Per-line-item reimbursement markers — same shape as `reimbursement`
      * but scoped to specific line items. Lets a single invoice mix
      * normal-expense lines with reimbursement lines (and even reimburse
-     * different people on different lines).
+     * different payers on different lines).
      */
     reimbursementLineItems: v.optional(
       v.array(
@@ -221,8 +231,11 @@ export default defineSchema({
           lineItemIndex: v.number(),
           ownerId: v.id("owners"),
           ownerName: v.string(),
-          personId: v.id("people"),
-          personName: v.string(),
+          payerType: v.optional(v.union(v.literal("person"), v.literal("business"))),
+          payerId: v.optional(v.string()),
+          payerName: v.optional(v.string()),
+          personId: v.optional(v.id("people")),
+          personName: v.optional(v.string()),
           resolvedAt: v.optional(v.number()),
           resolvedBy: v.optional(v.string()),
         })

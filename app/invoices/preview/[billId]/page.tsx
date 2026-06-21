@@ -472,12 +472,15 @@ export default function InvoicePreviewPage() {
   // Reimbursement markers — pure label. `wholeReimbursement` covers
   // "the whole invoice is a reimbursement"; `lineReimbursements` covers
   // per-line markers. Each entry holds the business that owes (ownerId)
-  // and the person who fronted the cost (personId). `resolvedAt` flips
-  // when the user manually marks the reimbursement paid; we keep it in
-  // local state so a subsequent save doesn't blow it away.
+  // and the payer who fronted the cost. The payer can be either a person
+  // OR another business (e.g. one LLC reimbursing another), discriminated
+  // by `payerType`. `resolvedAt` flips when the user manually marks the
+  // reimbursement paid; we keep it in local state so a subsequent save
+  // doesn't blow it away.
   type ReimbursementMarker = {
     ownerId: string;
-    personId: string;
+    payerType: "person" | "business";
+    payerId: string;
     resolvedAt?: number;
     resolvedBy?: string;
   };
@@ -819,31 +822,31 @@ export default function InvoicePreviewPage() {
     }
 
     // Reimbursement markers — whole + per-line.
-    const wholeReimb = (bill as any).reimbursement as
-      | { ownerId: string; personId: string; resolvedAt?: number; resolvedBy?: string }
-      | undefined;
-    setWholeReimbursement(
-      wholeReimb
-        ? {
-            ownerId: String(wholeReimb.ownerId),
-            personId: String(wholeReimb.personId),
-            resolvedAt: wholeReimb.resolvedAt,
-            resolvedBy: wholeReimb.resolvedBy,
-          }
-        : null,
-    );
-    const lineReimbs = (bill as any).reimbursementLineItems as
-      | Array<{ lineItemIndex: number; ownerId: string; personId: string; resolvedAt?: number; resolvedBy?: string }>
-      | undefined;
+    // Prefer the new `payerType`/`payerId` fields; fall back to legacy
+    // `personId` (everything written before the business-payer change
+    // was implicitly a person).
+    const normalizeReimb = (raw: any): { ownerId: string; payerType: "person" | "business"; payerId: string; resolvedAt?: number; resolvedBy?: string } | null => {
+      if (!raw) return null;
+      const ownerId = String(raw.ownerId ?? "");
+      if (!ownerId) return null;
+      const payerType: "person" | "business" = raw.payerType === "business" ? "business" : "person";
+      const payerId = String(raw.payerId ?? raw.personId ?? "");
+      return {
+        ownerId,
+        payerType,
+        payerId,
+        resolvedAt: raw.resolvedAt,
+        resolvedBy: raw.resolvedBy,
+      };
+    };
+    const wholeReimb = (bill as any).reimbursement;
+    setWholeReimbursement(normalizeReimb(wholeReimb));
+    const lineReimbs = (bill as any).reimbursementLineItems as Array<any> | undefined;
     if (Array.isArray(lineReimbs) && lineReimbs.length > 0) {
       const map: Record<number, ReimbursementMarker> = {};
       for (const entry of lineReimbs) {
-        map[entry.lineItemIndex] = {
-          ownerId: String(entry.ownerId),
-          personId: String(entry.personId),
-          resolvedAt: entry.resolvedAt,
-          resolvedBy: entry.resolvedBy,
-        };
+        const norm = normalizeReimb(entry);
+        if (norm) map[entry.lineItemIndex] = norm;
       }
       setLineReimbursements(map);
     } else {
@@ -1496,9 +1499,17 @@ export default function InvoicePreviewPage() {
                       onChange={(event) => {
                         markDirty();
                         const ownerId = event.target.value;
+                        const firstPerson = people[0]?._id ? String(people[0]._id) : "";
+                        const firstBiz = (businesses[0] as any)?._id ? String((businesses[0] as any)._id) : "";
+                        const defaultPayerType: "person" | "business" = firstPerson ? "person" : "business";
+                        const defaultPayerId = firstPerson || firstBiz;
                         setLineReimbursements((prev) => ({
                           ...prev,
-                          [index]: { ownerId, personId: prev[index]?.personId ?? (people[0]?._id ? String(people[0]._id) : "") },
+                          [index]: {
+                            ownerId,
+                            payerType: prev[index]?.payerType ?? defaultPayerType,
+                            payerId: prev[index]?.payerId ?? defaultPayerId,
+                          },
                         }));
                       }}
                     >
@@ -1507,23 +1518,40 @@ export default function InvoicePreviewPage() {
                         <option key={String(b._id)} value={String(b._id)}>{b.name}</option>
                       ))}
                     </select>
-                    <div className={styles.label} style={{ marginTop: 8 }}>PERSON FRONTED COST</div>
+                    <div className={styles.label} style={{ marginTop: 8 }}>PAID OUT-OF-POCKET BY</div>
                     <select
                       className={styles.categorySelect}
-                      value={marker?.personId ?? ""}
+                      value={marker ? `${marker.payerType}:${marker.payerId}` : "person:"}
                       onChange={(event) => {
                         markDirty();
-                        const personId = event.target.value;
+                        const [type, id] = event.target.value.split(":");
+                        if (type !== "person" && type !== "business") return;
+                        const firstBiz = (businesses[0] as any)?._id ? String((businesses[0] as any)._id) : "";
                         setLineReimbursements((prev) => ({
                           ...prev,
-                          [index]: { ownerId: prev[index]?.ownerId ?? (businesses[0] as any)?._id ? String((businesses[0] as any)._id) : "", personId },
+                          [index]: {
+                            ownerId: prev[index]?.ownerId ?? firstBiz,
+                            payerType: type,
+                            payerId: id ?? "",
+                          },
                         }));
                       }}
                     >
-                      <option value="">select person...</option>
-                      {(people as { _id: any; name: string }[]).map((p) => (
-                        <option key={String(p._id)} value={String(p._id)}>{p.name}</option>
-                      ))}
+                      <option value="person:">select payer...</option>
+                      {people.length > 0 ? (
+                        <optgroup label="People">
+                          {(people as { _id: any; name: string }[]).map((p) => (
+                            <option key={String(p._id)} value={`person:${String(p._id)}`}>👤 {p.name}</option>
+                          ))}
+                        </optgroup>
+                      ) : null}
+                      {businesses.length > 0 ? (
+                        <optgroup label="Businesses">
+                          {businesses.map((b: any) => (
+                            <option key={String(b._id)} value={`business:${String(b._id)}`}>🏢 {b.name}</option>
+                          ))}
+                        </optgroup>
+                      ) : null}
                     </select>
                     {isSet ? (
                       <div style={{
@@ -2302,27 +2330,25 @@ export default function InvoicePreviewPage() {
       // are self-describing (no extra join needed at read time).
       const resolveOwnerName = (id: string) =>
         businesses.find((b: any) => String(b._id) === id)?.name ?? "Business";
-      const resolvePersonName = (id: string) =>
-        (people as { _id: any; name: string }[]).find((p) => String(p._id) === id)?.name ?? "Person";
+      const resolvePayerName = (payerType: "person" | "business", id: string) =>
+        payerType === "business"
+          ? (businesses.find((b: any) => String(b._id) === id)?.name ?? "Business")
+          : ((people as { _id: any; name: string }[]).find((p) => String(p._id) === id)?.name ?? "Person");
 
-      const reimbursementPayload = wholeReimbursement
-        ? {
-            ownerId: wholeReimbursement.ownerId as any,
-            ownerName: resolveOwnerName(wholeReimbursement.ownerId),
-            personId: wholeReimbursement.personId as any,
-            personName: resolvePersonName(wholeReimbursement.personId),
-            resolvedAt: wholeReimbursement.resolvedAt,
-            resolvedBy: wholeReimbursement.resolvedBy,
-          }
-        : null;
-      const reimbursementLineItemsPayload = Object.entries(lineReimbursements).map(([idx, marker]) => ({
-        lineItemIndex: Number(idx),
+      const markerToPayload = (marker: ReimbursementMarker) => ({
         ownerId: marker.ownerId as any,
         ownerName: resolveOwnerName(marker.ownerId),
-        personId: marker.personId as any,
-        personName: resolvePersonName(marker.personId),
+        payerType: marker.payerType,
+        payerId: marker.payerId,
+        payerName: resolvePayerName(marker.payerType, marker.payerId),
         resolvedAt: marker.resolvedAt,
         resolvedBy: marker.resolvedBy,
+      });
+
+      const reimbursementPayload = wholeReimbursement ? markerToPayload(wholeReimbursement) : null;
+      const reimbursementLineItemsPayload = Object.entries(lineReimbursements).map(([idx, marker]) => ({
+        lineItemIndex: Number(idx),
+        ...markerToPayload(marker),
       }));
 
       await approveBill({
@@ -3611,8 +3637,10 @@ export default function InvoicePreviewPage() {
                     optional · {wholeReimbursement
                       ? (() => {
                           const biz = businesses.find((b: any) => String(b._id) === wholeReimbursement.ownerId)?.name ?? "Business";
-                          const pers = (people as { _id: any; name: string }[]).find((p) => String(p._id) === wholeReimbursement.personId)?.name ?? "Person";
-                          return `${biz} reimburses ${pers}`;
+                          const payerName = wholeReimbursement.payerType === "business"
+                            ? (businesses.find((b: any) => String(b._id) === wholeReimbursement.payerId)?.name ?? "Business")
+                            : ((people as { _id: any; name: string }[]).find((p) => String(p._id) === wholeReimbursement.payerId)?.name ?? "Person");
+                          return `${biz} reimburses ${payerName}`;
                         })()
                       : "not a reimbursement"}
                   </div>
@@ -3626,13 +3654,19 @@ export default function InvoicePreviewPage() {
                     style={{ display: "flex", alignItems: "center", gap: 8, textAlign: "left" }}
                     onClick={() => {
                       markDirty();
-                      // Default to the first business + first person; user
-                      // can change via the pickers below. Skip if there's
-                      // nothing to pick — surfaces an empty marker the
-                      // user must edit before saving.
+                      // Default to the first business + the first available
+                      // payer (a person if any exist, otherwise the first
+                      // business). The user picks the real values via the
+                      // pickers below.
                       const firstBiz = (businesses[0] as any)?._id ? String((businesses[0] as any)._id) : "";
                       const firstPerson = people[0]?._id ? String(people[0]._id) : "";
-                      setWholeReimbursement({ ownerId: firstBiz, personId: firstPerson });
+                      const defaultPayerType: "person" | "business" = firstPerson ? "person" : "business";
+                      const defaultPayerId = firstPerson || firstBiz;
+                      setWholeReimbursement({
+                        ownerId: firstBiz,
+                        payerType: defaultPayerType,
+                        payerId: defaultPayerId,
+                      });
                     }}
                   >
                     <span>💵</span>
@@ -3658,19 +3692,32 @@ export default function InvoicePreviewPage() {
                         </select>
                       </div>
                       <div>
-                        <div className={styles.label} style={{ marginBottom: 4 }}>PERSON FRONTED COST</div>
+                        <div className={styles.label} style={{ marginBottom: 4 }}>PAID OUT-OF-POCKET BY</div>
                         <select
                           className={styles.categorySelect}
-                          value={wholeReimbursement.personId}
+                          value={`${wholeReimbursement.payerType}:${wholeReimbursement.payerId}`}
                           onChange={(event) => {
                             markDirty();
-                            setWholeReimbursement((prev) => prev ? { ...prev, personId: event.target.value } : prev);
+                            const [type, id] = event.target.value.split(":");
+                            if (type !== "person" && type !== "business") return;
+                            setWholeReimbursement((prev) => prev ? { ...prev, payerType: type, payerId: id ?? "" } : prev);
                           }}
                         >
-                          <option value="">select person...</option>
-                          {(people as { _id: any; name: string }[]).map((p) => (
-                            <option key={String(p._id)} value={String(p._id)}>{p.name}</option>
-                          ))}
+                          <option value="person:">select payer...</option>
+                          {people.length > 0 ? (
+                            <optgroup label="People">
+                              {(people as { _id: any; name: string }[]).map((p) => (
+                                <option key={String(p._id)} value={`person:${String(p._id)}`}>👤 {p.name}</option>
+                              ))}
+                            </optgroup>
+                          ) : null}
+                          {businesses.length > 0 ? (
+                            <optgroup label="Businesses">
+                              {businesses.map((b: any) => (
+                                <option key={String(b._id)} value={`business:${String(b._id)}`}>🏢 {b.name}</option>
+                              ))}
+                            </optgroup>
+                          ) : null}
                         </select>
                       </div>
                     </div>
