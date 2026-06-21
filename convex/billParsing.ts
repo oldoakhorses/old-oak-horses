@@ -237,6 +237,18 @@ export const parseBillPdf = internalAction({
       if (isAirbnbProviderSignal(provider?.name, pickString(parsed, ["provider_name", "providerName"]), extractedPdfText)) {
         parsed = normalizeAirbnbReceiptParse(parsed, extractedPdfText);
       }
+      // TD Equine Veterinary Group (Calgary, AB). Multi-patient layout
+      // with per-horse sections + recurring vet descriptions. Detect and
+      // normalize: CAD currency, auto-categorize line items, attribute
+      // each row to the horse it belongs to.
+      const tdEquineSignal = isTdEquineProviderSignal(
+        provider?.name,
+        pickString(parsed, ["contact_name", "contactName", "provider_name", "providerName"]),
+        extractedPdfText,
+      );
+      if (tdEquineSignal) {
+        parsed = normalizeTdEquineParse(parsed, extractedPdfText);
+      }
       const eqSportsSignal = isEqSportsProviderSignal(
         provider?.name,
         pickString(parsed, ["contact_name", "contactName"]),
@@ -2025,6 +2037,216 @@ function isAirbnbProviderSignal(...values: Array<string | undefined>) {
   const joined = values.filter(Boolean).join(" ").toLowerCase();
   if (!joined) return false;
   return joined.includes("airbnb");
+}
+
+/** Fingerprint for TD Equine Veterinary Group (Calgary, AB). Detects both
+ *  the brand name and the email-domain variant ("tdequine"). */
+function isTdEquineProviderSignal(...values: Array<string | undefined>) {
+  const joined = values.filter(Boolean).join(" ").toLowerCase();
+  if (!joined) return false;
+  return (
+    joined.includes("td equine") ||
+    joined.includes("tdequine") ||
+    joined.includes("td equine veterinary group") ||
+    joined.includes("tdequinevet")
+  );
+}
+
+/**
+ * Derive a veterinary subcategory + label from a TD Equine line item
+ * description. The clinic's descriptions follow a stable lexicon:
+ *
+ *   "FEI Treatment"                                  → treatment
+ *   "Treatment ..."                                  → treatment
+ *   "Ultrasound Diagnostic" / "Ultrasound ..."       → exams_diagnostics
+ *   "Lab: ..."                                       → lab_work
+ *   "Blood collection & interpretation"              → lab_work
+ *   "Rx: ..."                                        → medication
+ *   "Tournament/Show Service ..."                    → fees
+ *   "Joint Injection ..."                            → joint_injections
+ *   "Shockwave ..."                                  → shockwave
+ *   "Sedation ..."                                   → sedation
+ *   "Vaccin..." / "Coggins" / "Strangles" / "Flu"    → vaccinations
+ *   "X-Ray ..." / "Radiograph ..." / "Imaging ..."   → exams_diagnostics
+ *   "Exam ..."                                       → exams_diagnostics
+ *
+ * Falls back to undefined when nothing matches — the user can still set
+ * the subcategory by hand at approval.
+ */
+function classifyTdEquineLineItem(description: string): string | undefined {
+  const d = (description || "").toLowerCase().trim();
+  if (!d) return undefined;
+  if (d.startsWith("rx:") || d.includes(" rx ") || d.startsWith("prescription")) return "medication";
+  if (d.startsWith("lab:") || d.includes("western blot") || d.includes("antibody") || d.includes("titer")) return "lab_work";
+  if (d.includes("blood collection") || d.includes("blood draw") || d.includes("blood test")) return "lab_work";
+  if (d.includes("ultrasound") || d.includes("x-ray") || d.includes("xray") || d.includes("radiograph") || d.includes("imaging") || d.includes("mri") || d.includes("ct scan")) return "exams_diagnostics";
+  if (d.includes("tournament") || d.includes("show service") || d.includes("show fee")) return "fees";
+  if (d.includes("joint injection") || d.includes("joint inj")) return "joint_injections";
+  if (d.includes("shockwave")) return "shockwave";
+  if (d.includes("sedation") || d.includes("sedate")) return "sedation";
+  if (d.includes("vaccin") || /\b(coggins|strangles|flu|tetanus|rabies|west nile|ehv|wee\b|eee\b)\b/.test(d)) return "vaccinations";
+  if (d.includes("treatment") || d.includes("fei treatment")) return "treatment";
+  if (d.includes("exam") || d.includes("evaluation") || d.includes("lameness")) return "exams_diagnostics";
+  return undefined;
+}
+
+/**
+ * TD Equine invoice normalizer. Their format is a multi-patient horse-
+ * grouped layout:
+ *
+ *   Ticket/Invoice | Doctor | Date | Description | Quantity | Amount
+ *   {Horse Name}                                                   ← section header
+ *   {ticket} {doctor} {date} {description} {qty} {amount}
+ *   ...more rows for this horse
+ *   {Horse Name} Subtotal: $X    Tax 5% Tax: $Y    Total: $Z       ← subtotal block
+ *   {Next Horse Name}                                              ← next section
+ *   ...
+ *
+ * This normalizer:
+ *   1. Force-stamps contact_name + provider_name to the canonical brand.
+ *   2. Sets currency to CAD (Calgary clinic — always sends CAD).
+ *   3. Walks the extracted text to identify each per-horse section's
+ *      line items and stamps the right horse_name on each row, even
+ *      when Claude's extraction missed it.
+ *   4. Auto-categorizes every line item's veterinary subcategory based
+ *      on description patterns (treatment / lab_work / medication / ...).
+ *   5. Always categorizes the bill itself as "veterinary".
+ */
+function normalizeTdEquineParse(
+  parsed: Record<string, unknown>,
+  extractedText: string,
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...parsed };
+
+  next.contact_name = "TD Equine Veterinary Group";
+  next.provider_name = "TD Equine Veterinary Group";
+  next.vendorName = "TD Equine Veterinary Group";
+
+  // Calgary-based clinic — invoices are always CAD. Flag for the currency
+  // conversion path (ensureUsdAmounts handles the actual multiplication
+  // downstream when exchange rate is available).
+  next.currency = "CAD";
+  next.original_currency = "CAD";
+  next.originalCurrency = "CAD";
+
+  // Build a map: line-of-text → horse_name. We walk the extracted PDF
+  // text top-to-bottom; whenever we see a candidate horse-section header
+  // (a line that isn't a header row, isn't a subtotal/tax/total row, and
+  // doesn't look like a line item), every subsequent line item until the
+  // next "{Horse} Subtotal:" or new section belongs to that horse.
+  const lines = (extractedText || "").split(/\r?\n/);
+  const horseByDescription = new Map<string, string>();
+  const horseTotals = new Map<string, number>();
+  let currentHorse: string | null = null;
+
+  const isStructuralLine = (line: string): boolean => {
+    const l = line.trim();
+    if (!l) return true;
+    if (/^(ticket\/invoice|doctor|date|description|quantity|amount)$/i.test(l)) return true;
+    if (/^(invoice details|account|name|number|date range|printed|page \d+ of)/i.test(l)) return true;
+    if (/^(subtotal|tax|total|gst)/i.test(l)) return true;
+    if (/this is your invoice summary/i.test(l)) return true;
+    if (/please refer to your account statement/i.test(l)) return true;
+    return false;
+  };
+
+  const looksLikeLineItem = (line: string): boolean => {
+    // Line items contain a $-amount and a date (e.g. "6/14/26") or an
+    // "Invoice #..." prefix.
+    return /\$[\d,]+\.\d{2}/.test(line) && (/\bInvoice\s*#/i.test(line) || /\d{1,2}\/\d{1,2}\/\d{2,4}/.test(line));
+  };
+
+  const looksLikeHorseHeader = (line: string): boolean => {
+    const l = line.trim();
+    if (!l) return false;
+    if (isStructuralLine(l)) return false;
+    if (looksLikeLineItem(l)) return false;
+    // Common horse-name shape: 1-4 word tokens, mostly letters, may have
+    // a number suffix (e.g. "Ben 431") or apostrophes/accents/hyphens.
+    if (!/^[A-Z][A-Za-zÀ-ÿ' 0-9.\-]{0,40}$/.test(l)) return false;
+    // Skip obviously non-horse lines.
+    if (/\b(suite|street|avenue|blvd|inc|llc|ltd|corp|email|phone|fax|tel)\b/i.test(l)) return false;
+    if (l.length > 35) return false;
+    return true;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    if (looksLikeHorseHeader(trimmed)) {
+      // Confirm it's actually a horse section by peeking ahead for either
+      // a line item or that horse's "Subtotal" within the next 30 lines.
+      const lookahead = lines.slice(i + 1, i + 30).join("\n");
+      const subtotalRegex = new RegExp(`${trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+Subtotal`, "i");
+      if (subtotalRegex.test(lookahead) || /\bInvoice\s*#/i.test(lookahead)) {
+        currentHorse = trimmed;
+        if (!horseTotals.has(currentHorse)) horseTotals.set(currentHorse, 0);
+        continue;
+      }
+    }
+    if (currentHorse && looksLikeLineItem(trimmed)) {
+      const amountMatch = trimmed.match(/\$([\d,]+\.\d{2})\s*$/);
+      const amount = amountMatch ? Number(amountMatch[1].replace(/,/g, "")) : 0;
+      if (amount > 0) {
+        horseTotals.set(currentHorse, (horseTotals.get(currentHorse) ?? 0) + amount);
+      }
+      // Build a description key from the line so we can match this row
+      // back to whatever Claude extracted. Strip the leading
+      // "Invoice #... Watt, S 6/14/26 " noise and trailing amount.
+      const descKey = trimmed
+        .replace(/^Invoice\s*#\S+\s*\([^)]+\)\s*/i, "")
+        .replace(/^[A-Za-z]+,\s*[A-Za-z]\s*/, "")
+        .replace(/^\d{1,2}\/\d{1,2}\/\d{2,4}\s*/, "")
+        .replace(/\s+\d+(\s+\w+)?\s*\$[\d,]+\.\d{2}\s*$/, "")
+        .trim()
+        .toLowerCase();
+      if (descKey) horseByDescription.set(descKey, currentHorse);
+    }
+  }
+
+  // Apply horse attribution + subcategory categorization to the parsed
+  // line items. Try to match each parsed line back to a horse via its
+  // description key.
+  const lineItems = Array.isArray(next.line_items) ? next.line_items : Array.isArray((next as any).lineItems) ? (next as any).lineItems : [];
+  const updatedLineItems = (lineItems as any[]).map((row: any) => {
+    const out = { ...row };
+    const desc = String(row.description ?? row.descr ?? "").trim();
+    const key = desc.toLowerCase();
+
+    // Prefer an existing horse_name on the parsed row (Claude may have
+    // gotten it right); fall back to our per-line map.
+    let horseName = String(row.horse_name ?? row.horseName ?? "").trim();
+    if (!horseName) {
+      // Try exact match first, then partial.
+      if (horseByDescription.has(key)) horseName = horseByDescription.get(key)!;
+      else {
+        for (const [k, h] of horseByDescription) {
+          if (k && (k.includes(key) || key.includes(k))) {
+            horseName = h;
+            break;
+          }
+        }
+      }
+    }
+    if (horseName) {
+      out.horse_name = horseName;
+      out.horseName = horseName;
+    }
+
+    // Force category to veterinary; pick a subcategory by lexicon.
+    out.category = "veterinary";
+    const subcat = classifyTdEquineLineItem(desc);
+    if (subcat) {
+      out.subcategory = subcat;
+      out.subcategoryAutoDetected = true;
+    }
+    return out;
+  });
+
+  next.line_items = updatedLineItems;
+  (next as any).lineItems = updatedLineItems;
+
+  return next;
 }
 
 /**
