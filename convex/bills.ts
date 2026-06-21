@@ -2548,6 +2548,8 @@ export const saveHorseAssignment = mutation({
       v.object({
         lineItemIndex: v.number(),
         splitType: v.optional(v.union(v.literal("all"), v.literal("invoice"))),
+        viaGroupId: v.optional(v.id("horseGroups")),
+        viaGroupName: v.optional(v.string()),
         splits: v.array(
           v.object({
             horseId: v.id("horses"),
@@ -2556,7 +2558,12 @@ export const saveHorseAssignment = mutation({
           })
         )
       })
-    )
+    ),
+    /** Whole-invoice horse-group reference. Set when the user picked a
+     *  group for the whole invoice's horse split. `assignedViaGroupId` is
+     *  cleared when omitted. */
+    assignedViaGroupId: v.optional(v.union(v.null(), v.id("horseGroups"))),
+    assignedViaGroupName: v.optional(v.union(v.null(), v.string())),
   },
   handler: async (ctx, args) => {
     const bill = await ctx.db.get(args.billId);
@@ -2565,7 +2572,9 @@ export const saveHorseAssignment = mutation({
       horseSplitType: args.horseSplitType,
       assignedHorses: args.assignedHorses,
       horseAssignments: args.horseAssignments,
-      splitLineItems: args.splitLineItems
+      splitLineItems: args.splitLineItems,
+      assignedViaGroupId: args.assignedViaGroupId ?? undefined,
+      assignedViaGroupName: args.assignedViaGroupName ?? undefined,
     });
 
     const lineItems = getLineItems(bill.extractedData);

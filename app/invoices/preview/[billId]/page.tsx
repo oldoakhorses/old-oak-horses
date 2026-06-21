@@ -417,6 +417,60 @@ export default function InvoicePreviewPage() {
     () => new Map(allHorses.map((h) => [String(h._id), h.name])),
     [allHorses],
   );
+
+  // Named horse groups — used as a "split evenly across these N horses"
+  // shortcut on whole-invoice and per-line assignments. Hoisted above
+  // the memos that read from it so deletedGroupSplitsByIndex etc. can
+  // reference it.
+  const horseGroups = (useQuery(api.horseGroups.list, {}) ?? []) as Array<{
+    _id: any;
+    name: string;
+    horseIds: any[];
+  }>;
+
+  /**
+   * Per-line lookup of "this line was split via a horse group that is
+   * now DELETED". When non-null, the line-row renderer falls back to
+   * showing the snapshotted horse names instead of the generic "↔ split
+   * in invoice" pill. Keeps the bill readable after a group is deleted.
+   */
+  const deletedGroupSplitsByIndex = useMemo(() => {
+    const out: Record<number, { groupName: string; horses: Array<{ horseId: string; horseName: string; amount: number }> }> = {};
+    const list = ((bill as any)?.splitLineItems ?? []) as any[];
+    for (const entry of list) {
+      const vgi = entry.viaGroupId ? String(entry.viaGroupId) : null;
+      if (!vgi) continue;
+      const exists = horseGroups.find((g) => String(g._id) === vgi);
+      if (exists) continue;
+      out[entry.lineItemIndex] = {
+        groupName: String(entry.viaGroupName ?? "deleted group"),
+        horses: (entry.splits ?? []).map((s: any) => ({
+          horseId: String(s.horseId),
+          horseName: String(s.horseName ?? "Unknown"),
+          amount: Number(s.amount ?? 0),
+        })),
+      };
+    }
+    return out;
+  }, [bill, horseGroups]);
+
+  /** Same lookup for the whole-invoice horse split, when the source
+   *  group has been deleted. Surfaces snapshotted horse names alongside
+   *  the now-orphan group name. */
+  const deletedWholeGroupHorses = useMemo(() => {
+    const vgi = (bill as any)?.assignedViaGroupId ? String((bill as any).assignedViaGroupId) : null;
+    if (!vgi) return null;
+    const exists = horseGroups.find((g) => String(g._id) === vgi);
+    if (exists) return null;
+    return {
+      groupName: String((bill as any)?.assignedViaGroupName ?? "deleted group"),
+      horses: ((bill as any)?.assignedHorses ?? []).map((entry: any) => ({
+        horseId: String(entry.horseId),
+        horseName: String(entry.horseName ?? "Unknown"),
+        amount: Number(entry.amount ?? 0),
+      })),
+    };
+  }, [bill, horseGroups]);
   const people = useQuery(api.people.getAllPeople) ?? [];
   // Owners are surfaced as "businesses" in this flow — when the user
   // picks "🏢 businesses" the same entity-list slot pulls from here.
@@ -428,14 +482,6 @@ export default function InvoicePreviewPage() {
         .map((o: any) => ({ _id: o._id, name: o.name })),
     [businessesRaw],
   );
-  // Named horse groups — used as a "split evenly across these N horses"
-  // shortcut on whole-invoice and per-line assignments.
-  const horseGroups = (useQuery(api.horseGroups.list, {}) ?? []) as Array<{
-    _id: any;
-    name: string;
-    horseIds: any[];
-  }>;
-
   // Reverse CC matching: only ask the server when there's something to ask
   // about. Skip for already-linked bills and for the brief window before
   // bill loads.
@@ -512,6 +558,11 @@ export default function InvoicePreviewPage() {
   const [wholeAssignedIds, setWholeAssignedIds] = useState<string[]>([]);
   const [wholeAmounts, setWholeAmounts] = useState<Record<string, string>>({});
   const [wholeAssignMode, setWholeAssignMode] = useState<WholeAssignMode>("split");
+  /** Source group when the whole-invoice horse assignment came from a
+   *  group pick. Stamped on the bill at save time so a future reload
+   *  (and future group deletion) can show the right label. Null when
+   *  the assignment was manually picked. */
+  const [wholeAssignedViaGroupId, setWholeAssignedViaGroupId] = useState<string | null>(null);
   const [wholeCategoryOverride, setWholeCategoryOverride] = useState("");
   const [wholeSubcategoryOverride, setWholeSubcategoryOverride] = useState("");
 
@@ -695,12 +746,21 @@ export default function InvoicePreviewPage() {
         String(row.horse_name ?? row.horseName ?? "").toLowerCase().trim() === SPLIT_ALL
         || (Array.isArray((row as any).horses) && (row as any).horses.includes(SPLIT_ALL));
 
-      // Resolve which sentinel to load. Explicit splitType wins; legacy
-      // rows fall back to "invoice" unless we can prove "all" via the
+      // Resolve which sentinel to load. Group reference wins (when the
+      // group still exists); otherwise explicit splitType; legacy rows
+      // fall back to "invoice" unless we can prove "all" via the
       // horse-set comparison below.
-      let splitSentinel: typeof SPLIT_ALL | typeof SPLIT_INVOICE | null = null;
+      let splitSentinel: string | null = null;
+      const savedViaGroupId = (savedSplitEntry as any)?.viaGroupId
+        ? String((savedSplitEntry as any).viaGroupId)
+        : null;
+      const groupStillExists = savedViaGroupId
+        ? Boolean(horseGroups.find((g) => String(g._id) === savedViaGroupId))
+        : false;
       if (savedSplitEntry) {
-        if (savedSplitEntry.splitType === "all") splitSentinel = SPLIT_ALL;
+        if (savedViaGroupId && groupStillExists) {
+          splitSentinel = SPLIT_GROUP_PREFIX + savedViaGroupId;
+        } else if (savedSplitEntry.splitType === "all") splitSentinel = SPLIT_ALL;
         else if (savedSplitEntry.splitType === "invoice") splitSentinel = SPLIT_INVOICE;
         else {
           // Legacy row: infer from data. If the split covered horses
@@ -833,6 +893,17 @@ export default function InvoicePreviewPage() {
       setWholeAssignedIds([]);
       setWholeAmounts({});
     }
+
+    // Whole-invoice group source. Only restore the group sentinel if
+    // the group still exists; otherwise leave the horse selection as-is
+    // (so the pill shows individual horses for a deleted group).
+    const savedWholeViaGroupId = (bill as any).assignedViaGroupId
+      ? String((bill as any).assignedViaGroupId)
+      : null;
+    const wholeGroupStillExists = savedWholeViaGroupId
+      ? Boolean(horseGroups.find((g) => String(g._id) === savedWholeViaGroupId))
+      : false;
+    setWholeAssignedViaGroupId(wholeGroupStillExists ? savedWholeViaGroupId : null);
 
     // Reimbursement markers — whole + per-line.
     // Prefer the new `payerType`/`payerId` fields; fall back to legacy
@@ -1268,10 +1339,33 @@ export default function InvoicePreviewPage() {
             }`}
             onClick={() => setOpenDropdownId((prev) => (prev === index ? null : index))}
           >
-            {hasSplitAll ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillSplit}`}>↔ split all</span> : null}
-            {hasSplitInvoice ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillSplit}`}>↔ split in invoice</span> : null}
-            {groupForRow ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillSplit}`}>👥 {groupForRow.name} ({groupForRow.horseIds.length})</span> : null}
-            {hasBusinessGeneral ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillGeneral}`}>◼ general</span> : null}
+            {(() => {
+              // When this line was originally split via a horse group
+              // that's since been deleted, fall back to listing the
+              // snapshotted horse names instead of the generic "↔ split
+              // in invoice" pill. Preserves the audit trail of which
+              // horses were charged after the group's gone.
+              const orphan = deletedGroupSplitsByIndex[index];
+              if (orphan) {
+                return (
+                  <>
+                    {orphan.horses.map((h) => (
+                      <span key={`orphan:${h.horseId}`} className={styles.lineHorsePill} title={`from deleted group "${orphan.groupName}"`}>
+                        🐴 {h.horseName}
+                      </span>
+                    ))}
+                  </>
+                );
+              }
+              return (
+                <>
+                  {hasSplitAll ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillSplit}`}>↔ split all</span> : null}
+                  {hasSplitInvoice ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillSplit}`}>↔ split in invoice</span> : null}
+                  {groupForRow ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillSplit}`}>👥 {groupForRow.name} ({groupForRow.horseIds.length})</span> : null}
+                  {hasBusinessGeneral ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillGeneral}`}>◼ general</span> : null}
+                </>
+              );
+            })()}
             {!hasAnySplit && !hasBusinessGeneral ? selectedEntityIds.map((id) => {
               // Resolve each pill's entity from the ID, not the global
               // assignType — so a horse picked under business mode shows
@@ -2005,7 +2099,9 @@ export default function InvoicePreviewPage() {
             horseSplitType: "single",
             assignedHorses: [],
             horseAssignments: [],
-            splitLineItems: []
+            splitLineItems: [],
+            assignedViaGroupId: null,
+            assignedViaGroupName: null,
           });
         } else {
           await savePersonAssignment({
@@ -2031,12 +2127,19 @@ export default function InvoicePreviewPage() {
           };
         });
 
+        const wholeGroupSnapshot = wholeAssignedViaGroupId
+          ? horseGroups.find((g) => String(g._id) === wholeAssignedViaGroupId)
+          : null;
         await saveHorseAssignment({
           billId,
           horseSplitType: assignedHorses.length > 1 ? "split" : "single",
           assignedHorses,
           horseAssignments: [],
-          splitLineItems: []
+          splitLineItems: [],
+          assignedViaGroupId: wholeAssignedViaGroupId
+            ? (wholeAssignedViaGroupId as Id<"horseGroups">)
+            : null,
+          assignedViaGroupName: wholeGroupSnapshot?.name ?? null,
         });
         return;
       }
@@ -2174,9 +2277,20 @@ export default function InvoicePreviewPage() {
           // matches the on-bill semantics — saved horses are concrete.
           const splitTypeTag: "all" | "invoice" = isSplitAll ? "all" : "invoice";
           const splitAmounts = splitEven(getLineAmount(row.line), targetIds.length);
+          // Stamp the source group on the entry so the picker / pill can
+          // restore the group tag on the next load (and gracefully fall
+          // back to horse names if the group is later deleted).
+          const groupRef = isGroup
+            ? (() => {
+                const gid = groupIdFromSentinel(sentinel);
+                const g = horseGroups.find((entry) => String(entry._id) === gid);
+                return { viaGroupId: gid as Id<"horseGroups">, viaGroupName: g?.name ?? "Group" };
+              })()
+            : { viaGroupId: undefined, viaGroupName: undefined };
           return {
             lineItemIndex: row.index,
             splitType: splitTypeTag,
+            ...groupRef,
             splits: targetIds.map((horseId, idx) => {
               const horse = horses.find((entry) => String(entry._id) === horseId);
               return {
@@ -2186,7 +2300,7 @@ export default function InvoicePreviewPage() {
               };
             })
           };
-        }).filter(Boolean) as Array<{ lineItemIndex: number; splitType: "all" | "invoice"; splits: Array<{ horseId: Id<"horses">; horseName: string; amount: number }> }>;
+        }).filter(Boolean) as Array<{ lineItemIndex: number; splitType: "all" | "invoice"; viaGroupId?: Id<"horseGroups">; viaGroupName?: string; splits: Array<{ horseId: Id<"horses">; horseName: string; amount: number }> }>;
 
       const horseTotals = new Map<string, { horseName: string; direct: number; shared: number }>();
       for (const row of directAssignments) {
@@ -2218,7 +2332,11 @@ export default function InvoicePreviewPage() {
         horseSplitType: splitLineItems.length > 0 || assignedHorses.length > 1 ? "split" : "single",
         assignedHorses,
         horseAssignments,
-        splitLineItems
+        splitLineItems,
+        // Per-line mode doesn't have a whole-invoice group; clear any
+        // stale value so it doesn't confuse the read code later.
+        assignedViaGroupId: null,
+        assignedViaGroupName: null,
       });
       return;
     }
@@ -3339,6 +3457,9 @@ export default function InvoicePreviewPage() {
                           );
                           const toggleEntity = (id: string) => {
                             markDirty();
+                            // Manual edit clears the group source — the selection
+                            // is no longer a one-to-one snapshot of any group.
+                            setWholeAssignedViaGroupId(null);
                             setWholeAssignedIds((prev) => {
                               if (isSingle) {
                                 // Single mode: behaves like a radio. Picking
@@ -3418,6 +3539,7 @@ export default function InvoicePreviewPage() {
                                               setWholeAssignedIds(ids);
                                               setWholeAmounts({});
                                               setWholeSplitType("even");
+                                              setWholeAssignedViaGroupId(String(group._id));
                                               setWholePickerOpen(false);
                                             }}
                                             style={{
@@ -3491,6 +3613,7 @@ export default function InvoicePreviewPage() {
                                         type="button"
                                         onClick={() => {
                                           markDirty();
+                                          setWholeAssignedViaGroupId(null);
                                           setWholeAssignedIds([]);
                                           setWholeAmounts({});
                                         }}
@@ -3541,6 +3664,7 @@ export default function InvoicePreviewPage() {
                             className={styles.removeBtn}
                             onClick={() => {
                               markDirty();
+                              setWholeAssignedViaGroupId(null);
                               setWholeAssignedIds((prev) => prev.filter((row) => row !== id));
                               setWholeAmounts((prev) => {
                                 const next = { ...prev };

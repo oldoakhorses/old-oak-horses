@@ -104,6 +104,11 @@ export default defineSchema({
         })
       )
     ),
+    /** Whole-invoice horse-group reference. Set when the user picked a
+     *  group on the whole invoice (the assignedHorses entries above are
+     *  the snapshot of that group's horses at save time). */
+    assignedViaGroupId: v.optional(v.id("horseGroups")),
+    assignedViaGroupName: v.optional(v.string()),
     /**
      * Whole-invoice business assignments — analogous to assignedHorses/
      * assignedPeople. Each entry pins a slice of the invoice total to a
@@ -144,6 +149,13 @@ export default defineSchema({
            *  with fallback to "all" if the split's horse set is broader
            *  than the bill's direct-assigned horse set. */
           splitType: v.optional(v.union(v.literal("all"), v.literal("invoice"))),
+          /** Source group reference. When the split was triggered by a
+           *  horse-group pick, we stamp the groupId here so the picker can
+           *  re-show the group tag on the next load. Snapshot of the
+           *  group's name is kept too so the UI can still render a useful
+           *  tag if the group has since been deleted. */
+          viaGroupId: v.optional(v.id("horseGroups")),
+          viaGroupName: v.optional(v.string()),
           splits: v.array(
             v.object({
               horseId: v.id("horses"),
