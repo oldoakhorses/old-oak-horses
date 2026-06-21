@@ -142,6 +142,7 @@ export default function StatementReconcilePage() {
   const updateMatch = useMutation(api.ccReconcile.updateTransactionMatch);
   const assignTxn = useMutation(api.ccReconcile.assignTransaction);
   const approveTxn = useMutation(api.ccReconcile.approveTransaction);
+  const reconcileBillAmount = useMutation(api.ccReconcile.reconcileBillAmountToTransaction);
   const approveAllAssigned = useMutation(api.ccReconcile.approveAllAssigned);
   const approveStatement = useMutation(api.ccReconcile.approveStatement);
   const deleteStatement = useMutation(api.ccReconcile.deleteStatement);
@@ -486,6 +487,62 @@ export default function StatementReconcilePage() {
                 {isExpanded ? (
                   <div className={styles.txnExpanded}>
                     <div className={styles.txnFullDesc}>{txn.description}</div>
+
+                    {/* Close-match disambiguation. When the linked bill's
+                        invoice total differs from the bank charge by more
+                        than a penny but less than ~10%, surface both
+                        amounts and let the user pick which one is
+                        canonical. Picking the bank amount writes a
+                        synthetic "FX / reconciliation" line item on the
+                        bill so totals still reconcile. */}
+                    {(() => {
+                      if (!txn.matchedBillId) return null;
+                      const billTotal = (txn as any).matchedBillTotalUsd;
+                      if (typeof billTotal !== "number") return null;
+                      const bankAmount = Math.abs(txn.amount);
+                      const diff = Math.abs(bankAmount - billTotal);
+                      if (diff < 0.02) return null; // exact-ish, no prompt
+                      if (billTotal > 0 && diff / billTotal > 0.15) return null; // too far apart
+                      return (
+                        <div style={{ background: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.2)", borderRadius: 6, padding: "10px 12px", marginBottom: 10, fontSize: 12 }}>
+                          <div style={{ fontWeight: 700, marginBottom: 6 }}>amounts don&apos;t match — pick canonical</div>
+                          <div style={{ color: "#6B7084", marginBottom: 8 }}>
+                            bank charge {fmtUSD(-bankAmount)} · invoice total {fmtUSD(-billTotal)} · diff ${diff.toFixed(2)}
+                          </div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                              type="button"
+                              className={styles.btnAction}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  await reconcileBillAmount({ billId: txn.matchedBillId as any, transactionId: txn._id, useAmount: "transaction" });
+                                } catch (err) {
+                                  alert(`Reconcile failed: ${err instanceof Error ? err.message : String(err)}`);
+                                }
+                              }}
+                            >
+                              use bank amount ({fmtUSD(-bankAmount)})
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.btnAction}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  await reconcileBillAmount({ billId: txn.matchedBillId as any, transactionId: txn._id, useAmount: "bill" });
+                                } catch (err) {
+                                  alert(`Reconcile failed: ${err instanceof Error ? err.message : String(err)}`);
+                                }
+                              }}
+                            >
+                              keep invoice ({fmtUSD(-billTotal)})
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     <div className={styles.txnActions}>
                       <button
                         type="button"

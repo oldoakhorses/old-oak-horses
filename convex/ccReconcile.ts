@@ -169,15 +169,36 @@ export const getStatement = query({
       return db - da;
     });
 
-    const matched = transactions.filter((t) => t.matchedBillId);
-    const unmatched = transactions.filter((t) => !t.matchedBillId && t.amount < 0);
-    const credits = transactions.filter((t) => t.amount > 0);
-    const approved = transactions.filter((t) => t.isApproved);
-    const assigned = transactions.filter((t) => t.assignType);
+    // Enrich each matched transaction with the matched bill's USD total
+    // so the UI can detect close-but-not-exact amount drift (e.g. when
+    // the bill is CAD-converted and the bank's actual charge ran through
+    // a slightly different exchange rate or carried a small fee).
+    const enrichedTransactions = await Promise.all(
+      transactions.map(async (t) => {
+        if (!t.matchedBillId) return { ...t, matchedBillTotalUsd: undefined };
+        const bill = await ctx.db.get(t.matchedBillId);
+        if (!bill) return { ...t, matchedBillTotalUsd: undefined };
+        const extracted = ((bill as any).extractedData ?? {}) as Record<string, unknown>;
+        const totalRaw =
+          (extracted as any).invoice_total_usd ??
+          (extracted as any).invoiceTotalUsd ??
+          (extracted as any).total;
+        const total = typeof totalRaw === "number" && Number.isFinite(totalRaw)
+          ? Math.abs(totalRaw)
+          : undefined;
+        return { ...t, matchedBillTotalUsd: total };
+      }),
+    );
+
+    const matched = enrichedTransactions.filter((t) => t.matchedBillId);
+    const unmatched = enrichedTransactions.filter((t) => !t.matchedBillId && t.amount < 0);
+    const credits = enrichedTransactions.filter((t) => t.amount > 0);
+    const approved = enrichedTransactions.filter((t) => t.isApproved);
+    const assigned = enrichedTransactions.filter((t) => t.assignType);
 
     return {
       ...stmt,
-      transactions,
+      transactions: enrichedTransactions,
       matchedCount: matched.length,
       unmatchedCount: unmatched.length,
       creditCount: credits.length,
@@ -1379,6 +1400,85 @@ export const linkBillToTransaction = mutation({
     // the link.
     await ctx.db.patch(args.billId, {
       ccTransactionId: args.transactionId,
+    });
+  },
+});
+
+/**
+ * Reconcile a linked bill's invoice_total_usd to the matched CC
+ * transaction's amount. Common case: bill was CAD-converted at ~0.72
+ * and the bank's actual charge ran a slightly different exchange rate
+ * (or carried a small foreign-transaction fee), leaving a couple-dollar
+ * gap. User picks "use bank amount" and we:
+ *
+ *   - Set bill.extractedData.invoice_total_usd to the txn amount.
+ *   - Append a synthetic line item "FX / bank reconciliation
+ *     adjustment" carrying the difference (positive or negative) so
+ *     line items still sum to the new total.
+ *   - Stamp originalTotal/exchangeRate to reflect the override so the
+ *     UI shows the user-confirmed reconciled rate.
+ *
+ * Calling with useAmount === "bill" is a no-op on the totals — it just
+ * cements the existing bill amount as canonical. The link itself is
+ * always created (or preserved) regardless.
+ */
+export const reconcileBillAmountToTransaction = mutation({
+  args: {
+    billId: v.id("bills"),
+    transactionId: v.id("ccTransactions"),
+    useAmount: v.union(v.literal("bill"), v.literal("transaction")),
+  },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    const txn = await ctx.db.get(args.transactionId);
+    if (!bill) throw new Error("Bill not found");
+    if (!txn) throw new Error("Transaction not found");
+
+    // Make sure the two are linked. If a different transaction is already
+    // matched, refuse — caller should unlink first.
+    if (txn.matchedBillId && String(txn.matchedBillId) !== String(args.billId)) {
+      throw new Error("This transaction is linked to a different bill — unlink first");
+    }
+    await ctx.db.patch(args.transactionId, {
+      matchedBillId: args.billId,
+      matchConfidence: "exact",
+    });
+    await ctx.db.patch(args.billId, { ccTransactionId: args.transactionId });
+
+    if (args.useAmount !== "transaction") return;
+
+    const extracted = (((bill as any).extractedData ?? {}) as Record<string, unknown>);
+    const currentTotalRaw =
+      (extracted as any).invoice_total_usd ??
+      (extracted as any).invoiceTotalUsd ??
+      (extracted as any).total ??
+      0;
+    const currentTotal = Math.abs(Number(currentTotalRaw) || 0);
+    const bankAmount = Math.abs(txn.amount);
+    if (Math.abs(bankAmount - currentTotal) < 0.005) return; // already matches
+
+    const adjustment = round2(bankAmount - currentTotal);
+    const newLineItems = Array.isArray((extracted as any).line_items)
+      ? [...((extracted as any).line_items as any[])]
+      : Array.isArray((extracted as any).lineItems)
+        ? [...((extracted as any).lineItems as any[])]
+        : [];
+    newLineItems.push({
+      description: "FX / bank reconciliation adjustment",
+      quantity: 1,
+      amount: adjustment,
+      total_usd: adjustment,
+      is_fee: true,
+    });
+
+    await ctx.db.patch(args.billId, {
+      extractedData: {
+        ...extracted,
+        line_items: newLineItems,
+        invoice_total_usd: round2(bankAmount),
+        invoiceTotalUsd: round2(bankAmount),
+        total: round2(bankAmount),
+      },
     });
   },
 });
