@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -126,6 +126,8 @@ const MEDICATION_OPTIONS = [
 export default function HorseRecordsPage() {
   const params = useParams<{ horseId: string }>();
   const horseId = params?.horseId as Id<"horses">;
+  const searchParams = useSearchParams();
+  const focusRecordId = searchParams?.get("focus") || null;
 
   const horse = useQuery(api.horses.getHorseById, horseId ? { horseId } : "skip");
   // Medications live on /meds (and the horse profile's MEDS tile), so we
@@ -189,6 +191,20 @@ export default function HorseRecordsPage() {
     setSortColumn("date");
     setSortDirection(activeTab === "upcoming" ? "asc" : "desc");
   }, [activeTab]);
+
+  // When linked from the all-records page with ?focus=<recordId>, expand
+  // that record and scroll it into view once data is loaded.
+  useEffect(() => {
+    if (!focusRecordId || !allRecordsRaw.length) return;
+    const match = allRecordsRaw.find((r) => r._id === focusRecordId);
+    if (!match) return;
+    setExpandedId(match._id);
+    // Defer scroll until after the expanded row paints.
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`record-${match._id}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [focusRecordId, allRecordsRaw]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -567,7 +583,7 @@ export default function HorseRecordsPage() {
               const subtitle = getRecordSubtitle(record);
 
               return (
-                <div key={record._id}>
+                <div key={record._id} id={`record-${record._id}`}>
                   <div
                     className={`${styles.recordRow} ${expanded ? styles.recordRowExpanded : ""}`}
                     onClick={() => {

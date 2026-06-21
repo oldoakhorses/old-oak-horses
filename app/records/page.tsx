@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -247,6 +248,7 @@ export default function RecordsPage() {
   const [sortColumn, setSortColumn] = useState<SortColumn>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
+  const router = useRouter();
   const [expandedId, setExpandedId] = useState<Id<"horseRecords"> | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<Id<"horseRecords"> | null>(null);
   const [editingRecordId, setEditingRecordId] = useState<Id<"horseRecords"> | null>(null);
@@ -765,6 +767,32 @@ export default function RecordsPage() {
           </div>
         </section>
 
+        {/* Stats overview — at-a-glance counts pulled from the live record
+            and horse queries. No mock numbers; everything is derived from
+            the same data the table renders below. */}
+        <section className={styles.statsRow}>
+          <div className={styles.statCard}>
+            <div className={styles.statLabel}>Total Records</div>
+            <div className={styles.statValue}>{allRecords.length.toLocaleString()}</div>
+            <div className={styles.statSub}>{pastRecordsBase.length} past · {upcomingRecordsBase.length} upcoming</div>
+          </div>
+          <div className={styles.statCard}>
+            <div className={styles.statLabel}>Active Horses</div>
+            <div className={styles.statValue}>{activeHorses.length}</div>
+            <div className={styles.statSub}>across all owners</div>
+          </div>
+          <div className={styles.statCard}>
+            <div className={styles.statLabel}>Past Records</div>
+            <div className={styles.statValue}>{pastRecordsBase.length}</div>
+            <div className={styles.statSub}>through today</div>
+          </div>
+          <div className={styles.statCard}>
+            <div className={styles.statLabel}>Upcoming</div>
+            <div className={styles.statValue}>{upcomingRecordsBase.length}</div>
+            <div className={styles.statSub}>scheduled visits</div>
+          </div>
+        </section>
+
         <div className={styles.tabs} role="tablist">
           <button
             type="button"
@@ -908,11 +936,11 @@ export default function RecordsPage() {
 
         <section className={styles.recordsCard}>
           <div className={styles.tableHeader}>
-            <span className={`${styles.colRecord} ${styles.sortableHeader}`} onClick={() => handleSort("record")}>Record{sortArrow("record")}</span>
-            <span className={`${styles.colSubtitle} ${styles.sortableHeader}`} onClick={() => handleSort("detail")}>Contact{sortArrow("detail")}</span>
-            <span className={`${styles.colDate} ${styles.sortableHeader}`} onClick={() => handleSort("date")}>Date{sortArrow("date")}</span>
-            <span className={`${styles.colCategory} ${styles.sortableHeader}`} onClick={() => handleSort("category")}>Category{sortArrow("category")}</span>
             <span className={`${styles.colHorse} ${styles.sortableHeader}`} onClick={() => handleSort("horse")}>Horse{sortArrow("horse")}</span>
+            <span className={`${styles.colRecord} ${styles.sortableHeader}`} onClick={() => handleSort("record")}>Record{sortArrow("record")}</span>
+            <span className={`${styles.colContact} ${styles.sortableHeader}`} onClick={() => handleSort("detail")}>Contact{sortArrow("detail")}</span>
+            <span className={`${styles.colDate} ${styles.sortableHeader}`} onClick={() => handleSort("date")}>Date{sortArrow("date")}</span>
+            <span className={`${styles.colLinkedInvoice}`}>Linked Invoice</span>
           </div>
 
           {sortedRecords.length === 0 ? (
@@ -950,26 +978,12 @@ export default function RecordsPage() {
                   <div
                     className={`${styles.recordRow} ${expanded ? styles.recordRowExpanded : ""}`}
                     onClick={() => {
-                      setExpandedId((prev) => (prev === record._id ? null : record._id));
-                      setMenuOpenId(null);
-                      setEditingRecordId(null);
-                      setEditState(null);
+                      if (record.horseId) {
+                        router.push(`/horses/${record.horseId}/records?focus=${record._id}`);
+                      }
                     }}
                   >
-                    <span className={styles.colRecord}>
-                      <span className={styles.recordIcon}>{recordIcon(record.type)}</span>
-                      <span className={styles.recordLabel}>{getRecordLabel(record)}</span>
-                      {activeTab === "upcoming" && row.isFollowup ? (
-                        <span className={styles.followupBadge}>{record.type === "farrier" ? "due" : "f/u"}</span>
-                      ) : null}
-                    </span>
-                    <span className={styles.colSubtitle}>{subtitle || <span className={styles.muted}>—</span>}</span>
-                    <span className={`${styles.colDate} ${dateSoon ? styles.recordDateSoon : ""}`}>{formatDateShort(row.eventDate)}</span>
-                    <span className={styles.colCategory}>
-                      <span className={styles.categoryBadge} style={{ background: badgeColors.bg, color: badgeColors.color }}>
-                        {prettyType(record.type)}
-                      </span>
-                    </span>
+                    {/* Horse — name on top, status/owner subtitle below. */}
                     <span className={styles.colHorse}>
                       <Link
                         href={record.horseId ? `/horses/${record.horseId}` : "/horses"}
@@ -978,6 +992,52 @@ export default function RecordsPage() {
                       >
                         {record.horseName}
                       </Link>
+                      {record.horse?.status && record.horse.status !== "active" ? (
+                        <span className={styles.cellSub}>{record.horse.status}</span>
+                      ) : null}
+                    </span>
+
+                    {/* Record — title on top, subtitle (visit type / med list) below. */}
+                    <span className={styles.colRecord}>
+                      <span className={styles.recordLabel}>
+                        {getRecordLabel(record)}
+                        {activeTab === "upcoming" && row.isFollowup ? (
+                          <span className={styles.followupBadge} style={{ marginLeft: 6 }}>{record.type === "farrier" ? "due" : "f/u"}</span>
+                        ) : null}
+                      </span>
+                      <span className={styles.cellSub}>
+                        {subtitle ? `${prettyType(record.type)} · ${subtitle}` : prettyType(record.type)}
+                      </span>
+                    </span>
+
+                    {/* Contact — name on top, category subtitle below. */}
+                    <span className={styles.colContact}>
+                      {record.contactName ? (
+                        <>
+                          <span className={styles.cellPrimary}>{record.contactName}</span>
+                          <span className={styles.cellSub}>{prettyType(record.type)}</span>
+                        </>
+                      ) : (
+                        <span className={styles.muted}>—</span>
+                      )}
+                    </span>
+
+                    {/* Date */}
+                    <span className={`${styles.colDate} ${dateSoon ? styles.recordDateSoon : ""}`}>{formatDateShort(row.eventDate)}</span>
+
+                    {/* Linked Invoice */}
+                    <span className={styles.colLinkedInvoice}>
+                      {record.billInfo ? (
+                        <Link
+                          href={`/invoices/preview/${record.billInfo.billId}`}
+                          onClick={(event) => event.stopPropagation()}
+                          className={styles.invoiceLink}
+                        >
+                          {record.billInfo.contactName?.split(/[\s—]/)[0] || "View"}
+                        </Link>
+                      ) : (
+                        <span className={styles.mutedSmall}>Not linked</span>
+                      )}
                     </span>
                   </div>
 
@@ -2245,14 +2305,6 @@ function getRecordDetail(record: GlobalRecord): React.ReactNode {
     );
   }
   return "";
-}
-
-function recordIcon(type: RecordType) {
-  if (type === "veterinary") return "🩺";
-  if (type === "medication") return "💊";
-  if (type === "farrier") return "🔧";
-  if (type === "bodywork") return "🦴";
-  return "📋";
 }
 
 function prettyType(type: RecordType) {

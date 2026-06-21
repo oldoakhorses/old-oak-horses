@@ -333,11 +333,55 @@
   overflow: hidden;
 }
 
+/* Stats row at top of the records page — at-a-glance counts. */
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+@media (max-width: 760px) {
+  .statsRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.statCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.statLabel {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b7084;
+  margin-bottom: 8px;
+}
+
+.statValue {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a2e;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.statSub {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #9ea2b0;
+}
+
+/* Records table: 5 columns matching the Medivault-inspired layout —
+ * Horse | Record | Contact | Date | Linked Invoice. */
 .tableHeader {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr) 80px 100px minmax(0, 1fr);
-  gap: 12px;
-  padding: 8px 20px;
+  grid-template-columns: minmax(140px, 1.2fr) minmax(180px, 1.7fr) minmax(140px, 1.3fr) 100px 120px;
+  gap: 14px;
+  padding: 10px 20px;
   background: #fafafc;
   border-bottom: 1px solid #e8eaf0;
   align-items: center;
@@ -346,7 +390,7 @@
 .tableHeader > span {
   font-size: 10px;
   font-weight: 600;
-  color: #9ea2b0;
+  color: #6b7084;
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
@@ -362,45 +406,88 @@
 .colRecord {
   min-width: 0;
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 2px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.colSubtitle {
-  min-width: 0;
+.colRecord .recordLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a2e;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: #9ea2b0;
+}
+
+.colContact {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
 }
 
 .colDate {
   white-space: nowrap;
   font-size: 12px;
-  color: #9ea2b0;
+  color: #6b7084;
   font-variant-numeric: tabular-nums;
 }
 
-.colCategory {}
+.colLinkedInvoice {
+  white-space: nowrap;
+  font-size: 12px;
+}
+
 .colHorse {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+/* Stacked cell helpers — primary line + muted subtitle. */
+.cellPrimary {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a2e;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.cellSub {
+  font-size: 11px;
+  color: #9ea2b0;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.invoiceLink {
+  color: #4a5bdb;
+  text-decoration: none;
+  font-weight: 500;
+}
+.invoiceLink:hover {
+  text-decoration: underline;
+}
+
+.mutedSmall {
+  font-size: 11px;
+  color: #9ea2b0;
 }
 
 .muted { color: #d9dbe3; }
 
 .recordRow {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr) 80px 100px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: minmax(140px, 1.2fr) minmax(180px, 1.7fr) minmax(140px, 1.3fr) 100px 120px;
+  gap: 14px;
   align-items: center;
-  padding: 11px 20px;
+  padding: 14px 20px;
   border-bottom: 1px solid #f0f1f5;
   cursor: pointer;
   transition: background 0.1s;
@@ -1451,6 +1538,8 @@
   }
 }
 
+/* Mobile: stack the row into a Medivault-style card —
+ * horse + date on top, record title bold, contact muted, linked invoice bottom-right. */
 @media (max-width: 900px) {
   .tableHeader {
     display: none;
@@ -1459,20 +1548,21 @@
   .recordRow {
     display: grid;
     grid-template-columns: 1fr auto;
-    grid-template-rows: auto auto;
-    gap: 6px 12px;
-    padding: 14px 18px;
-    align-items: center;
+    grid-template-rows: auto auto auto;
+    gap: 4px 12px;
+    padding: 14px 16px;
+    align-items: start;
+    border-bottom: 1px solid #f0f1f5;
   }
 
-  .colRecord {
+  .colHorse {
     grid-column: 1;
     grid-row: 1;
-    min-width: 0;
-  }
-
-  .colRecord .recordLabel {
-    font-size: 13px;
+    font-size: 12px;
+    color: #6b7084;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
   }
 
   .colDate {
@@ -1484,22 +1574,28 @@
     white-space: nowrap;
   }
 
-  .colSubtitle {
-    display: none;
+  .colRecord {
+    grid-column: 1 / span 2;
+    grid-row: 2;
+    min-width: 0;
   }
 
-  .colCategory {
+  .colRecord .recordLabel {
+    font-size: 15px;
+  }
+
+  .colContact {
     grid-column: 1;
-    grid-row: 2;
-    padding-left: 22px;
+    grid-row: 3;
+    min-width: 0;
+    font-size: 12px;
   }
 
-  .colHorse {
+  .colLinkedInvoice {
     grid-column: 2;
-    grid-row: 2;
-    font-size: 11px;
-    color: #6b7084;
+    grid-row: 3;
     text-align: right;
+    font-size: 12px;
   }
 
   .expandedMetaRow {
