@@ -1466,8 +1466,27 @@ export default function InvoicePreviewPage() {
     setSavingDetails(true);
     setSavingContact(true);
     setError("");
+
+    // Save invoice fields FIRST so a contact mutation failure can't drop
+    // the user's edits. Each step is wrapped in its own try so a partial
+    // success is still better than nothing.
+    let detailsSaved = false;
     try {
-      // 1. Resolve contact (existing → reuse, otherwise create)
+      await updatePreviewFields({
+        billId,
+        invoiceName: details.invoiceName || undefined,
+        invoiceDetails: details.invoiceDetails || undefined,
+        invoiceNumber: details.invoiceNumber || undefined,
+        invoiceDate: details.invoiceDate || undefined,
+      });
+      detailsSaved = true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[onSaveCombinedDetails] updatePreviewFields failed:", msg);
+      setError(`Failed to save invoice details: ${msg}`);
+    }
+
+    try {
       const trimmedName = (contactSearch || contactForm.name || "").trim();
       let contactId = selectedContactId ?? undefined;
       if (!contactId && trimmedName) {
@@ -1484,33 +1503,26 @@ export default function InvoicePreviewPage() {
         }
         setSelectedContactId(contactId ?? null);
       }
-
       await updateBillContact({
         billId,
         contactId,
         extractedVendorContact: { vendorName: trimmedName || undefined },
       });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[onSaveCombinedDetails] updateBillContact failed:", msg);
+      // Don't overwrite a details-save error if both fired.
+      setError((prev) => prev || `Failed to save contact: ${msg}`);
+    }
 
-      // 2. Save invoice details (the editable invoice fields + the new
-      //    free-form details subtitle).
-      await updatePreviewFields({
-        billId,
-        invoiceName: details.invoiceName || undefined,
-        invoiceDetails: details.invoiceDetails || undefined,
-        invoiceNumber: details.invoiceNumber || undefined,
-        invoiceDate: details.invoiceDate || undefined,
-      });
-
+    setSavingDetails(false);
+    setSavingContact(false);
+    if (detailsSaved) {
       setDetailsEdit(false);
       setShowContactSuggestions(false);
       // Re-lock the card after a save on an approved bill so the user
       // lands back in the read-only summary view.
       setDetailsUnlocked(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
-    } finally {
-      setSavingDetails(false);
-      setSavingContact(false);
     }
   }
 
@@ -2372,6 +2384,11 @@ export default function InvoicePreviewPage() {
                 </div>
               </div>
 
+              {error ? (
+                <div style={{ marginTop: 8, fontSize: 12, color: "#dc2626", padding: "8px 12px", background: "rgba(220, 38, 38, 0.08)", borderRadius: 6 }}>
+                  {error}
+                </div>
+              ) : null}
               {detailsDirty ? (
                 <div className={styles.rowActions}>
                   <button
