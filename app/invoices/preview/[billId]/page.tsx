@@ -571,19 +571,48 @@ export default function InvoicePreviewPage() {
         .map((entry) => entry.horseId)
         .filter(Boolean) as string[];
       const savedPerson = bill.personAssignments?.find((entry) => entry.lineItemIndex === index)?.personId;
-      const savedSplitAll = bill.splitLineItems?.some((entry) => entry.lineItemIndex === index);
+      // Find the saved split entry for this line item and read its
+      // discriminator. Treat missing splitType as "invoice" (the more
+      // common case for legacy rows) UNLESS the split covered horses
+      // that aren't directly assigned anywhere on the bill — that's
+      // the signature of an old "split all" entry.
+      const savedSplitEntry = bill.splitLineItems?.find((entry) => entry.lineItemIndex === index);
       const splitAllByParsedHorse =
         String(row.horse_name ?? row.horseName ?? "").toLowerCase().trim() === SPLIT_ALL;
 
       const savedAssigneeId = (row as any).assigneeId ?? (row as any).entityId;
       const savedAssigneeType = (row as any).assigneeType ?? (row as any).entityType;
       const isGeneralEntity = savedAssigneeType === "general" || savedAssigneeType === "business_general";
-      const isSplitAll = savedSplitAll
-        || String(row.horse_name ?? row.horseName ?? "").toLowerCase().trim() === SPLIT_ALL
+      const splitFromMarker =
+        String(row.horse_name ?? row.horseName ?? "").toLowerCase().trim() === SPLIT_ALL
         || (Array.isArray((row as any).horses) && (row as any).horses.includes(SPLIT_ALL));
 
+      // Resolve which sentinel to load. Explicit splitType wins; legacy
+      // rows fall back to "invoice" unless we can prove "all" via the
+      // horse-set comparison below.
+      let splitSentinel: typeof SPLIT_ALL | typeof SPLIT_INVOICE | null = null;
+      if (savedSplitEntry) {
+        if (savedSplitEntry.splitType === "all") splitSentinel = SPLIT_ALL;
+        else if (savedSplitEntry.splitType === "invoice") splitSentinel = SPLIT_INVOICE;
+        else {
+          // Legacy row: infer from data. If the split covered horses
+          // that weren't directly assigned anywhere else on the bill,
+          // it was the broader "split all". Otherwise (the typical
+          // case) treat as "split in invoice".
+          const directIds = new Set<string>();
+          for (const entry of bill.horseAssignments ?? []) {
+            if (entry.horseId) directIds.add(String(entry.horseId));
+          }
+          const splitIds = savedSplitEntry.splits.map((s) => String(s.horseId));
+          const allWithinDirect = splitIds.every((id) => directIds.has(id));
+          splitSentinel = allWithinDirect ? SPLIT_INVOICE : SPLIT_ALL;
+        }
+      } else if (splitFromMarker || splitAllByParsedHorse) {
+        splitSentinel = SPLIT_ALL;
+      }
+
       let assignees: string[] = [];
-      if (isSplitAll || splitAllByParsedHorse) assignees = [SPLIT_ALL];
+      if (splitSentinel) assignees = [splitSentinel];
       else if (savedHorses.length > 0) assignees = savedHorses.map(String);
       else if (savedPerson) assignees = [String(savedPerson)];
       else if (isGeneralEntity) assignees = [BUSINESS_GENERAL];
@@ -1751,9 +1780,15 @@ export default function InvoicePreviewPage() {
           const isSplitAll = row.state?.assignees?.[0] === SPLIT_ALL;
           const targetIds = isSplitAll ? splitAllTargetIds : splitInvoiceTargetIds;
           if (targetIds.length === 0) return null;
+          // Stamp which kind of split this was so the next load can tell
+          // them apart — the targets alone don't distinguish "split all"
+          // from "split in invoice" once the directly-assigned horse set
+          // happens to equal the all-horses set.
+          const splitTypeTag: "all" | "invoice" = isSplitAll ? "all" : "invoice";
           const splitAmounts = splitEven(getLineAmount(row.line), targetIds.length);
           return {
             lineItemIndex: row.index,
+            splitType: splitTypeTag,
             splits: targetIds.map((horseId, idx) => {
               const horse = horses.find((entry) => String(entry._id) === horseId);
               return {
@@ -1763,7 +1798,7 @@ export default function InvoicePreviewPage() {
               };
             })
           };
-        }).filter(Boolean) as Array<{ lineItemIndex: number; splits: Array<{ horseId: Id<"horses">; horseName: string; amount: number }> }>;
+        }).filter(Boolean) as Array<{ lineItemIndex: number; splitType: "all" | "invoice"; splits: Array<{ horseId: Id<"horses">; horseName: string; amount: number }> }>;
 
       const horseTotals = new Map<string, { horseName: string; direct: number; shared: number }>();
       for (const row of directAssignments) {

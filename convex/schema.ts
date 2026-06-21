@@ -133,6 +133,17 @@ export default defineSchema({
       v.array(
         v.object({
           lineItemIndex: v.number(),
+          /** Which kind of split this was:
+           *    "all"     — split evenly across every active horse in the
+           *                system (or every direct-assigned horse on this
+           *                bill, whichever the save flow resolved).
+           *    "invoice" — split evenly across only horses that were
+           *                directly assigned somewhere else on this bill.
+           *  Optional for backwards-compat with existing rows: missing
+           *  splitType resolves to "invoice" on load (the more common case),
+           *  with fallback to "all" if the split's horse set is broader
+           *  than the bill's direct-assigned horse set. */
+          splitType: v.optional(v.union(v.literal("all"), v.literal("invoice"))),
           splits: v.array(
             v.object({
               horseId: v.id("horses"),

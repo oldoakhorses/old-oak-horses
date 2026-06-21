@@ -2034,6 +2034,7 @@ export const markDone = internalMutation({
       v.array(
         v.object({
           lineItemIndex: v.number(),
+          splitType: v.optional(v.union(v.literal("all"), v.literal("invoice"))),
           splits: v.array(
             v.object({
               horseId: v.id("horses"),
@@ -2546,6 +2547,7 @@ export const saveHorseAssignment = mutation({
     splitLineItems: v.array(
       v.object({
         lineItemIndex: v.number(),
+        splitType: v.optional(v.union(v.literal("all"), v.literal("invoice"))),
         splits: v.array(
           v.object({
             horseId: v.id("horses"),
@@ -2615,6 +2617,7 @@ export const saveHorseTransportAssignment = mutation({
       v.array(
         v.object({
           lineItemIndex: v.number(),
+          splitType: v.optional(v.union(v.literal("all"), v.literal("invoice"))),
           splits: v.array(
             v.object({
               horseId: v.id("horses"),
