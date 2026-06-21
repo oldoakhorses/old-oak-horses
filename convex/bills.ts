@@ -170,13 +170,29 @@ export const triggerBillParsing = mutation({
     const bill = await ctx.db.get(args.billId);
     if (!bill) throw new Error("Bill not found");
 
-    await ctx.db.patch(args.billId, { status: "parsing", errorMessage: undefined });
-    // Route email-sourced bills (HTML body stored in fileId) to the email
-    // parser; everything else goes through the PDF/image path. The PDF
-    // parser can't read an HTML body — it'd silently produce nothing.
-    const isEmailSource = bill.source === "email"
-      || (typeof bill.fileName === "string" && /\.html?$/i.test(bill.fileName));
-    if (isEmailSource) {
+    // Clear currency/exchange-rate stamps from the previous parse so a
+    // re-parse can't accidentally compound a CAD→USD conversion. The new
+    // parse will re-detect currency and write its own values. The
+    // extractedData itself stays so the UI doesn't briefly go blank;
+    // markDone fully replaces it once parsing finishes.
+    await ctx.db.patch(args.billId, {
+      status: "parsing",
+      errorMessage: undefined,
+      originalCurrency: undefined,
+      originalTotal: undefined,
+      exchangeRate: undefined,
+    });
+
+    // Route to the email parser ONLY when the stored file is the HTML
+    // email body. Email bills with a PDF attachment store the PDF as
+    // fileId (not the body), so they go through the regular PDF path.
+    // The previous version checked bill.source === "email" which over-
+    // matched: PDF attachments forwarded via email were getting sent
+    // to the email parser, which then read the binary PDF bytes as
+    // text, garbling everything and double-converting amounts on
+    // every re-parse.
+    const isEmailHtmlBody = typeof bill.fileName === "string" && /\.html?$/i.test(bill.fileName);
+    if (isEmailHtmlBody) {
       await ctx.scheduler.runAfter(0, internal.billParsing.reparseEmailBillFromStorage, {
         billId: args.billId,
       });

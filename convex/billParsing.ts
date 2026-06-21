@@ -346,6 +346,21 @@ export const parseBillPdf = internalAction({
           (parsed as any).currency = detected;
         }
       }
+      // Strip any line-item amount_original / original_amount values that
+      // might have leaked in from the LLM response. ensureUsdAmounts uses
+      // those as the source for conversion — if a re-parse echoed back
+      // values from a previously-converted bill (e.g. amount_original
+      // already set to the converted USD figure), we'd compound the
+      // conversion. The line item's amount/total_usd field is the raw
+      // post-extraction number; treat that as source-of-truth.
+      const li = Array.isArray((parsed as any).line_items) ? (parsed as any).line_items : Array.isArray((parsed as any).lineItems) ? (parsed as any).lineItems : [];
+      for (const row of li as any[]) {
+        if (row && typeof row === "object") {
+          delete row.amount_original;
+          delete row.original_amount;
+          delete row.amount_usd;
+        }
+      }
       parsed = ensureUsdAmounts(parsed);
       if (categorySlug) annotateSuggestedCategories(parsed, categorySlug);
       // Collect unique line-item categories and store on the bill
