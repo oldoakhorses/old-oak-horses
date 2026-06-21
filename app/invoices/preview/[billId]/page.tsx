@@ -314,25 +314,62 @@ function LockedAssignmentSummary({
           const horseIds: string[] = Array.isArray(line.horses) ? line.horses : [];
           const peopleIds: string[] = Array.isArray(line.people) ? line.people : [];
           const singleId = String(line.assigneeId ?? line.assignee ?? "").trim();
-          const ids = horseIds.length > 0
+
+          // Detect "split in invoice" / "split all" sentinels persisted on
+          // the line. When found, expand them by reading the splits array
+          // from bill.splitLineItems for this lineItemIndex so the pill
+          // shows the actual horse names that share the cost — not the
+          // raw sentinel string (which renders as "Unknown").
+          const rawIds = horseIds.length > 0
             ? horseIds.map(String)
             : peopleIds.length > 0
               ? peopleIds.map(String)
               : singleId
                 ? [singleId]
                 : [];
+          const hasSplitSentinel = rawIds.some(
+            (id) => id === "__split_invoice__" || id === "__split_all__",
+          );
+          let resolvedIds = rawIds;
+          let splitLabel: string | null = null;
+          if (hasSplitSentinel) {
+            const splitEntry = (bill?.splitLineItems ?? []).find(
+              (s: any) => s.lineItemIndex === idx,
+            );
+            const splitHorseIds: string[] = Array.isArray(splitEntry?.splits)
+              ? splitEntry.splits.map((s: any) => String(s.horseId))
+              : [];
+            if (splitHorseIds.length > 0) {
+              resolvedIds = splitHorseIds;
+              // Tag the row with which kind of split this was so the user
+              // can see "split in invoice" / "split all" at a glance.
+              splitLabel = splitEntry?.splitType === "all"
+                ? "↔ split all"
+                : "↔ split in invoice";
+            } else {
+              resolvedIds = [];
+              splitLabel = rawIds[0] === "__split_all__" ? "↔ split all" : "↔ split in invoice";
+            }
+          }
+          const isSplitInvoice = rawIds[0] === "__split_invoice__";
+          const ids = resolvedIds;
           return (
             <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 16, alignItems: "center", padding: "10px 0", borderBottom: "1px solid #eef0f3", fontSize: 13 }}>
               <span>{line.description || `Line ${idx + 1}`}</span>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "flex-end" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "flex-end", alignItems: "center" }}>
+                {splitLabel ? (
+                  <span style={{ background: "rgba(74,91,219,0.10)", color: "#4a5bdb", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, marginRight: 2 }}>{splitLabel}</span>
+                ) : null}
                 {at === "business_general" ? (
                   <span style={{ background: "rgba(107,112,132,0.10)", color: "#6b7084", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600 }}>◼ general</span>
                 ) : ids.length === 0 ? (
-                  <span style={{ color: "#6b7084", fontSize: 11 }}>—</span>
+                  splitLabel ? null : (
+                    <span style={{ color: "#6b7084", fontSize: 11 }}>—</span>
+                  )
                 ) : (
                   ids.map((id) => (
                     <span key={id} style={{ background: "rgba(74,91,219,0.08)", color: "#1a1a2e", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600 }}>
-                      {iconFor(at, id)} {resolveName(id, at)}
+                      🐴 {resolveName(id, hasSplitSentinel ? "horse" : at)}
                     </span>
                   ))
                 )}
