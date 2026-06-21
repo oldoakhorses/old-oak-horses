@@ -194,6 +194,10 @@ export default defineSchema({
      * any cost-per breakdown or change the assignment math. Two pickers:
      * `personId` is who fronted the cost out-of-pocket; `ownerId` is the
      * business that's reimbursing them.
+     *
+     * `resolvedAt` is the timestamp the user manually marked it paid;
+     * absent means still outstanding. `resolvedBy` records the email of
+     * the user who marked it paid for audit purposes.
      */
     reimbursement: v.optional(
       v.object({
@@ -201,6 +205,8 @@ export default defineSchema({
         ownerName: v.string(),
         personId: v.id("people"),
         personName: v.string(),
+        resolvedAt: v.optional(v.number()),
+        resolvedBy: v.optional(v.string()),
       })
     ),
     /**
@@ -217,6 +223,8 @@ export default defineSchema({
           ownerName: v.string(),
           personId: v.id("people"),
           personName: v.string(),
+          resolvedAt: v.optional(v.number()),
+          resolvedBy: v.optional(v.string()),
         })
       )
     ),

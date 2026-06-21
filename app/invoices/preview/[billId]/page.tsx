@@ -9,6 +9,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import Modal from "@/components/Modal";
 import NavBar from "@/components/NavBar";
 import { formatInvoiceName } from "@/lib/formatInvoiceName";
+import { useAuth } from "@/contexts/AuthContext";
 import { useOrgArgs } from "@/lib/useOrgArgs";
 import styles from "./preview.module.css";
 
@@ -471,8 +472,15 @@ export default function InvoicePreviewPage() {
   // Reimbursement markers — pure label. `wholeReimbursement` covers
   // "the whole invoice is a reimbursement"; `lineReimbursements` covers
   // per-line markers. Each entry holds the business that owes (ownerId)
-  // and the person who fronted the cost (personId).
-  type ReimbursementMarker = { ownerId: string; personId: string };
+  // and the person who fronted the cost (personId). `resolvedAt` flips
+  // when the user manually marks the reimbursement paid; we keep it in
+  // local state so a subsequent save doesn't blow it away.
+  type ReimbursementMarker = {
+    ownerId: string;
+    personId: string;
+    resolvedAt?: number;
+    resolvedBy?: string;
+  };
   const [wholeReimbursement, setWholeReimbursement] = useState<ReimbursementMarker | null>(null);
   const [lineReimbursements, setLineReimbursements] = useState<Record<number, ReimbursementMarker>>({});
   const [reimbursePickerOpen, setReimbursePickerOpen] = useState<"whole" | number | null>(null);
@@ -556,6 +564,8 @@ export default function InvoicePreviewPage() {
   const saveBusinessAssignment = useMutation(api.bills.saveBusinessAssignment);
   const saveDuesAssignments = useMutation(api.bills.saveDuesAssignments);
   const approveBill = useMutation(api.bills.approveBill);
+  const resolveReimbursement = useMutation(api.bills.resolveReimbursement);
+  const { user } = useAuth();
   const deleteBill = useMutation(api.bills.deleteBill);
   const deleteLineItem = useMutation(api.bills.deleteLineItem);
   const addLineItem = useMutation(api.bills.addLineItem);
@@ -810,18 +820,30 @@ export default function InvoicePreviewPage() {
 
     // Reimbursement markers — whole + per-line.
     const wholeReimb = (bill as any).reimbursement as
-      | { ownerId: string; personId: string }
+      | { ownerId: string; personId: string; resolvedAt?: number; resolvedBy?: string }
       | undefined;
     setWholeReimbursement(
-      wholeReimb ? { ownerId: String(wholeReimb.ownerId), personId: String(wholeReimb.personId) } : null,
+      wholeReimb
+        ? {
+            ownerId: String(wholeReimb.ownerId),
+            personId: String(wholeReimb.personId),
+            resolvedAt: wholeReimb.resolvedAt,
+            resolvedBy: wholeReimb.resolvedBy,
+          }
+        : null,
     );
     const lineReimbs = (bill as any).reimbursementLineItems as
-      | Array<{ lineItemIndex: number; ownerId: string; personId: string }>
+      | Array<{ lineItemIndex: number; ownerId: string; personId: string; resolvedAt?: number; resolvedBy?: string }>
       | undefined;
     if (Array.isArray(lineReimbs) && lineReimbs.length > 0) {
       const map: Record<number, ReimbursementMarker> = {};
       for (const entry of lineReimbs) {
-        map[entry.lineItemIndex] = { ownerId: String(entry.ownerId), personId: String(entry.personId) };
+        map[entry.lineItemIndex] = {
+          ownerId: String(entry.ownerId),
+          personId: String(entry.personId),
+          resolvedAt: entry.resolvedAt,
+          resolvedBy: entry.resolvedBy,
+        };
       }
       setLineReimbursements(map);
     } else {
@@ -1447,14 +1469,21 @@ export default function InvoicePreviewPage() {
             const marker = lineReimbursements[index];
             const isOpen = reimbursePickerOpen === index;
             const isSet = !!marker;
+            const isResolved = Boolean(marker?.resolvedAt);
             return (
               <div style={{ position: "relative" }} ref={isOpen ? reimbursePickerRef : undefined}>
                 <button
                   type="button"
-                  className={`${styles.confirmCheck} ${isSet ? styles.lineReimburseBtnSet : styles.lineReimburseBtn}`}
+                  className={`${styles.confirmCheck} ${
+                    isResolved
+                      ? styles.lineReimburseBtnPaid
+                      : isSet
+                        ? styles.lineReimburseBtnSet
+                        : styles.lineReimburseBtn
+                  }`}
                   onClick={() => setReimbursePickerOpen(isOpen ? null : index)}
-                  aria-label={isSet ? "edit reimbursement" : "mark as reimbursement"}
-                  title="Reimbursement"
+                  aria-label={isResolved ? "paid reimbursement" : isSet ? "edit reimbursement" : "mark as reimbursement"}
+                  title={isResolved ? "Reimbursement paid" : "Reimbursement"}
                 >
                   💵
                 </button>
@@ -1496,6 +1525,58 @@ export default function InvoicePreviewPage() {
                         <option key={String(p._id)} value={String(p._id)}>{p.name}</option>
                       ))}
                     </select>
+                    {isSet ? (
+                      <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        padding: "6px 8px",
+                        marginTop: 10,
+                        borderRadius: 6,
+                        background: marker?.resolvedAt ? "rgba(34, 197, 131, 0.08)" : "#fafafc",
+                        border: `1px solid ${marker?.resolvedAt ? "rgba(34, 197, 131, 0.35)" : "#e8eaf0"}`,
+                        fontSize: 11,
+                      }}>
+                        <span style={{ color: marker?.resolvedAt ? "#1aad72" : "#6b7084" }}>
+                          {marker?.resolvedAt
+                            ? `✓ Paid ${new Date(marker.resolvedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                            : "Outstanding"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (marker?.resolvedAt) {
+                              setLineReimbursements((prev) => ({
+                                ...prev,
+                                [index]: { ...prev[index], resolvedAt: undefined, resolvedBy: undefined },
+                              }));
+                              try { await resolveReimbursement({ billId, lineItemIndex: index, undo: true }); } catch (err) { console.error("resolve undo failed", err); }
+                            } else {
+                              const ts = Date.now();
+                              setLineReimbursements((prev) => ({
+                                ...prev,
+                                [index]: { ...prev[index], resolvedAt: ts, resolvedBy: user?.email ?? undefined },
+                              }));
+                              try { await resolveReimbursement({ billId, lineItemIndex: index, resolvedBy: user?.email ?? undefined }); } catch (err) { console.error("resolve failed", err); }
+                            }
+                          }}
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 600,
+                            padding: "4px 10px",
+                            borderRadius: 4,
+                            border: "1px solid",
+                            borderColor: marker?.resolvedAt ? "#9ea2b0" : "#22c583",
+                            background: marker?.resolvedAt ? "transparent" : "#22c583",
+                            color: marker?.resolvedAt ? "#6b7084" : "#fff",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {marker?.resolvedAt ? "unpaid" : "mark paid"}
+                        </button>
+                      </div>
+                    ) : null}
                     <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
                       {isSet ? (
                         <button
@@ -2230,6 +2311,8 @@ export default function InvoicePreviewPage() {
             ownerName: resolveOwnerName(wholeReimbursement.ownerId),
             personId: wholeReimbursement.personId as any,
             personName: resolvePersonName(wholeReimbursement.personId),
+            resolvedAt: wholeReimbursement.resolvedAt,
+            resolvedBy: wholeReimbursement.resolvedBy,
           }
         : null;
       const reimbursementLineItemsPayload = Object.entries(lineReimbursements).map(([idx, marker]) => ({
@@ -2238,6 +2321,8 @@ export default function InvoicePreviewPage() {
         ownerName: resolveOwnerName(marker.ownerId),
         personId: marker.personId as any,
         personName: resolvePersonName(marker.personId),
+        resolvedAt: marker.resolvedAt,
+        resolvedBy: marker.resolvedBy,
       }));
 
       await approveBill({
@@ -3588,6 +3673,53 @@ export default function InvoicePreviewPage() {
                           ))}
                         </select>
                       </div>
+                    </div>
+                    {/* Resolved / unresolved row. Mark-as-paid persists
+                        through the dedicated resolveReimbursement mutation
+                        so the user doesn't have to hit "save changes"; the
+                        local state still tracks resolvedAt for save-time
+                        merging. */}
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      padding: "10px 12px",
+                      borderRadius: 8,
+                      background: wholeReimbursement.resolvedAt ? "rgba(34, 197, 131, 0.08)" : "#fafafc",
+                      border: `1px solid ${wholeReimbursement.resolvedAt ? "rgba(34, 197, 131, 0.35)" : "#e8eaf0"}`,
+                    }}>
+                      <div style={{ fontSize: 12, color: wholeReimbursement.resolvedAt ? "#1aad72" : "#6b7084" }}>
+                        {wholeReimbursement.resolvedAt
+                          ? `✓ Paid ${new Date(wholeReimbursement.resolvedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                          : "Outstanding"}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (wholeReimbursement.resolvedAt) {
+                            setWholeReimbursement((prev) => prev ? { ...prev, resolvedAt: undefined, resolvedBy: undefined } : prev);
+                            try { await resolveReimbursement({ billId, undo: true }); } catch (err) { console.error("resolve undo failed", err); }
+                          } else {
+                            const ts = Date.now();
+                            setWholeReimbursement((prev) => prev ? { ...prev, resolvedAt: ts, resolvedBy: user?.email ?? undefined } : prev);
+                            try { await resolveReimbursement({ billId, resolvedBy: user?.email ?? undefined }); } catch (err) { console.error("resolve failed", err); }
+                          }
+                        }}
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          border: "1px solid",
+                          borderColor: wholeReimbursement.resolvedAt ? "#9ea2b0" : "#22c583",
+                          background: wholeReimbursement.resolvedAt ? "transparent" : "#22c583",
+                          color: wholeReimbursement.resolvedAt ? "#6b7084" : "#fff",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {wholeReimbursement.resolvedAt ? "mark unpaid" : "mark paid"}
+                      </button>
                     </div>
                     <button
                       type="button"

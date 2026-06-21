@@ -789,6 +789,15 @@ select.categorySelect:hover {
   opacity: 1;
 }
 
+/* Paid (resolved) reimbursement — green tint, signals "done". */
+.lineReimburseBtnPaid {
+  border-color: #22c583;
+  background: rgba(34, 197, 131, 0.12);
+  color: #22c583;
+  font-size: 11px;
+  opacity: 1;
+}
+
 .reimbPopover {
   position: absolute;
   top: calc(100% + 4px);

@@ -141,13 +141,18 @@ export default function InvoicesPage() {
   const approvedCount = useMemo(() => rows.filter((r) => r.isApproved).length, [rows]);
   const pendingCount = useMemo(() => rows.filter((r) => !r.isApproved).length, [rows]);
 
-  /** A row has a reimbursement when EITHER the whole-invoice marker is
-   *  set OR at least one line-item marker exists. */
-  const hasReimbursement = (row: any) =>
-    Boolean(row.reimbursement) ||
-    (Array.isArray(row.reimbursementLineItems) && row.reimbursementLineItems.length > 0);
+  /** A row has an OUTSTANDING reimbursement when EITHER the whole-invoice
+   *  marker is set and not yet resolved, OR at least one line-item marker
+   *  exists that isn't resolved. Resolved markers stay on the bill for
+   *  history but stop counting toward the active filter. */
+  const hasActiveReimbursement = (row: any) => {
+    const whole = row.reimbursement;
+    if (whole && !whole.resolvedAt) return true;
+    const lines = Array.isArray(row.reimbursementLineItems) ? row.reimbursementLineItems : [];
+    return lines.some((entry: any) => !entry?.resolvedAt);
+  };
 
-  const reimbursementCount = useMemo(() => rows.filter(hasReimbursement).length, [rows]);
+  const reimbursementCount = useMemo(() => rows.filter(hasActiveReimbursement).length, [rows]);
 
   /** Sum of (absolute) totals across all invoices in the current dataset.
    *  Used by the "total value" stat card. */
@@ -170,7 +175,7 @@ export default function InvoicesPage() {
         || (row.categoryName ?? "").toLowerCase().includes(q)
         || (getProvider(row)).toLowerCase().includes(q)
         || date.includes(q);
-      const reimbursementPass = !reimbursementOnly || hasReimbursement(row);
+      const reimbursementPass = !reimbursementOnly || hasActiveReimbursement(row);
       return tabPass && categoryPass && horsePass && fromPass && toPass && searchPass && reimbursementPass;
     });
 
@@ -275,12 +280,12 @@ export default function InvoicesPage() {
             className={`${styles.statCard} ${styles.statCardClickable} ${reimbursementOnly ? styles.statCardActive : ""}`}
             onClick={() => setReimbursementOnly((v) => !v)}
             aria-pressed={reimbursementOnly}
-            title={reimbursementOnly ? "Clear reimbursement filter" : "Show only invoices with reimbursements"}
+            title={reimbursementOnly ? "Clear reimbursement filter" : "Show only invoices with outstanding reimbursements"}
           >
             <div className={styles.statLabel}>Reimbursements</div>
             <div className={styles.statValue}>{reimbursementCount}</div>
             <div className={styles.statSub}>
-              {reimbursementOnly ? "filter active — tap to clear" : "tap to filter"}
+              {reimbursementOnly ? "filter active — tap to clear" : "outstanding · tap to filter"}
             </div>
           </button>
           <div className={styles.statCard}>

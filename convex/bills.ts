@@ -3037,6 +3037,8 @@ export const approveBill = mutation({
           ownerName: v.string(),
           personId: v.id("people"),
           personName: v.string(),
+          resolvedAt: v.optional(v.number()),
+          resolvedBy: v.optional(v.string()),
         }),
       ),
     ),
@@ -3052,6 +3054,8 @@ export const approveBill = mutation({
             ownerName: v.string(),
             personId: v.id("people"),
             personName: v.string(),
+            resolvedAt: v.optional(v.number()),
+            resolvedBy: v.optional(v.string()),
           }),
         ),
       ),
@@ -3164,6 +3168,53 @@ export const approveBill = mutation({
     const result = await approveBillById(ctx, args.billId);
     return result;
   }
+});
+
+/**
+ * Mark a reimbursement marker as paid (resolved). When `lineItemIndex` is
+ * omitted, resolves the whole-invoice marker; otherwise resolves the
+ * matching line-item entry. Passing `undo: true` clears the resolved
+ * fields instead — used by the "unresolve" button.
+ *
+ * Stamps `resolvedAt` (current ms) and `resolvedBy` (caller email if
+ * provided) so we have a basic audit trail without a separate events
+ * table.
+ */
+export const resolveReimbursement = mutation({
+  args: {
+    billId: v.id("bills"),
+    lineItemIndex: v.optional(v.number()),
+    resolvedBy: v.optional(v.string()),
+    undo: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+
+    const now = Date.now();
+    const stamp = args.undo
+      ? { resolvedAt: undefined, resolvedBy: undefined }
+      : { resolvedAt: now, resolvedBy: args.resolvedBy };
+
+    if (args.lineItemIndex === undefined) {
+      const current = (bill as any).reimbursement;
+      if (!current) throw new Error("No whole-invoice reimbursement to resolve");
+      await ctx.db.patch(args.billId, {
+        reimbursement: { ...current, ...stamp },
+      } as any);
+      return;
+    }
+
+    const list = (bill as any).reimbursementLineItems as any[] | undefined;
+    if (!Array.isArray(list)) throw new Error("No line-item reimbursements to resolve");
+    const next = list.map((entry) =>
+      entry.lineItemIndex === args.lineItemIndex ? { ...entry, ...stamp } : entry,
+    );
+    if (next.every((entry, i) => entry === list[i])) {
+      throw new Error(`No reimbursement on line item ${args.lineItemIndex}`);
+    }
+    await ctx.db.patch(args.billId, { reimbursementLineItems: next } as any);
+  },
 });
 
 async function resolveUnmatchedHorseHandler(
