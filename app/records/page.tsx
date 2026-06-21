@@ -793,27 +793,6 @@ export default function RecordsPage() {
           </div>
         </section>
 
-        <div className={styles.tabs} role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "past"}
-            className={`${styles.tab} ${activeTab === "past" ? styles.tabActive : ""}`}
-            onClick={() => setActiveTab("past")}
-          >
-            Past <span className={styles.tabCount}>{pastRecordsBase.length}</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "upcoming"}
-            className={`${styles.tab} ${activeTab === "upcoming" ? styles.tabActive : ""}`}
-            onClick={() => setActiveTab("upcoming")}
-          >
-            Upcoming <span className={styles.tabCount}>{upcomingRecordsBase.length}</span>
-          </button>
-        </div>
-
         {(() => {
           const categoryLabel =
             typeFilter === "all" ? null : (
@@ -832,13 +811,39 @@ export default function RecordsPage() {
           return (
             <>
               <section className={styles.toolbar}>
-                <input
-                  type="text"
-                  className={styles.toolbarSearch}
-                  placeholder="search records..."
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
+                <div className={styles.tabs} role="tablist">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === "past"}
+                    className={`${styles.tab} ${activeTab === "past" ? styles.tabActive : ""}`}
+                    onClick={() => setActiveTab("past")}
+                  >
+                    Past <span className={styles.tabCount}>{pastRecordsBase.length}</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === "upcoming"}
+                    className={`${styles.tab} ${activeTab === "upcoming" ? styles.tabActive : ""}`}
+                    onClick={() => setActiveTab("upcoming")}
+                  >
+                    Upcoming <span className={styles.tabCount}>{upcomingRecordsBase.length}</span>
+                  </button>
+                </div>
+                <div className={styles.toolbarSearchWrap}>
+                  <svg className={styles.toolbarSearchIcon} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="9" cy="9" r="6" />
+                    <path d="M14 14l4 4" />
+                  </svg>
+                  <input
+                    type="text"
+                    className={styles.toolbarSearch}
+                    placeholder="search records, horse, contact..."
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                </div>
                 <div className={styles.toolbarFiltersWrap} ref={filtersPopoverRef}>
                   <button
                     type="button"

@@ -12,45 +12,52 @@
   color: #1a1a2e;
 }
 
-/* Tabs */
+/* Tabs — Medivault-style segmented pill control.
+ * Lives inline in the toolbar (search/filter row).
+ * Each tab is auto-width; active tab pops up as a white card with a soft shadow. */
 .tabs {
-  display: flex;
-  gap: 0;
-  margin-bottom: 20px;
-  border-bottom: 1px solid #e8eaf0;
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: #f2f3f7;
+  border-radius: 999px;
+  flex: 0 0 auto;
 }
 
 .tab {
   font-size: 13px;
   font-weight: 600;
-  color: #9ea2b0;
+  color: #6b7084;
   background: transparent;
   border: none;
-  padding: 10px 20px;
+  padding: 7px 16px;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  display: flex;
+  border-radius: 999px;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   font-family: inherit;
-  transition: color 0.15s;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
 }
 
 .tab:hover {
   color: #1a1a2e;
 }
 
-.tabActive {
+.tabActive,
+.tabActive:hover {
   color: #1a1a2e;
-  border-bottom-color: #1a1a2e;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(26, 26, 46, 0.06), 0 1px 1px rgba(26, 26, 46, 0.04);
 }
 
 .tabCount {
   font-size: 10px;
   font-weight: 700;
-  background: #f2f3f7;
-  color: #9ea2b0;
+  background: #e8eaf0;
+  color: #6b7084;
   padding: 2px 7px;
   border-radius: 10px;
   min-width: 18px;
@@ -100,7 +107,7 @@
   border-color: #4a5bdb;
 }
 
-/* Toolbar: search + filters */
+/* Toolbar: search + filters — pill-shaped to match the Medivault inspo. */
 .toolbar {
   display: flex;
   align-items: center;
@@ -108,24 +115,45 @@
   margin-bottom: 14px;
 }
 
-.toolbarSearch {
+.toolbarSearchWrap {
+  position: relative;
   flex: 1;
-  max-width: 400px;
+  max-width: 460px;
+}
+
+.toolbarSearchIcon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: #9ea2b0;
+  pointer-events: none;
+}
+
+.toolbarSearch {
+  width: 100%;
   background: #fff;
   border: 1px solid #e8eaf0;
-  border-radius: 8px;
-  padding: 0 14px;
-  height: 36px;
-  font-size: 12px;
+  border-radius: 999px;
+  padding: 0 18px 0 40px;
+  height: 40px;
+  font-size: 13px;
   box-sizing: border-box;
   color: #1a1a2e;
   outline: none;
   font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.toolbarSearch::placeholder {
+  color: #9ea2b0;
 }
 
 .toolbarSearch:focus {
   border-color: #4a5bdb;
-  box-shadow: 0 0 0 3px rgba(74, 91, 219, 0.06);
+  box-shadow: 0 0 0 3px rgba(74, 91, 219, 0.08);
 }
 
 .toolbarFiltersWrap {
@@ -136,13 +164,13 @@
 .toolbarFiltersBtn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 14px;
-  height: 36px;
+  gap: 8px;
+  padding: 0 18px;
+  height: 40px;
   border: 1px solid #e8eaf0;
   background: #fff;
-  border-radius: 8px;
-  font-size: 12px;
+  border-radius: 999px;
+  font-size: 13px;
   font-weight: 500;
   color: #6b7084;
   cursor: pointer;
