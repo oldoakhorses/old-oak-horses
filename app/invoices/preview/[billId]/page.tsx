@@ -424,6 +424,10 @@ export default function InvoicePreviewPage() {
   const [lineStates, setLineStates] = useState<Record<number, LineState>>({});
   const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
   const dropdownRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  /** State for the new whole-invoice multi-select picker (Step 4). */
+  const [wholePickerOpen, setWholePickerOpen] = useState(false);
+  const [wholePickerSearch, setWholePickerSearch] = useState("");
+  const wholePickerRef = useRef<HTMLDivElement | null>(null);
   const [wholeSplitType, setWholeSplitType] = useState<"even" | "custom">("even");
   const [wholeAssignedIds, setWholeAssignedIds] = useState<string[]>([]);
   const [wholeAmounts, setWholeAmounts] = useState<Record<string, string>>({});
@@ -709,6 +713,23 @@ export default function InvoicePreviewPage() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [openDropdownId]);
+
+  /** Close the whole-invoice multi-select popover on outside-click. */
+  useEffect(() => {
+    if (!wholePickerOpen) return;
+    const handleClick = (event: MouseEvent) => {
+      const container = wholePickerRef.current;
+      if (!container) {
+        setWholePickerOpen(false);
+        return;
+      }
+      if (!container.contains(event.target as Node)) {
+        setWholePickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [wholePickerOpen]);
 
   const contactName = bill?.extractedVendorContact?.vendorName || (bill?.contactName ?? bill?.customProviderName ?? "Unknown");
   const previewTitle = formatInvoiceName({ contactName: bill?.contactName ?? contactName, date: bill?.date });
@@ -2799,31 +2820,139 @@ export default function InvoicePreviewPage() {
                               : "SELECT PEOPLE"}
                         </span>
                       </div>
-                      <div className={styles.formField}>
-                        <select
-                          className={`${styles.assignSelect} ${assignType === "horse" ? styles.addEntityHorse : styles.addEntityPerson}`}
-                          value=""
-                          onChange={(event) => {
-                            const value = event.target.value;
-                            if (value === BUSINESS_GENERAL) {
-                              setWholeAssignMode("business_general");
-                              setWholeAssignedIds([]);
-                              setWholeAmounts({});
-                              return;
-                            }
-                            if (!value || wholeAssignedIds.includes(value)) return;
-                            setWholeAssignedIds((prev) => wholeAssignMode === "single" ? [value] : [...prev, value]);
-                          }}
-                        >
-                          <option value="">
-                            + add {assignType === "horse" ? "horse" : assignType === "business" ? "business" : "person"}...
-                          </option>
-                          {entityList
-                            .filter((entry) => !wholeAssignedIds.includes(String(entry._id)))
-                            .map((entry) => (
-                              <option key={entry._id} value={entry._id}>{entry.name}</option>
-                            ))}
-                        </select>
+                      <div className={styles.formField} ref={wholePickerRef} style={{ position: "relative" }}>
+                        {(() => {
+                          const entityLabel = assignType === "horse" ? "horse" : assignType === "business" ? "business" : "person";
+                          const entityLabelPlural = assignType === "horse" ? "horses" : assignType === "business" ? "businesses" : "people";
+                          const isSingle = wholeAssignMode === "single";
+                          const selectedCount = wholeAssignedIds.length;
+                          const filtered = entityList.filter((entry) =>
+                            !wholePickerSearch.trim()
+                              ? true
+                              : entry.name.toLowerCase().includes(wholePickerSearch.trim().toLowerCase()),
+                          );
+                          const toggleEntity = (id: string) => {
+                            setWholeAssignedIds((prev) => {
+                              if (isSingle) {
+                                // Single mode: behaves like a radio. Picking
+                                // replaces the selection; picking the same
+                                // entity again clears it.
+                                if (prev[0] === id) return [];
+                                setWholePickerOpen(false);
+                                return [id];
+                              }
+                              return prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+                            });
+                          };
+                          return (
+                            <>
+                              <button
+                                type="button"
+                                className={`${styles.assignSelect} ${assignType === "horse" ? styles.addEntityHorse : styles.addEntityPerson}`}
+                                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", textAlign: "left" }}
+                                onClick={() => setWholePickerOpen((v) => !v)}
+                              >
+                                <span>
+                                  {selectedCount === 0
+                                    ? `+ add ${entityLabel}${isSingle ? "" : "(s)"}...`
+                                    : isSingle
+                                      ? "change selection"
+                                      : `add more ${entityLabelPlural}... (${selectedCount} picked)`}
+                                </span>
+                                <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 8 }}>▾</span>
+                              </button>
+                              {wholePickerOpen ? (
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    top: "100%",
+                                    left: 0,
+                                    right: 0,
+                                    marginTop: 4,
+                                    background: "#fff",
+                                    border: "1px solid #e6e7ed",
+                                    borderRadius: 8,
+                                    boxShadow: "0 6px 18px rgba(15, 23, 42, 0.08)",
+                                    zIndex: 50,
+                                    maxHeight: 340,
+                                    overflowY: "auto",
+                                  }}
+                                >
+                                  <div style={{ padding: 8, borderBottom: "1px solid #f1f2f5", position: "sticky", top: 0, background: "#fff" }}>
+                                    <input
+                                      type="text"
+                                      value={wholePickerSearch}
+                                      onChange={(e) => setWholePickerSearch(e.target.value)}
+                                      placeholder={`search ${entityLabelPlural}...`}
+                                      style={{ width: "100%", padding: "6px 8px", border: "1px solid #e6e7ed", borderRadius: 6, fontSize: 12 }}
+                                      autoFocus
+                                    />
+                                  </div>
+                                  {filtered.length === 0 ? (
+                                    <div style={{ padding: 12, fontSize: 12, color: "#6B7084" }}>no matches</div>
+                                  ) : (
+                                    filtered.map((entry) => {
+                                      const id = String(entry._id);
+                                      const selected = wholeAssignedIds.includes(id);
+                                      return (
+                                        <button
+                                          key={id}
+                                          type="button"
+                                          onClick={() => toggleEntity(id)}
+                                          style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 8,
+                                            width: "100%",
+                                            padding: "8px 12px",
+                                            background: selected ? "rgba(74, 91, 219, 0.06)" : "transparent",
+                                            border: "none",
+                                            cursor: "pointer",
+                                            textAlign: "left",
+                                            fontSize: 13,
+                                            color: "#1a1a2e",
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            if (!selected) (e.currentTarget as HTMLElement).style.background = "#f5f6f9";
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            if (!selected) (e.currentTarget as HTMLElement).style.background = "transparent";
+                                          }}
+                                        >
+                                          <span style={{ width: 16, display: "inline-flex", justifyContent: "center" }}>
+                                            {isSingle ? (selected ? "●" : "○") : (selected ? "☑" : "☐")}
+                                          </span>
+                                          <span style={{ flex: 1 }}>{entry.name}</span>
+                                        </button>
+                                      );
+                                    })
+                                  )}
+                                  {!isSingle && selectedCount > 0 ? (
+                                    <div style={{ padding: 8, borderTop: "1px solid #f1f2f5", display: "flex", justifyContent: "space-between", gap: 8, position: "sticky", bottom: 0, background: "#fff" }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setWholeAssignedIds([]);
+                                          setWholeAmounts({});
+                                        }}
+                                        style={{ fontSize: 11, color: "#dc2626", background: "transparent", border: "none", cursor: "pointer" }}
+                                      >
+                                        clear all
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setWholePickerOpen(false)}
+                                        style={{ fontSize: 11, color: "#1a1a2e", background: "transparent", border: "none", cursor: "pointer", fontWeight: 600 }}
+                                      >
+                                        done
+                                      </button>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   ) : null}
