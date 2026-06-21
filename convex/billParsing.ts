@@ -1102,6 +1102,31 @@ function normalizeParsedPayload(input: Record<string, unknown>) {
     } as any);
   }
 
+  // Defensive backfill: if the parsed invoice_total is clearly bigger than
+  // the sum of every line item we've assembled so far (including the
+  // tax/shipping/fees we just synthesized from explicit fields), the
+  // remainder is unitemized — usually shipping + tax bundled into the
+  // receipt's "Total" line without per-component breakdown. Insert a
+  // single catch-all line so approving doesn't drop the missing amount
+  // and the user can re-categorize / split it manually.
+  const computedItemsTotal = lineItems.reduce(
+    (sum: number, it: any) => sum + (typeof it.total_usd === "number" ? it.total_usd : 0),
+    0,
+  );
+  const missing = (invoiceTotalUsd ?? 0) - computedItemsTotal;
+  if (typeof invoiceTotalUsd === "number" && missing > 0.05 && missing / invoiceTotalUsd > 0.005) {
+    console.log(
+      `[billParsing] invoice_total_usd ${invoiceTotalUsd.toFixed(2)} exceeds line-item sum ${computedItemsTotal.toFixed(2)} by ${missing.toFixed(2)} — inserting catch-all "Shipping & Taxes" line`,
+    );
+    lineItems.push({
+      description: "Shipping & Taxes",
+      quantity: 1,
+      total_usd: round2(missing),
+      amount_original: round2(missing),
+      is_fee: true,
+    } as any);
+  }
+
   if (contactName) {
     output.contact_name = contactName;
     output.contactName = contactName;
@@ -1597,6 +1622,7 @@ For the overall invoice, extract:
 - invoice_date: Date on the invoice (MM/DD/YYYY)
 - due_date: Due date if shown
 - invoice_total_usd: The FINAL grand total in USD — the amount actually charged / due / paid. This is the "Total", "Grand Total", "Amount Due", "Balance Due", or "Total Charged" line, AFTER tax, shipping, and any fees. NEVER use the subtotal as invoice_total_usd. If the invoice shows "Sub Total $X" and "Total $Y" where Y > X, use Y.
+- invoice_total_usd: THE FINAL GRAND TOTAL of the invoice, after every tax / shipping / fee. Read the receipt's largest dollar amount labeled "Total", "Grand Total", "Amount Due", "Balance Due", or "Total Charged". NEVER use the subtotal — if the receipt shows "Subtotal $X" + "Total $Y" with Y > X, ALWAYS use Y. If the receipt shows the breakdown collapsed (just "Subtotal Shipping Taxes Total $Y" without per-component amounts), Y is still the invoice_total_usd.
 - tax: Sales tax / VAT amount if shown (separate from subtotal)
 - subtotal: Subtotal before tax if shown
 - shipping_fee: Shipping / handling charge if shown
