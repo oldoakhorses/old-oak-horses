@@ -906,10 +906,16 @@ export default function InvoicePreviewPage() {
   function switchAssignType(newType: AssignType) {
     if (newType === assignType) return;
     setAssignType(newType);
+    // Business assignments default to "everything included" — the common
+    // case is the whole invoice belongs to one LLC, so checking every
+    // line item out of the gate saves the user from confirming each row.
+    // Horse/person still default to unconfirmed since those need an
+    // explicit per-line pick before assignment makes sense.
+    const autoConfirm = newType === "business";
     setLineStates((prev) => Object.fromEntries(
       Object.entries(prev).map(([key, value]) => [
         key,
-        { ...value, assignees: [], confirmed: false, autoDetected: false }
+        { ...value, assignees: [], confirmed: autoConfirm, autoDetected: false }
       ])
     ));
     setWholeAssignedIds([]);
@@ -2481,7 +2487,7 @@ export default function InvoicePreviewPage() {
                 <>
                   <div className={`${styles.lineHeader} ${styles.lineHeaderVet}`}>
                     <div>DESCRIPTION</div>
-                    <div>{assignType === "horse" ? "HORSE" : "PERSON"}</div>
+                    <div>{assignType === "horse" ? "HORSE" : assignType === "business" ? "BUSINESS" : "PERSON"}</div>
                     <div>CATEGORY</div>
                     <div>SUBCATEGORY</div>
                     <div style={{ textAlign: "right" }}>AMOUNT</div>
