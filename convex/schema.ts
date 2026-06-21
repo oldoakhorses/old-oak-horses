@@ -189,6 +189,37 @@ export default defineSchema({
         })
       )
     ),
+    /**
+     * Whole-invoice reimbursement marker. Pure label — does NOT drive
+     * any cost-per breakdown or change the assignment math. Two pickers:
+     * `personId` is who fronted the cost out-of-pocket; `ownerId` is the
+     * business that's reimbursing them.
+     */
+    reimbursement: v.optional(
+      v.object({
+        ownerId: v.id("owners"),
+        ownerName: v.string(),
+        personId: v.id("people"),
+        personName: v.string(),
+      })
+    ),
+    /**
+     * Per-line-item reimbursement markers — same shape as `reimbursement`
+     * but scoped to specific line items. Lets a single invoice mix
+     * normal-expense lines with reimbursement lines (and even reimburse
+     * different people on different lines).
+     */
+    reimbursementLineItems: v.optional(
+      v.array(
+        v.object({
+          lineItemIndex: v.number(),
+          ownerId: v.id("owners"),
+          ownerName: v.string(),
+          personId: v.id("people"),
+          personName: v.string(),
+        })
+      )
+    ),
     linkedFromBillId: v.optional(v.id("bills"))
     ,
     hasUnmatchedHorses: v.optional(v.boolean()),

@@ -769,6 +769,39 @@ select.categorySelect:hover {
   color: transparent;
 }
 
+/* Reimbursement toggle on each line-item row. Sits in .lineActions next
+ * to the confirm checkbox; click opens a small picker popover. */
+.lineReimburseBtn {
+  font-size: 11px;
+  opacity: 0.45;
+  border-color: #d0d2d8;
+  background: transparent;
+}
+.lineReimburseBtn:hover {
+  opacity: 1;
+  border-color: #4a5bdb;
+}
+.lineReimburseBtnSet {
+  border-color: #4a5bdb;
+  background: rgba(74, 91, 219, 0.1);
+  color: #4a5bdb;
+  font-size: 11px;
+  opacity: 1;
+}
+
+.reimbPopover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  width: 240px;
+  background: #fff;
+  border: 1px solid #e6e7ed;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  padding: 10px;
+  z-index: 50;
+}
+
 .lineActions {
   display: flex;
   align-items: center;

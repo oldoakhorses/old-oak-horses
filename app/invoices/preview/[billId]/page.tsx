@@ -467,6 +467,16 @@ export default function InvoicePreviewPage() {
   const [taggedPeoplePickerOpen, setTaggedPeoplePickerOpen] = useState(false);
   const [taggedPeoplePickerSearch, setTaggedPeoplePickerSearch] = useState("");
   const taggedPeoplePickerRef = useRef<HTMLDivElement | null>(null);
+
+  // Reimbursement markers — pure label. `wholeReimbursement` covers
+  // "the whole invoice is a reimbursement"; `lineReimbursements` covers
+  // per-line markers. Each entry holds the business that owes (ownerId)
+  // and the person who fronted the cost (personId).
+  type ReimbursementMarker = { ownerId: string; personId: string };
+  const [wholeReimbursement, setWholeReimbursement] = useState<ReimbursementMarker | null>(null);
+  const [lineReimbursements, setLineReimbursements] = useState<Record<number, ReimbursementMarker>>({});
+  const [reimbursePickerOpen, setReimbursePickerOpen] = useState<"whole" | number | null>(null);
+  const reimbursePickerRef = useRef<HTMLDivElement | null>(null);
   const [lineStates, setLineStates] = useState<Record<number, LineState>>({});
   const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
   const dropdownRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -798,6 +808,26 @@ export default function InvoicePreviewPage() {
       setWholeAmounts({});
     }
 
+    // Reimbursement markers — whole + per-line.
+    const wholeReimb = (bill as any).reimbursement as
+      | { ownerId: string; personId: string }
+      | undefined;
+    setWholeReimbursement(
+      wholeReimb ? { ownerId: String(wholeReimb.ownerId), personId: String(wholeReimb.personId) } : null,
+    );
+    const lineReimbs = (bill as any).reimbursementLineItems as
+      | Array<{ lineItemIndex: number; ownerId: string; personId: string }>
+      | undefined;
+    if (Array.isArray(lineReimbs) && lineReimbs.length > 0) {
+      const map: Record<number, ReimbursementMarker> = {};
+      for (const entry of lineReimbs) {
+        map[entry.lineItemIndex] = { ownerId: String(entry.ownerId), personId: String(entry.personId) };
+      }
+      setLineReimbursements(map);
+    } else {
+      setLineReimbursements({});
+    }
+
     // Bill (re)loaded — nothing edited yet.
     setFormDirty(false);
   }, [bill?._id, bill?.contactId, bill?.categoryId, bill?.status, bill?.extractedData, requiresPerson, categorySlug]);
@@ -851,6 +881,19 @@ export default function InvoicePreviewPage() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [taggedPeoplePickerOpen]);
+
+  /** Close the reimbursement picker (whole or per-line) on outside click. */
+  useEffect(() => {
+    if (reimbursePickerOpen === null) return;
+    const handleClick = (event: MouseEvent) => {
+      const container = reimbursePickerRef.current;
+      if (!container || !container.contains(event.target as Node)) {
+        setReimbursePickerOpen(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [reimbursePickerOpen]);
 
   const contactName = bill?.extractedVendorContact?.vendorName || (bill?.contactName ?? bill?.customProviderName ?? "Unknown");
   const previewTitle = formatInvoiceName({ contactName: bill?.contactName ?? contactName, date: bill?.date });
@@ -1398,6 +1441,92 @@ export default function InvoicePreviewPage() {
               ✕
             </button>
           ) : null}
+          {/* Reimbursement toggle. Click to mark this line as a
+              reimbursement; opens an inline popover with two pickers. */}
+          {(() => {
+            const marker = lineReimbursements[index];
+            const isOpen = reimbursePickerOpen === index;
+            const isSet = !!marker;
+            return (
+              <div style={{ position: "relative" }} ref={isOpen ? reimbursePickerRef : undefined}>
+                <button
+                  type="button"
+                  className={`${styles.confirmCheck} ${isSet ? styles.lineReimburseBtnSet : styles.lineReimburseBtn}`}
+                  onClick={() => setReimbursePickerOpen(isOpen ? null : index)}
+                  aria-label={isSet ? "edit reimbursement" : "mark as reimbursement"}
+                  title="Reimbursement"
+                >
+                  💵
+                </button>
+                {isOpen ? (
+                  <div className={styles.reimbPopover}>
+                    <div className={styles.label}>BUSINESS REIMBURSING</div>
+                    <select
+                      className={styles.categorySelect}
+                      value={marker?.ownerId ?? ""}
+                      onChange={(event) => {
+                        markDirty();
+                        const ownerId = event.target.value;
+                        setLineReimbursements((prev) => ({
+                          ...prev,
+                          [index]: { ownerId, personId: prev[index]?.personId ?? (people[0]?._id ? String(people[0]._id) : "") },
+                        }));
+                      }}
+                    >
+                      <option value="">select business...</option>
+                      {businesses.map((b: any) => (
+                        <option key={String(b._id)} value={String(b._id)}>{b.name}</option>
+                      ))}
+                    </select>
+                    <div className={styles.label} style={{ marginTop: 8 }}>PERSON FRONTED COST</div>
+                    <select
+                      className={styles.categorySelect}
+                      value={marker?.personId ?? ""}
+                      onChange={(event) => {
+                        markDirty();
+                        const personId = event.target.value;
+                        setLineReimbursements((prev) => ({
+                          ...prev,
+                          [index]: { ownerId: prev[index]?.ownerId ?? (businesses[0] as any)?._id ? String((businesses[0] as any)._id) : "", personId },
+                        }));
+                      }}
+                    >
+                      <option value="">select person...</option>
+                      {(people as { _id: any; name: string }[]).map((p) => (
+                        <option key={String(p._id)} value={String(p._id)}>{p.name}</option>
+                      ))}
+                    </select>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
+                      {isSet ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            markDirty();
+                            setLineReimbursements((prev) => {
+                              const next = { ...prev };
+                              delete next[index];
+                              return next;
+                            });
+                            setReimbursePickerOpen(null);
+                          }}
+                          style={{ fontSize: 11, color: "#dc2626", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                        >
+                          remove tag
+                        </button>
+                      ) : <span />}
+                      <button
+                        type="button"
+                        onClick={() => setReimbursePickerOpen(null)}
+                        style={{ fontSize: 11, color: "#1a1a2e", background: "transparent", border: "none", cursor: "pointer", fontWeight: 600 }}
+                      >
+                        done
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })()}
         </div>
       </div>
     );
@@ -2088,6 +2217,29 @@ export default function InvoicePreviewPage() {
           };
         })
         .filter((item) => mode === "whole" || item.confirmed);
+      // Resolve reimbursement IDs → names so the server-side records
+      // are self-describing (no extra join needed at read time).
+      const resolveOwnerName = (id: string) =>
+        businesses.find((b: any) => String(b._id) === id)?.name ?? "Business";
+      const resolvePersonName = (id: string) =>
+        (people as { _id: any; name: string }[]).find((p) => String(p._id) === id)?.name ?? "Person";
+
+      const reimbursementPayload = wholeReimbursement
+        ? {
+            ownerId: wholeReimbursement.ownerId as any,
+            ownerName: resolveOwnerName(wholeReimbursement.ownerId),
+            personId: wholeReimbursement.personId as any,
+            personName: resolvePersonName(wholeReimbursement.personId),
+          }
+        : null;
+      const reimbursementLineItemsPayload = Object.entries(lineReimbursements).map(([idx, marker]) => ({
+        lineItemIndex: Number(idx),
+        ownerId: marker.ownerId as any,
+        ownerName: resolveOwnerName(marker.ownerId),
+        personId: marker.personId as any,
+        personName: resolvePersonName(marker.personId),
+      }));
+
       await approveBill({
         billId,
         lineItems: payloadLineItems,
@@ -2108,7 +2260,9 @@ export default function InvoicePreviewPage() {
                 };
               })
             : undefined,
-        notes: notes.trim() || undefined
+        notes: notes.trim() || undefined,
+        reimbursement: reimbursementPayload,
+        reimbursementLineItems: reimbursementLineItemsPayload,
       });
       // Determine redirect based on line item categories (which may have been changed by the user)
       const dominantLineCat = (mode === "whole" && wholeCategoryOverride) ? wholeCategoryOverride : (() => {
@@ -3355,6 +3509,95 @@ export default function InvoicePreviewPage() {
                     })}
                   </div>
                 ) : null}
+              </div>
+            </div>
+
+            {/* REIMBURSEMENT (optional, invoice-level). Marks the whole
+                invoice as a reimbursement — picks the business that
+                owes and the person who fronted the cost. Pure label;
+                doesn't change cost-per math.
+                Per-line-item reimbursement chips also live on each row
+                in the assignment card above. */}
+            <div className={styles.detailsCard}>
+              <div className={styles.cardHeader}>
+                <div>
+                  <div className={styles.cardTitle}>reimbursement</div>
+                  <div className={styles.cardMeta}>
+                    optional · {wholeReimbursement
+                      ? (() => {
+                          const biz = businesses.find((b: any) => String(b._id) === wholeReimbursement.ownerId)?.name ?? "Business";
+                          const pers = (people as { _id: any; name: string }[]).find((p) => String(p._id) === wholeReimbursement.personId)?.name ?? "Person";
+                          return `${biz} reimburses ${pers}`;
+                        })()
+                      : "not a reimbursement"}
+                  </div>
+                </div>
+              </div>
+              <div style={{ padding: "12px 22px 22px", display: "flex", flexDirection: "column", gap: 10 }}>
+                {wholeReimbursement === null ? (
+                  <button
+                    type="button"
+                    className={styles.assignSelect}
+                    style={{ display: "flex", alignItems: "center", gap: 8, textAlign: "left" }}
+                    onClick={() => {
+                      markDirty();
+                      // Default to the first business + first person; user
+                      // can change via the pickers below. Skip if there's
+                      // nothing to pick — surfaces an empty marker the
+                      // user must edit before saving.
+                      const firstBiz = (businesses[0] as any)?._id ? String((businesses[0] as any)._id) : "";
+                      const firstPerson = people[0]?._id ? String(people[0]._id) : "";
+                      setWholeReimbursement({ ownerId: firstBiz, personId: firstPerson });
+                    }}
+                  >
+                    <span>💵</span>
+                    <span>mark this invoice as a reimbursement</span>
+                  </button>
+                ) : (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                      <div>
+                        <div className={styles.label} style={{ marginBottom: 4 }}>BUSINESS REIMBURSING</div>
+                        <select
+                          className={styles.categorySelect}
+                          value={wholeReimbursement.ownerId}
+                          onChange={(event) => {
+                            markDirty();
+                            setWholeReimbursement((prev) => prev ? { ...prev, ownerId: event.target.value } : prev);
+                          }}
+                        >
+                          <option value="">select business...</option>
+                          {businesses.map((b: any) => (
+                            <option key={String(b._id)} value={String(b._id)}>{b.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <div className={styles.label} style={{ marginBottom: 4 }}>PERSON FRONTED COST</div>
+                        <select
+                          className={styles.categorySelect}
+                          value={wholeReimbursement.personId}
+                          onChange={(event) => {
+                            markDirty();
+                            setWholeReimbursement((prev) => prev ? { ...prev, personId: event.target.value } : prev);
+                          }}
+                        >
+                          <option value="">select person...</option>
+                          {(people as { _id: any; name: string }[]).map((p) => (
+                            <option key={String(p._id)} value={String(p._id)}>{p.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { markDirty(); setWholeReimbursement(null); }}
+                      style={{ alignSelf: "flex-start", fontSize: 11, color: "#dc2626", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                    >
+                      remove reimbursement tag
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 

@@ -3027,7 +3027,35 @@ export const approveBill = mutation({
       )
     ),
     splitMode: v.optional(v.union(v.literal("even"), v.literal("custom"))),
-    notes: v.optional(v.string())
+    notes: v.optional(v.string()),
+    /** Whole-invoice reimbursement marker. Pass `null` to clear. */
+    reimbursement: v.optional(
+      v.union(
+        v.null(),
+        v.object({
+          ownerId: v.id("owners"),
+          ownerName: v.string(),
+          personId: v.id("people"),
+          personName: v.string(),
+        }),
+      ),
+    ),
+    /** Per-line-item reimbursement markers. Pass `null` (or omit) to leave
+     *  alone; pass `[]` to clear. */
+    reimbursementLineItems: v.optional(
+      v.union(
+        v.null(),
+        v.array(
+          v.object({
+            lineItemIndex: v.number(),
+            ownerId: v.id("owners"),
+            ownerName: v.string(),
+            personId: v.id("people"),
+            personName: v.string(),
+          }),
+        ),
+      ),
+    ),
   },
   handler: async (ctx, args) => {
     const bill = await ctx.db.get(args.billId);
@@ -3040,6 +3068,16 @@ export const approveBill = mutation({
     };
     if (args.notes !== undefined) {
       patch.notes = args.notes.trim() || undefined;
+    }
+    // Reimbursement markers — null/undefined semantics differ:
+    //   - undefined: don't touch
+    //   - null:      clear
+    //   - object/[]: set
+    if (args.reimbursement !== undefined) {
+      patch.reimbursement = args.reimbursement ?? undefined;
+    }
+    if (args.reimbursementLineItems !== undefined) {
+      patch.reimbursementLineItems = args.reimbursementLineItems ?? undefined;
     }
     await ctx.db.patch(args.billId, patch);
 
