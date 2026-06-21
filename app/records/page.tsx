@@ -216,6 +216,9 @@ function createInitialRecordForm(): RecordFormState {
 
 export default function RecordsPage() {
   const { user } = useAuth();
+  // Linked invoice cross-references are admin/owner-only. Team members
+  // shouldn't see which invoice a record traces back to.
+  const canSeeLinkedInvoice = user?.role === "admin" || user?.role === "owner";
   // Medication records live on /meds; filter them out of the records page
   // so the two surfaces don't double-show the same data.
   const orgArgs = useOrgArgs();
@@ -939,13 +942,15 @@ export default function RecordsPage() {
             : `showing ${filteredCount} of ${totalCount} ${activeTab} records`}
         </div>
 
-        <section className={styles.recordsCard}>
+        <section className={`${styles.recordsCard} ${canSeeLinkedInvoice ? "" : styles.recordsCardNoInvoice}`}>
           <div className={styles.tableHeader}>
             <span className={`${styles.colHorse} ${styles.sortableHeader}`} onClick={() => handleSort("horse")}>Horse{sortArrow("horse")}</span>
             <span className={`${styles.colRecord} ${styles.sortableHeader}`} onClick={() => handleSort("record")}>Record{sortArrow("record")}</span>
             <span className={`${styles.colContact} ${styles.sortableHeader}`} onClick={() => handleSort("detail")}>Contact{sortArrow("detail")}</span>
             <span className={`${styles.colDate} ${styles.sortableHeader}`} onClick={() => handleSort("date")}>Date{sortArrow("date")}</span>
-            <span className={`${styles.colLinkedInvoice}`}>Linked Invoice</span>
+            {canSeeLinkedInvoice ? (
+              <span className={`${styles.colLinkedInvoice}`}>Linked Invoice</span>
+            ) : null}
           </div>
 
           {sortedRecords.length === 0 ? (
@@ -1030,18 +1035,21 @@ export default function RecordsPage() {
                     {/* Date */}
                     <span className={`${styles.colDate} ${dateSoon ? styles.recordDateSoon : ""}`}>{formatDateShort(row.eventDate)}</span>
 
-                    {/* Linked Invoice */}
-                    <span className={styles.colLinkedInvoice}>
-                      {record.billInfo ? (
-                        <Link
-                          href={`/invoices/preview/${record.billInfo.billId}`}
-                          onClick={(event) => event.stopPropagation()}
-                          className={styles.invoiceLink}
-                        >
-                          {record.billInfo.contactName?.split(/[\s—]/)[0] || "View"}
-                        </Link>
-                      ) : null}
-                    </span>
+                    {/* Linked Invoice — admin/owner only. Hidden from
+                        team members. */}
+                    {canSeeLinkedInvoice ? (
+                      <span className={styles.colLinkedInvoice}>
+                        {record.billInfo ? (
+                          <Link
+                            href={`/invoices/preview/${record.billInfo.billId}`}
+                            onClick={(event) => event.stopPropagation()}
+                            className={styles.invoiceLink}
+                          >
+                            {record.billInfo.contactName?.split(/[\s—]/)[0] || "View"}
+                          </Link>
+                        ) : null}
+                      </span>
+                    ) : null}
                   </div>
 
                   {expanded ? (

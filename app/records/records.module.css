@@ -521,6 +521,13 @@
   transition: background 0.1s;
 }
 
+/* Team-member view: the "Linked Invoice" column is hidden, so collapse
+ * to 4 columns. */
+.recordsCardNoInvoice .tableHeader,
+.recordsCardNoInvoice .recordRow {
+  grid-template-columns: minmax(140px, 1.2fr) minmax(180px, 1.8fr) minmax(140px, 1.4fr) 100px;
+}
+
 .recordRow:last-child {
   border-bottom: none;
 }
