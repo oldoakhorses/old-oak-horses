@@ -2122,16 +2122,22 @@ function parseSquareReceipt(emailText: string): Record<string, unknown> | null {
   // Line items — narrow to the slice between "Let MERCHANT know" and
   // "Total $X" so we don't grab amounts from the header/footer.
   const lineItems: Array<Record<string, unknown>> = [];
+  // The body-total dollar amount that Square renders in big type can be
+  // emitted in the HTML as separate text nodes — `$`, `88`, `.`, `00` —
+  // which collapse to `"$ 88 . 00"` after our text join. A regex looking
+  // for the continuous `$NN.NN` form would skip right past it and land
+  // on the FIRST itemized price instead (i.e. eat the first line item's
+  // amount). Use a tolerant pattern that allows whitespace between the
+  // sigil, digits, and decimal.
   const startIdx = (() => {
     const letKnow = text.search(/Let .+? know how your experience was/i);
     if (letKnow >= 0) {
-      // skip past the phrase plus the big body-total dollar amount that
-      // immediately follows it
       const afterKnow = text.slice(letKnow);
-      const bodyTotalRel = afterKnow.search(/\$[\d,]+\.\d{2}/);
+      const bodyTotalRegex = /\$\s*[\d,]+\s*\.\s*\d{2}/;
+      const bodyTotalRel = afterKnow.search(bodyTotalRegex);
       if (bodyTotalRel >= 0) {
-        const bodyTotalAbs = letKnow + bodyTotalRel;
-        return bodyTotalAbs + afterKnow.slice(bodyTotalRel).match(/^\$[\d,]+\.\d{2}/)![0].length;
+        const match = afterKnow.slice(bodyTotalRel).match(bodyTotalRegex);
+        if (match) return letKnow + bodyTotalRel + match[0].length;
       }
       return letKnow + afterKnow.indexOf("was") + 3;
     }
