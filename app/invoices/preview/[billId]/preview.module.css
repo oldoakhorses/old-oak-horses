@@ -8,6 +8,49 @@
   align-items: start;
 }
 
+/* Top bar above the invoice editor — back link on the left, prominent
+ * "retry" (re-parse) action on the right so it's easy to find when a
+ * parse came out wrong. */
+.topBar {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.retryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #4a5bdb;
+  background: #4a5bdb;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.retryBtn:hover {
+  background: #3b4ac4;
+  border-color: #3b4ac4;
+  box-shadow: 0 2px 6px rgba(74, 91, 219, 0.25);
+}
+
+.retryBtn:disabled {
+  background: #e8eaf0;
+  border-color: #e8eaf0;
+  color: #9ea2b0;
+  cursor: default;
+  box-shadow: none;
+}
+
 .pdfButton {
   font-size: 9px;
   color: #4a5bdb;

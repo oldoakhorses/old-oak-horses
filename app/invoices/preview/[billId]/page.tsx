@@ -2317,7 +2317,24 @@ export default function InvoicePreviewPage() {
       />
 
       <main className="page-main">
-        <Link href="/invoices" className="ui-back-link">← cd /invoices</Link>
+        <div className={styles.topBar}>
+          <Link href="/invoices" className="ui-back-link">← cd /invoices</Link>
+          <button
+            type="button"
+            className={styles.retryBtn}
+            onClick={onReparseBill}
+            disabled={reparsing || !!isParsing}
+            title="Re-run the bill parser on this invoice"
+          >
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 10a7 7 0 0 1 12-4.95L17 7" />
+              <path d="M17 3v4h-4" />
+              <path d="M17 10a7 7 0 0 1-12 4.95L3 13" />
+              <path d="M3 17v-4h4" />
+            </svg>
+            {reparsing || isParsing ? "retrying..." : "retry"}
+          </button>
+        </div>
 
         <section className={styles.previewLayout}>
           <div className={styles.previewDetails}>
@@ -2481,17 +2498,7 @@ export default function InvoicePreviewPage() {
                     >
                       edit
                     </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className={styles.changeLink}
-                      onClick={onReparseBill}
-                      disabled={reparsing || !!isParsing}
-                      title="Re-run the bill parser on this invoice"
-                    >
-                      {reparsing || isParsing ? "re-parsing..." : "re-parse"}
-                    </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
