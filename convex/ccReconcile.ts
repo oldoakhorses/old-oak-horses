@@ -262,6 +262,8 @@ export const uploadStatement = mutation({
       contactName: string;
       contactId?: Id<"contacts">;
       providerKeywords: string[];
+      /** Invoice date in ms, used to gate matches by date proximity. */
+      invoiceDateMs: number | null;
     };
 
     const billRefs: BillRef[] = approvedBills.map((b) => {
@@ -280,6 +282,17 @@ export const uploadStatement = mutation({
       }
 
       const allNames = [pName, contactName, b.fileName].filter(Boolean).join(" ");
+
+      // Bill date for the date-proximity gate.
+      const invoiceDateRaw =
+        (extracted as any).invoice_date ??
+        (extracted as any).invoiceDate;
+      let invoiceDateMs: number | null = null;
+      if (typeof invoiceDateRaw === "string") {
+        const parsed = new Date(invoiceDateRaw);
+        if (!Number.isNaN(parsed.getTime())) invoiceDateMs = parsed.getTime();
+      }
+
       return {
         id: b._id,
         fileName: b.fileName,
@@ -287,6 +300,7 @@ export const uploadStatement = mutation({
         contactName: pName || contactName,
         contactId: b.contactId,
         providerKeywords: extractKeywords(allNames),
+        invoiceDateMs,
       };
     });
 
@@ -310,53 +324,74 @@ export const uploadStatement = mutation({
         : undefined;
       const staticContactId = staticContact?._id;
 
-      // Try to find a matching bill
+      // Try to find a matching bill. Forward matching mirrors the same
+      // tightened gates as findMatchingTransactionsForBill (reverse
+      // direction): amount + name + date all have to line up.
       let bestMatch: { billRef: BillRef; confidence: "exact" | "high" | "medium" | "low" } | null = null;
+      const MAX_DAYS_DIFF = 45;
+      const DATE_VERY_CLOSE = 14;
+      const DATE_CLOSE = 30;
+      const txnPostMs = new Date(row.postingDate).getTime();
+      const haveTxnDate = !Number.isNaN(txnPostMs);
 
       for (const ref of billRefs) {
         // Amount match
         const amountDiff = Math.abs(ref.amount - absAmount);
         const amountMatch = amountDiff < 0.02; // exact match within 2 cents
         const closeAmount = amountDiff / Math.max(absAmount, 1) < 0.05; // within 5%
+        if (!amountMatch && !closeAmount) continue;
 
-        // Static-mapping contact match: when the txn maps to a known contact and
-        // this bill is for that same contact, that's a much stronger signal than
-        // keyword overlap. Treat amountMatch+contactMatch as exact, closeAmount
-        // +contactMatch as high.
+        // HARD date gate. Skip if the bill date and txn posting date are
+        // > 45 days apart — almost certainly a different charge that
+        // happens to share the amount.
+        let daysDiff: number | null = null;
+        let dateVeryClose = false;
+        let dateClose = false;
+        if (haveTxnDate && ref.invoiceDateMs != null) {
+          daysDiff = Math.abs(ref.invoiceDateMs - txnPostMs) / (1000 * 60 * 60 * 24);
+          if (daysDiff > MAX_DAYS_DIFF) continue; // HARD reject
+          dateVeryClose = daysDiff <= DATE_VERY_CLOSE;
+          dateClose = daysDiff <= DATE_CLOSE;
+        }
+
+        // Static-mapping contact match.
         const contactMatch = staticContactId && ref.contactId
           ? String(ref.contactId) === String(staticContactId)
           : false;
-        if (contactMatch && amountMatch) {
-          bestMatch = { billRef: ref, confidence: "exact" };
-          break;
-        }
-        if (contactMatch && closeAmount) {
-          if (!bestMatch || bestMatch.confidence !== "exact") {
-            bestMatch = { billRef: ref, confidence: "high" };
-          }
-          continue;
-        }
 
-        // Name/keyword match
+        // Name/keyword match.
         const commonKeywords = txnKeywords.filter((kw) =>
           ref.providerKeywords.some((pk) => pk.includes(kw) || kw.includes(pk))
         );
         const nameMatch = commonKeywords.length >= 1;
         const strongNameMatch = commonKeywords.length >= 2;
 
-        if (amountMatch && strongNameMatch) {
-          bestMatch = { billRef: ref, confidence: "exact" };
-          break;
-        } else if (amountMatch && nameMatch) {
-          if (!bestMatch || bestMatch.confidence !== "exact") {
-            bestMatch = { billRef: ref, confidence: "high" };
-          }
-        } else if (closeAmount && strongNameMatch) {
-          if (!bestMatch || (bestMatch.confidence !== "exact" && bestMatch.confidence !== "high")) {
-            bestMatch = { billRef: ref, confidence: "medium" };
-          }
-        } else if (nameMatch && !bestMatch) {
-          bestMatch = { billRef: ref, confidence: "low" };
+        // HARD name gate — amount alone is never enough.
+        if (!contactMatch && !nameMatch) continue;
+
+        // HARD date+name combination gate. When we have both dates and
+        // they're not "close" (<=30 days), require contact+exact to
+        // accept anything in the 30–45 day window.
+        if (daysDiff != null && !dateClose) {
+          if (!(contactMatch && amountMatch)) continue;
+        }
+
+        let confidence: "exact" | "high" | "medium" | "low" | null = null;
+        if (contactMatch && amountMatch && dateVeryClose) confidence = "exact";
+        else if (amountMatch && strongNameMatch && dateVeryClose) confidence = "exact";
+        else if (contactMatch && amountMatch) confidence = "high";
+        else if (contactMatch && closeAmount && dateClose) confidence = "high";
+        else if (amountMatch && strongNameMatch && dateClose) confidence = "high";
+        else if (amountMatch && nameMatch && dateClose) confidence = "medium";
+        else if (closeAmount && strongNameMatch && dateClose) confidence = "medium";
+        else if (amountMatch && nameMatch) confidence = "low";
+        else if (closeAmount && nameMatch && dateClose) confidence = "low";
+        if (!confidence) continue;
+
+        const order = { exact: 4, high: 3, medium: 2, low: 1 } as const;
+        if (!bestMatch || order[confidence] > order[bestMatch.confidence]) {
+          bestMatch = { billRef: ref, confidence };
+          if (confidence === "exact") break;
         }
       }
 
@@ -1294,6 +1329,13 @@ export const findMatchingTransactionsForBill = query({
       amountDiff: number;
       daysDiff: number | null;
     };
+    // Tightened thresholds — the old version surfaced matches from 90+
+    // days away on amount alone. Now every match must pass a hard date
+    // gate AND have a meaningful name signal.
+    const MAX_DAYS_DIFF = 45;       // hard rejection beyond this
+    const DATE_VERY_CLOSE = 14;     // unlocks "exact" / "high"
+    const DATE_CLOSE = 30;          // unlocks "medium"
+
     const matches: Scored[] = [];
     for (const txn of allTxns) {
       if (txn.matchedBillId) continue;
@@ -1304,6 +1346,23 @@ export const findMatchingTransactionsForBill = query({
       const amountMatch = amountDiff < 0.02;
       const closeAmount = amountDiff / Math.max(billTotal, 1) < 0.05;
       if (!amountMatch && !closeAmount) continue; // gate on amount first
+
+      // HARD date gate. If we have both dates and they're > 45 days
+      // apart, skip — that's almost certainly a different charge that
+      // happens to share an amount. If we DON'T have a bill date,
+      // require a strong contact/name signal below to compensate.
+      let daysDiff: number | null = null;
+      let dateVeryClose = false;
+      let dateClose = false;
+      if (billDateMs && txn.postingDate) {
+        const txnMs = new Date(txn.postingDate).getTime();
+        if (!Number.isNaN(txnMs)) {
+          daysDiff = Math.abs(billDateMs - txnMs) / (1000 * 60 * 60 * 24);
+          if (daysDiff > MAX_DAYS_DIFF) continue; // HARD reject
+          dateVeryClose = daysDiff <= DATE_VERY_CLOSE;
+          dateClose = daysDiff <= DATE_CLOSE;
+        }
+      }
 
       // Static descriptor → contact mapping. If the txn cleanly maps to a
       // known contact and that contact is this bill's contact, that's the
@@ -1327,34 +1386,39 @@ export const findMatchingTransactionsForBill = query({
       );
       const nameMatch = commonKeywords.length >= 1;
       const strongNameMatch = commonKeywords.length >= 2;
+      const anyNameSignal = contactMatch || nameMatch;
 
-      // Date proximity — bill date within ~60 days of posting date.
-      let daysDiff: number | null = null;
-      let dateClose = false;
-      if (billDateMs && txn.postingDate) {
-        const txnMs = new Date(txn.postingDate).getTime();
-        if (!Number.isNaN(txnMs)) {
-          daysDiff = Math.abs(billDateMs - txnMs) / (1000 * 60 * 60 * 24);
-          dateClose = daysDiff < 60;
-        }
+      // HARD name gate. Amount alone is not enough — two unrelated
+      // vendors charging the same $45 within 30 days is the most common
+      // false-positive we were generating. Require at least a contact
+      // hit OR one keyword overlap.
+      if (!anyNameSignal) continue;
+
+      // HARD date+name combination gate. When we have a bill date,
+      // require date to be at least "close" (<=30 days). The MAX_DAYS_DIFF
+      // gate above lets 30–45-day windows through only if we also have
+      // BOTH a contact match AND an exact amount.
+      if (daysDiff != null && !dateClose) {
+        if (!(contactMatch && amountMatch)) continue;
       }
 
       let confidence: Scored["confidence"];
-      if (contactMatch && amountMatch) confidence = "exact";
-      else if (amountMatch && strongNameMatch && dateClose) confidence = "exact";
-      else if (contactMatch && closeAmount) confidence = "high";
-      else if (amountMatch && (strongNameMatch || (nameMatch && dateClose))) confidence = "high";
-      else if (amountMatch && (nameMatch || dateClose)) confidence = "medium";
-      else if (closeAmount && strongNameMatch) confidence = "medium";
-      else if (amountMatch) confidence = "low";
-      else if (closeAmount && nameMatch) confidence = "low";
+      if (contactMatch && amountMatch && dateVeryClose) confidence = "exact";
+      else if (amountMatch && strongNameMatch && dateVeryClose) confidence = "exact";
+      else if (contactMatch && amountMatch) confidence = "high";
+      else if (contactMatch && closeAmount && dateClose) confidence = "high";
+      else if (amountMatch && strongNameMatch && dateClose) confidence = "high";
+      else if (amountMatch && nameMatch && dateClose) confidence = "medium";
+      else if (closeAmount && strongNameMatch && dateClose) confidence = "medium";
+      else if (amountMatch && nameMatch) confidence = "low";
+      else if (closeAmount && nameMatch && dateClose) confidence = "low";
       else continue;
 
       // Numeric score for sort stability — higher is better.
       const score =
         (confidence === "exact" ? 100 : confidence === "high" ? 75 : confidence === "medium" ? 50 : 25)
         - amountDiff
-        - (daysDiff ?? 30) * 0.1;
+        - (daysDiff ?? 30) * 0.2;
 
       matches.push({ txn, confidence, score, amountDiff, daysDiff });
     }
