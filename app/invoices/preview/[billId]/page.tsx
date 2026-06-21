@@ -459,6 +459,14 @@ export default function InvoicePreviewPage() {
 
   const [mode, setMode] = useState<"line" | "whole">("line");
   const [assignType, setAssignType] = useState<AssignType>("horse");
+  /** Invoice-level person tags. Optional reference — does NOT drive
+   *  cost-per-person breakdowns. Stored using the existing
+   *  bills.assignedPeople field with isSplit=false, so the schema doesn't
+   *  need to change for this MVP. */
+  const [taggedPersonIds, setTaggedPersonIds] = useState<string[]>([]);
+  const [taggedPeoplePickerOpen, setTaggedPeoplePickerOpen] = useState(false);
+  const [taggedPeoplePickerSearch, setTaggedPeoplePickerSearch] = useState("");
+  const taggedPeoplePickerRef = useRef<HTMLDivElement | null>(null);
   const [lineStates, setLineStates] = useState<Record<number, LineState>>({});
   const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
   const dropdownRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -599,7 +607,26 @@ export default function InvoicePreviewPage() {
     setSelectedContactId(bill.contactId ?? null);
     setShowContactSuggestions(false);
 
-    setAssignType((bill.assignType as AssignType | undefined) ?? (requiresPerson ? "person" : "horse"));
+    // Seed invoice-level person tags from the bill's saved assignedPeople
+    // list. Works for both the new "tag" semantics (whatever's saved is a
+    // tag) AND legacy person-assigned bills (people on the old bill
+    // become tags on load).
+    if (Array.isArray(bill.assignedPeople) && bill.assignedPeople.length > 0) {
+      setTaggedPersonIds(bill.assignedPeople.map((p) => String(p.personId)));
+    } else {
+      setTaggedPersonIds([]);
+    }
+
+    // People are no longer an assignment type — they're tags. If an old
+    // bill was saved with assignType "person", flip to "horse" on load
+    // so the assignment UI is still usable. The saved assignedPeople list
+    // is preserved and surfaces as the invoice-level person tags instead.
+    const savedAssignType = bill.assignType as string | undefined;
+    setAssignType(
+      savedAssignType === "horse" || savedAssignType === "business"
+        ? (savedAssignType as AssignType)
+        : "horse",
+    );
 
     const nextLineStates: Record<number, LineState> = {};
     lineItems.forEach((row, index) => {
@@ -797,6 +824,23 @@ export default function InvoicePreviewPage() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [wholePickerOpen]);
+
+  /** Same for the person-tag multi-select popover. */
+  useEffect(() => {
+    if (!taggedPeoplePickerOpen) return;
+    const handleClick = (event: MouseEvent) => {
+      const container = taggedPeoplePickerRef.current;
+      if (!container) {
+        setTaggedPeoplePickerOpen(false);
+        return;
+      }
+      if (!container.contains(event.target as Node)) {
+        setTaggedPeoplePickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [taggedPeoplePickerOpen]);
 
   const contactName = bill?.extractedVendorContact?.vendorName || (bill?.contactName ?? bill?.customProviderName ?? "Unknown");
   const previewTitle = formatInvoiceName({ contactName: bill?.contactName ?? contactName, date: bill?.date });
@@ -1942,6 +1986,23 @@ export default function InvoicePreviewPage() {
     try {
       await saveNotesIfNeeded();
       await persistAssignments();
+
+      // Persist invoice-level person tags. People are no longer an
+      // assignment type — they're a tag. Reuse the existing
+      // assignedPeople slot with isSplit=false and zero amount so the
+      // tags don't show up in cost-per-person breakdowns by mistake.
+      // Skip when assignType is "person" — that's the legacy person
+      // assignment path which persistAssignments above already handled.
+      if ((assignType as string) !== "person") {
+        await savePersonAssignment({
+          billId,
+          isSplit: false,
+          assignedPeople: taggedPersonIds.map((id) => ({
+            personId: id as Id<"people">,
+            amount: 0,
+          })),
+        });
+      }
       const payloadLineItems = lineItems
         .map((line, index) => {
           const state = lineStates[index];
@@ -2682,7 +2743,10 @@ export default function InvoicePreviewPage() {
                       <button type="button" className={mode === "line" ? styles.modeToggleActive : styles.modeToggleInactive} onClick={() => setMode("line")}>by line item</button>
                       <button type="button" className={mode === "whole" ? styles.modeToggleActive : styles.modeToggleInactive} onClick={() => setMode("whole")}>split whole invoice</button>
                     </div>
-                    {/* Compact entity toggle — secondary to the mode choice */}
+                    {/* Compact entity toggle — invoices and line items
+                        are assignable to horses or businesses. People
+                        moved out of assignment and live in the separate
+                        "TAG PEOPLE" section further down. */}
                     <div className={styles.entityToggleCompact}>
                       <button
                         type="button"
@@ -2692,15 +2756,6 @@ export default function InvoicePreviewPage() {
                         title="horses"
                       >
                         🐴
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.entityToggleCompactBtn} ${assignType === "person" ? styles.entityToggleCompactActive : ""}`}
-                        onClick={() => switchAssignType("person")}
-                        aria-label="assign to people"
-                        title="people"
-                      >
-                        👤
                       </button>
                       <button
                         type="button"
@@ -3113,6 +3168,168 @@ export default function InvoicePreviewPage() {
                   ) : null}
                 </div>
               )}
+            </div>
+
+            {/* TAG PEOPLE (optional, invoice-level). People are a reference
+                tag, not an assignment — they don't drive the cost-per
+                breakdown. Stored via the existing bill.assignedPeople
+                slot so no schema change was needed. Available in both
+                line-item and whole-invoice modes. */}
+            <div className={styles.detailsCard}>
+              <div className={styles.cardHeader}>
+                <div>
+                  <div className={styles.cardTitle}>tag people</div>
+                  <div className={styles.cardMeta}>
+                    optional · {taggedPersonIds.length === 0 ? "no people tagged" : `${taggedPersonIds.length} tagged`}
+                  </div>
+                </div>
+              </div>
+              <div style={{ padding: "12px 22px 22px" }}>
+                <div ref={taggedPeoplePickerRef} style={{ position: "relative" }}>
+                  {(() => {
+                    const filtered = (people as { _id: any; name: string }[]).filter((p) =>
+                      !taggedPeoplePickerSearch.trim()
+                        ? true
+                        : p.name.toLowerCase().includes(taggedPeoplePickerSearch.trim().toLowerCase()),
+                    );
+                    const togglePerson = (id: string) => {
+                      setTaggedPersonIds((prev) =>
+                        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+                      );
+                    };
+                    return (
+                      <>
+                        <button
+                          type="button"
+                          className={styles.assignSelect}
+                          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", textAlign: "left" }}
+                          onClick={() => setTaggedPeoplePickerOpen((v) => !v)}
+                        >
+                          <span>
+                            {taggedPersonIds.length === 0
+                              ? "+ tag a person..."
+                              : `add or remove people... (${taggedPersonIds.length} tagged)`}
+                          </span>
+                          <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 8 }}>▾</span>
+                        </button>
+                        {taggedPeoplePickerOpen ? (
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: "100%",
+                              left: 0,
+                              right: 0,
+                              marginTop: 4,
+                              background: "#fff",
+                              border: "1px solid #e6e7ed",
+                              borderRadius: 8,
+                              boxShadow: "0 6px 18px rgba(15, 23, 42, 0.08)",
+                              zIndex: 50,
+                              maxHeight: 340,
+                              overflowY: "auto",
+                            }}
+                          >
+                            <div style={{ padding: 8, borderBottom: "1px solid #f1f2f5", position: "sticky", top: 0, background: "#fff" }}>
+                              <input
+                                type="text"
+                                value={taggedPeoplePickerSearch}
+                                onChange={(e) => setTaggedPeoplePickerSearch(e.target.value)}
+                                placeholder="search people..."
+                                style={{ width: "100%", padding: "6px 8px", border: "1px solid #e6e7ed", borderRadius: 6, fontSize: 12 }}
+                                autoFocus
+                              />
+                            </div>
+                            {filtered.length === 0 ? (
+                              <div style={{ padding: 12, fontSize: 12, color: "#6B7084" }}>no matches</div>
+                            ) : (
+                              filtered.map((p) => {
+                                const id = String(p._id);
+                                const selected = taggedPersonIds.includes(id);
+                                return (
+                                  <button
+                                    key={id}
+                                    type="button"
+                                    onClick={() => togglePerson(id)}
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 8,
+                                      width: "100%",
+                                      padding: "8px 12px",
+                                      background: selected ? "rgba(74, 91, 219, 0.06)" : "transparent",
+                                      border: "none",
+                                      cursor: "pointer",
+                                      textAlign: "left",
+                                      fontSize: 13,
+                                      color: "#1a1a2e",
+                                    }}
+                                  >
+                                    <span style={{ width: 16, display: "inline-flex", justifyContent: "center" }}>
+                                      {selected ? "☑" : "☐"}
+                                    </span>
+                                    <span style={{ flex: 1 }}>👤 {p.name}</span>
+                                  </button>
+                                );
+                              })
+                            )}
+                            {taggedPersonIds.length > 0 ? (
+                              <div style={{ padding: 8, borderTop: "1px solid #f1f2f5", display: "flex", justifyContent: "space-between", gap: 8, position: "sticky", bottom: 0, background: "#fff" }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setTaggedPersonIds([])}
+                                  style={{ fontSize: 11, color: "#dc2626", background: "transparent", border: "none", cursor: "pointer" }}
+                                >
+                                  clear all
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setTaggedPeoplePickerOpen(false)}
+                                  style={{ fontSize: 11, color: "#1a1a2e", background: "transparent", border: "none", cursor: "pointer", fontWeight: 600 }}
+                                >
+                                  done
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </>
+                    );
+                  })()}
+                </div>
+                {taggedPersonIds.length > 0 ? (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+                    {taggedPersonIds.map((id) => {
+                      const name = (people as { _id: any; name: string }[]).find((p) => String(p._id) === id)?.name ?? "Unknown";
+                      return (
+                        <span
+                          key={id}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            fontSize: 11,
+                            padding: "4px 8px",
+                            background: "rgba(236, 72, 153, 0.08)",
+                            color: "#ec4899",
+                            borderRadius: 6,
+                            fontWeight: 600,
+                          }}
+                        >
+                          👤 {name}
+                          <button
+                            type="button"
+                            onClick={() => setTaggedPersonIds((prev) => prev.filter((x) => x !== id))}
+                            style={{ background: "transparent", border: "none", color: "#ec4899", cursor: "pointer", padding: 0, fontSize: 11 }}
+                            aria-label={`remove ${name} tag`}
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <div className={styles.detailsCard}>
