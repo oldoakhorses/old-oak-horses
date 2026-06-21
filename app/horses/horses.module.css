@@ -114,6 +114,141 @@
   letter-spacing: 0.01em;
 }
 
+/* Horse Groups card — named multi-horse shortcuts above the main list. */
+.groupsCard {
+  background: #fff;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 20px;
+}
+
+.groupsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.groupsTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a2e;
+  text-transform: lowercase;
+}
+
+.groupsSubtitle {
+  font-size: 11px;
+  color: #9ea2b0;
+  margin-top: 2px;
+}
+
+.groupsGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.groupChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 14px;
+  border: 1px solid #e8eaf0;
+  border-radius: 999px;
+  background: #fafafc;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.groupChip:hover {
+  border-color: #4a5bdb;
+  background: rgba(74, 91, 219, 0.04);
+}
+
+.groupChipBody {
+  display: flex;
+  flex-direction: column;
+}
+
+.groupChipName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.groupChipMembers {
+  font-size: 10px;
+  color: #6b7084;
+  margin-top: 1px;
+}
+
+.groupChipActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.groupChipBtn {
+  font-size: 10px;
+  font-weight: 600;
+  color: #4a5bdb;
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.groupChipBtn:hover {
+  background: rgba(74, 91, 219, 0.1);
+}
+
+.groupChipBtnDelete {
+  font-size: 14px;
+  color: #9ea2b0;
+  background: transparent;
+  border: none;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1;
+}
+.groupChipBtnDelete:hover {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+}
+
+/* Multi-select horse list inside the group create/edit modal. */
+.groupHorseList {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  background: #fafafc;
+  padding: 6px;
+}
+
+.groupHorseOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 13px;
+  color: #1a1a2e;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.groupHorseOption:hover {
+  background: rgba(74, 91, 219, 0.06);
+}
+
+.groupHorseEmpty {
+  padding: 12px;
+  font-size: 12px;
+  color: #9ea2b0;
+  text-align: center;
+}
+
 .horsesCard {
   background: #fff;
   border: 1px solid #e8eaf0;

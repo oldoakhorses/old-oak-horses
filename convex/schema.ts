@@ -378,6 +378,24 @@ export default defineSchema({
     .index("by_status_name", ["status", "name"])
     .index("by_organization", ["organizationId"]),
 
+  /**
+   * Named groups of horses used as a shortcut when assigning invoices /
+   * line items. Picking a group on an invoice expands to "split evenly
+   * across every horse in the group" — saves the user from multi-
+   * selecting the same six horses on every farrier bill, for example.
+   * Groups are scoped per owner (and optionally per organization).
+   */
+  horseGroups: defineTable({
+    ownerId: v.optional(v.id("owners")),
+    organizationId: v.optional(v.id("organizations")),
+    name: v.string(),
+    horseIds: v.array(v.id("horses")),
+    isActive: v.optional(v.boolean()),
+    createdAt: v.number(),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_organization", ["organizationId"]),
+
   contacts: defineTable({
     name: v.string(),
     slug: v.optional(v.string()),

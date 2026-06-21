@@ -28,6 +28,7 @@ import type * as emailInbound from "../emailInbound.js";
 import type * as feedPlans from "../feedPlans.js";
 import type * as horseAccess from "../horseAccess.js";
 import type * as horseAliases from "../horseAliases.js";
+import type * as horseGroups from "../horseGroups.js";
 import type * as horseOwnerships from "../horseOwnerships.js";
 import type * as horseRecords from "../horseRecords.js";
 import type * as horses from "../horses.js";
@@ -75,6 +76,7 @@ declare const fullApi: ApiFromModules<{
   feedPlans: typeof feedPlans;
   horseAccess: typeof horseAccess;
   horseAliases: typeof horseAliases;
+  horseGroups: typeof horseGroups;
   horseOwnerships: typeof horseOwnerships;
   horseRecords: typeof horseRecords;
   horses: typeof horses;

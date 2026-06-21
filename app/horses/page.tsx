@@ -58,6 +58,13 @@ export default function HorsesPage() {
   const createHorse = useMutation(api.horses.createHorse);
   const setHorseStatus = useMutation(api.horses.setHorseStatus);
 
+  // Horse groups — named multi-horse shortcuts used when assigning
+  // invoices. Owner-scoped; admins see all.
+  const horseGroups = useQuery(api.horseGroups.list, ownerIdForFilter ? { ownerId: ownerIdForFilter as unknown as string } : {}) ?? [];
+  const createGroup = useMutation(api.horseGroups.create);
+  const updateGroup = useMutation(api.horseGroups.update);
+  const removeGroup = useMutation(api.horseGroups.remove);
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [search, setSearch] = useState("");
   const [openMenuHorseId, setOpenMenuHorseId] = useState<string>("");
@@ -66,6 +73,52 @@ export default function HorsesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [form, setForm] = useState<HorseFormState>(EMPTY_FORM);
+
+  // Group modal state. `groupModalOpen` doubles as create/edit mode:
+  //   null   → closed
+  //   "new"  → create
+  //   <id>   → edit that group
+  const [groupModalOpen, setGroupModalOpen] = useState<null | "new" | string>(null);
+  const [groupForm, setGroupForm] = useState<{ name: string; horseIds: string[] }>({ name: "", horseIds: [] });
+  const [groupError, setGroupError] = useState("");
+
+  function openCreateGroup() {
+    setGroupForm({ name: "", horseIds: [] });
+    setGroupError("");
+    setGroupModalOpen("new");
+  }
+  function openEditGroup(group: any) {
+    setGroupForm({ name: group.name, horseIds: group.horseIds.map((id: any) => String(id)) });
+    setGroupError("");
+    setGroupModalOpen(String(group._id));
+  }
+  async function submitGroup() {
+    const name = groupForm.name.trim();
+    if (!name) { setGroupError("Name is required"); return; }
+    if (groupForm.horseIds.length === 0) { setGroupError("Pick at least one horse"); return; }
+    try {
+      if (groupModalOpen === "new") {
+        await createGroup({
+          name,
+          horseIds: groupForm.horseIds as Id<"horses">[],
+          ownerId: ownerIdForFilter,
+        });
+      } else if (groupModalOpen) {
+        await updateGroup({
+          groupId: groupModalOpen as Id<"horseGroups">,
+          name,
+          horseIds: groupForm.horseIds as Id<"horses">[],
+        });
+      }
+      setGroupModalOpen(null);
+    } catch (err) {
+      setGroupError(err instanceof Error ? err.message : "Failed to save group");
+    }
+  }
+  async function deleteGroup(group: any) {
+    if (!confirm(`Delete group "${group.name}"? Past invoices that used it keep their horse assignments.`)) return;
+    await removeGroup({ groupId: group._id });
+  }
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -173,6 +226,53 @@ export default function HorsesPage() {
           onChange={(e) => setSearch(e.target.value)}
         />
 
+        {/* Horse Groups — named multi-horse shortcuts. Pick a group on
+            an invoice (or line item) to split evenly across every horse
+            in it; saves you from re-multi-selecting the same set each
+            time. Managed here; consumed in the invoice approval flow. */}
+        <section className={styles.groupsCard}>
+          <div className={styles.groupsHeader}>
+            <div>
+              <div className={styles.groupsTitle}>horse groups</div>
+              <div className={styles.groupsSubtitle}>
+                {horseGroups.length === 0
+                  ? "create reusable horse sets for invoice tagging"
+                  : `${horseGroups.length} group${horseGroups.length === 1 ? "" : "s"} · pick on invoices to split evenly`}
+              </div>
+            </div>
+            <button type="button" className={styles.addButton} onClick={openCreateGroup}>
+              + create group
+            </button>
+          </div>
+          {horseGroups.length > 0 ? (
+            <div className={styles.groupsGrid}>
+              {horseGroups.map((group: any) => {
+                const horsesInGroup = group.horseIds
+                  .map((id: any) => horses.find((h) => String(h._id) === String(id)))
+                  .filter(Boolean) as Array<{ name: string }>;
+                return (
+                  <div key={String(group._id)} className={styles.groupChip}>
+                    <div className={styles.groupChipBody}>
+                      <div className={styles.groupChipName}>{group.name}</div>
+                      <div className={styles.groupChipMembers}>
+                        {horsesInGroup.length === 0
+                          ? "empty"
+                          : horsesInGroup.length <= 3
+                            ? horsesInGroup.map((h) => h.name).join(", ")
+                            : `${horsesInGroup.slice(0, 3).map((h) => h.name).join(", ")} +${horsesInGroup.length - 3}`}
+                      </div>
+                    </div>
+                    <div className={styles.groupChipActions}>
+                      <button type="button" className={styles.groupChipBtn} onClick={() => openEditGroup(group)} title="Edit group">edit</button>
+                      <button type="button" className={styles.groupChipBtnDelete} onClick={() => void deleteGroup(group)} title="Delete group">×</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+        </section>
+
         <section className={styles.horsesCard}>
           <div className={styles.horsesHeader}>
             <div>HORSE</div>
@@ -250,6 +350,60 @@ export default function HorsesPage() {
 
         <div className="ui-footer">TEAM_LDK // HORSES</div>
       </main>
+
+      <Modal
+        open={groupModalOpen !== null}
+        title={groupModalOpen === "new" ? "create horse group" : "edit horse group"}
+        onClose={() => setGroupModalOpen(null)}
+      >
+        <div className={styles.form}>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>GROUP NAME *</span>
+            <input
+              className={styles.input}
+              value={groupForm.name}
+              onChange={(e) => setGroupForm((p) => ({ ...p, name: e.target.value }))}
+              placeholder="e.g. barn ponies, show team..."
+            />
+          </label>
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>HORSES * ({groupForm.horseIds.length} selected)</span>
+            <div className={styles.groupHorseList}>
+              {horses.filter((h) => h.status === "active").map((horse) => {
+                const id = String(horse._id);
+                const checked = groupForm.horseIds.includes(id);
+                return (
+                  <label key={id} className={styles.groupHorseOption}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => setGroupForm((prev) => ({
+                        ...prev,
+                        horseIds: checked
+                          ? prev.horseIds.filter((x) => x !== id)
+                          : [...prev.horseIds, id],
+                      }))}
+                    />
+                    <span>🐴 {horse.name}{horse.barnName ? ` (${horse.barnName})` : ""}</span>
+                  </label>
+                );
+              })}
+              {horses.filter((h) => h.status === "active").length === 0 ? (
+                <div className={styles.groupHorseEmpty}>no active horses to add</div>
+              ) : null}
+            </div>
+          </div>
+          {groupError ? <p className={styles.error}>{groupError}</p> : null}
+          <div className={styles.modalActions}>
+            <button type="button" className="ui-button-outlined" onClick={() => setGroupModalOpen(null)}>
+              cancel
+            </button>
+            <button type="button" className="ui-button-filled" onClick={() => void submitGroup()}>
+              {groupModalOpen === "new" ? "create group" : "save changes"}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal open={showAddModal} title="add horse" onClose={() => setShowAddModal(false)}>
         <form className={styles.form} onSubmit={onSubmitHorse}>

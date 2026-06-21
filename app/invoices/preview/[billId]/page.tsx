@@ -84,6 +84,12 @@ const PERSON_CATEGORY_SLUGS = new Set(["travel", "admin", "grooming"]);
 const NO_ASSIGNMENT_CATEGORY_SLUGS = new Set(["marketing"]);
 const SPLIT_ALL = "__split_all__";
 const SPLIT_INVOICE = "__split_invoice__";
+/** Per-line group split sentinel: assignees stores "__group__:<groupId>"
+ *  to mean "split this line evenly across all horses currently in that
+ *  group". Resolved at save-time into a concrete splitLineItems entry. */
+const SPLIT_GROUP_PREFIX = "__group__:";
+const isGroupSentinel = (s: string | undefined) => Boolean(s && s.startsWith(SPLIT_GROUP_PREFIX));
+const groupIdFromSentinel = (s: string) => s.slice(SPLIT_GROUP_PREFIX.length);
 const BUSINESS_GENERAL = "__business_general__";
 /** Per-line-item assignment to a specific business (= owner). Stored in
  *  `assignees` as `BIZ_PREFIX + ownerId` so it doesn't collide with
@@ -422,6 +428,13 @@ export default function InvoicePreviewPage() {
         .map((o: any) => ({ _id: o._id, name: o.name })),
     [businessesRaw],
   );
+  // Named horse groups — used as a "split evenly across these N horses"
+  // shortcut on whole-invoice and per-line assignments.
+  const horseGroups = (useQuery(api.horseGroups.list, {}) ?? []) as Array<{
+    _id: any;
+    name: string;
+    horseIds: any[];
+  }>;
 
   // Reverse CC matching: only ask the server when there's something to ask
   // about. Skip for already-linked bills and for the brief window before
@@ -1156,7 +1169,7 @@ export default function InvoicePreviewPage() {
         autoDetected: false
       };
 
-      if (entityId === SPLIT_ALL || entityId === SPLIT_INVOICE || entityId === BUSINESS_GENERAL) {
+      if (entityId === SPLIT_ALL || entityId === SPLIT_INVOICE || entityId === BUSINESS_GENERAL || isGroupSentinel(entityId)) {
         return {
           ...prev,
           [index]: {
@@ -1184,7 +1197,7 @@ export default function InvoicePreviewPage() {
         };
       }
 
-      let current = row.assignees.filter((id) => id !== SPLIT_ALL && id !== SPLIT_INVOICE && id !== BUSINESS_GENERAL && !isBizId(id));
+      let current = row.assignees.filter((id) => id !== SPLIT_ALL && id !== SPLIT_INVOICE && id !== BUSINESS_GENERAL && !isBizId(id) && !isGroupSentinel(id));
       if (current.includes(entityId)) {
         current = current.filter((id) => id !== entityId);
       } else {
@@ -1216,9 +1229,12 @@ export default function InvoicePreviewPage() {
     const firstAssignee = row.assignees[0];
     const hasSplitAll = firstAssignee === SPLIT_ALL;
     const hasSplitInvoice = firstAssignee === SPLIT_INVOICE;
-    const hasAnySplit = hasSplitAll || hasSplitInvoice;
+    const hasGroupSplit = isGroupSentinel(firstAssignee);
+    const hasAnySplit = hasSplitAll || hasSplitInvoice || hasGroupSplit;
     const hasBusinessGeneral = firstAssignee === BUSINESS_GENERAL;
-    const selectedEntityIds = row.assignees.filter((id) => id !== SPLIT_ALL && id !== SPLIT_INVOICE && id !== BUSINESS_GENERAL);
+    const selectedEntityIds = row.assignees.filter((id) => id !== SPLIT_ALL && id !== SPLIT_INVOICE && id !== BUSINESS_GENERAL && !isGroupSentinel(id));
+    const groupSentinel = row.assignees.find((id) => isGroupSentinel(id));
+    const groupForRow = groupSentinel ? horseGroups.find((g) => String(g._id) === groupIdFromSentinel(groupSentinel)) : null;
 
     const horseButtonTitle =
       row.autoDetected && row.assignees.length > 0 && !hasAnySplit && !hasBusinessGeneral
@@ -1254,6 +1270,7 @@ export default function InvoicePreviewPage() {
           >
             {hasSplitAll ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillSplit}`}>↔ split all</span> : null}
             {hasSplitInvoice ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillSplit}`}>↔ split in invoice</span> : null}
+            {groupForRow ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillSplit}`}>👥 {groupForRow.name} ({groupForRow.horseIds.length})</span> : null}
             {hasBusinessGeneral ? <span className={`${styles.lineHorsePill} ${styles.lineHorsePillGeneral}`}>◼ general</span> : null}
             {!hasAnySplit && !hasBusinessGeneral ? selectedEntityIds.map((id) => {
               // Resolve each pill's entity from the ID, not the global
@@ -1314,6 +1331,23 @@ export default function InvoicePreviewPage() {
                   </button>
                 </>
               )}
+              {/* Horse groups — only when picking horses; clicking splits
+                  the line evenly across every horse currently in the
+                  group. Resolved at save time. */}
+              {assignType === "horse" && horseGroups.map((group) => {
+                const selected = isGroupSentinel(row.assignees[0]) && groupIdFromSentinel(row.assignees[0]) === String(group._id);
+                return (
+                  <button
+                    key={`group:${String(group._id)}`}
+                    type="button"
+                    className={styles.lineHorseOption}
+                    onClick={() => toggleEntityOnItem(index, SPLIT_GROUP_PREFIX + String(group._id))}
+                    style={selected ? { background: "rgba(74, 91, 219, 0.08)" } : undefined}
+                  >
+                    👥 split across group: {group.name} <span style={{ fontSize: 10, opacity: 0.6, marginLeft: 4 }}>({group.horseIds.length})</span>
+                  </button>
+                );
+              })}
               <button type="button" className={styles.lineHorseOption} onClick={() => toggleEntityOnItem(index, BUSINESS_GENERAL)}>◼ business general</button>
               <div className={styles.lineHorseDivider} />
 
@@ -2071,7 +2105,9 @@ export default function InvoicePreviewPage() {
         .filter((row) => row.state?.confirmed)
         .map((row) => ({
           ...row,
-          assignees: (row.state?.assignees ?? []).filter((id) => id !== SPLIT_ALL && id !== SPLIT_INVOICE && id !== BUSINESS_GENERAL),
+          assignees: (row.state?.assignees ?? []).filter((id) =>
+            id !== SPLIT_ALL && id !== SPLIT_INVOICE && id !== BUSINESS_GENERAL && !isGroupSentinel(id)
+          ),
         }))
         .filter((row) => row.assignees.length > 0);
       const directHorseIds = [...new Set(directAssignments.flatMap((row) => row.assignees))];
@@ -2108,15 +2144,34 @@ export default function InvoicePreviewPage() {
 
       const splitLineItems = lineItems
         .map((line, index) => ({ line, index, state: lineStates[index] }))
-        .filter((row) => row.state?.confirmed && (row.state.assignees?.[0] === SPLIT_ALL || row.state.assignees?.[0] === SPLIT_INVOICE))
+        .filter((row) => row.state?.confirmed && (
+          row.state.assignees?.[0] === SPLIT_ALL
+          || row.state.assignees?.[0] === SPLIT_INVOICE
+          || isGroupSentinel(row.state.assignees?.[0])
+        ))
         .map((row) => {
-          const isSplitAll = row.state?.assignees?.[0] === SPLIT_ALL;
-          const targetIds = isSplitAll ? splitAllTargetIds : splitInvoiceTargetIds;
+          const sentinel = row.state?.assignees?.[0] ?? "";
+          const isSplitAll = sentinel === SPLIT_ALL;
+          const isGroup = isGroupSentinel(sentinel);
+          // Resolve targets per sentinel type. Group sentinel expands to
+          // the group's current horse list at save time (snapshot).
+          let targetIds: string[];
+          if (isGroup) {
+            const groupId = groupIdFromSentinel(sentinel);
+            const group = horseGroups.find((g) => String(g._id) === groupId);
+            targetIds = group ? group.horseIds.map((id) => String(id)) : [];
+          } else if (isSplitAll) {
+            targetIds = splitAllTargetIds;
+          } else {
+            targetIds = splitInvoiceTargetIds;
+          }
           if (targetIds.length === 0) return null;
           // Stamp which kind of split this was so the next load can tell
           // them apart — the targets alone don't distinguish "split all"
           // from "split in invoice" once the directly-assigned horse set
-          // happens to equal the all-horses set.
+          // happens to equal the all-horses set. Group splits collapse
+          // into "invoice" on read (we lose the group identity), which
+          // matches the on-bill semantics — saved horses are concrete.
           const splitTypeTag: "all" | "invoice" = isSplitAll ? "all" : "invoice";
           const splitAmounts = splitEven(getLineAmount(row.line), targetIds.length);
           return {
@@ -3340,6 +3395,57 @@ export default function InvoicePreviewPage() {
                                       autoFocus
                                     />
                                   </div>
+                                  {/* Horse groups shortcut — only when picking horses, only in
+                                      split mode (single-entity assignment can't expand a group).
+                                      Picking a group replaces the current horse selection with
+                                      every horse in the group and forces an even split. */}
+                                  {assignType === "horse" && !isSingle && horseGroups.length > 0
+                                    && (!wholePickerSearch.trim()
+                                        || horseGroups.some((g) => g.name.toLowerCase().includes(wholePickerSearch.trim().toLowerCase()))) ? (
+                                    <>
+                                      <div style={{ padding: "6px 12px", fontSize: 10, fontWeight: 600, color: "#9ea2b0", letterSpacing: "0.05em", textTransform: "uppercase", background: "#fafafc" }}>
+                                        Groups
+                                      </div>
+                                      {horseGroups
+                                        .filter((g) => !wholePickerSearch.trim() || g.name.toLowerCase().includes(wholePickerSearch.trim().toLowerCase()))
+                                        .map((group) => (
+                                          <button
+                                            key={`group:${String(group._id)}`}
+                                            type="button"
+                                            onClick={() => {
+                                              markDirty();
+                                              const ids = group.horseIds.map((h) => String(h));
+                                              setWholeAssignedIds(ids);
+                                              setWholeAmounts({});
+                                              setWholeSplitType("even");
+                                              setWholePickerOpen(false);
+                                            }}
+                                            style={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: 8,
+                                              width: "100%",
+                                              padding: "8px 12px",
+                                              background: "transparent",
+                                              border: "none",
+                                              cursor: "pointer",
+                                              textAlign: "left",
+                                              fontSize: 13,
+                                              color: "#1a1a2e",
+                                            }}
+                                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#f5f6f9"; }}
+                                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                                          >
+                                            <span style={{ width: 16, display: "inline-flex", justifyContent: "center" }}>👥</span>
+                                            <span style={{ flex: 1 }}>{group.name}</span>
+                                            <span style={{ fontSize: 11, color: "#9ea2b0" }}>{group.horseIds.length}</span>
+                                          </button>
+                                        ))}
+                                      <div style={{ padding: "6px 12px", fontSize: 10, fontWeight: 600, color: "#9ea2b0", letterSpacing: "0.05em", textTransform: "uppercase", background: "#fafafc" }}>
+                                        Individual {entityLabelPlural}
+                                      </div>
+                                    </>
+                                  ) : null}
                                   {filtered.length === 0 ? (
                                     <div style={{ padding: 12, fontSize: 12, color: "#6B7084" }}>no matches</div>
                                   ) : (
