@@ -135,9 +135,15 @@ export const parseBillPdf = internalAction({
       }
       const client = new Anthropic({ apiKey: anthropicApiKey });
       console.log("2. Extracting text from attachment...");
+      // Bumped max_tokens 4096 → 8192 so multi-page or text-dense
+      // invoices (vet folios, hotel statements, equine pharmacy)
+      // don't get truncated. The prompt also explicitly asks for
+      // EVERY visible piece of text including totals and line items
+      // so the downstream regex fallback has something to work with
+      // even if the structured extraction returns nothing.
       const textExtractionResponse = await client.messages.create({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
+        max_tokens: 8192,
         temperature: 0,
         messages: [
           {
@@ -147,8 +153,8 @@ export const parseBillPdf = internalAction({
               {
                 type: "text",
                 text: isImageBlock
-                  ? "Extract all visible text from this invoice image. Return plain text only."
-                  : "Extract visible text from this invoice PDF. Return plain text only.",
+                  ? "Extract ALL visible text from this invoice image, preserving line breaks. Include every dollar amount, every date, every horse name, every line item description, every header, and the total. Do not summarize. Return plain text only."
+                  : "Extract ALL visible text from this invoice PDF, preserving line breaks. Include every dollar amount, every date, every horse name, every line item description, every header, and the total. Do not summarize. Return plain text only.",
               },
             ],
           },
@@ -162,6 +168,17 @@ export const parseBillPdf = internalAction({
       console.log(extractedPdfText);
       console.log("=== END RAW TEXT ===");
       console.log("Text length:", extractedPdfText.length);
+
+      // If the text extraction yielded essentially nothing, this PDF is
+      // either corrupt, image-only with bad OCR, or empty. Mark it as a
+      // parse error so the user sees a real failure instead of a silent
+      // pending-with-zero bill.
+      if (!extractedPdfText || extractedPdfText.trim().length < 30) {
+        throw new Error(
+          `Could not read invoice — extracted only ${extractedPdfText.trim().length} chars from the PDF. ` +
+            `It may be a scanned image with no OCR layer, or the file may be corrupt. Try re-uploading or replacing the file.`,
+        );
+      }
 
       // Hotel folios from well-known chains are full of per-night room
       // charges, taxes, resort fees, parking, F&B — the structured
@@ -204,7 +221,7 @@ export const parseBillPdf = internalAction({
 
       const response = await client.messages.create({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
+        max_tokens: 8192,
         temperature: 0,
         messages: [
           {
@@ -222,7 +239,33 @@ export const parseBillPdf = internalAction({
         throw new Error("Claude response had no text payload");
       }
 
-      const parsedRaw = JSON.parse(stripCodeFences(textBlock.text)) as Record<string, unknown>;
+      // Tolerant JSON extraction. Claude sometimes wraps the JSON in code
+      // fences, adds chatty preamble, or trails commentary. Strip fences
+      // first, then if that still doesn't parse, extract the
+      // outermost balanced { ... } block.
+      let parsedRaw: Record<string, unknown>;
+      try {
+        parsedRaw = JSON.parse(stripCodeFences(textBlock.text)) as Record<string, unknown>;
+      } catch {
+        const stripped = stripCodeFences(textBlock.text);
+        const firstBrace = stripped.indexOf("{");
+        const lastBrace = stripped.lastIndexOf("}");
+        if (firstBrace >= 0 && lastBrace > firstBrace) {
+          try {
+            parsedRaw = JSON.parse(stripped.slice(firstBrace, lastBrace + 1)) as Record<string, unknown>;
+          } catch (err) {
+            throw new Error(
+              `Could not parse structured response from Claude. ` +
+                `Raw response (first 400 chars): ${stripped.slice(0, 400)}`,
+            );
+          }
+        } else {
+          throw new Error(
+            `Could not parse structured response from Claude — no JSON object found. ` +
+              `Raw response (first 400 chars): ${stripped.slice(0, 400)}`,
+          );
+        }
+      }
       console.log("6. Parsed invoice data:", JSON.stringify(parsedRaw, null, 2));
       console.log("=== PARSED RESULT ===");
       console.log(JSON.stringify(parsedRaw, null, 2));
@@ -481,6 +524,68 @@ export const parseBillPdf = internalAction({
         if (dominant) {
           const matched = await ctx.runQuery(internal.bills.getCategoryBySlug, { slug: dominant });
           if (matched) inferredCategoryId = matched._id;
+        }
+      }
+
+      // Quality gate. If the structured parse came back with no usable
+      // signal (zero total + no line items + no contact name), throw
+      // so the bill lands in "error" status — visible to the user —
+      // instead of silently writing all zeros into the pending list.
+      // Try a regex rescue from the already-extracted OCR text first
+      // so we don't lose a clearly readable invoice to a finicky JSON
+      // response.
+      const totalGuess = pickNumber(parsed, [
+        "invoice_total_usd",
+        "invoiceTotalUsd",
+        "total",
+        "amount_due",
+        "balance_due",
+      ]) ?? 0;
+      const itemsCount = Array.isArray((parsed as any).line_items)
+        ? (parsed as any).line_items.length
+        : Array.isArray((parsed as any).lineItems)
+          ? (parsed as any).lineItems.length
+          : 0;
+      const contactGuess = pickString(parsed, [
+        "contact_name",
+        "contactName",
+        "provider_name",
+        "providerName",
+        "vendor_name",
+        "vendorName",
+      ]);
+      if (totalGuess <= 0 && itemsCount === 0 && !contactGuess) {
+        const rescued = rescueFromOcrText(extractedPdfText);
+        if (rescued.total > 0 || rescued.contact) {
+          console.log(
+            `[billParsing] structured parse was empty — rescued total=${rescued.total} contact=${rescued.contact ?? "(none)"} from OCR text`,
+          );
+          (parsed as any).invoice_total_usd = rescued.total;
+          (parsed as any).invoiceTotalUsd = rescued.total;
+          (parsed as any).total = rescued.total;
+          if (rescued.contact) {
+            (parsed as any).contact_name = rescued.contact;
+            (parsed as any).vendor_name = rescued.contact;
+          }
+          if (rescued.date) {
+            (parsed as any).invoice_date = rescued.date;
+            (parsed as any).invoiceDate = rescued.date;
+          }
+          if (rescued.total > 0) {
+            (parsed as any).line_items = [
+              {
+                description: rescued.contact ? `${rescued.contact} — invoice` : "Invoice line",
+                amount: rescued.total,
+                total_usd: rescued.total,
+                category: undefined,
+              },
+            ];
+          }
+        } else {
+          throw new Error(
+            `Could not extract usable data from this invoice — total, line items, and contact all came back empty. ` +
+              `Try re-uploading the file, replacing it with a higher-quality version, or filling in the fields manually.`,
+          );
         }
       }
 
@@ -2037,6 +2142,100 @@ function isAirbnbProviderSignal(...values: Array<string | undefined>) {
   const joined = values.filter(Boolean).join(" ").toLowerCase();
   if (!joined) return false;
   return joined.includes("airbnb");
+}
+
+/**
+ * Last-resort extraction directly from the OCR text when Claude's
+ * structured parse came back empty. We try four signals in order:
+ *
+ *   1. Total: any line labeled "Total", "Balance Due", "Amount Due",
+ *      "Grand Total". Falls back to the largest dollar amount in the
+ *      document.
+ *   2. Contact: scan the first ~20 lines for a non-trivial title-line
+ *      that doesn't look like a date, address, or "Invoice #..." marker.
+ *      Common business words ("Inc", "LLC", "Veterinary", "Services") get
+ *      a slight preference.
+ *   3. Date: ISO (YYYY-MM-DD), US (MM/DD/YYYY), or natural-language
+ *      (Mon DD, YYYY) — whichever appears first.
+ *
+ * Returns whatever was found; callers should treat zero/null as "no
+ * signal" and surface a clean error to the user.
+ */
+function rescueFromOcrText(extractedText: string): {
+  total: number;
+  contact: string | undefined;
+  date: string | undefined;
+} {
+  const text = (extractedText || "").trim();
+  if (!text) return { total: 0, contact: undefined, date: undefined };
+
+  // Total
+  let total = 0;
+  const labeledTotalRegex =
+    /\b(?:grand\s+total|balance\s+due|amount\s+due|total\s+due|total)\b[^\n\r]{0,40}\$?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})?|[0-9]+\.[0-9]{2})/gi;
+  let m: RegExpExecArray | null;
+  while ((m = labeledTotalRegex.exec(text)) !== null) {
+    const v = Number(m[1].replace(/,/g, ""));
+    if (Number.isFinite(v) && v > total) total = v;
+  }
+  if (total === 0) {
+    const allAmounts = [...text.matchAll(/\$\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})|[0-9]+\.[0-9]{2})/g)];
+    for (const am of allAmounts) {
+      const v = Number(am[1].replace(/,/g, ""));
+      if (Number.isFinite(v) && v > total) total = v;
+    }
+  }
+
+  // Contact — first reasonable line near the top.
+  let contact: string | undefined;
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  for (const line of lines.slice(0, 25)) {
+    if (line.length < 3 || line.length > 60) continue;
+    if (/^\$?\d/.test(line)) continue; // starts with a price/number
+    if (/^(invoice|receipt|date|page|account|bill\s*to|ship\s*to|customer)/i.test(line)) continue;
+    if (/^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(line)) continue;
+    if (/^\d{4}-\d{2}-\d{2}/.test(line)) continue;
+    if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i.test(line)) continue;
+    if (!/[A-Za-z]/.test(line)) continue;
+    if (/\b(suite|p\.?o\.?\s*box|street|avenue|blvd|highway|drive|road)\b/i.test(line)) continue;
+    // Prefer lines that look like a business name.
+    if (/\b(inc|llc|ltd|corp|veterinary|services|equine|farm|pharmacy|hospital|clinic|stables|tack|company|co\b)/i.test(line)) {
+      contact = line;
+      break;
+    }
+    if (!contact) contact = line; // remember as fallback
+  }
+
+  // Date
+  let date: string | undefined;
+  const isoMatch = text.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
+  if (isoMatch) {
+    date = `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  } else {
+    const usMatch = text.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](20\d{2}|\d{2})\b/);
+    if (usMatch) {
+      let yyyy = usMatch[3];
+      if (yyyy.length === 2) yyyy = `20${yyyy}`;
+      const mm = String(usMatch[1]).padStart(2, "0");
+      const dd = String(usMatch[2]).padStart(2, "0");
+      date = `${yyyy}-${mm}-${dd}`;
+    } else {
+      const naturalMatch = text.match(
+        /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{1,2}),?\s+(20\d{2})\b/i,
+      );
+      if (naturalMatch) {
+        const monthMap: Record<string, string> = {
+          jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+          jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+        };
+        const mm = monthMap[naturalMatch[1].toLowerCase().slice(0, 3)];
+        const dd = String(naturalMatch[2]).padStart(2, "0");
+        if (mm) date = `${naturalMatch[3]}-${mm}-${dd}`;
+      }
+    }
+  }
+
+  return { total: round2(total), contact, date };
 }
 
 /** Fingerprint for TD Equine Veterinary Group (Calgary, AB). Detects both
