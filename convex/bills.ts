@@ -3548,6 +3548,101 @@ export const convertBillCurrency = mutation({
   }
 });
 
+/**
+ * Undo whatever currency conversion is currently applied to this bill,
+ * restoring the pre-conversion amounts on every line item and the
+ * invoice total. Use when convertBillCurrency ran with the wrong
+ * source currency (e.g. the parser auto-flagged CAD but the receipt
+ * was actually USD), so the user can reset to the parsed values
+ * without re-parsing the whole file.
+ *
+ * Restoration strategy:
+ *   1. If bill.originalTotal is set, that's the pre-conversion total.
+ *      For each line item, prefer amount_original / originalAmount
+ *      (stamped by convertBillCurrency). Falls back to amount/total_usd
+ *      ÷ exchangeRate if not present.
+ *   2. Clear originalCurrency / originalTotal / exchangeRate on the
+ *      bill record and on extractedData so the UI stops showing the
+ *      "converted from X @ rate" tag.
+ *
+ * Idempotent — calling on a never-converted bill is a no-op.
+ */
+export const clearBillCurrencyConversion = mutation({
+  args: { billId: v.id("bills") },
+  handler: async (ctx, args) => {
+    const bill = await ctx.db.get(args.billId);
+    if (!bill) throw new Error("Bill not found");
+
+    const originalCurrency = (bill as any).originalCurrency;
+    const exchangeRate = typeof (bill as any).exchangeRate === "number" ? (bill as any).exchangeRate : undefined;
+    if (!originalCurrency || originalCurrency === "USD") {
+      // Nothing to undo. Still clear stale stamps in case they were left
+      // over by an aborted conversion.
+      await ctx.db.patch(args.billId, {
+        originalCurrency: undefined,
+        originalTotal: undefined,
+        exchangeRate: undefined,
+      });
+      return args.billId;
+    }
+
+    const extracted = ((bill.extractedData ?? {}) as Record<string, unknown>);
+    const lineItems = getLineItems(extracted).map((row) => ({ ...(row as Record<string, unknown>) }));
+
+    const restoredLineItems = lineItems.map((row: any) => {
+      const out: any = { ...row };
+      // Prefer the pre-conversion value stamped at convert time.
+      const original =
+        typeof row.amount_original === "number" ? row.amount_original :
+        typeof row.originalAmount === "number" ? row.originalAmount :
+        (exchangeRate && typeof row.total_usd === "number"
+          ? Math.round((row.total_usd / exchangeRate) * 100) / 100
+          : typeof row.amount === "number" && exchangeRate
+            ? Math.round((row.amount / exchangeRate) * 100) / 100
+            : undefined);
+      if (typeof original === "number" && Number.isFinite(original)) {
+        out.amount = original;
+        out.total_usd = original;
+        out.amount_usd = original;
+      }
+      delete out.amount_original;
+      delete out.originalAmount;
+      return out;
+    });
+
+    const originalTotal =
+      typeof (bill as any).originalTotal === "number" ? (bill as any).originalTotal :
+      exchangeRate && typeof (extracted as any).invoice_total_usd === "number"
+        ? Math.round(((extracted as any).invoice_total_usd as number) / exchangeRate * 100) / 100
+        : undefined;
+
+    const restoredExtracted: Record<string, unknown> = {
+      ...extracted,
+      line_items: restoredLineItems,
+    };
+    if (typeof originalTotal === "number") {
+      restoredExtracted.invoice_total_usd = originalTotal;
+      restoredExtracted.invoiceTotalUsd = originalTotal;
+      restoredExtracted.total = originalTotal;
+    }
+    // Strip the converted-from breadcrumbs from extractedData.
+    delete (restoredExtracted as any).original_currency;
+    delete (restoredExtracted as any).originalCurrency;
+    delete (restoredExtracted as any).original_total;
+    delete (restoredExtracted as any).originalTotal;
+    delete (restoredExtracted as any).exchange_rate;
+    delete (restoredExtracted as any).exchangeRate;
+
+    await ctx.db.patch(args.billId, {
+      originalCurrency: undefined,
+      originalTotal: undefined,
+      exchangeRate: undefined,
+      extractedData: restoredExtracted,
+    });
+    return args.billId;
+  },
+});
+
 export const setLineItemConfirmedCategory = mutation({
   args: {
     billId: v.id("bills"),

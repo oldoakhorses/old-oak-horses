@@ -493,6 +493,7 @@ export default function InvoicePreviewPage() {
   const deleteLineItem = useMutation(api.bills.deleteLineItem);
   const addLineItem = useMutation(api.bills.addLineItem);
   const convertBillCurrency = useMutation(api.bills.convertBillCurrency);
+  const clearBillCurrencyConversion = useMutation(api.bills.clearBillCurrencyConversion);
   const updateBillNotes = useMutation(api.bills.updateBillNotes);
   const createHorseRecord = useMutation(api.horseRecords.createHorseRecord);
   const generateUploadUrl = useMutation(api.bills.generateUploadUrl);
@@ -1427,6 +1428,28 @@ export default function InvoicePreviewPage() {
       await convertBillCurrency({ billId, fromCurrency: convertFromCurrency });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to convert currency");
+    } finally {
+      setConvertingCurrency(false);
+    }
+  }
+
+  /**
+   * Inverse of onConvertCurrency. Restores every line item and the
+   * total to its pre-conversion value, clears the originalCurrency /
+   * exchangeRate stamps, and snaps the selector back to USD. Used when
+   * the parser auto-flagged a non-USD currency that the user later
+   * realized was wrong.
+   */
+  async function onClearConversion() {
+    if (!bill) return;
+    if (!confirm("Clear the currency conversion on this invoice? Every line item and the total will be restored to the pre-conversion (parsed) values.")) return;
+    setConvertingCurrency(true);
+    setError("");
+    try {
+      await clearBillCurrencyConversion({ billId });
+      setConvertFromCurrency("USD");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to clear conversion");
     } finally {
       setConvertingCurrency(false);
     }
@@ -2476,6 +2499,21 @@ export default function InvoicePreviewPage() {
                     {convertingCurrency ? "converting..." : "convert"}
                   </button>
                 </div>
+                {/* Clear-conversion button. Visible only when a non-USD
+                    conversion is currently applied to this bill. */}
+                {(bill as any)?.originalCurrency && (bill as any).originalCurrency !== "USD" ? (
+                  <div className={styles.currencyOverrideRow} style={{ marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="ui-button-outlined"
+                      disabled={convertingCurrency}
+                      onClick={() => void onClearConversion()}
+                      title="Restore every amount to the pre-conversion value the parser extracted, and remove the converted-from tag."
+                    >
+                      {convertingCurrency ? "clearing..." : "clear conversion"}
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               {bill?.createdBy ? (
