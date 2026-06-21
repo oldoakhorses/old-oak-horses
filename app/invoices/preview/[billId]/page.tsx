@@ -896,6 +896,11 @@ export default function InvoicePreviewPage() {
   // re-locks it. Unapproved bills are always unlocked.
   const [assignmentsUnlocked, setAssignmentsUnlocked] = useState(false);
   const assignmentsLocked = isEditing && !assignmentsUnlocked;
+  // Same view/edit gate for the invoice-details card so an approved
+  // invoice's fields render as read-only summary by default; clicking
+  // "edit" unlocks the form and "save" re-locks it.
+  const [detailsUnlocked, setDetailsUnlocked] = useState(false);
+  const detailsLocked = isEditing && !detailsUnlocked;
 
   const entityList = (
     assignType === "horse" ? horses
@@ -1498,6 +1503,9 @@ export default function InvoicePreviewPage() {
 
       setDetailsEdit(false);
       setShowContactSuggestions(false);
+      // Re-lock the card after a save on an approved bill so the user
+      // lands back in the read-only summary view.
+      setDetailsUnlocked(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
@@ -2219,20 +2227,61 @@ export default function InvoicePreviewPage() {
                 unsaved changes vs the bill's current values. */}
             <div className={styles.detailsCard}>
               <div className={styles.cardHeader}>
-                <div className={styles.cardTitle}>invoice details</div>
+                <div className={styles.cardTitle}>
+                  invoice details
+                  {detailsLocked ? <span className={styles.lockedBadge} style={{ marginLeft: 8 }}>approved</span> : null}
+                </div>
                 <div className={styles.cardHeaderActions}>
-                  <button
-                    type="button"
-                    className={styles.changeLink}
-                    onClick={onReparseBill}
-                    disabled={reparsing || !!isParsing}
-                    title="Re-run the bill parser on this invoice"
-                  >
-                    {reparsing || isParsing ? "re-parsing..." : "re-parse"}
-                  </button>
+                  {detailsLocked ? (
+                    <button
+                      type="button"
+                      className="ui-button-outlined"
+                      onClick={() => setDetailsUnlocked(true)}
+                    >
+                      edit
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.changeLink}
+                      onClick={onReparseBill}
+                      disabled={reparsing || !!isParsing}
+                      title="Re-run the bill parser on this invoice"
+                    >
+                      {reparsing || isParsing ? "re-parsing..." : "re-parse"}
+                    </button>
+                  )}
                 </div>
               </div>
 
+              {detailsLocked ? (
+                /* Read-only summary view. Each row shows the saved value or
+                   a muted "—" when blank. Mirrors the field order of the
+                   editable form so the layout doesn't shift on edit. */
+                <div className={styles.detailsStack}>
+                  <div>
+                    <div className={styles.label}>INVOICE NAME</div>
+                    <div className={styles.value}>{details.invoiceName || <span className={styles.muted}>—</span>}</div>
+                  </div>
+                  <div>
+                    <div className={styles.label}>DETAILS</div>
+                    <div className={styles.value}>{details.invoiceDetails || <span className={styles.muted}>—</span>}</div>
+                  </div>
+                  <div>
+                    <div className={styles.label}>INVOICE DATE</div>
+                    <div className={styles.value}>{details.invoiceDate || <span className={styles.muted}>—</span>}</div>
+                  </div>
+                  <div>
+                    <div className={styles.label}>INVOICE #</div>
+                    <div className={styles.value}>{details.invoiceNumber || <span className={styles.muted}>—</span>}</div>
+                  </div>
+                  <div>
+                    <div className={styles.label}>CONTACT</div>
+                    <div className={styles.value}>{contactSearch || <span className={styles.muted}>—</span>}</div>
+                  </div>
+                </div>
+              ) : (
+              <>
               <div className={styles.detailsStack}>
                 {/* 1. Invoice Name (required, blank by default — no autofill on upload/email) */}
                 <div>
@@ -2343,13 +2392,19 @@ export default function InvoicePreviewPage() {
                   <button
                     type="button"
                     className="ui-button-filled"
-                    disabled={savingDetails || savingContact || !details.invoiceName.trim() || !details.invoiceDate.trim() || !contactSearch.trim()}
+                    /* invoiceName is required at first approval (the form's
+                       placeholder shows the suggested format). For follow-up
+                       edits on an approved bill it shouldn't block a save
+                       that only touches secondary fields like details. */
+                    disabled={savingDetails || savingContact || !details.invoiceDate.trim() || !contactSearch.trim() || (!isEditing && !details.invoiceName.trim())}
                     onClick={() => void onSaveCombinedDetails()}
                   >
                     {savingDetails || savingContact ? "saving..." : "save"}
                   </button>
                 </div>
               ) : null}
+              </>
+              )}
 
               <div className={styles.totalBlock}>
                 <div className={styles.label}>TOTAL</div>
