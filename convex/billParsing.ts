@@ -47,6 +47,25 @@ const PROVIDER_CONTACT_PROMPT = `Also extract the provider/vendor contact detail
 - website: website URL
 - accountNumber: any account number, customer number, or debtor ID
 Look in the letterhead, header, footer, and sidebar areas of the invoice for this info.`;
+
+/** Shared instructions for totals + taxes + fees, used by every category
+ *  prompt. Repeating the rules per-category lets the LLM see them in the same
+ *  context window as the category-specific guidance — putting them only at
+ *  the document level was failing on short prompts like the farrier one.
+ *
+ *  Background: a Canadian farrier invoice (Subtotal $915, GST $45.75, Total
+ *  $960.75) parsed as $915 because the farrier prompt never mentioned tax —
+ *  the LLM extracted the most visible "amount" line. */
+const TOTALS_AND_TAX_PROMPT = `IMPORTANT — totals, taxes, and additional fees:
+- invoice_total_usd MUST be the FINAL grand total: the amount actually charged / due / paid AFTER tax, shipping, and every fee. Read the line labeled "Total", "Grand Total", "Amount Due", "Balance Due", "Total Charged", or "Please Pay This Amount".
+- NEVER use the "Subtotal" or "Sub Total" line as invoice_total_usd. If the invoice shows BOTH "Subtotal $X" and "Total $Y" where Y > X, ALWAYS use Y.
+- Always extract these footer fields when present (they're often shown above/below the grand total):
+  - subtotal — subtotal before tax
+  - tax (also: sales_tax, vat, gst, hst, pst) — total tax amount
+  - shipping_fee — shipping / handling / delivery charge
+  - other_fees — processing fees, service charges, fuel surcharges, surcharges, etc.
+- Decimal-format note: many Canadian and European invoices use a comma as the decimal separator (e.g. "915,00" = 915.00, "45,75" = 45.75, "960,75" = 960.75). Treat the comma in "<digits>,<2 digits>" as a decimal point — do NOT interpret it as a thousands separator.
+- Sanity check before returning: subtotal + tax + shipping_fee + other_fees should equal invoice_total_usd within a couple cents. If your invoice_total_usd matches the subtotal but the receipt clearly shows a tax line below it, you picked the wrong total — re-check and use the grand total.`;
 /**
  * Build the right Anthropic content block for a stored attachment. PDFs go
  * in as `document`; PNG/JPEG/GIF/WEBP go in as `image`. Used to be PDF-only,
@@ -1636,12 +1655,7 @@ For the overall invoice, extract:
 - invoice_number: Invoice or reference number
 - invoice_date: Date on the invoice (MM/DD/YYYY)
 - due_date: Due date if shown
-- invoice_total_usd: The FINAL grand total in USD — the amount actually charged / due / paid. This is the "Total", "Grand Total", "Amount Due", "Balance Due", or "Total Charged" line, AFTER tax, shipping, and any fees. NEVER use the subtotal as invoice_total_usd. If the invoice shows "Sub Total $X" and "Total $Y" where Y > X, use Y.
-- invoice_total_usd: THE FINAL GRAND TOTAL of the invoice, after every tax / shipping / fee. Read the receipt's largest dollar amount labeled "Total", "Grand Total", "Amount Due", "Balance Due", or "Total Charged". NEVER use the subtotal — if the receipt shows "Subtotal $X" + "Total $Y" with Y > X, ALWAYS use Y. If the receipt shows the breakdown collapsed (just "Subtotal Shipping Taxes Total $Y" without per-component amounts), Y is still the invoice_total_usd.
-- tax: Sales tax / VAT amount if shown (separate from subtotal)
-- subtotal: Subtotal before tax if shown
-- shipping_fee: Shipping / handling charge if shown
-- other_fees: Any other fees (processing, etc.) if shown
+- invoice_total_usd, subtotal, tax, shipping_fee, other_fees — see the TOTALS_AND_TAX_PROMPT rules below for definitions and the no-subtotal-as-total rule.
 
 For each line item, extract into a "line_items" array:
 - description: What the item/service is
@@ -1658,6 +1672,8 @@ For each line item, extract into a "line_items" array:
   Use "equity" for investor dues, horse purchases, or equity-related transactions. Subcategories: "investor-dues", "horse-purchases".
   Choose the most specific match. If unclear, use "supplies".
 - subcategory: Optional more specific classification within the category (e.g., "medication", "joint_injections" for veterinary; "flights", "hotels" for travel; "hay", "grain" for feed-bedding; "grooming", "stable", "tack" for supplies)
+
+${TOTALS_AND_TAX_PROMPT}
 
 ${PROVIDER_CONTACT_PROMPT}`;
 }
@@ -1845,13 +1861,17 @@ Full Shoeing / Gigi
 DIHS Per Horse Travel Fee / null
 2 pads with Equithane / Carlin
 
-Return strict JSON with invoice_number, invoice_date, contact_name, invoice_total_usd, line_items[].
+Return strict JSON with invoice_number, invoice_date, contact_name, invoice_total_usd, subtotal, tax, shipping_fee, other_fees, and line_items[].
+
+${TOTALS_AND_TAX_PROMPT}
 
 ${PROVIDER_CONTACT_PROMPT}`;
 }
 
 function genericExtractionPrompt(categorySlug?: string, travelSubcategory?: string, billSubcategory?: string) {
-  const base = `Extract invoice data as strict JSON with invoice_number, invoice_date, contact_name, account_number, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[].
+  const base = `Extract invoice data as strict JSON with invoice_number, invoice_date, contact_name, account_number, original_currency, original_total, exchange_rate, invoice_total_usd, subtotal, tax, shipping_fee, other_fees, and line_items[].
+
+${TOTALS_AND_TAX_PROMPT}
 
 ${PROVIDER_CONTACT_PROMPT}`;
   if (categorySlug === "veterinary") {
@@ -1912,7 +1932,9 @@ Return strict JSON only.`;
     return `${base} For each line item return amount_original and amount_usd when available.`;
   }
   if (categorySlug === "marketing") {
-    return `Extract from this marketing invoice: provider/vendor name and contact details (address, phone, email), invoice_number, invoice_date, due_date, original_currency, original_total, exchange_rate, invoice_total_usd, and line_items[] with description, quantity, unit_price, total_usd.
+    return `Extract from this marketing invoice: provider/vendor name and contact details (address, phone, email), invoice_number, invoice_date, due_date, original_currency, original_total, exchange_rate, invoice_total_usd, subtotal, tax, shipping_fee, other_fees, and line_items[] with description, quantity, unit_price, total_usd.
+
+${TOTALS_AND_TAX_PROMPT}
 
 ${PROVIDER_CONTACT_PROMPT}
 Return strict JSON.`;
