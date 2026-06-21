@@ -40,6 +40,11 @@ export function formatInvoiceName(input: InvoiceNameInput) {
     input.provider?.trim() ||
     "Unassigned Invoice";
 
+  // Fallback default: "Provider - Date". Falls back to just the provider
+  // when no usable date is present.
+  const dateValue = input.date ?? input.invoiceDate ?? input.invoice_date;
+  const formattedDate = formatInvoiceDate(dateValue as any);
+  if (provider && formattedDate) return `${provider} - ${formattedDate}`;
   return provider || "Unassigned Invoice";
 }
 

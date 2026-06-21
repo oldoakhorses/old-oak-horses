@@ -2261,7 +2261,13 @@ export default function InvoicePreviewPage() {
                 <div className={styles.detailsStack}>
                   <div>
                     <div className={styles.label}>INVOICE NAME</div>
-                    <div className={styles.value}>{details.invoiceName || <span className={styles.muted}>—</span>}</div>
+                    <div className={styles.value}>
+                      {details.invoiceName || (
+                        <span className={styles.muted}>
+                          {formatInvoiceName({ contactName: contactSearch, date: details.invoiceDate })}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <div className={styles.label}>DETAILS</div>
@@ -2283,14 +2289,15 @@ export default function InvoicePreviewPage() {
               ) : (
               <>
               <div className={styles.detailsStack}>
-                {/* 1. Invoice Name (required, blank by default — no autofill on upload/email) */}
+                {/* 1. Invoice Name (optional — defaults to "Provider - Date"
+                    when blank, computed on display via formatInvoiceName). */}
                 <div>
-                  <div className={styles.label}>INVOICE NAME *</div>
+                  <div className={styles.label}>INVOICE NAME</div>
                   <input
                     className={styles.inputCompact}
                     value={details.invoiceName}
                     onChange={(e) => setDetails((prev) => ({ ...prev, invoiceName: e.target.value }))}
-                    placeholder="e.g. Hagyard Pharmacy — Apr 27, 2026"
+                    placeholder={`defaults to "${contactSearch || "provider"} - ${details.invoiceDate || "date"}"`}
                   />
                 </div>
 
@@ -2392,11 +2399,10 @@ export default function InvoicePreviewPage() {
                   <button
                     type="button"
                     className="ui-button-filled"
-                    /* invoiceName is required at first approval (the form's
-                       placeholder shows the suggested format). For follow-up
-                       edits on an approved bill it shouldn't block a save
-                       that only touches secondary fields like details. */
-                    disabled={savingDetails || savingContact || !details.invoiceDate.trim() || !contactSearch.trim() || (!isEditing && !details.invoiceName.trim())}
+                    /* invoiceName is now optional — when blank the display
+                       falls back to "{provider} - {date}". So only date +
+                       contact are required for save. */
+                    disabled={savingDetails || savingContact || !details.invoiceDate.trim() || !contactSearch.trim()}
                     onClick={() => void onSaveCombinedDetails()}
                   >
                     {savingDetails || savingContact ? "saving..." : "save"}
