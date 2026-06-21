@@ -130,12 +130,31 @@ export default function InvoicesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [tab, setTab] = useState<"approved" | "pending">("approved");
-  const hasActiveFilters = categoryFilter !== "all" || horseFilter !== "all" || fromDate || toDate;
+  /** When on, filtered list narrows to invoices with active reimbursement
+   *  markers (whole-invoice or per-line). Toggled by the reimbursements
+   *  stat card on the top row. */
+  const [reimbursementOnly, setReimbursementOnly] = useState(false);
+  const hasActiveFilters = categoryFilter !== "all" || horseFilter !== "all" || fromDate || toDate || reimbursementOnly;
 
   const categories = useMemo(() => ["all", ...new Set(rows.map((row) => row.categoryName))], [rows]);
 
   const approvedCount = useMemo(() => rows.filter((r) => r.isApproved).length, [rows]);
   const pendingCount = useMemo(() => rows.filter((r) => !r.isApproved).length, [rows]);
+
+  /** A row has a reimbursement when EITHER the whole-invoice marker is
+   *  set OR at least one line-item marker exists. */
+  const hasReimbursement = (row: any) =>
+    Boolean(row.reimbursement) ||
+    (Array.isArray(row.reimbursementLineItems) && row.reimbursementLineItems.length > 0);
+
+  const reimbursementCount = useMemo(() => rows.filter(hasReimbursement).length, [rows]);
+
+  /** Sum of (absolute) totals across all invoices in the current dataset.
+   *  Used by the "total value" stat card. */
+  const totalValue = useMemo(
+    () => rows.reduce((sum, row) => sum + Math.abs(getTotal(row)), 0),
+    [rows],
+  );
 
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -151,7 +170,8 @@ export default function InvoicesPage() {
         || (row.categoryName ?? "").toLowerCase().includes(q)
         || (getProvider(row)).toLowerCase().includes(q)
         || date.includes(q);
-      return tabPass && categoryPass && horsePass && fromPass && toPass && searchPass;
+      const reimbursementPass = !reimbursementOnly || hasReimbursement(row);
+      return tabPass && categoryPass && horsePass && fromPass && toPass && searchPass && reimbursementPass;
     });
 
     const sorted = [...base];
@@ -180,7 +200,7 @@ export default function InvoicesPage() {
       return sortDirection === "asc" ? cmp : -cmp;
     });
     return sorted;
-  }, [rows, tab, categoryFilter, horseFilter, fromDate, toDate, searchQuery, sortColumn, sortDirection]);
+  }, [rows, tab, categoryFilter, horseFilter, fromDate, toDate, searchQuery, sortColumn, sortDirection, reimbursementOnly]);
 
   function handleSort(col: SortColumn) {
     if (sortColumn === col) {
@@ -236,6 +256,39 @@ export default function InvoicesPage() {
           <div className="ui-label">// Invoices</div>
           <h1 className={styles.title}>Invoices</h1>
         </div>
+
+        <section className={styles.statsRow}>
+          <div className={styles.statCard}>
+            <div className={styles.statLabel}>Total Invoices</div>
+            <div className={styles.statValue}>{rows.length.toLocaleString()}</div>
+            <div className={styles.statSub}>{approvedCount} approved · {pendingCount} pending</div>
+          </div>
+          <div className={styles.statCard}>
+            <div className={styles.statLabel}>Total Value</div>
+            <div className={styles.statValue}>
+              ${totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </div>
+            <div className={styles.statSub}>across all invoices</div>
+          </div>
+          <button
+            type="button"
+            className={`${styles.statCard} ${styles.statCardClickable} ${reimbursementOnly ? styles.statCardActive : ""}`}
+            onClick={() => setReimbursementOnly((v) => !v)}
+            aria-pressed={reimbursementOnly}
+            title={reimbursementOnly ? "Clear reimbursement filter" : "Show only invoices with reimbursements"}
+          >
+            <div className={styles.statLabel}>Reimbursements</div>
+            <div className={styles.statValue}>{reimbursementCount}</div>
+            <div className={styles.statSub}>
+              {reimbursementOnly ? "filter active — tap to clear" : "tap to filter"}
+            </div>
+          </button>
+          <div className={styles.statCard}>
+            <div className={styles.statLabel}>Pending Review</div>
+            <div className={styles.statValue}>{pendingCount}</div>
+            <div className={styles.statSub}>awaiting approval</div>
+          </div>
+        </section>
 
         <div className={styles.tabs}>
           <button type="button" className={`${styles.tab} ${tab === "approved" ? styles.tabActive : ""}`} onClick={() => setTab("approved")}>
