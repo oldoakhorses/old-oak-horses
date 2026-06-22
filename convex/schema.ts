@@ -227,6 +227,12 @@ export default defineSchema({
         // fields above. Read code prefers payerType if present.
         personId: v.optional(v.id("people")),
         personName: v.optional(v.string()),
+        // Optional subset of the invoice's tagged horses that this
+        // reimbursement actually covers. When omitted (or empty), the
+        // reimbursement applies to every horse tagged on the invoice —
+        // the common case. Use this when only a subset of the horses
+        // were paid out-of-pocket while the rest were paid directly.
+        horseIds: v.optional(v.array(v.id("horses"))),
         resolvedAt: v.optional(v.number()),
         resolvedBy: v.optional(v.string()),
       })
@@ -248,6 +254,10 @@ export default defineSchema({
           payerName: v.optional(v.string()),
           personId: v.optional(v.id("people")),
           personName: v.optional(v.string()),
+          /** Optional subset of the line's tagged horses that this
+           *  reimbursement covers. Empty/omitted = applies to every
+           *  horse tagged on the line. */
+          horseIds: v.optional(v.array(v.id("horses"))),
           resolvedAt: v.optional(v.number()),
           resolvedBy: v.optional(v.string()),
         })

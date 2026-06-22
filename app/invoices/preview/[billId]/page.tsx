@@ -540,6 +540,10 @@ export default function InvoicePreviewPage() {
     ownerId: string;
     payerType: "person" | "business";
     payerId: string;
+    /** Optional subset of horse IDs (on the line / on the invoice) that
+     *  this reimbursement covers. Empty → applies to all tagged horses;
+     *  surfacing as a multi-select in the popover. */
+    horseIds?: string[];
     resolvedAt?: number;
     resolvedBy?: string;
   };
@@ -909,16 +913,20 @@ export default function InvoicePreviewPage() {
     // Prefer the new `payerType`/`payerId` fields; fall back to legacy
     // `personId` (everything written before the business-payer change
     // was implicitly a person).
-    const normalizeReimb = (raw: any): { ownerId: string; payerType: "person" | "business"; payerId: string; resolvedAt?: number; resolvedBy?: string } | null => {
+    const normalizeReimb = (raw: any): ReimbursementMarker | null => {
       if (!raw) return null;
       const ownerId = String(raw.ownerId ?? "");
       if (!ownerId) return null;
       const payerType: "person" | "business" = raw.payerType === "business" ? "business" : "person";
       const payerId = String(raw.payerId ?? raw.personId ?? "");
+      const horseIds = Array.isArray(raw.horseIds) && raw.horseIds.length > 0
+        ? (raw.horseIds as any[]).map((id) => String(id))
+        : undefined;
       return {
         ownerId,
         payerType,
         payerId,
+        horseIds,
         resolvedAt: raw.resolvedAt,
         resolvedBy: raw.resolvedBy,
       };
@@ -990,6 +998,64 @@ export default function InvoicePreviewPage() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [taggedPeoplePickerOpen]);
+
+  /** Resolve which horses are tagged on a specific line item, regardless
+   *  of whether they were picked individually OR via a split sentinel /
+   *  group. Used to populate the reimbursement popover's "which horses"
+   *  multi-select. */
+  function lineReimbursableHorses(index: number): Array<{ id: string; name: string }> {
+    const state = lineStates[index];
+    if (!state) return [];
+    const first = state.assignees[0];
+    // Group sentinel: expand to the group's snapshotted horses.
+    if (isGroupSentinel(first)) {
+      const group = horseGroups.find((g) => String(g._id) === groupIdFromSentinel(first));
+      if (!group) return [];
+      return group.horseIds.map((id) => ({
+        id: String(id),
+        name: horses.find((h) => String(h._id) === String(id))?.name ?? horseNameById.get(String(id)) ?? "Unknown",
+      }));
+    }
+    // SPLIT_INVOICE: every horse directly assigned somewhere on this bill.
+    if (first === SPLIT_INVOICE) {
+      const ids = new Set<string>();
+      for (const idx in lineStates) {
+        const s = lineStates[Number(idx)];
+        const a = s?.assignees?.[0];
+        if (a === SPLIT_ALL || a === SPLIT_INVOICE || a === BUSINESS_GENERAL || isGroupSentinel(a) || isBizId(a)) continue;
+        for (const aid of s?.assignees ?? []) {
+          if (horses.find((h) => String(h._id) === aid)) ids.add(aid);
+        }
+      }
+      return [...ids].map((id) => ({
+        id,
+        name: horses.find((h) => String(h._id) === id)?.name ?? horseNameById.get(id) ?? "Unknown",
+      }));
+    }
+    // SPLIT_ALL: every active horse in the system.
+    if (first === SPLIT_ALL) {
+      return horses.map((h) => ({ id: String(h._id), name: h.name }));
+    }
+    // Direct multi-select: just the horse IDs.
+    const directIds = state.assignees.filter((id) => horses.find((h) => String(h._id) === id));
+    return directIds.map((id) => ({
+      id,
+      name: horses.find((h) => String(h._id) === id)?.name ?? "Unknown",
+    }));
+  }
+
+  /** Horses tagged on the whole invoice — only meaningful in whole-mode
+   *  horse-assigntype splits. Used by the whole-invoice reimbursement
+   *  card. */
+  function wholeReimbursableHorses(): Array<{ id: string; name: string }> {
+    if (mode !== "whole" || assignType !== "horse") return [];
+    return wholeAssignedIds
+      .filter((id) => horses.find((h) => String(h._id) === id))
+      .map((id) => ({
+        id,
+        name: horses.find((h) => String(h._id) === id)?.name ?? horseNameById.get(id) ?? "Unknown",
+      }));
+  }
 
   /** Close the reimbursement picker (whole or per-line) on outside click. */
   useEffect(() => {
@@ -1681,6 +1747,46 @@ export default function InvoicePreviewPage() {
                         </optgroup>
                       ) : null}
                     </select>
+                    {/* Horse subset picker — only shown when 2+ horses are
+                        tagged on this line. Default: all selected (means
+                        the reimbursement applies to every horse's share).
+                        Unchecking any horse narrows the marker to a
+                        specific subset, persisted as `horseIds`. */}
+                    {(() => {
+                      const options = lineReimbursableHorses(index);
+                      if (options.length < 2 || !marker) return null;
+                      const selectedSet = new Set(marker.horseIds && marker.horseIds.length > 0 ? marker.horseIds : options.map((o) => o.id));
+                      const togglesHorse = (id: string) => {
+                        markDirty();
+                        const nextSet = new Set(selectedSet);
+                        if (nextSet.has(id)) nextSet.delete(id);
+                        else nextSet.add(id);
+                        const nextIds = [...nextSet];
+                        // Sentinel: when every option is selected, clear horseIds
+                        // (= "applies to all"). Persists in a normalized form.
+                        const allSelected = nextIds.length === options.length;
+                        setLineReimbursements((prev) => ({
+                          ...prev,
+                          [index]: { ...prev[index], horseIds: allSelected ? undefined : nextIds },
+                        }));
+                      };
+                      return (
+                        <div style={{ marginTop: 10 }}>
+                          <div className={styles.label}>WHICH HORSES</div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4, padding: 6, border: "1px solid #e8eaf0", borderRadius: 6, background: "#fafafc" }}>
+                            {options.map((opt) => {
+                              const checked = selectedSet.has(opt.id);
+                              return (
+                                <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#1a1a2e", cursor: "pointer" }}>
+                                  <input type="checkbox" checked={checked} onChange={() => togglesHorse(opt.id)} />
+                                  <span>🐴 {opt.name}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {isSet ? (
                       <div style={{
                         display: "flex",
@@ -2514,6 +2620,12 @@ export default function InvoicePreviewPage() {
         payerType: marker.payerType,
         payerId: marker.payerId,
         payerName: resolvePayerName(marker.payerType, marker.payerId),
+        // Only send horseIds when the user actually picked a subset.
+        // Empty/undefined → server treats as "applies to every tagged
+        // horse" so existing markers behave the same.
+        horseIds: marker.horseIds && marker.horseIds.length > 0
+          ? (marker.horseIds as any[])
+          : undefined,
         resolvedAt: marker.resolvedAt,
         resolvedBy: marker.resolvedBy,
       });
@@ -3870,7 +3982,10 @@ export default function InvoicePreviewPage() {
                           const payerName = wholeReimbursement.payerType === "business"
                             ? (businesses.find((b: any) => String(b._id) === wholeReimbursement.payerId)?.name ?? "Business")
                             : ((people as { _id: any; name: string }[]).find((p) => String(p._id) === wholeReimbursement.payerId)?.name ?? "Person");
-                          return `${biz} reimburses ${payerName}`;
+                          const subset = wholeReimbursement.horseIds && wholeReimbursement.horseIds.length > 0
+                            ? ` · only ${wholeReimbursement.horseIds.length} horse${wholeReimbursement.horseIds.length === 1 ? "" : "s"}'  share`
+                            : "";
+                          return `${biz} reimburses ${payerName}${subset}`;
                         })()
                       : "not a reimbursement"}
                   </div>
@@ -3951,6 +4066,41 @@ export default function InvoicePreviewPage() {
                         </select>
                       </div>
                     </div>
+                    {/* Whole-invoice horse subset picker — only when the
+                        invoice is split across 2+ horses. Default: all
+                        selected (= reimbursement applies to the whole
+                        amount). */}
+                    {(() => {
+                      const options = wholeReimbursableHorses();
+                      if (options.length < 2) return null;
+                      const marker = wholeReimbursement;
+                      const selectedSet = new Set(marker.horseIds && marker.horseIds.length > 0 ? marker.horseIds : options.map((o) => o.id));
+                      const togglesHorse = (id: string) => {
+                        markDirty();
+                        const nextSet = new Set(selectedSet);
+                        if (nextSet.has(id)) nextSet.delete(id);
+                        else nextSet.add(id);
+                        const nextIds = [...nextSet];
+                        const allSelected = nextIds.length === options.length;
+                        setWholeReimbursement((prev) => prev ? { ...prev, horseIds: allSelected ? undefined : nextIds } : prev);
+                      };
+                      return (
+                        <div>
+                          <div className={styles.label} style={{ marginBottom: 4 }}>WHICH HORSES</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: 8, border: "1px solid #e8eaf0", borderRadius: 6, background: "#fafafc" }}>
+                            {options.map((opt) => {
+                              const checked = selectedSet.has(opt.id);
+                              return (
+                                <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#1a1a2e", cursor: "pointer" }}>
+                                  <input type="checkbox" checked={checked} onChange={() => togglesHorse(opt.id)} />
+                                  <span>🐴 {opt.name}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {/* Resolved / unresolved row. Mark-as-paid persists
                         through the dedicated resolveReimbursement mutation
                         so the user doesn't have to hit "save changes"; the
