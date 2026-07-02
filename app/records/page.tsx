@@ -654,8 +654,14 @@ export default function RecordsPage() {
         closePanel();
       }, 1200);
     } catch (error) {
-      console.error("Save error:", error);
-      setRecordError(error instanceof Error ? error.message : "Failed to save record");
+      console.error("[records] Save error:", error);
+      const msg = error instanceof Error ? error.message : String(error);
+      setRecordError(msg || "Failed to save record");
+      // Prod fallback — the recordError banner lives inside the scrollable
+      // form body, so if the user is looking at the fixed footer the
+      // banner is easy to miss. Surface via alert so the failure never
+      // vanishes silently.
+      try { window.alert(`Could not save record: ${msg || "unknown error"}`); } catch {}
     } finally {
       setRecordSubmitting(false);
     }
@@ -2075,6 +2081,14 @@ export default function RecordsPage() {
 
         {selectedRecordType && !recordSuccess ? (
           <div className={styles.recordPanelFooter}>
+            {/* Duplicate of the form-body error banner so failures are
+             *  visible whichever end of the (potentially scrolled) panel
+             *  the user is looking at. */}
+            {recordError ? (
+              <div className={styles.recordError} style={{ width: "100%", marginBottom: 8 }}>
+                {recordError}
+              </div>
+            ) : null}
             <button type="button" className={styles.recordCancelBtn} onClick={closePanel}>
               cancel
             </button>
