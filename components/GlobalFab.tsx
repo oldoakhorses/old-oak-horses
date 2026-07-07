@@ -704,8 +704,8 @@ export default function GlobalFab() {
     }
   }
 
-  async function onSaveRecord(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function onSaveRecord(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
     if (!selectedRecordType) {
       setRecordError("Select a record type.");
       return;
@@ -1121,7 +1121,10 @@ export default function GlobalFab() {
             </div>
           </div>
         ) : (
-          <form id="record-form" className={styles.recordPanelBody} onSubmit={onSaveRecord}>
+          // Unique id — the records page has its own "record-form"; a
+          // duplicate id made the footer's form= attribute submit the
+          // WRONG (empty) form on /records, silently no-oping.
+          <form id="fab-record-form" className={styles.recordPanelBody} onSubmit={onSaveRecord}>
             {recordReportDetection.detected ? (
               <div className={styles.reportDetectedBanner}>
                 <div className={styles.reportDetectedTitle}>{recordReportDetection.message}</div>
@@ -1711,7 +1714,10 @@ export default function GlobalFab() {
             <button type="button" className={styles.recordCancelBtn} onClick={closePanel}>
               cancel
             </button>
-            <button type="submit" form="record-form" className={styles.recordSaveBtn} disabled={recordForm.horseIds.length === 0 || recordSubmitting}>
+            {/* Direct onClick instead of type=submit form=... — the form=
+                attribute breaks on iOS Safari AND resolved to the records
+                page's duplicate form id. Same fix as cd65d2f on the page. */}
+            <button type="button" className={styles.recordSaveBtn} disabled={recordForm.horseIds.length === 0 || recordSubmitting} onClick={() => void onSaveRecord()}>
               {recordSubmitting ? "saving..." : "save record"}
             </button>
           </div>
